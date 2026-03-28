@@ -1,9 +1,8 @@
 
 #weapon {
     position: absolute;
-    position-anchor: --status;
-    bottom: anchor(top);
-    left: anchor(center);
+    bottom: calc(32px * var(--scale));
+    left: 50%;
     margin-bottom: -30px;
     margin-left: calc(var(--w) * var(--scale) * -0.5px);
     transition: transform 0.3s ease-in 0.8s;
@@ -15,6 +14,14 @@
     image-rendering: pixelated;
     z-index: -1;
     pointer-events: none;
+}
+
+@supports (position-anchor: --status) {
+    #weapon {
+        position-anchor: --status;
+        bottom: anchor(top);
+        left: anchor(center);
+    }
 }
 
 /* ========================================================================
