@@ -17,8 +17,11 @@ import { state } from './state.js';
 
 const ML_SOUNDBLOCK = 0x40;
 
-// Sector adjacency: Map<sectorIndex, Array<{ sector: number, soundBlock: boolean }>>
+// Sector adjacency: Map<sectorIndex, Array<{ sector: number, soundBlock: boolean, linedefIndex: number }>>
 let adjacency = null;
+
+// Door data lookup: Map<sectorIndex, doorData>
+let doorDataMap = null;
 
 // Set of sector indices that heard the last gunshot
 let alertedSectors = new Set();
@@ -30,6 +33,14 @@ let alertedSectors = new Set();
 export function buildSectorAdjacency() {
     adjacency = new Map();
     alertedSectors.clear();
+
+    // Build door lookup for P_LineOpening checks
+    doorDataMap = new Map();
+    if (mapData.doors) {
+        for (const door of mapData.doors) {
+            doorDataMap.set(door.sectorIndex, door);
+        }
+    }
 
     const linedefs = mapData.linedefs;
     const sidedefs = mapData.sidedefs;
@@ -47,9 +58,40 @@ export function buildSectorAdjacency() {
         if (!adjacency.has(frontSector)) adjacency.set(frontSector, []);
         if (!adjacency.has(backSector)) adjacency.set(backSector, []);
 
-        adjacency.get(frontSector).push({ sector: backSector, soundBlock });
-        adjacency.get(backSector).push({ sector: frontSector, soundBlock });
+        adjacency.get(frontSector).push({ sector: backSector, soundBlock, linedefIndex: i });
+        adjacency.get(backSector).push({ sector: frontSector, soundBlock, linedefIndex: i });
     }
+}
+
+/**
+ * Computes the vertical opening of a two-sided linedef, accounting for door state.
+ * Based on: linuxdoom-1.10/p_sight.c:P_LineOpening()
+ */
+function getLineOpening(linedefIndex) {
+    const ld = mapData.linedefs[linedefIndex];
+    const frontSectorIdx = mapData.sidedefs[ld.frontSidedef].sectorIndex;
+    const backSectorIdx = mapData.sidedefs[ld.backSidedef].sectorIndex;
+    const fs = mapData.sectors[frontSectorIdx];
+    const bs = mapData.sectors[backSectorIdx];
+
+    let frontCeil = fs.ceilingHeight;
+    let backCeil = bs.ceilingHeight;
+
+    // If either sector is a door, use its open height when open, closed height when closed
+    const frontDoor = doorDataMap.get(frontSectorIdx);
+    if (frontDoor) {
+        const doorState = state.doorState.get(frontSectorIdx);
+        frontCeil = doorState?.open ? frontDoor.openHeight : frontDoor.closedHeight;
+    }
+    const backDoor = doorDataMap.get(backSectorIdx);
+    if (backDoor) {
+        const doorState = state.doorState.get(backSectorIdx);
+        backCeil = doorState?.open ? backDoor.openHeight : backDoor.closedHeight;
+    }
+
+    const openTop = Math.min(frontCeil, backCeil);
+    const openBottom = Math.max(fs.floorHeight, bs.floorHeight);
+    return openTop - openBottom;
 }
 
 /**
@@ -85,7 +127,12 @@ export function propagateSound() {
         if (!neighbors) continue;
 
         for (let i = 0; i < neighbors.length; i++) {
-            const { sector: neighborSector, soundBlock } = neighbors[i];
+            const { sector: neighborSector, soundBlock, linedefIndex } = neighbors[i];
+
+            // Check if linedef is passable (closed doors have zero opening)
+            // Based on: linuxdoom-1.10/p_enemy.c:P_RecursiveSound() — skips if openrange <= 0
+            if (getLineOpening(linedefIndex) <= 0) continue;
+
             const newBlocks = blocks + (soundBlock ? 1 : 0);
 
             // Sound stops after passing through 2 sound-blocking lines
@@ -115,4 +162,5 @@ export function isSectorAlerted(sectorIndex) {
 export function clearSoundAlert() {
     alertedSectors.clear();
     adjacency = null;
+    doorDataMap = null;
 }

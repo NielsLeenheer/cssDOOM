@@ -342,7 +342,11 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                 } else {
                     const sector = getSectorAt(enemy.x, enemy.y);
                     if (sector && isSectorAlerted(sector.sectorIndex)) {
-                        shouldWake = true;
+                        // MF_AMBUSH (deaf) enemies only wake from sound if they
+                        // can see the player. Based on: linuxdoom-1.10/p_enemy.c:A_Look()
+                        if (!enemyAI.ambush || hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)) {
+                            shouldWake = true;
+                        }
                     }
                 }
                 if (shouldWake) {

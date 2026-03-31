@@ -91,6 +91,9 @@ export function buildThings() {
                     lastAttack: 0,
                     damageDealt: false,
                     reactionTimer: 0,
+                    // Based on: linuxdoom-1.10/p_mobj.c — MTF_AMBUSH (bit 3) means
+                    // the enemy is "deaf" and only wakes from sound with LOS
+                    ambush: (thing.flags & 8) !== 0,
                     // Infighting: `target` is 'player' or a reference to another enemy entry.
                     // `threshold` counts down each AI tick — while > 0 the enemy stays locked
                     // on its current target and won't retarget.
