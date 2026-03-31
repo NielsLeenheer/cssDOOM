@@ -8,7 +8,6 @@
  */
 
 import { dom, sceneState } from '../../dom.js';
-import { LIGHT_MINIMUM_BRIGHTNESS, DOOM_LIGHT_MAX } from '../constants.js';
 import { state as gameState } from '../../../game/state.js';
 
 // ============================================================================
@@ -154,12 +153,17 @@ export function updateThingPosition(thingIndex, x, y, floorHeight) {
     domData.element.style.setProperty('--floor-z', floorHeight);
 }
 
-/** Update a thing's light level from a raw DOOM sector light value (0–255). */
-export function updateThingLight(thingIndex, doomLightLevel) {
+/**
+ * Reparent a thing's DOM element to a different sector container using moveBefore().
+ * This preserves running CSS animations (walk cycles, light effects) while inheriting
+ * the new sector's --light value (including any CSS light animations).
+ */
+export function reparentThingToSector(thingIndex, sectorIndex) {
     const domData = sceneState.thingDom.get(thingIndex);
     if (!domData) return;
-    domData.element.style.setProperty('--light',
-        Math.max(LIGHT_MINIMUM_BRIGHTNESS, doomLightLevel / DOOM_LIGHT_MAX));
+    const target = sceneState.sectorContainers[sectorIndex];
+    if (!target || domData.element.parentNode === target) return;
+    target.moveBefore(domData.element, null);
 }
 
 /** Mark a pickup/thing element as collected (hides it via CSS). */

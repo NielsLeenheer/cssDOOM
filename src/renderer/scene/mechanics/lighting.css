@@ -10,6 +10,25 @@
     50%, 100% { --light: 0.5; }
 }
 
+@keyframes light-blink-fast {
+    0%, 49%  { --light: 1; }
+    50%, 100% { --light: 0.5; }
+}
+
+@keyframes light-fire-flicker {
+    0%, 7%   { --light: 1; }
+    8%, 15%  { --light: 0.6; }
+    16%, 23% { --light: 0.9; }
+    24%, 31% { --light: 0.5; }
+    32%, 47% { --light: 1; }
+    48%, 55% { --light: 0.7; }
+    56%, 63% { --light: 0.85; }
+    64%, 71% { --light: 0.55; }
+    72%, 79% { --light: 1; }
+    80%, 87% { --light: 0.65; }
+    88%, 100%{ --light: 0.9; }
+}
+
 @keyframes light-flicker {
     0%, 4%   { --light: 1; }
     5%, 8%   { --light: 0.5; }
@@ -23,7 +42,9 @@
 body.sector-lights {
     .light-glow { animation: light-glow 1s ease-in-out infinite; }
     .light-blink { animation: light-blink 1s steps(1) infinite; }
+    .light-blink-fast { animation: light-blink-fast 0.5s steps(1) infinite; }
     .light-flicker { animation: light-flicker 2s steps(1) infinite; }
+    .light-fire-flicker { animation: light-fire-flicker 1.5s steps(1) infinite; }
 }
 
 

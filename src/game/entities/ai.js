@@ -9,7 +9,7 @@ import {
 } from '../constants.js';
 
 import { state, debug } from '../state.js';
-import { canMoveTo, getFloorHeightAt, getSectorLightAt, getSectorAt } from '../physics.js';
+import { canMoveTo, getFloorHeightAt, getSectorAt } from '../physics.js';
 import * as renderer from '../../renderer/index.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { isSectorAlerted } from '../sound-propagation.js';
@@ -265,12 +265,9 @@ function moveEnemyToward(enemy, targetX, targetY, deltaTime) {
 function updateEnemyPosition(thingIndex, enemy) {
     const floorHeight = getFloorHeightAt(enemy.x, enemy.y);
     renderer.updateThingPosition(thingIndex, enemy.x, enemy.y, floorHeight);
-    // Only update lighting periodically — sector light doesn't change often
-    if (!enemy._lastLightUpdate || performance.now() - enemy._lastLightUpdate > 1000) {
-        enemy._lastLightUpdate = performance.now();
-        const sectorLight = getSectorLightAt(enemy.x, enemy.y);
-        renderer.updateThingLight(thingIndex, sectorLight);
-    }
+    // Reparent to current sector so the enemy inherits its --light (including animations)
+    const sector = getSectorAt(enemy.x, enemy.y);
+    if (sector) renderer.reparentThingToSector(thingIndex, sector.sectorIndex);
 }
 
 /**

@@ -16,10 +16,13 @@ import { dom, sceneState } from '../dom.js';
  * These classes trigger flickering, glowing, or blinking animations in the stylesheet.
  */
 const LIGHT_EFFECT_CLASS = {
-    1: 'light-flicker',   // blink random
-    8: 'light-glow',      // oscillate
-    12: 'light-blink',    // blink 0.5s sync
-    13: 'light-blink',    // blink 1s sync
+    1: 'light-flicker',       // blink random
+    2: 'light-blink-fast',    // blink 0.5s
+    3: 'light-blink',         // blink 1.0s
+    8: 'light-glow',          // oscillate
+    12: 'light-blink-fast',   // blink 0.5s sync
+    13: 'light-blink',        // blink 1.0s sync
+    17: 'light-fire-flicker', // fire flicker
 };
 
 function applyLightEffect(element, specialType) {
