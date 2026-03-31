@@ -59,6 +59,20 @@ const dirDX = [1, 0.7071, 0, -0.7071, -1, -0.7071, 0, 0.7071];
 const dirDY = [0, 0.7071, 1, 0.7071, 0, -0.7071, -1, -0.7071];
 
 /**
+ * Rolls random melee damage for an enemy type using DOOM's exact formulas.
+ * Based on: linuxdoom-1.10/p_enemy.c — A_TroopAttack, A_SargAttack, A_BruisAttack
+ */
+function rollMeleeDamage(enemyType) {
+    switch (enemyType) {
+        case 3001: return (Math.floor(Math.random() * 8) + 1) * 3;   // Imp: 3–24
+        case 3002:
+        case 58:   return (Math.floor(Math.random() * 10) + 1) * 4;  // Demon/Spectre: 4–40
+        case 3003: return (Math.floor(Math.random() * 8) + 1) * 10;  // Baron: 10–80
+        default:   return 0;
+    }
+}
+
+/**
  * Tests whether an enemy can take one step in a given direction.
  * The step distance matches DOOM's P_Move: mobjinfo.speed map units.
  * We derive this from the enemy's effective speed and chase tics:
@@ -344,21 +358,24 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                 break;
             }
 
-            // Check if enemy is close enough and attack cooldown has elapsed
-            if (distSqToTarget < enemyAI.attackRange * enemyAI.attackRange && (currentTime - enemyAI.lastAttack) > enemyAI.cooldown * 1000) {
-                // Debug: skip attacks against the player
+            // Attack decision: DOOM checks melee first, then ranged.
+            // Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines 405–440
+            if ((currentTime - enemyAI.lastAttack) > enemyAI.cooldown * 1000) {
                 if (debug.noEnemyAttack && enemyAI.target === 'player') break;
-                // Melee enemies always attack in range; ranged enemies need LOS and
-                // must pass the distance-based probability check (P_CheckMissileRange)
-                if (enemyAI.melee) {
+
+                // Melee attack: if enemy has a melee state and target is within MELEERANGE (64)
+                if (enemyAI.meleeRange && distSqToTarget < enemyAI.meleeRange * enemyAI.meleeRange) {
+                    enemyAI.attackIsMelee = true;
                     setEnemyState(thingIndex, enemy, 'attacking');
-                } else {
-                    // Throttle LOS checks for ranged attack decisions
+                }
+                // Ranged attack: non-melee-only enemies check LOS + P_CheckMissileRange
+                else if (!enemyAI.melee && distSqToTarget < enemyAI.attackRange * enemyAI.attackRange) {
                     enemyAI.losTimer += deltaTime;
                     if (enemyAI.losTimer >= LINE_OF_SIGHT_CHECK_INTERVAL) {
                         enemyAI.losTimer = 0;
                         if (hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)
                             && checkMissileRange(enemy, Math.sqrt(distSqToTarget))) {
+                            enemyAI.attackIsMelee = false;
                             setEnemyState(thingIndex, enemy, 'attacking');
                         }
                     }
@@ -373,16 +390,19 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                 enemyAI.damageDealt = true;
                 const targetIsPlayer = enemyAI.target === 'player';
 
-                if (enemyAI.melee) {
-                    // Melee attack (e.g. Demon bite): direct damage if target is in LOS
+                if (enemyAI.attackIsMelee) {
+                    // Melee attack: random damage roll matching DOOM's A_TroopAttack,
+                    // A_SargAttack, A_BruisAttack formulas
+                    const meleeDmg = rollMeleeDamage(enemy.type);
                     if (hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)) {
                         if (targetIsPlayer) {
-                            damagePlayer(enemyAI.damage);
+                            damagePlayer(meleeDmg);
                         } else {
-                            damageEnemy(enemyAI.target, enemyAI.damage, enemy);
+                            damageEnemy(enemyAI.target, meleeDmg, enemy);
                         }
                     }
-                    playSound('DSSGTATK');
+                    // Demon/Spectre: sfx_sgtatk, Imp/Baron: sfx_claw
+                    playSound(enemy.type === 3002 || enemy.type === 58 ? 'DSSGTATK' : 'DSCLAW');
                 } else {
                     // Ranged attack: either spawn a projectile or use hitscan
                     const projectileDefinition = ENEMY_PROJECTILES[enemy.type];
