@@ -88,6 +88,7 @@ export function damagePlayer(damageAmount) {
 function getSectorDamageAt(x, y) {
     let highestFloor = -Infinity;
     let highestFloorDamage = 0;
+    let highestFloorSpecialType = 0;
     forEachSectorAt(x, y, sector => {
         const outerBoundary = sector.boundaries[0];
         if (!outerBoundary || outerBoundary.length < 3) return;
@@ -106,16 +107,23 @@ function getSectorDamageAt(x, y) {
                 if (effectiveFloor > highestFloor) {
                     highestFloor = effectiveFloor;
                     highestFloorDamage = SECTOR_DAMAGE[sector.specialType] || 0;
+                    highestFloorSpecialType = sector.specialType;
                 }
             }
         }
     });
-    return highestFloorDamage;
+    return { damage: highestFloorDamage, specialType: highestFloorSpecialType };
 }
 
 export function checkSectorDamage(deltaTime) {
-    const sectorDamageAmount = getSectorDamageAt(state.playerX, state.playerY);
-    if (sectorDamageAmount > 0 && !state.powerups.radsuit) {
+    const { damage: sectorDamageAmount, specialType } = getSectorDamageAt(state.playerX, state.playerY);
+    // Based on: linuxdoom-1.10/p_spec.c:P_PlayerInSpecialSector()
+    // Radsuit protects against damage, but type 4 and 16 sectors can
+    // bypass the suit with ~2% probability per tick (P_Random() < 5).
+    const radsuitBypassed = state.powerups.radsuit
+        && (specialType === 4 || specialType === 16)
+        && Math.random() < 5 / 256;
+    if (sectorDamageAmount > 0 && (!state.powerups.radsuit || radsuitBypassed)) {
         state.sectorDamageTimer += deltaTime;
         if (state.sectorDamageTimer >= 32 / 35) {
             state.sectorDamageTimer -= 32 / 35;
