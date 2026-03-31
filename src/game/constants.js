@@ -39,7 +39,7 @@ export const MAX_FRAME_DELTA_TIME = 0.05;  // 50 ms = minimum 20 FPS equivalent
 // and walk-over triggers in the map.
 // ============================================================================
 
-export const USE_RANGE = 80;               // Max distance (map units) for activating a switch or door
+export const USE_RANGE = 64;               // Max distance (map units) for activating a switch or door
 export const WALK_TRIGGER_RANGE = 32;      // How close the player must be to a walk-over linedef to trigger it
 
 export const SWITCH_ON_PREFIX = 'SW1';     // Texture prefix for an inactive (ready-to-press) switch
