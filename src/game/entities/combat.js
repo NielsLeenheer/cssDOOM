@@ -4,7 +4,7 @@
 
 import {
     SHOOTABLE, ENEMY_RADIUS, PLAYER_RADIUS,
-    BARREL_EXPLOSION_RADIUS, BARREL_EXPLOSION_DAMAGE,
+    BARREL_EXPLOSION_DAMAGE, BARREL_RADIUS,
     INFIGHTING_THRESHOLD,
 } from '../constants.js';
 
@@ -152,16 +152,16 @@ export function checkMissileRange(enemy, distanceToPlayer) {
  * and other barrels), enabling chain explosions when barrels are clustered.
  */
 function barrelExplosion(barrel) {
-    const explosionRadiusSquared = BARREL_EXPLOSION_RADIUS * BARREL_EXPLOSION_RADIUS;
+    // Based on: linuxdoom-1.10/p_map.c:PIT_RadiusAttack()
+    // DOOM uses Chebyshev distance (max of abs deltas) minus target radius
 
-    // Damage player if within explosion radius
-    const playerDeltaX = state.playerX - barrel.x;
-    const playerDeltaY = state.playerY - barrel.y;
-    const playerDistanceSquared = playerDeltaX * playerDeltaX + playerDeltaY * playerDeltaY;
-    if (playerDistanceSquared < explosionRadiusSquared) {
-        const playerDistance = Math.sqrt(playerDistanceSquared);
-        const playerDamage = Math.max(0, Math.round(BARREL_EXPLOSION_DAMAGE - playerDistance));
-        if (playerDamage > 0) damagePlayer(playerDamage);
+    // Damage player if within explosion radius and in line of sight
+    const playerDX = Math.abs(state.playerX - barrel.x);
+    const playerDY = Math.abs(state.playerY - barrel.y);
+    const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
+    if (playerDist < BARREL_EXPLOSION_DAMAGE
+        && hasLineOfSight(barrel.x, barrel.y, state.playerX, state.playerY)) {
+        damagePlayer(BARREL_EXPLOSION_DAMAGE - playerDist);
     }
 
     // Damage nearby things (enemies and other barrels) within explosion radius
@@ -171,21 +171,19 @@ function barrelExplosion(barrel) {
         if (thing === barrel || thing.collected) continue;
         if (!SHOOTABLE.has(thing.type)) continue;
 
-        const deltaX = thing.x - barrel.x;
-        const deltaY = thing.y - barrel.y;
-        const distanceSquared = deltaX * deltaX + deltaY * deltaY;
-        if (distanceSquared >= explosionRadiusSquared) continue;
+        const dx = Math.abs(thing.x - barrel.x);
+        const dy = Math.abs(thing.y - barrel.y);
+        const thingRadius = thing.ai ? thing.ai.radius : BARREL_RADIUS;
+        const dist = Math.max(0, Math.max(dx, dy) - thingRadius);
+        if (dist >= BARREL_EXPLOSION_DAMAGE) continue;
 
-        // Subtractive damage falloff matching DOOM's P_RadiusAttack: damage = maxDamage - dist
-        const distance = Math.sqrt(distanceSquared);
-        const explosionDamage = Math.max(0, Math.round(BARREL_EXPLOSION_DAMAGE - distance));
-        if (explosionDamage <= 0) continue;
+        if (!hasLineOfSight(barrel.x, barrel.y, thing.x, thing.y)) continue;
 
         // Barrel explosions are sourced from 'player' since only player actions
         // can currently trigger them (shooting a barrel). This means barrel splash
         // damage won't trigger infighting — matching original DOOM where barrels
         // have no "source" monster and don't cause retargeting.
-        damageEnemy(thing, explosionDamage, 'player');
+        damageEnemy(thing, BARREL_EXPLOSION_DAMAGE - dist, 'player');
     }
 }
 

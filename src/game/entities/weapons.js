@@ -6,7 +6,8 @@ import { state } from '../state.js';
 import {
     WEAPONS, SHOOTABLE, EYE_HEIGHT,
     PLAYER_ROCKET_SPEED, PLAYER_ROCKET_RADIUS,
-    ROCKET_SPLASH_RADIUS, ROCKET_SPLASH_DAMAGE, PLAYER_RADIUS,
+    ROCKET_SPLASH_DAMAGE, PLAYER_RADIUS,
+    BARREL_RADIUS,
 } from '../constants.js';
 import { getFloorHeightAt, rayHitPoint } from '../physics.js';
 import { hasLineOfSight } from '../line-of-sight.js';
@@ -353,16 +354,16 @@ function spawnPlayerRocket(forwardX, forwardY) {
  * Accuracy: Exact — uses DOOM's subtractive falloff: damage = splashDamage - dist.
  */
 export function rocketExplosion(impactX, impactY) {
-    const splashRadiusSquared = ROCKET_SPLASH_RADIUS * ROCKET_SPLASH_RADIUS;
+    // Based on: linuxdoom-1.10/p_map.c:PIT_RadiusAttack()
+    // DOOM uses Chebyshev distance (max of abs deltas) minus target radius
 
     // Damage the player (rockets can self-damage)
-    const playerDX = state.playerX - impactX;
-    const playerDY = state.playerY - impactY;
-    const playerDistSq = playerDX * playerDX + playerDY * playerDY;
-    if (playerDistSq < splashRadiusSquared) {
-        const playerDist = Math.sqrt(playerDistSq);
-        const splashDmg = Math.max(0, Math.round(ROCKET_SPLASH_DAMAGE - playerDist));
-        if (splashDmg > 0) damagePlayer(splashDmg);
+    const playerDX = Math.abs(state.playerX - impactX);
+    const playerDY = Math.abs(state.playerY - impactY);
+    const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
+    if (playerDist < ROCKET_SPLASH_DAMAGE
+        && hasLineOfSight(impactX, impactY, state.playerX, state.playerY)) {
+        damagePlayer(ROCKET_SPLASH_DAMAGE - playerDist);
     }
 
     // Damage nearby things
@@ -372,14 +373,15 @@ export function rocketExplosion(impactX, impactY) {
         if (thing.collected) continue;
         if (!SHOOTABLE.has(thing.type)) continue;
 
-        const dx = thing.x - impactX;
-        const dy = thing.y - impactY;
-        const distSq = dx * dx + dy * dy;
-        if (distSq >= splashRadiusSquared) continue;
+        const dx = Math.abs(thing.x - impactX);
+        const dy = Math.abs(thing.y - impactY);
+        const thingRadius = thing.ai ? thing.ai.radius : BARREL_RADIUS;
+        const dist = Math.max(0, Math.max(dx, dy) - thingRadius);
+        if (dist >= ROCKET_SPLASH_DAMAGE) continue;
 
-        const dist = Math.sqrt(distSq);
-        const splashDmg = Math.max(0, Math.round(ROCKET_SPLASH_DAMAGE - dist));
-        if (splashDmg > 0) damageEnemy(thing, splashDmg, 'player');
+        if (!hasLineOfSight(impactX, impactY, thing.x, thing.y)) continue;
+
+        damageEnemy(thing, ROCKET_SPLASH_DAMAGE - dist, 'player');
     }
 }
 
