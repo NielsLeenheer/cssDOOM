@@ -51,14 +51,25 @@ export function checkPickups() {
             const effect = PICKUP_EFFECTS[thing.type];
             if (effect) {
                 if (effect.statType === 'health') {
-                    if (state.health >= MAX_HEALTH && thing.type !== 2013 && thing.type !== 2014) continue;
-                    const healthCap = thing.type === 2013 ? 200 : MAX_HEALTH;
+                    // Health Bonus (2014) and Soul Sphere (2013) can push health above 100, up to 200
+                    // Based on: linuxdoom-1.10/p_inter.c:P_GiveBody() — bonuses cap at 200
+                    const healthCap = (thing.type === 2013 || thing.type === 2014) ? 200 : MAX_HEALTH;
+                    if (state.health >= healthCap) continue;
                     state.health = Math.min(healthCap, state.health + effect.amount);
                 } else if (effect.statType === 'armor') {
-                    if (state.armor >= MAX_ARMOR) continue;
-                    state.armor = Math.min(MAX_ARMOR, state.armor + effect.amount);
-                    if (effect.armorClass && effect.armorClass > state.armorType) {
+                    if (effect.armorClass && effect.armorClass > 0) {
+                        // Green/Blue Armor: P_GiveArmor — skip if current armor >= armorClass * 100
+                        // Green (class 1): skip if armor >= 100
+                        // Blue (class 2): skip if armor >= 200
+                        if (state.armor >= effect.armorClass * 100) continue;
+                        state.armor = effect.amount;
                         state.armorType = effect.armorClass;
+                    } else {
+                        // Armor Bonus (2015): just adds 1 point, caps at MAX_ARMOR (200)
+                        // Gives class 1 if player has no armor type yet
+                        if (state.armor >= MAX_ARMOR) continue;
+                        state.armor = Math.min(MAX_ARMOR, state.armor + effect.amount);
+                        if (!state.armorType) state.armorType = 1;
                     }
                 } else if (effect.statType === 'ammo') {
                     const ammoType = effect.ammoType;

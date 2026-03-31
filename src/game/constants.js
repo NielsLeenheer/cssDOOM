@@ -80,9 +80,9 @@ export const PICKUP_EFFECTS = {
     2012: { statType: 'health', amount: 25 },   // Medikit
     2013: { statType: 'health', amount: 100 },  // Soul Sphere (sets health to 200)
     2014: { statType: 'health', amount: 1 },    // Health Bonus
-    2015: { statType: 'armor',  amount: 1, armorClass: 1 },    // Armor Bonus (green class)
-    2018: { statType: 'armor',  amount: 100, armorClass: 1 },  // Green Armor
-    2019: { statType: 'armor',  amount: 200, armorClass: 2 },  // Blue Armor
+    2015: { statType: 'armor',  amount: 1 },                    // Armor Bonus (+1, no class upgrade)
+    2018: { statType: 'armor',  amount: 100, armorClass: 1 },  // Green Armor (skipped if armor >= 100)
+    2019: { statType: 'armor',  amount: 200, armorClass: 2 },  // Blue Armor (skipped if armor >= 200)
     2007: { statType: 'ammo', ammoType: 'bullets', amount: 10 },   // Clip
     2048: { statType: 'ammo', ammoType: 'bullets', amount: 50 },   // Box of Ammo
     2008: { statType: 'ammo', ammoType: 'shells',  amount: 4 },    // Shells
