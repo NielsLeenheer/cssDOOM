@@ -68,6 +68,15 @@ CSS does the rest — it moves the entire world in the opposite direction of the
 Moving and looking around is just updating four custom properties.
 
 
+## Input
+
+The game supports mouse, keyboard, touch, and gamepad input, all funnelled through a unified input system that combines contributions from each source every frame.
+
+Mouse-look uses the **Pointer Lock API**, which activates automatically when entering fullscreen using the ICON top right (not F11). Raw `movementX` deltas from `mousemove` are multiplied by a sensitivity constant and accumulated as a `turnDelta` each frame. The game loop adds that delta directly to `--player-angle`, bypassing the rate-based turning used by keyboard and gamepad so the camera tracks the mouse exactly.
+
+Keyboard arrow keys and the gamepad's right stick apply a turn rate scaled by `deltaTime`, giving a constant angular speed regardless of frame rate. Touch controls use a drag gesture on the right half of the screen with half the mouse sensitivity. Left click (or right trigger on gamepad) fires the weapon.
+
+
 ## CSS features used
 
 ### 3D transforms and CSS trig functions
