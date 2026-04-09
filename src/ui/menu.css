@@ -40,8 +40,9 @@
     z-index: 1100;
     background: rgba(0, 0, 0, 0.8);
     display: flex;
-    align-items: center;
     justify-content: center;
+    overflow-y: auto;
+    padding: 120px 20px 80px;
 
     transition: opacity 0.3s ease-out, scale 0.3s ease-out;
 
@@ -70,15 +71,7 @@
 @media (max-width: 720px) {
     #menu-content {
         flex-direction: column;
-        gap: 40px;
     }
-
-    #menu-overlay {
-        align-items: flex-start;
-        overflow-y: auto;
-        padding: 120px 20px 40px;
-    }
-
 }
 
 #menu-inner {
@@ -88,8 +81,8 @@
 }
 
 #menu-about {
-    position: fixed;
-    bottom: 40px;
+    margin: 120px 0 40px;
+    padding: 0 40px;
     max-width: 480px;
     font-family: 'PressStart2P', monospace;
     font-size: 11px;
@@ -97,20 +90,13 @@
     color: #888;
     text-align: center;
 
+
     & p {
         margin-bottom: 1em;
     }
 
     & a {
         color: #aaa;
-    }
-}
-
-@media (max-width: 720px) {
-    #menu-about {
-        position: static;
-        margin-top: 80px;
-        padding: 0 40px;
     }
 }
 
