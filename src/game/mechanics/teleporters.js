@@ -5,8 +5,8 @@
  * thing (type 14) in the target sector.
  *
  * Based on: linuxdoom-1.10/p_telept.c:EV_Teleport()
- * Accuracy: Approximation — same walk-over trigger + destination lookup, but we
- * use edge-detection (crossing into range) instead of DOOM's line-crossing check.
+ * Accuracy: Approximation — same walk-over trigger + destination lookup, using
+ * line-crossing detection matching DOOM's original behaviour.
  *
  * When the player crosses a teleporter linedef:
  * 1. Player position is set to the destination coordinates.
@@ -15,7 +15,7 @@
  * 4. One-shot teleporters (W1, type 39/125) are disabled after first use.
  */
 
-import { WALK_TRIGGER_RANGE, EYE_HEIGHT, PLAYER_RADIUS, SHOOTABLE, BARREL_RADIUS } from '../constants.js';
+import { EYE_HEIGHT, PLAYER_RADIUS, SHOOTABLE, BARREL_RADIUS } from '../constants.js';
 
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
@@ -25,8 +25,9 @@ import { playSound } from '../../audio/audio.js';
 import { damageEnemy } from '../entities/combat.js';
 
 /**
- * Checks all teleporter linedefs each frame. Uses the same closest-point-on-segment
- * approach as walk-over triggers, with edge detection to prevent repeated activation.
+ * Checks all teleporter linedefs each frame. Uses crossing detection: fires
+ * when the player moves from one side of the linedef to the other, matching
+ * the original DOOM behaviour (linuxdoom-1.10/p_spec.c:P_CrossSpecialLine).
  */
 export function checkTeleporters() {
     const teleporters = mapData.teleporters;
@@ -36,24 +37,19 @@ export function checkTeleporters() {
         const tp = teleporters[i];
         if (tp.used) continue;
 
-        // Compute closest point on the teleporter linedef to the player
+        // Compute which side of the teleporter linedef the player is on
         const dx = tp.end.x - tp.start.x;
         const dy = tp.end.y - tp.start.y;
-        const lenSq = dx * dx + dy * dy;
-        if (lenSq === 0) continue;
+        const side = (state.playerX - tp.start.x) * dy - (state.playerY - tp.start.y) * dx;
+        const currentSide = side > 0;
 
-        let t = ((state.playerX - tp.start.x) * dx + (state.playerY - tp.start.y) * dy) / lenSq;
-        t = Math.max(0, Math.min(1, t));
+        const previousSide = tp._previousSide;
+        tp._previousSide = currentSide;
 
-        const closestX = tp.start.x + t * dx;
-        const closestY = tp.start.y + t * dy;
-        const distSq = (state.playerX - closestX) ** 2 + (state.playerY - closestY) ** 2;
+        // First frame: just record the side, don't fire
+        if (previousSide === undefined) continue;
 
-        const wasNear = tp._wasNear || false;
-        const isNear = distSq < WALK_TRIGGER_RANGE * WALK_TRIGGER_RANGE;
-        tp._wasNear = isNear;
-
-        if (isNear && !wasNear) {
+        if (previousSide !== currentSide) {
             // Save departure position for fog
             const departX = state.playerX;
             const departY = state.playerY;

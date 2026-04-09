@@ -11,15 +11,15 @@
  * Shaft walls are static geometry spanning the gap between lowerHeight and upperHeight,
  * positioned at upperHeight so they are always visible behind the moving platform.
  *
- * Walk-over triggers use edge detection: the trigger only fires when the player
- * crosses INTO range of a trigger linedef (wasNear=false -> isNear=true), preventing
- * repeated activation while standing near a trigger line.
+ * Walk-over triggers use crossing detection: the trigger fires when the player
+ * moves from one side of the trigger linedef to the other, matching the original
+ * DOOM behaviour (linuxdoom-1.10/p_spec.c:P_CrossSpecialLine).
  *
  * Collision edges block the player from walking into the lift shaft from below when
  * the platform is raised, handled externally by the collision system.
  */
 
-import { USE_RANGE, WALK_TRIGGER_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../constants.js';
+import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../constants.js';
 
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
@@ -51,7 +51,8 @@ export function initLifts() {
             currentHeight: lift.upperHeight,
             targetHeight: lift.upperHeight,
             moving: false,
-            timer: null
+            timer: null,
+            oneWay: lift.oneWay || false
         });
     }
 
@@ -60,6 +61,35 @@ export function initLifts() {
     state.liftState.forEach((entry, sectorIndex) => {
         liftEntries.push({ sectorIndex, entry });
     });
+
+    // Debug console commands
+    window.listTriggers = () => {
+        const triggers = mapData.triggers || [];
+        triggers.forEach((t, i) => {
+            console.log(`[${i}] type=${t.specialType} tag=${t.sectorTag} (${t.start.x},${t.start.y})→(${t.end.x},${t.end.y})${t._triggered ? ' [FIRED]' : ''}`);
+        });
+        console.log(`${triggers.length} trigger(s). Use triggerLinedef(index) to fire one.`);
+    };
+
+    window.triggerLinedef = (index) => {
+        const triggers = mapData.triggers || [];
+        const trigger = triggers[index];
+        if (!trigger) { console.error(`No trigger at index ${index}. Use listTriggers() to see available.`); return; }
+        console.log(`Firing trigger [${index}] type=${trigger.specialType} tag=${trigger.sectorTag}`);
+        for (let i = 0; i < liftEntries.length; i++) {
+            if (liftEntries[i].entry.tag === trigger.sectorTag) {
+                activateLift(liftEntries[i].sectorIndex);
+            }
+        }
+    };
+
+    window.activateLift = activateLift;
+
+    window.listLifts = () => {
+        liftEntries.forEach(({ sectorIndex, entry }) => {
+            console.log(`sector=${sectorIndex} tag=${entry.tag} height=${entry.currentHeight} (${entry.lowerHeight}..${entry.upperHeight}) moving=${entry.moving} oneWay=${entry.oneWay}`);
+        });
+    };
 }
 
 export function activateLift(sectorIndex) {
@@ -77,9 +107,11 @@ export function activateLift(sectorIndex) {
     renderer.setLiftState(sectorIndex, 'lowered');
     playSound('DSPSTART');
 
-    // Schedule automatic raise after the configured delay
-    clearTimeout(liftState.timer);
-    liftState.timer = setTimeout(() => raiseLift(sectorIndex), LIFT_RAISE_DELAY);
+    // One-way lifts (e.g. type 36) stay lowered permanently
+    if (!liftState.oneWay) {
+        clearTimeout(liftState.timer);
+        liftState.timer = setTimeout(() => raiseLift(sectorIndex), LIFT_RAISE_DELAY);
+    }
 }
 
 function raiseLift(sectorIndex) {
@@ -126,10 +158,10 @@ export function updatePlayerFromLift(timestamp) {
 
 /**
  * Check all walk-over trigger lines each frame.
- * For each trigger linedef, compute the closest point on the line segment to the
- * player and check if the player is within WALK_TRIGGER_RANGE. Uses edge detection
- * (only fires when crossing INTO range, not while standing near) to prevent
- * repeated activation on consecutive frames.
+ * Uses crossing detection: fires when the player moves from one side of the
+ * trigger linedef to the other, matching the original DOOM behaviour
+ * (linuxdoom-1.10/p_spec.c:P_CrossSpecialLine).
+ * W1 types (10, 53) fire once; WR types (88, 120) fire on every crossing.
  */
 export function checkWalkOverTriggers() {
     const triggers = mapData.triggers;
@@ -138,28 +170,29 @@ export function checkWalkOverTriggers() {
     for (let index = 0, count = triggers.length; index < count; index++) {
         const trigger = triggers[index];
 
-        // Compute the vector along the trigger linedef
-        const deltaX = trigger.end.x - trigger.start.x;
-        const deltaY = trigger.end.y - trigger.start.y;
-        const lengthSquared = deltaX * deltaX + deltaY * deltaY;
-        if (lengthSquared === 0) continue;
+        // W1 triggers only fire once
+        if (trigger._triggered) continue;
 
-        // Project the player position onto the trigger line segment, clamped to [0, 1]
-        let parameter = ((state.playerX - trigger.start.x) * deltaX + (state.playerY - trigger.start.y) * deltaY) / lengthSquared;
-        parameter = Math.max(0, Math.min(1, parameter));
+        // Compute which side of the trigger linedef the player is on.
+        // sign > 0 → front side, sign < 0 → back side.
+        const dx = trigger.end.x - trigger.start.x;
+        const dy = trigger.end.y - trigger.start.y;
+        const side = (state.playerX - trigger.start.x) * dy - (state.playerY - trigger.start.y) * dx;
+        const currentSide = side > 0;
 
-        // Find the closest point on the segment to the player
-        const closestX = trigger.start.x + parameter * deltaX;
-        const closestY = trigger.start.y + parameter * deltaY;
-        const distSq = (state.playerX - closestX) ** 2 + (state.playerY - closestY) ** 2;
+        const previousSide = trigger._previousSide;
+        trigger._previousSide = currentSide;
 
-        // Edge detection: only fire when the player crosses into range, not while
-        // continuously standing near the trigger line
-        const wasPreviouslyNear = trigger._wasNear || false;
-        const isCurrentlyNear = distSq < WALK_TRIGGER_RANGE * WALK_TRIGGER_RANGE;
-        trigger._wasNear = isCurrentlyNear;
+        // First frame: just record the side, don't fire
+        if (previousSide === undefined) continue;
 
-        if (isCurrentlyNear && !wasPreviouslyNear) {
+        // Fire when the player crosses from one side to the other
+        if (previousSide !== currentSide) {
+            // Mark W1 (one-shot) types so they don't fire again
+            if (trigger.specialType === 10 || trigger.specialType === 53 || trigger.specialType === 36) {
+                trigger._triggered = true;
+            }
+
             // Activate all lifts whose tag matches this trigger's sector tag
             for (let liftIndex = 0, liftCount = liftEntries.length; liftIndex < liftCount; liftIndex++) {
                 if (liftEntries[liftIndex].entry.tag === trigger.sectorTag) {
