@@ -6,7 +6,7 @@
  */
 
 import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from './constants.js';
-import { state } from './state.js';
+import { state, debug } from './state.js';
 import { isDoorClosed, getDoorEntry } from './mechanics/doors.js';
 import { circleLineCollision, pointInPolygon } from './geometry.js';
 import { forEachWallInAABB, forEachSectorAt } from './spatial-grid.js';
@@ -52,6 +52,8 @@ function crossesLinedef(newX, newY, _radius, wall) {
  * and without encountering an impassable step height change.
  */
 export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight = state.floorHeight, maxDropHeight = Infinity, excludeThing = null) {
+    if (debug.noclip) return true;
+
     // Check collision against walls via spatial grid.
     // Solid walls and closed doors always block. Two-sided linedefs (windows,
     // ledges) block only when the player crosses the linedef and the opening

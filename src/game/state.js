@@ -77,4 +77,5 @@ export const state = {
 export const debug = {
     noEnemyAttack: false,
     noEnemyMove: false,
+    noclip: false,
 };

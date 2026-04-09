@@ -324,6 +324,17 @@ export function initDebugMenu() {
     noMoveLabel.appendChild(document.createTextNode(' No enemy movement'));
     details.appendChild(noMoveLabel);
 
+    const noclipLabel = document.createElement('label');
+    const noclipCheckbox = document.createElement('input');
+    noclipCheckbox.type = 'checkbox';
+    noclipCheckbox.checked = false;
+    noclipCheckbox.addEventListener('change', () => {
+        debug.noclip = noclipCheckbox.checked;
+    });
+    noclipLabel.appendChild(noclipCheckbox);
+    noclipLabel.appendChild(document.createTextNode(' No collision (noclip)'));
+    details.appendChild(noclipLabel);
+
     // Separator
     const hr3 = document.createElement('hr');
     hr3.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
