@@ -174,6 +174,10 @@ function wallFacesCamera(wallData, wallAngle, midX, midY, playerX, playerY) {
 // point (along the ray from the player) to be culled.
 const SKY_CULL_MARGIN = 128;
 
+// Elements in sky sectors closer than this distance are never sky-culled —
+// they are visible perimeter walls of a nearby outdoor area.
+const SKY_EXEMPT_DISTANCE_SQ = 1500 * 1500;
+
 /**
  * Tests whether a sky wall segment lies between the player and the element.
  * Casts a ray from the player to the element and checks if it crosses any
@@ -181,6 +185,12 @@ const SKY_CULL_MARGIN = 128;
  * point, the element is culled.
  */
 function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes) {
+    // Nearby elements in sky sectors are visible outdoor perimeter — skip culling.
+    if (sceneState.skyGroupOf?.has(sectorIndex)) {
+        const dx2 = x - playerX, dy2 = y - playerY;
+        if (dx2 * dx2 + dy2 * dy2 < SKY_EXEMPT_DISTANCE_SQ) return false;
+    }
+
     const dx = x - playerX;
     const dy = y - playerY;
 
