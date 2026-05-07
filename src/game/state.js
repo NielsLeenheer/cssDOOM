@@ -1,55 +1,27 @@
 /**
  * Mutable game state accessible by all modules.
  *
- * This is the shared data bridge between game logic and renderer.
- * Game logic writes gameplay fields (positions, health, AI).
- * Renderer reads them and updates visuals accordingly.
+ * Shared world state (things, projectiles, doors, lifts) lives here directly.
+ * Per-player state (position, health, ammo, weapons, keys, powerups) lives
+ * on Player objects in `state.players`.
+ *
+ * During the multiplayer migration, `state.playerX`, `state.health`, etc. are
+ * defined as getters/setters that forward to `state.players[0]` (see proxy
+ * block at the end of this file). Once all call sites take an explicit
+ * `player` parameter, those proxies will be removed.
  */
+
+import { Player } from './player/player.js';
 
 export const state = {
     // Skill level 1-5 (maps to DOOM flag bits for thing spawning)
     skillLevel: 1,
 
-    // ── Player position & orientation ─────────────────────────────────
-    // World-space coordinates in DOOM units. X/Y are the horizontal plane;
-    // Z is the vertical (eye height above the map origin).
-    // playerAngle is in radians: 0 = north, increasing = counter-clockwise.
-    playerX: 0,
-    playerY: 0,
-    playerZ: 0,
-    playerAngle: 0,
-    // The floor height of the sector the player currently stands on.
-    // playerZ is derived from this plus the eye-height offset.
-    floorHeight: 0,
-
-    // ── Player stats & combat ─────────────────────────────────────────
-    // Current health, armor, and ammo counts — displayed in the HUD
-    // and modified by pickups, damage, and weapon fire.
-    health: 100,
-    armor: 0,
-    // Armor type determines damage absorption ratio:
-    //   0 = no armor, 1 = green armor (absorbs 1/3), 2 = blue armor (absorbs 1/2)
-    // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj()
-    armorType: 0,
-    ammo: { bullets: 50, shells: 0, rockets: 0, cells: 0 },
-    maxAmmo: { bullets: 200, shells: 50, rockets: 50, cells: 300 },
-    hasBackpack: false,
-    isDead: false,
-    deathTime: 0,
-    // Currently selected weapon slot number (1=Fist, 2=Pistol, 3=Shotgun, etc.)
-    currentWeapon: 2,
-    // Set of weapon slot numbers the player has picked up.
-    ownedWeapons: new Set([1, 2]),  // Fist + Pistol
-    // True while the weapon fire animation is playing, prevents re-firing.
-    isFiring: false,
-    // Accumulates time spent standing on a damaging sector (e.g. nukage).
-    // Damage is applied once per second, then the timer resets.
-    sectorDamageTimer: 0,
-    // Collected key cards — set of color strings ('blue', 'yellow', 'red')
-    collectedKeys: new Set(),
-    // Active powerups — each key is a powerup name, value is remaining duration
-    // in seconds. Based on: linuxdoom-1.10/d_player.h:player_t.powers[]
-    powerups: {},
+    // ── Players ───────────────────────────────────────────────────────
+    // Length 1 in single-player, 2 in deathmatch. Per-player fields like
+    // position, health, weapons live here. Legacy `state.playerX` etc.
+    // proxy to `players[0]` via the Object.defineProperty block below.
+    players: [new Player(0)],
 
     // ── Doors & lifts ─────────────────────────────────────────────────
     // Maps from sector index → state object tracking open/close animation
@@ -71,6 +43,40 @@ export const state = {
     projectiles: [],
     nextProjectileId: 0,
 };
+
+// ── Backwards-compat proxies (Phase 1 multiplayer migration) ─────────
+// Forward legacy `state.playerX`/`state.health`/etc. to `state.players[0]`.
+// To be removed once all call sites take an explicit `player` parameter.
+const PLAYER_FIELD_MAP = {
+    playerX: 'x',
+    playerY: 'y',
+    playerZ: 'z',
+    playerAngle: 'angle',
+    floorHeight: 'floorHeight',
+    health: 'health',
+    armor: 'armor',
+    armorType: 'armorType',
+    ammo: 'ammo',
+    maxAmmo: 'maxAmmo',
+    hasBackpack: 'hasBackpack',
+    isDead: 'isDead',
+    deathTime: 'deathTime',
+    currentWeapon: 'currentWeapon',
+    ownedWeapons: 'ownedWeapons',
+    isFiring: 'isFiring',
+    sectorDamageTimer: 'sectorDamageTimer',
+    collectedKeys: 'collectedKeys',
+    powerups: 'powerups',
+};
+
+for (const [stateName, playerField] of Object.entries(PLAYER_FIELD_MAP)) {
+    Object.defineProperty(state, stateName, {
+        get() { return state.players[0][playerField]; },
+        set(value) { state.players[0][playerField] = value; },
+        enumerable: true,
+        configurable: true,
+    });
+}
 
 // ── Debug flags ──────────────────────────────────────────────────────
 // Toggled from the debug menu at runtime.

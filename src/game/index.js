@@ -3,6 +3,7 @@
  */
 
 import { MAX_FRAME_DELTA_TIME } from './constants.js';
+import { state } from './state.js';
 import { updateMovement } from './movement.js';
 import { checkSectorDamage } from './player/damage.js';
 import { checkPickups, updatePowerups } from './player/pickups.js';
@@ -16,9 +17,13 @@ let previousTimestamp = 0;
 
 export function updateGame(timestamp) {
     const deltaTime = Math.min((timestamp - previousTimestamp) / 1000, MAX_FRAME_DELTA_TIME);
+    if (updateGame._logCount === undefined) updateGame._logCount = 0;
+    if (updateGame._logCount++ < 300 && updateGame._logCount % 60 === 0) {
+        console.log('[game] deltaTime:', deltaTime.toFixed(4), 'ts:', timestamp.toFixed(1), 'prev:', previousTimestamp.toFixed(1));
+    }
     previousTimestamp = timestamp;
 
-    updateMovement(deltaTime, timestamp);
+    updateMovement(state.players[0], deltaTime, timestamp);
     checkSectorDamage(deltaTime);
     updateAllEnemies(deltaTime);
     updateProjectiles(deltaTime);

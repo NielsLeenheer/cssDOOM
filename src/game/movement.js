@@ -4,24 +4,23 @@
  */
 
 import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED } from './constants.js';
-import { state } from './state.js';
 import { canMoveTo, getFloorHeightAt } from './physics.js';
 import { playSound } from '../audio/audio.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
 import { input, collectInput } from '../input/index.js';
 
-let wasMoving = false;
+const wasMovingByPlayer = new Map();
 
-export function updateMovement(deltaTime, timestamp) {
+export function updateMovement(player, deltaTime, timestamp) {
     collectInput();
-    updateLocation(deltaTime);
+    updateLocation(player, deltaTime);
     updatePlayerFromLift(timestamp);
-    updateHeight();
-    updateMovingState();
+    updateHeight(player);
+    updateMovingState(player);
 }
 
-function updateLocation(deltaTime) {
+function updateLocation(player, deltaTime) {
 
     // Speed modifier
     const speed = input.run ? MOVE_SPEED * RUN_MULTIPLIER : MOVE_SPEED;
@@ -30,24 +29,24 @@ function updateLocation(deltaTime) {
     /* Turning */
 
     // Rate-based turning (keyboard arrows) + absolute turn deltas (mouse, analog sticks)
-    state.playerAngle += input.turn * turnSpeed * deltaTime + input.turnDelta;
+    player.angle += input.turn * turnSpeed * deltaTime + input.turnDelta;
 
     /* Moving */
 
     // Forward direction (angle 0 = north = +Y).
-    const forwardX = -Math.sin(state.playerAngle);
-    const forwardY = Math.cos(state.playerAngle);
+    const forwardX = -Math.sin(player.angle);
+    const forwardY = Math.cos(player.angle);
 
     // Strafe direction is perpendicular (90° clockwise from forward).
-    const strafeX = Math.cos(state.playerAngle);
-    const strafeY = Math.sin(state.playerAngle);
+    const strafeX = Math.cos(player.angle);
+    const strafeY = Math.sin(player.angle);
 
     /* Determine desired movement vector */
 
-    let desiredX = state.playerX + forwardX * speed * input.moveY * deltaTime
-                                 + strafeX * speed * input.moveX * deltaTime;
-    let desiredY = state.playerY + forwardY * speed * input.moveY * deltaTime
-                                 + strafeY * speed * input.moveX * deltaTime;
+    let desiredX = player.x + forwardX * speed * input.moveY * deltaTime
+                            + strafeX * speed * input.moveX * deltaTime;
+    let desiredY = player.y + forwardY * speed * input.moveY * deltaTime
+                            + strafeY * speed * input.moveX * deltaTime;
 
     /**
      * Collision resolution
@@ -61,35 +60,36 @@ function updateLocation(deltaTime) {
      * walls instead of stopping dead when moving diagonally into them.
      */
 
-    if (desiredX !== state.playerX || desiredY !== state.playerY) {
+    if (desiredX !== player.x || desiredY !== player.y) {
         if (canMoveTo(desiredX, desiredY)) {
-            state.playerX = desiredX;
-            state.playerY = desiredY;
-        } else if (canMoveTo(desiredX, state.playerY)) {
-            state.playerX = desiredX;
-        } else if (canMoveTo(state.playerX, desiredY)) {
-            state.playerY = desiredY;
+            player.x = desiredX;
+            player.y = desiredY;
+        } else if (canMoveTo(desiredX, player.y)) {
+            player.x = desiredX;
+        } else if (canMoveTo(player.x, desiredY)) {
+            player.y = desiredY;
         }
     }
 }
 
-function updateMovingState() {
+function updateMovingState(player) {
     const isMoving = input.moveX !== 0 || input.moveY !== 0;
+    const wasMoving = wasMovingByPlayer.get(player.index) ?? false;
     if (isMoving !== wasMoving) {
-        wasMoving = isMoving;
+        wasMovingByPlayer.set(player.index, isMoving);
         renderer.setPlayerMoving(isMoving);
     }
 }
 
-function updateHeight() {
-    const prevFloorHeight = state.floorHeight;
-    state.floorHeight = getFloorHeightAt(state.playerX, state.playerY);
-    state.playerZ = state.floorHeight + EYE_HEIGHT;
+function updateHeight(player) {
+    const prevFloorHeight = player.floorHeight;
+    player.floorHeight = getFloorHeightAt(player.x, player.y);
+    player.z = player.floorHeight + EYE_HEIGHT;
 
     // Based on: linuxdoom-1.10/p_mobj.c:P_ZMovement() — oof on hard landing.
     // DOOM plays sfx_oof when momz < -GRAVITY*8. With gravity=1 unit/tic²,
     // that velocity is reached after falling 32 units (v²=2gh → h=8²/2=32).
-    if (prevFloorHeight - state.floorHeight > 32) {
+    if (prevFloorHeight - player.floorHeight > 32) {
         playSound('DSOOF');
     }
 }
