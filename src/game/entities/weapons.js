@@ -165,7 +165,7 @@ function rollWeaponDamage(damageType) {
         case 'melee': {
             // Based on: linuxdoom-1.10/p_map.c:P_LineAttack() — Berserk multiplies by 10
             const baseDamage = (Math.floor(Math.random() * 10) + 1) * 2;
-            return hasPowerup('berserk') ? baseDamage * 10 : baseDamage;
+            return hasPowerup(state.players[0], 'berserk') ? baseDamage * 10 : baseDamage;
         }
         case 'hitscan':
             return 5 * (Math.floor(Math.random() * 3) + 1);
@@ -352,7 +352,7 @@ export function rocketExplosion(impactX, impactY) {
     const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
     if (playerDist < ROCKET_SPLASH_DAMAGE
         && hasLineOfSight(impactX, impactY, state.playerX, state.playerY)) {
-        damagePlayer(ROCKET_SPLASH_DAMAGE - playerDist);
+        damagePlayer(state.players[0], ROCKET_SPLASH_DAMAGE - playerDist, state.players[0]);
     }
 
     // Damage nearby things

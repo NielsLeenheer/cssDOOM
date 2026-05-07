@@ -93,7 +93,7 @@ export function updateProjectiles() {
                 spawnFireballExplosion(projectile.x, projectile.y, projectile.z);
                 // Roll damage on impact: (P_Random()%8+1) * missileDamage
                 // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() missile damage
-                damagePlayer((Math.floor(Math.random() * 8) + 1) * projectile.missileDamage);
+                damagePlayer(state.players[0], (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage);
                 playSound(projectile.hitSound);
                 renderer.removeProjectile(projectile.id);
                 state.projectiles.splice(index, 1);

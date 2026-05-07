@@ -56,7 +56,7 @@ export function enemyHitscanAttack(enemy, enemyAI) {
         // giving roughly ±22.4° max spread. We convert directly to radians.
         // Based on: linuxdoom-1.10/p_enemy.c:A_PosAttack() / p_map.c:P_AimLineAttack()
         // When the player has Partial Invisibility (MF_SHADOW), the spread is doubled.
-        const maxSpreadDegrees = hasPowerup('invisibility') ? 45 : 22.5;
+        const maxSpreadDegrees = hasPowerup(state.players[0], 'invisibility') ? 45 : 22.5;
         const spreadFraction = (Math.floor(Math.random() * 256) - Math.floor(Math.random() * 256)) / 255;
         const spreadAngle = spreadFraction * (maxSpreadDegrees * Math.PI / 180);
 
@@ -69,7 +69,7 @@ export function enemyHitscanAttack(enemy, enemyAI) {
 
     playSound(enemyAI.hitscanSound);
     if (totalDamage > 0) {
-        damagePlayer(totalDamage);
+        damagePlayer(state.players[0], totalDamage, enemy);
     }
 }
 
@@ -161,7 +161,7 @@ function barrelExplosion(barrel) {
     const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
     if (playerDist < BARREL_EXPLOSION_DAMAGE
         && hasLineOfSight(barrel.x, barrel.y, state.playerX, state.playerY)) {
-        damagePlayer(BARREL_EXPLOSION_DAMAGE - playerDist);
+        damagePlayer(state.players[0], BARREL_EXPLOSION_DAMAGE - playerDist);
     }
 
     // Damage nearby things (enemies and other barrels) within explosion radius

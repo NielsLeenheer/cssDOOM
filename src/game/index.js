@@ -24,12 +24,12 @@ export function updateGame(timestamp) {
     previousTimestamp = timestamp;
 
     updateMovement(state.players[0], deltaTime, timestamp);
-    checkSectorDamage(deltaTime);
+    checkSectorDamage(state.players[0], deltaTime);
     updateAllEnemies(deltaTime);
     updateProjectiles(deltaTime);
     checkWalkOverTriggers();
     checkTeleporters();
     updateCrushers(deltaTime);
-    checkPickups();
-    updatePowerups(deltaTime);
+    checkPickups(state.players[0]);
+    updatePowerups(state.players[0], deltaTime);
 }

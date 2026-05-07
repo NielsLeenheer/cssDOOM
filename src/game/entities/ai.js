@@ -410,7 +410,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                     const meleeDmg = rollMeleeDamage(enemy.type);
                     if (hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)) {
                         if (targetIsPlayer) {
-                            damagePlayer(meleeDmg);
+                            damagePlayer(state.players[0], meleeDmg, enemy);
                         } else {
                             damageEnemy(enemyAI.target, meleeDmg, enemy);
                         }

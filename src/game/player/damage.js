@@ -19,6 +19,11 @@ import { clearWeaponSlots } from '../../renderer/hud.js';
 // When the player takes damage, the renderer shows a brief red flash (300ms).
 // Rapid successive hits restart the flash. On death, a persistent red tint
 // remains until the game resets.
+//
+// The `attacker` parameter is the entity (enemy or other Player) that caused
+// the damage, or null for environmental sources (sector damage, crushers).
+// It is currently unused but threaded through call sites in preparation for
+// deathmatch frag attribution (`player.lastDamagedBy`).
 // ============================================================================
 
 /**
@@ -29,36 +34,36 @@ import { clearWeaponSlots } from '../../renderer/hud.js';
  * If remaining armor points are less than or equal to the absorbed amount, the armor is
  * fully depleted and armorType resets to 0.
  */
-export function damagePlayer(damageAmount) {
-    if (state.isDead) return;
-    if (state.powerups.invulnerability) return;
+export function damagePlayer(player, damageAmount, attacker = null) {
+    if (player.isDead) return;
+    if (player.powerups.invulnerability) return;
 
     // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() — skill 1 halves damage
     if (state.skillLevel === 1) damageAmount >>= 1;
 
     // Armor absorption depends on armor type: green (1) = 1/3, blue (2) = 1/2
-    if (state.armorType) {
-        let saved = state.armorType === 1
+    if (player.armorType) {
+        let saved = player.armorType === 1
             ? Math.floor(damageAmount / 3)
             : Math.floor(damageAmount / 2);
 
         // If armor can't cover the absorbed amount, it's fully depleted
-        if (state.armor <= saved) {
-            saved = state.armor;
-            state.armorType = 0;
+        if (player.armor <= saved) {
+            saved = player.armor;
+            player.armorType = 0;
         }
-        state.armor -= saved;
+        player.armor -= saved;
         damageAmount -= saved;
     }
-    state.health -= damageAmount;
+    player.health -= damageAmount;
 
     renderer.triggerFlash('hurt');
     playSound('DSPLPAIN');
 
-    if (state.health <= 0) {
-        state.health = 0;
-        state.isDead = true;
-        state.deathTime = performance.now();
+    if (player.health <= 0) {
+        player.health = 0;
+        player.isDead = true;
+        player.deathTime = performance.now();
         renderer.setPlayerDead(true);
         playSound('DSPLDETH');
     }
@@ -115,22 +120,22 @@ function getSectorDamageAt(x, y) {
     return { damage: highestFloorDamage, specialType: highestFloorSpecialType };
 }
 
-export function checkSectorDamage(deltaTime) {
-    const { damage: sectorDamageAmount, specialType } = getSectorDamageAt(state.playerX, state.playerY);
+export function checkSectorDamage(player, deltaTime) {
+    const { damage: sectorDamageAmount, specialType } = getSectorDamageAt(player.x, player.y);
     // Based on: linuxdoom-1.10/p_spec.c:P_PlayerInSpecialSector()
     // Radsuit protects against damage, but type 4 and 16 sectors can
     // bypass the suit with ~2% probability per tick (P_Random() < 5).
-    const radsuitBypassed = state.powerups.radsuit
+    const radsuitBypassed = player.powerups.radsuit
         && (specialType === 4 || specialType === 16)
         && Math.random() < 5 / 256;
-    if (sectorDamageAmount > 0 && (!state.powerups.radsuit || radsuitBypassed)) {
-        state.sectorDamageTimer += deltaTime;
-        if (state.sectorDamageTimer >= 32 / 35) {
-            state.sectorDamageTimer -= 32 / 35;
-            damagePlayer(sectorDamageAmount);
+    if (sectorDamageAmount > 0 && (!player.powerups.radsuit || radsuitBypassed)) {
+        player.sectorDamageTimer += deltaTime;
+        if (player.sectorDamageTimer >= 32 / 35) {
+            player.sectorDamageTimer -= 32 / 35;
+            damagePlayer(player, sectorDamageAmount);
         }
     } else {
-        state.sectorDamageTimer = 0;
+        player.sectorDamageTimer = 0;
     }
 }
 
@@ -153,44 +158,51 @@ export function checkSectorDamage(deltaTime) {
 // Both call clearSceneState internally to clean up per-map transient data.
 // ============================================================================
 
-// Clear transient scene state (called on any map change)
+// Clear transient scene state (called on any map change).
+// Resets per-player transient flags for every player in state.players.
 function clearSceneState() {
-    state.isDead = false;
-    state.isFiring = false;
-    state.sectorDamageTimer = 0;
+    for (const player of state.players) {
+        player.isDead = false;
+        player.isFiring = false;
+        player.sectorDamageTimer = 0;
+        // Clear all active powerup effects and visuals
+        for (const name in player.powerups) {
+            renderer.hidePowerup(name);
+        }
+        player.powerups = {};
+    }
     state.things = [];
     for (let index = 0; index < state.projectiles.length; index++) renderer.removeProjectile(state.projectiles[index].id);
     state.projectiles = [];
     state.nextProjectileId = 0;
-    // Clear all active powerup effects and visuals
-    for (const name in state.powerups) {
-        renderer.hidePowerup(name);
-    }
-    state.powerups = {};
     renderer.setPlayerDead(false);
 }
 
 // Level transition — keep inventory, clear keys (keys are per-level)
 export function transitionToLevel() {
     clearSceneState();
-    state.collectedKeys.clear();
+    for (const player of state.players) {
+        player.collectedKeys.clear();
+    }
     renderer.clearKeys();
-    equipWeapon(state.currentWeapon);
+    equipWeapon(state.players[0].currentWeapon);
 }
 
 // Full reset — new game or respawn after death
 export function resetGameState() {
     clearSceneState();
-    state.health = 100;
-    state.armor = 0;
-    state.armorType = 0;
-    state.ammo = { bullets: 50, shells: 0, rockets: 0, cells: 0 };
-    state.maxAmmo = { bullets: 200, shells: 50, rockets: 50, cells: 300 };
-    state.hasBackpack = false;
-    state.currentWeapon = 2;
-    state.ownedWeapons = new Set([1, 2]);
-    state.collectedKeys.clear();
+    for (const player of state.players) {
+        player.health = 100;
+        player.armor = 0;
+        player.armorType = 0;
+        player.ammo = { bullets: 50, shells: 0, rockets: 0, cells: 0 };
+        player.maxAmmo = { bullets: 200, shells: 50, rockets: 50, cells: 300 };
+        player.hasBackpack = false;
+        player.currentWeapon = 2;
+        player.ownedWeapons = new Set([1, 2]);
+        player.collectedKeys.clear();
+    }
     renderer.clearKeys();
     clearWeaponSlots();
-    equipWeapon(state.currentWeapon);
+    equipWeapon(state.players[0].currentWeapon);
 }

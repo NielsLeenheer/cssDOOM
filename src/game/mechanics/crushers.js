@@ -129,6 +129,6 @@ function checkCrusherDamage(entry, deltaTime) {
     entry.damageTimer += deltaTime;
     if (entry.damageTimer >= CRUSHER_DAMAGE_INTERVAL) {
         entry.damageTimer -= CRUSHER_DAMAGE_INTERVAL;
-        damagePlayer(CRUSHER_DAMAGE);
+        damagePlayer(state.players[0], CRUSHER_DAMAGE);
     }
 }
