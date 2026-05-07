@@ -13,6 +13,8 @@ import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
 import { updateCamera } from '../renderer/scene/camera.js';
 import { mapData, currentMap, loadMap } from '../shared/maps.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
+import { initCanvasRenderer } from '../experiments/canvas-renderer.js';
+import { initMonitor } from '../experiments/monitor.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 
@@ -361,6 +363,43 @@ export function initDebugMenu() {
         label.appendChild(checkbox);
         label.appendChild(document.createTextNode(` ${toggle.label}`));
         details.appendChild(label);
+    }
+
+    // Canvas renderer experiment
+    const canvasRenderer = initCanvasRenderer();
+    if (canvasRenderer) {
+        const hr4 = document.createElement('hr');
+        hr4.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
+        details.appendChild(hr4);
+
+        const crLabel = document.createElement('label');
+        const crCheckbox = document.createElement('input');
+        crCheckbox.type = 'checkbox';
+        crCheckbox.checked = false;
+        crCheckbox.addEventListener('change', () => {
+            if (crCheckbox.checked) canvasRenderer.enable();
+            else canvasRenderer.disable();
+        });
+        crLabel.appendChild(crCheckbox);
+        crLabel.appendChild(document.createTextNode(' Canvas renderer'));
+        details.appendChild(crLabel);
+    }
+
+    // In-world monitor experiment
+    const monitor = initMonitor();
+    if (monitor) {
+        const monLabel = document.createElement('label');
+        const monCheckbox = document.createElement('input');
+        monCheckbox.type = 'checkbox';
+        monCheckbox.checked = true;
+        monCheckbox.addEventListener('change', () => {
+            if (monCheckbox.checked) monitor.enable();
+            else monitor.disable();
+        });
+        monitor.enable();
+        monLabel.appendChild(monCheckbox);
+        monLabel.appendChild(document.createTextNode(' In-world monitor (M to interact)'));
+        details.appendChild(monLabel);
     }
 
     document.body.appendChild(details);
