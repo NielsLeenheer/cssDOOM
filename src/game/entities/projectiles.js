@@ -121,7 +121,7 @@ export function updateProjectiles() {
                 playSound(projectile.hitSound);
                 // Player rockets deal direct hit damage + splash damage in a radius
                 if (projectile.isPlayerRocket) {
-                    damageEnemy(thing, projectile.damage, 'player');
+                    damageEnemy(thing, projectile.damage, projectile.source);
                     rocketExplosion(projectile.x, projectile.y);
                 } else {
                     // Roll damage on impact: (P_Random()%8+1) * missileDamage

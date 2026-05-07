@@ -425,7 +425,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                     } else if (enemyAI.pellets) {
                         // Hitscan enemies (Zombieman, Shotgun Guy)
                         if (targetIsPlayer) {
-                            enemyHitscanAttack(enemy, enemyAI);
+                            enemyHitscanAttack(enemy, enemyAI, enemyAI.target);
                         } else {
                             // Hitscan against another enemy during infighting
                             enemyHitscanAttackEnemy(enemy, enemyAI);

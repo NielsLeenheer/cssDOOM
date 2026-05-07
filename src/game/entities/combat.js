@@ -9,6 +9,7 @@ import {
 } from '../constants.js';
 
 import { state } from '../state.js';
+import { Player } from '../player/player.js';
 import { currentMap } from '../../shared/maps.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';
@@ -36,14 +37,14 @@ import * as renderer from '../../renderer/index.js';
  *
  * Zombieman fires 1 pellet (3-15 damage), Shotgun Guy fires 3 (9-45 damage).
  */
-export function enemyHitscanAttack(enemy, enemyAI) {
-    if (!hasLineOfSight(enemy.x, enemy.y, state.playerX, state.playerY)) {
+export function enemyHitscanAttack(enemy, enemyAI, targetPlayer) {
+    if (!hasLineOfSight(enemy.x, enemy.y, targetPlayer.x, targetPlayer.y)) {
         playSound(enemyAI.hitscanSound);
         return;
     }
 
-    const deltaX = state.playerX - enemy.x;
-    const deltaY = state.playerY - enemy.y;
+    const deltaX = targetPlayer.x - enemy.x;
+    const deltaY = targetPlayer.y - enemy.y;
     const distanceToPlayer = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
     // Angular size of the player at this distance (using player collision radius)
@@ -56,7 +57,7 @@ export function enemyHitscanAttack(enemy, enemyAI) {
         // giving roughly ±22.4° max spread. We convert directly to radians.
         // Based on: linuxdoom-1.10/p_enemy.c:A_PosAttack() / p_map.c:P_AimLineAttack()
         // When the player has Partial Invisibility (MF_SHADOW), the spread is doubled.
-        const maxSpreadDegrees = hasPowerup(state.players[0], 'invisibility') ? 45 : 22.5;
+        const maxSpreadDegrees = hasPowerup(targetPlayer, 'invisibility') ? 45 : 22.5;
         const spreadFraction = (Math.floor(Math.random() * 256) - Math.floor(Math.random() * 256)) / 255;
         const spreadAngle = spreadFraction * (maxSpreadDegrees * Math.PI / 180);
 
@@ -69,7 +70,7 @@ export function enemyHitscanAttack(enemy, enemyAI) {
 
     playSound(enemyAI.hitscanSound);
     if (totalDamage > 0) {
-        damagePlayer(state.players[0], totalDamage, enemy);
+        damagePlayer(targetPlayer, totalDamage, enemy);
     }
 }
 
@@ -122,9 +123,9 @@ export function enemyHitscanAttackEnemy(attacker, attackerAI) {
  * ~78% chance (200/256) the enemy decides NOT to attack this frame.
  * Melee-only enemies skip this check entirely (they always attack in range).
  */
-export function checkMissileRange(enemy, distanceToPlayer) {
+export function checkMissileRange(enemy, distanceToTarget) {
     // Subtract a close-range buffer so enemies are very aggressive up close
-    let adjustedDistance = distanceToPlayer - 64;
+    let adjustedDistance = distanceToTarget - 64;
 
     // If the enemy has no melee attack, subtract an additional buffer
     // (they are more eager to fire since they have no fallback)
@@ -148,20 +149,29 @@ export function checkMissileRange(enemy, distanceToPlayer) {
 /**
  * Handles the explosive barrel (thing type 2035) chain-reaction explosion.
  * Deals area-of-effect damage that falls off linearly with distance from the
- * barrel center. Affects both the player and nearby shootable things (enemies
+ * barrel center. Affects all players and nearby shootable things (enemies
  * and other barrels), enabling chain explosions when barrels are clustered.
+ *
+ * The `attacker` parameter is the entity that triggered this explosion — a
+ * Player who shot the barrel, an enemy whose attack hit it, or null for chain
+ * reactions originating from another barrel. It is forwarded to damageEnemy so
+ * kill attribution and infighting behave correctly: a Player attacker won't
+ * trigger infighting on damaged enemies (matching original DOOM where barrels
+ * have no "source" monster), while an enemy attacker correctly retargets.
  */
-function barrelExplosion(barrel) {
+function barrelExplosion(barrel, attacker) {
     // Based on: linuxdoom-1.10/p_map.c:PIT_RadiusAttack()
     // DOOM uses Chebyshev distance (max of abs deltas) minus target radius
 
-    // Damage player if within explosion radius and in line of sight
-    const playerDX = Math.abs(state.playerX - barrel.x);
-    const playerDY = Math.abs(state.playerY - barrel.y);
-    const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
-    if (playerDist < BARREL_EXPLOSION_DAMAGE
-        && hasLineOfSight(barrel.x, barrel.y, state.playerX, state.playerY)) {
-        damagePlayer(state.players[0], BARREL_EXPLOSION_DAMAGE - playerDist);
+    // Damage every player within explosion radius and line of sight
+    for (const player of state.players) {
+        const playerDX = Math.abs(player.x - barrel.x);
+        const playerDY = Math.abs(player.y - barrel.y);
+        const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
+        if (playerDist < BARREL_EXPLOSION_DAMAGE
+            && hasLineOfSight(barrel.x, barrel.y, player.x, player.y)) {
+            damagePlayer(player, BARREL_EXPLOSION_DAMAGE - playerDist, attacker);
+        }
     }
 
     // Damage nearby things (enemies and other barrels) within explosion radius
@@ -179,11 +189,7 @@ function barrelExplosion(barrel) {
 
         if (!hasLineOfSight(barrel.x, barrel.y, thing.x, thing.y)) continue;
 
-        // Barrel explosions are sourced from 'player' since only player actions
-        // can currently trigger them (shooting a barrel). This means barrel splash
-        // damage won't trigger infighting — matching original DOOM where barrels
-        // have no "source" monster and don't cause retargeting.
-        damageEnemy(thing, BARREL_EXPLOSION_DAMAGE - dist, 'player');
+        damageEnemy(thing, BARREL_EXPLOSION_DAMAGE - dist, attacker);
     }
 }
 
@@ -196,9 +202,9 @@ function barrelExplosion(barrel) {
  * and infighting retarget logic.
  *
  * The `source` parameter identifies who dealt the damage:
- * - 'player' — the player fired a weapon or caused a barrel explosion
+ * - a Player reference — a player fired a weapon, caused a barrel explosion, etc.
  * - an enemy entry object — another enemy's projectile or hitscan hit this target
- * - null — environmental damage (no retarget)
+ * - null — environmental damage or unattributed (no retarget)
  *
  * Infighting retarget logic:
  * Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() lines ~730-745
@@ -208,6 +214,9 @@ function barrelExplosion(barrel) {
  * When a monster damages another monster, the target retargets to the attacker
  * if its threshold is 0 (not locked onto a current chase target). The threshold
  * is then set to BASETHRESHOLD (~2.86s) to prevent rapid target-switching.
+ * Damage from a Player or null source never triggers infighting — barrels have
+ * no "source" monster in original DOOM and player attacks don't make monsters
+ * fight each other.
  */
 export function damageEnemy(target, damage, source) {
     target.hp -= damage;
@@ -222,7 +231,7 @@ export function damageEnemy(target, damage, source) {
 
         if (target.type === 2035) {
             playSound('DSBAREXP');
-            barrelExplosion(target);
+            barrelExplosion(target, source);
         } else {
             playSound('DSPODTH1');
             // Based on: linuxdoom-1.10/p_mobj.c:P_NightmareRespawn()
@@ -251,10 +260,10 @@ export function damageEnemy(target, damage, source) {
                 setEnemyState(thingIndex, target, 'pain');
             }
 
-            // Infighting retarget: if the source is another enemy (not the player,
+            // Infighting retarget: if the source is another enemy (not a Player,
             // not self-damage, not null), and the target isn't locked on a chase
             // target (threshold === 0), retarget to the attacker.
-            if (source && source !== 'player' && source !== target
+            if (source && !(source instanceof Player) && source !== target
                 && target.ai.threshold <= 0) {
                 target.ai.target = source;
                 target.ai.threshold = INFIGHTING_THRESHOLD;

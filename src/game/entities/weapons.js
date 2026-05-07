@@ -259,7 +259,7 @@ function checkWeaponHit(player) {
             const target = findHitscanTarget(player, pelletDirX, pelletDirY, weapon.range);
             if (target && hasLineOfSight(player.x, player.y, target.x, target.y)) {
                 spawnPuff(player, target.x, target.y, getFloorHeightAt(target.x, target.y));
-                damageEnemy(target, rollWeaponDamage(player, 'hitscan'), 'player');
+                damageEnemy(target, rollWeaponDamage(player, 'hitscan'), player);
             } else {
                 const wallHit = rayHitPoint(player.x, player.y, pelletDirX, pelletDirY, weapon.range);
                 if (wallHit) spawnPuff(player, wallHit.x, wallHit.y);
@@ -273,7 +273,7 @@ function checkWeaponHit(player) {
 
     if (target && hasLineOfSight(player.x, player.y, target.x, target.y)) {
         if (weapon.hitscan) spawnPuff(player, target.x, target.y, getFloorHeightAt(target.x, target.y));
-        damageEnemy(target, rollWeaponDamage(player, weapon.damageType), 'player');
+        damageEnemy(target, rollWeaponDamage(player, weapon.damageType), player);
         return;
     }
 
@@ -329,7 +329,7 @@ function spawnPlayerRocket(player, forwardX, forwardY) {
         speed: PLAYER_ROCKET_SPEED,
         damage: rollWeaponDamage(player, 'rocket'),
         hitSound: 'DSBAREXP',
-        source: 'player',
+        source: player,
         lifetime,
         isPlayerRocket: true,
         spawnTime: performance.now() / 1000,
@@ -377,7 +377,7 @@ export function rocketExplosion(impactX, impactY) {
 
         if (!hasLineOfSight(impactX, impactY, thing.x, thing.y)) continue;
 
-        damageEnemy(thing, ROCKET_SPLASH_DAMAGE - dist, 'player');
+        damageEnemy(thing, ROCKET_SPLASH_DAMAGE - dist, null);
     }
 }
 

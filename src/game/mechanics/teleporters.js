@@ -65,7 +65,7 @@ export function checkTeleporters() {
                 const thingRadius = thing.ai ? thing.ai.radius : BARREL_RADIUS;
                 const blockDist = PLAYER_RADIUS + thingRadius;
                 if (Math.abs(thing.x - tp.destX) < blockDist && Math.abs(thing.y - tp.destY) < blockDist) {
-                    damageEnemy(thing, 10000, 'player');
+                    damageEnemy(thing, 10000, null);
                 }
             }
 
