@@ -109,7 +109,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
 }
 
 /**
- * Animates the #scene transform by setting an inline transition, then toggling
+ * Animates the .scene transform by setting an inline transition, then toggling
  * the CSS class in the next frame. The inline transition overrides the
  * `transition: none` in spectator CSS rules. A requestAnimationFrame ensures
  * the browser captures the "before" state before applying the class change.

@@ -1,12 +1,17 @@
 /*
  * DOOM HUD — status bar, weapon, overlays, face, keys, digits
+ *
+ * Per-pane: every selector that targets HUD elements uses the per-pane class
+ * roots (.renderer, .hud, .status, .weapon, .viewport, .scene, etc.) rather
+ * than ids. Each pane's HUD lives inside its own .renderer subtree; the
+ * .renderer.<state> classes are toggled by JS on the per-pane renderer.
  */
 
 /* ========================================================================
    HUD Container — wraps status bar, weapon, and overlays
    ======================================================================== */
 
-#hud {
+.hud {
     --scale: 3;
 
     position: fixed;
@@ -16,14 +21,14 @@
 }
 
 @media (max-width: 960px) {
-    #hud { --scale: 2; }
+    .hud { --scale: 2; }
 }
 
 /* ========================================================================
    Status Bar — flex container of independent sections
    ======================================================================== */
 
-#status {
+.status {
     anchor-name: --status;
     position: absolute;
     bottom: 0;
@@ -38,7 +43,7 @@
 
 /* 320*2 = 640px — allow wrapping */
 @media (max-width: 640px) {
-    #status {
+    .status {
         flex-wrap: wrap;
         background: rgba(80, 80, 80, 0.60);
     }
@@ -53,13 +58,13 @@
     overflow: hidden;
 }
 
-#hud-ammo       { width: calc(48px  * var(--scale)); background-position-x: 0; }
-#hud-health     { width: calc(58px  * var(--scale)); background-position-x: calc(-48px  * var(--scale)); }
-#hud-arms       { width: calc(37px  * var(--scale)); background-position-x: calc(-106px * var(--scale)); }
-#hud-face       { width: calc(36px  * var(--scale)); background-position-x: calc(-143px * var(--scale)); }
-#hud-armor      { width: calc(57px  * var(--scale)); background-position-x: calc(-179px * var(--scale)); }
-#hud-keys       { width: calc(13px  * var(--scale)); background-position-x: calc(-236px * var(--scale)); }
-#hud-ammo-types { width: calc(71px  * var(--scale)); background-position-x: calc(-249px * var(--scale)); }
+.hud-section-ammo       { width: calc(48px  * var(--scale)); background-position-x: 0; }
+.hud-section-health     { width: calc(58px  * var(--scale)); background-position-x: calc(-48px  * var(--scale)); }
+.hud-section-arms       { width: calc(37px  * var(--scale)); background-position-x: calc(-106px * var(--scale)); }
+.hud-section-face       { width: calc(36px  * var(--scale)); background-position-x: calc(-143px * var(--scale)); }
+.hud-section-armor      { width: calc(57px  * var(--scale)); background-position-x: calc(-179px * var(--scale)); }
+.hud-section-keys       { width: calc(13px  * var(--scale)); background-position-x: calc(-236px * var(--scale)); }
+.hud-section-ammo-types { width: calc(71px  * var(--scale)); background-position-x: calc(-249px * var(--scale)); }
 
 
 /* ========================================================================
@@ -133,19 +138,19 @@
 }
 
 /* Map container properties to --value per digit element */
-#hud-ammo   .hud-number { --value: var(--ammo, 0);   left: calc(2px * var(--scale)); top: calc(3px * var(--scale)); }
-#hud-health .hud-number { --value: var(--health, 0); }
-#hud-armor  .hud-number { --value: var(--armor, 0); }
+.hud-section-ammo   .hud-number { --value: var(--ammo, 0);   left: calc(2px * var(--scale)); top: calc(3px * var(--scale)); }
+.hud-section-health .hud-number { --value: var(--health, 0); }
+.hud-section-armor  .hud-number { --value: var(--armor, 0); }
 
-#hud-health .hud-pct { left: 0; top: calc(3px * var(--scale)); }
-#hud-armor  .hud-pct { left: 0; top: calc(3px * var(--scale)); }
+.hud-section-health .hud-pct { left: 0; top: calc(3px * var(--scale)); }
+.hud-section-armor  .hud-pct { left: 0; top: calc(3px * var(--scale)); }
 
 
 /* ========================================================================
    Face
    ======================================================================== */
 
-#hud-face {
+.hud-section-face {
     overflow: hidden;
     /* Layer the face background (STFB0) on top of the STBAR slice */
     background-image:
@@ -160,7 +165,7 @@
     background-repeat: no-repeat;
 }
 
-#face-sprite {
+.face-sprite {
     position: absolute;
     left: 50%;
     top: calc(1px * var(--scale));
@@ -180,7 +185,7 @@
     66%      { background-position-x: calc(-48px * var(--scale)); }
 }
 
-#renderer.dead #face-sprite {
+.renderer.dead .face-sprite {
     animation: none;
     background-position-x: 0;
 }
@@ -190,7 +195,7 @@
    Keys
    ======================================================================== */
 
-#hud-keys {
+.hud-section-keys {
     display: flex;
     flex-direction: column;
     justify-content: space-evenly;
@@ -213,9 +218,9 @@
 .key-yellow { background-image: url('/assets/hud/STKEYS1.png'); }
 .key-red    { background-image: url('/assets/hud/STKEYS2.png'); }
 
-#renderer.has-blue-key .key-blue,
-#renderer.has-yellow-key .key-yellow,
-#renderer.has-red-key .key-red {
+.renderer.has-blue-key .key-blue,
+.renderer.has-yellow-key .key-yellow,
+.renderer.has-red-key .key-red {
     opacity: 1;
 }
 
@@ -224,7 +229,7 @@
    Arms (weapon slots 2–7)
    ======================================================================== */
 
-#hud-arms {
+.hud-section-arms {
     background-image:
         url('/assets/hud/STARMS.png'),
         url('/assets/hud/STBAR.png');
@@ -262,19 +267,19 @@
 .slot[data-slot="7"] { background-image: url('/assets/hud/STGNUM7.png'); }
 
 /* Yellow (owned) */
-#renderer.has-weapon-2 .slot[data-slot="2"] { background-image: url('/assets/hud/STYSNUM2.png'); }
-#renderer.has-weapon-3 .slot[data-slot="3"] { background-image: url('/assets/hud/STYSNUM3.png'); }
-#renderer.has-weapon-4 .slot[data-slot="4"] { background-image: url('/assets/hud/STYSNUM4.png'); }
-#renderer.has-weapon-5 .slot[data-slot="5"] { background-image: url('/assets/hud/STYSNUM5.png'); }
-#renderer.has-weapon-6 .slot[data-slot="6"] { background-image: url('/assets/hud/STYSNUM6.png'); }
-#renderer.has-weapon-7 .slot[data-slot="7"] { background-image: url('/assets/hud/STYSNUM7.png'); }
+.renderer.has-weapon-2 .slot[data-slot="2"] { background-image: url('/assets/hud/STYSNUM2.png'); }
+.renderer.has-weapon-3 .slot[data-slot="3"] { background-image: url('/assets/hud/STYSNUM3.png'); }
+.renderer.has-weapon-4 .slot[data-slot="4"] { background-image: url('/assets/hud/STYSNUM4.png'); }
+.renderer.has-weapon-5 .slot[data-slot="5"] { background-image: url('/assets/hud/STYSNUM5.png'); }
+.renderer.has-weapon-6 .slot[data-slot="6"] { background-image: url('/assets/hud/STYSNUM6.png'); }
+.renderer.has-weapon-7 .slot[data-slot="7"] { background-image: url('/assets/hud/STYSNUM7.png'); }
 
 
 /* ========================================================================
    Ammo Panel (bullets, shells, rockets, cells)
    ======================================================================== */
 
-#hud-ammo-types {
+.hud-section-ammo-types {
     position: relative;
 }
 
@@ -359,31 +364,31 @@
    Overlays
    ======================================================================== */
 
-#damage-overlay, #pickup-overlay, #teleport-overlay {
+.damage-overlay, .pickup-overlay, .teleport-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
     opacity: 0;
 }
 
-#damage-overlay { background: red; }
-#pickup-overlay { background: gold; }
-#teleport-overlay { background: #00ff00; }
+.damage-overlay { background: red; }
+.pickup-overlay { background: gold; }
+.teleport-overlay { background: #00ff00; }
 
 @keyframes flash-overlay {
     0%   { opacity: 0.35; }
     100% { opacity: 0; }
 }
 
-#renderer.hurt #damage-overlay {
+.renderer.hurt .damage-overlay {
     animation: flash-overlay 300ms ease-out forwards;
 }
 
-#renderer.pickup-flash #pickup-overlay {
+.renderer.pickup-flash .pickup-overlay {
     animation: flash-overlay 300ms ease-out forwards;
 }
 
-#renderer.teleport-flash #teleport-overlay {
+.renderer.teleport-flash .teleport-overlay {
     animation: flash-overlay 300ms ease-out forwards;
 }
 
@@ -392,25 +397,25 @@
    Powerup Effects
    ======================================================================== */
 
-#renderer.powerup-invulnerability #viewport {
+.renderer.powerup-invulnerability .viewport {
     filter: saturate(0) brightness(1.5) sepia(1) hue-rotate(90deg);
 }
 
-#renderer.powerup-berserk #viewport {
+.renderer.powerup-berserk .viewport {
     filter: saturate(1.3);
 }
 
-#renderer.powerup-invisibility #weapon {
+.renderer.powerup-invisibility .weapon {
     opacity: 0.3;
 }
 
-#renderer.powerup-radsuit #viewport {
+.renderer.powerup-radsuit .viewport {
     filter: sepia(0.3) hue-rotate(60deg) brightness(1.1);
 }
 
-#renderer.powerup-lightamp .wall,
-#renderer.powerup-lightamp .floor,
-#renderer.powerup-lightamp .ceiling {
+.renderer.powerup-lightamp .wall,
+.renderer.powerup-lightamp .floor,
+.renderer.powerup-lightamp .ceiling {
     --light: 1 !important;
 }
 
@@ -444,6 +449,3 @@
         user-select: none;
     }
 }
-
-
-

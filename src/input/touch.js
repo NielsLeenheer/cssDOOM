@@ -221,7 +221,7 @@ function setupPointerHandlers() {
     });
 
     // --- Weapon cycling by tapping the ARMS panel ---
-    const armsPanel = document.getElementById('hud-arms');
+    const armsPanel = document.querySelector('.hud-section-arms');
     if (armsPanel) {
         armsPanel.style.touchAction = 'none';
         armsPanel.addEventListener('pointerdown', e => {

@@ -29,7 +29,7 @@ export function initMouseInput() {
 
     // Fire weapon on left click (outside UI elements)
     document.addEventListener('mousedown', event => {
-        if (event.button === 0 && !spectatorActive && !isTouchDevice && !event.target.closest('#debug-menu, #menu, #hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) {
+        if (event.button === 0 && !spectatorActive && !isTouchDevice && !event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) {
             input.fireHeld = true;
             fireWeapon(state.players[0]);
         }

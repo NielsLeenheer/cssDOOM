@@ -51,7 +51,7 @@ body.sector-lights {
 /* Distance Fog */
 
 body.light-falloff {
-    #scene {
+    .scene {
         --camera-forward-x: calc(sin(calc(var(--player-angle) * 1rad)) * -1);
         --camera-forward-y: cos(calc(var(--player-angle) * 1rad));
     }

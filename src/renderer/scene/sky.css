@@ -1,13 +1,13 @@
 /* Sky */
 
-#viewport {
+.viewport {
     background:
         url('/assets/textures/SKY1.png') repeat-x top left / auto 70%;
     background-position-x: calc(var(--player-angle) * 163px), 0;
     image-rendering: pixelated;
 }
 
-#viewport::after {
+.viewport::after {
     content: '';
     position: absolute;
     inset: 0;

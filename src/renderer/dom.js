@@ -16,11 +16,13 @@
  * single references.
  */
 
-const renderer = document.getElementById('renderer');
-const scene = document.getElementById('scene');
-const viewport = document.getElementById('viewport');
-const status = document.getElementById('status');
-const weaponElement = document.getElementById('weapon');
+// Per-pane elements are looked up by class — index.html holds one .renderer
+// subtree for SP. Phase 3 will add a second pane and the arrays below grow.
+const renderer = document.querySelector('.renderer');
+const scene = document.querySelector('.scene');
+const viewport = document.querySelector('.viewport');
+const status = document.querySelector('.status');
+const weaponElement = document.querySelector('.weapon');
 
 export const dom = {
     // Per-pane elements (legacy singletons + length-1 arrays sharing the same DOM nodes).

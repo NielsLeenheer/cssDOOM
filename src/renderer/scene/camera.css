@@ -1,6 +1,6 @@
 /* Camera Transform — inverse of player position/angle applied to the scene */
 
-#scene {
+.scene {
     translate: 0 0 var(--perspective);
     rotate: x 0deg;
     transform:
@@ -30,7 +30,7 @@
 }
 
 body.head-bob {
-    #scene {
+    .scene {
         transform:
             rotateY(calc(var(--player-angle) * -1rad))
             translate3d(
@@ -39,7 +39,7 @@ body.head-bob {
                 calc(var(--player-y) * 1px)
             );
     }
-    .moving #scene {
+    .moving .scene {
         animation: head-bob 400ms ease-in-out infinite;
     }
 }

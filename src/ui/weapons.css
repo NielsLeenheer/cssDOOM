@@ -1,5 +1,5 @@
 
-#weapon {
+.weapon {
     position: absolute;
     bottom: calc(32px * var(--scale));
     left: 50%;
@@ -17,7 +17,7 @@
 }
 
 @supports (position-anchor: --status) {
-    #weapon {
+    .weapon {
         position-anchor: --status;
         bottom: anchor(top);
         left: anchor(center);
@@ -33,7 +33,7 @@
     to   { background-position-x: calc(var(--w) * var(--frames) * var(--scale) * -1px); }
 }
 
-#weapon.firing {
+.weapon.firing {
     animation: weapon-fire var(--fire-duration) steps(calc(var(--frames) - 1)) forwards;
 }
 
@@ -53,7 +53,7 @@
     100%     { transform: translateX(40px)  translateY(-24px); }
 }
 
-body:not(.spectator) #renderer.moving #weapon:not(.firing):not(.switching) {
+body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
     animation: weapon-bob 1.4s linear infinite;
 }
 
@@ -68,7 +68,7 @@ body:not(.spectator) #renderer.moving #weapon:not(.firing):not(.switching) {
     100% { transform: translateY(0); }
 }
 
-#weapon.switching {
+.weapon.switching {
     animation: weapon-switch 400ms ease-in-out forwards;
     transition: none;
 }
@@ -77,7 +77,7 @@ body:not(.spectator) #renderer.moving #weapon:not(.firing):not(.switching) {
    Death
    ======================================================================== */
 
-#renderer.dead #weapon {
+.renderer.dead .weapon {
     transform: translateY(110%);
 }
 
@@ -85,23 +85,23 @@ body:not(.spectator) #renderer.moving #weapon:not(.firing):not(.switching) {
    Weapon Definitions
    ======================================================================== */
 
-#weapon[data-type="FIST"] {
+.weapon[data-type="FIST"] {
     background-image: url('/assets/weapons/FIST.png');
     --w: 147; --h: 76; --frames: 4;}
 
-#weapon[data-type="PISTOL"] {
+.weapon[data-type="PISTOL"] {
     background-image: url('/assets/weapons/PISTOL.png');
     --w: 79; --h: 103; --frames: 5;}
 
-#weapon[data-type="SHOTGUN"] {
+.weapon[data-type="SHOTGUN"] {
     background-image: url('/assets/weapons/SHOTGUN.png');
     --w: 119; --h: 151; --frames: 6;}
 
-#weapon[data-type="CHAINGUN"] {
+.weapon[data-type="CHAINGUN"] {
     background-image: url('/assets/weapons/CHAINGUN.png');
     --w: 114; --h: 103; --frames: 3;}
 
-#weapon[data-type="CHAINGUN"].firing {
+.weapon[data-type="CHAINGUN"].firing {
     animation: chaingun-fire 300ms steps(2) infinite;
 }
 
@@ -110,10 +110,10 @@ body:not(.spectator) #renderer.moving #weapon:not(.firing):not(.switching) {
     to   { background-position-x: calc(var(--w) * 3 * var(--scale) * -1px); }
 }
 
-#weapon[data-type="ROCKET"] {
+.weapon[data-type="ROCKET"] {
     background-image: url('/assets/weapons/ROCKET.png');
     --w: 105; --h: 119; --frames: 5;}
 
-#weapon[data-type="CHAINSAW"] {
+.weapon[data-type="CHAINSAW"] {
     background-image: url('/assets/weapons/CHAINSAW.png');
     --w: 154; --h: 89; --frames: 4;}

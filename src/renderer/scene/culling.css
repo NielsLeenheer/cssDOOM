@@ -133,7 +133,7 @@ body.css-distance-culling {
 body.css-frustum-culling {
     --max-render-dist-sq: calc(2500 * 2500);
 
-    #scene {
+    .scene {
         /* Camera forward vector */
         --cam-fx: calc(sin(calc(var(--player-angle) * 1rad)) * -1);
         --cam-fy: cos(calc(var(--player-angle) * 1rad));

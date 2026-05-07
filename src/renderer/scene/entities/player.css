@@ -1,12 +1,12 @@
 /* Player */
 
-#renderer.dead {
-    #viewport {
+.renderer.dead {
+    .viewport {
         filter: sepia(0.5) saturate(2) hue-rotate(-20deg);
         transition: filter 1s;
     }
 
-    #scene {
+    .scene {
         --player-z: 10;
     }
 }

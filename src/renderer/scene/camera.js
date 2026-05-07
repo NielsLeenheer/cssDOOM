@@ -2,7 +2,7 @@
  * Camera Module — Updates the CSS 3D camera transform.
  *
  * CSS has no native "camera" concept. To simulate one, we apply an inverse
- * transform to the entire scene container (#scene). Instead of moving a camera
+ * transform to the entire scene container (.scene). Instead of moving a camera
  * forward, we move the whole world backward. Instead of rotating the camera
  * right, we rotate the whole world left. This is the standard trick for
  * first-person 3D in CSS.

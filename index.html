@@ -52,26 +52,27 @@
     <!-- Loading overlay -->
     <div id="loading-overlay" class="visible"></div>
 
-    <!-- Renderer — wraps viewport, HUD, and overlays -->
-    <div id="renderer">
+    <!-- Renderer — wraps viewport, HUD, and overlays. Per-pane: each pane has
+         its own .renderer/.viewport/.scene/.hud/.weapon subtree. SP has one. -->
+    <div class="renderer">
         <!-- Scene viewport -->
-        <div id="viewport">
-            <div id="scene"></div>
+        <div class="viewport">
+            <div class="scene"></div>
         </div>
 
         <!-- HUD — gameplay overlay elements -->
-        <div id="hud">
+        <div class="hud">
         <!-- Status bar -->
-        <div id="status">
-            <div class="hud-section" id="hud-ammo">
-                <output id="ammo" class="hud-number" value=" 50"></output>
+        <div class="status">
+            <div class="hud-section hud-section-ammo">
+                <output class="hud-number" value=" 50"></output>
             </div>
-            <div class="hud-section" id="hud-health">
+            <div class="hud-section hud-section-health">
                 <div class="hud-pct">
-                    <output id="health" class="hud-number" value="100"></output>
+                    <output class="hud-number" value="100"></output>
                 </div>
             </div>
-            <div class="hud-section" id="hud-arms">
+            <div class="hud-section hud-section-arms">
                 <div class="slot" data-slot="2"></div>
                 <div class="slot" data-slot="3"></div>
                 <div class="slot" data-slot="4"></div>
@@ -79,46 +80,46 @@
                 <div class="slot" data-slot="6"></div>
                 <div class="slot" data-slot="7"></div>
             </div>
-            <div class="hud-section" id="hud-face">
-                <div id="face-sprite"></div>
+            <div class="hud-section hud-section-face">
+                <div class="face-sprite"></div>
             </div>
-            <div class="hud-section" id="hud-armor">
+            <div class="hud-section hud-section-armor">
                 <div class="hud-pct">
-                    <output id="armor" class="hud-number" value="  0"></output>
+                    <output class="hud-number" value="  0"></output>
                 </div>
             </div>
-            <div class="hud-section" id="hud-keys">
+            <div class="hud-section hud-section-keys">
                 <div class="key key-blue"></div>
                 <div class="key key-yellow"></div>
                 <div class="key key-red"></div>
             </div>
-            <div class="hud-section" id="hud-ammo-types">
+            <div class="hud-section hud-section-ammo-types">
                 <div class="ammo-row" data-ammo="bullets">
-                    <output class="small-number ammo-cur" id="ammo-cur-bullets"></output>
-                    <output class="small-number ammo-max" id="ammo-max-bullets"></output>
+                    <output class="small-number ammo-cur"></output>
+                    <output class="small-number ammo-max"></output>
                 </div>
                 <div class="ammo-row" data-ammo="shells">
-                    <output class="small-number ammo-cur" id="ammo-cur-shells"></output>
-                    <output class="small-number ammo-max" id="ammo-max-shells"></output>
+                    <output class="small-number ammo-cur"></output>
+                    <output class="small-number ammo-max"></output>
                 </div>
                 <div class="ammo-row" data-ammo="rockets">
-                    <output class="small-number ammo-cur" id="ammo-cur-rockets"></output>
-                    <output class="small-number ammo-max" id="ammo-max-rockets"></output>
+                    <output class="small-number ammo-cur"></output>
+                    <output class="small-number ammo-max"></output>
                 </div>
                 <div class="ammo-row" data-ammo="cells">
-                    <output class="small-number ammo-cur" id="ammo-cur-cells"></output>
-                    <output class="small-number ammo-max" id="ammo-max-cells"></output>
+                    <output class="small-number ammo-cur"></output>
+                    <output class="small-number ammo-max"></output>
                 </div>
             </div>
         </div>
 
         <!-- Weapon (after status bar for CSS anchor positioning) -->
-        <div id="weapon"></div>
+        <div class="weapon"></div>
 
         <!-- Overlays for color effects -->
-        <div id="damage-overlay"></div>
-        <div id="pickup-overlay"></div>
-        <div id="teleport-overlay"></div>
+        <div class="damage-overlay"></div>
+        <div class="pickup-overlay"></div>
+        <div class="teleport-overlay"></div>
     </div>
     </div>
 

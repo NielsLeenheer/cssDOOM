@@ -39,7 +39,7 @@
 }
 
 /* Top-down spectator mode: camera looks down at the map */
-body.spectator:not(.follow-mode) #scene {
+body.spectator:not(.follow-mode) .scene {
     translate: 0 0 var(--perspective);
     rotate: x -70deg;
     transform:
@@ -53,7 +53,7 @@ body.spectator:not(.follow-mode) #scene {
 }
 
 /* Follow mode: camera behind the player using sin/cos */
-body.spectator.follow-mode #scene {
+body.spectator.follow-mode .scene {
     --follow-dist: calc(var(--follow-height) * 0.7);
     translate: 0 10vh var(--perspective);
     rotate: x -55deg;
@@ -75,18 +75,18 @@ body.spectator.follow-mode #player > .sprite {
         scaleX(var(--mirror, 1));
 }
 
-body.spectator #viewport::after {
+body.spectator .viewport::after {
     opacity: 1;
     transition: opacity 1.5s;
 }
 
-body.spectator #status {
+body.spectator .status {
     transform: translateY(100%);
     pointer-events: none;
     transition-delay: 0s;
 }
 
-body.spectator #weapon {
+body.spectator .weapon {
     transform: translateY(calc(100% + 100px));
     pointer-events: none;
     transition-delay: 0s;
@@ -183,7 +183,7 @@ body.spectator #player > .marker {
     animation-duration: calc(var(--frames) * 150ms);
 }
 
-#renderer.moving #player > .sprite {
+.renderer.moving #player > .sprite {
     animation-play-state: running, running;
 }
 
@@ -202,11 +202,11 @@ body.spectator #player > .marker {
 }
 
 
-body.spectator #scene :not(.sector, .ceiling) {
+body.spectator .scene :not(.sector, .ceiling) {
     backface-visibility: visible;
 }
 
-body.spectator #scene .ceiling {
+body.spectator .scene .ceiling {
     display: none;
 }
 
