@@ -57,7 +57,7 @@ export function damagePlayer(player, damageAmount, attacker = null) {
     }
     player.health -= damageAmount;
 
-    renderer.triggerFlash('hurt');
+    renderer.triggerFlash(player.viewportIndex, 'hurt');
     playSound('DSPLPAIN');
 
     if (player.health <= 0) {
@@ -167,7 +167,7 @@ function clearSceneState() {
         player.sectorDamageTimer = 0;
         // Clear all active powerup effects and visuals
         for (const name in player.powerups) {
-            renderer.hidePowerup(name);
+            renderer.hidePowerup(player.viewportIndex, name);
         }
         player.powerups = {};
     }

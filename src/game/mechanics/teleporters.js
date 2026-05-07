@@ -90,7 +90,7 @@ export function checkTeleporters() {
                 // Based on: linuxdoom-1.10/p_telept.c — spawns MT_TFOG at both ends
                 renderer.createTeleportFog(departX, departZ, departY);
                 renderer.createTeleportFog(player.x, player.floorHeight, player.y);
-                renderer.triggerFlash('teleport-flash');
+                renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
                 playSound('DSTELEPT');
 
                 // Update the moving player's camera immediately so there's no

@@ -44,7 +44,7 @@ export function checkPickups(player) {
                 renderer.collectKey(keyColor);
                 thing.collected = true;
                 renderer.collectItem(index);
-                triggerPickupFlash();
+                triggerPickupFlash(player);
                 continue;
             }
 
@@ -83,7 +83,7 @@ export function checkPickups(player) {
                 }
                 thing.collected = true;
                 renderer.collectItem(index);
-                triggerPickupFlash();
+                triggerPickupFlash(player);
                 continue;
             }
 
@@ -119,19 +119,19 @@ export function checkPickups(player) {
             if (PICKUPS.has(thing.type)) {
                 thing.collected = true;
                 renderer.collectItem(index);
-                triggerPickupFlash();
+                triggerPickupFlash(player);
             }
         }
     }
 }
 
 /**
- * Triggers a brief golden flash overlay when the player picks up an item.
- * Rapid successive pickups restart the flash animation.
+ * Triggers a brief golden flash overlay on the given player's pane when they
+ * pick up an item. Rapid successive pickups restart the flash animation.
  */
-function triggerPickupFlash() {
+function triggerPickupFlash(player) {
     playSound('DSITEMUP');
-    renderer.triggerFlash('pickup-flash');
+    renderer.triggerFlash(player.viewportIndex, 'pickup-flash');
 }
 
 // ============================================================================
@@ -157,7 +157,7 @@ function triggerPickupFlash() {
  */
 function activatePowerup(player, name) {
     player.powerups[name] = POWERUP_DURATION[name];
-    renderer.showPowerup(name);
+    renderer.showPowerup(player.viewportIndex, name);
 
     if (name === 'berserk') {
         // Berserk gives +100 health (capped at 100) and auto-switches to fist
@@ -182,12 +182,12 @@ export function updatePowerups(player, deltaTime) {
         // Flicker warning in the last 4 seconds
         if (player.powerups[name] <= 4 && player.powerups[name] > 0) {
             const visible = Math.floor(player.powerups[name] * 8) % 2 === 0;
-            renderer.flickerPowerup(name, visible);
+            renderer.flickerPowerup(player.viewportIndex, name, visible);
         }
 
         if (player.powerups[name] <= 0) {
             delete player.powerups[name];
-            renderer.hidePowerup(name);
+            renderer.hidePowerup(player.viewportIndex, name);
         }
     }
 }
