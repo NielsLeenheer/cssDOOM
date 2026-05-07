@@ -33,7 +33,7 @@ window.teleport = (positionX, positionY, angleDegrees) => {
     if (angleDegrees !== undefined) state.playerAngle = angleDegrees * Math.PI / 180;
     state.floorHeight = getFloorHeightAt(state.playerX, state.playerY);
     state.playerZ = state.floorHeight + EYE_HEIGHT;
-    updateCamera();
+    updateCamera(state.players[0]);
 };
 
 window.save = function (slot = 0) {
@@ -60,7 +60,7 @@ window.load = async function (slot = 0) {
     state.playerAngle = data.angle;
     state.floorHeight = getFloorHeightAt(state.playerX, state.playerY);
     state.playerZ = state.floorHeight + EYE_HEIGHT;
-    updateCamera();
+    updateCamera(state.players[0]);
     console.log(`Loaded slot ${slot}: ${data.map} (${Math.round(data.x)}, ${Math.round(data.y)})`);
 };
 

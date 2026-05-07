@@ -29,42 +29,43 @@
  *        - DOOM Z (height)      → CSS -Y axis (positive here because CSS Y
  *          points down, but the state already stores the negated value)
  *
- * This module passes the player's position and angle to CSS as custom
- * properties (--player-x, --player-y, --player-z, --player-angle), and CSS
- * handles the actual transform composition. This keeps the math in CSS where
- * the browser can optimize transitions (e.g., the falling ease-out on
- * --player-z) and avoids JavaScript reflow overhead.
+ * Per-player: each pane has its own `.viewport` element that owns its own
+ * `--player-x/y/z/floor/angle` custom properties. updateCamera(player) writes
+ * those properties on dom.viewports[player.viewportIndex] so each pane reads
+ * its own values via CSS variable inheritance.
  */
 
-import { state } from '../../game/state.js';
 import { dom } from '../dom.js';
 
 /**
- * Pushes the current player position and viewing angle to CSS custom
- * properties on the viewport element. The CSS transform on #scene reads
- * these properties to compute the inverse camera transform each frame.
+ * Pushes the given player's position and viewing angle to CSS custom
+ * properties on that player's viewport element. The CSS transform on the
+ * pane's `.scene` reads these properties to compute the inverse camera
+ * transform each frame.
  */
-export function updateCamera() {
-    const viewportStyle = dom.viewport.style;
+export function updateCamera(player) {
+    const viewportStyle = dom.viewports[player.viewportIndex].style;
 
     // Horizontal position along the east-west axis
-    viewportStyle.setProperty('--player-x', state.playerX);
+    viewportStyle.setProperty('--player-x', player.x);
 
     // Horizontal position along the north-south axis
-    viewportStyle.setProperty('--player-y', state.playerY);
+    viewportStyle.setProperty('--player-y', player.y);
 
     // Vertical position / height
-    viewportStyle.setProperty('--player-z', state.playerZ);
+    viewportStyle.setProperty('--player-z', player.z);
 
     // Floor height at player position
-    viewportStyle.setProperty('--player-floor', state.floorHeight || 0);
+    viewportStyle.setProperty('--player-floor', player.floorHeight || 0);
 
     // Viewing angle in radians (0 = north, increasing clockwise)
-    viewportStyle.setProperty('--player-angle', state.playerAngle);
+    viewportStyle.setProperty('--player-angle', player.angle);
 
-    // Toggle firing class on player marker for spectator mode visual feedback
+    // Toggle firing class on player marker for spectator mode visual feedback.
+    // Spectator is single-player only (will be disabled in DM), so reading
+    // player 0's firing flag here is correct.
     const marker = document.querySelector('#player > .marker');
     if (marker) {
-        marker.classList.toggle('firing', state.isFiring);
+        marker.classList.toggle('firing', player.isFiring);
     }
 }

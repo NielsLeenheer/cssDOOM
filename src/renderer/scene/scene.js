@@ -8,6 +8,7 @@
  */
 
 import { dom, sceneState } from '../dom.js';
+import { state } from '../../game/state.js';
 import { clearSpatialGrid, buildSpatialGrid } from '../../game/spatial-grid.js';
 import { initDoors } from '../../game/mechanics/doors.js';
 import { initLifts } from '../../game/mechanics/lifts.js';
@@ -64,7 +65,7 @@ export async function buildScene() {
     initLifts();
     initCrushers();
     buildSpatialGrid();
-    updateCamera();
+    for (const player of state.players) updateCamera(player);
 
     // Run culling synchronously before the first frame so the browser
     // never has to composite the entire level at once. Elements are

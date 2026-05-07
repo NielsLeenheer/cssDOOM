@@ -38,14 +38,14 @@ function gameLoop(timestamp) {
     }
 
     if (state.isDead) {
-        updateCamera();
+        for (const player of state.players) updateCamera(player);
         requestAnimationFrame(gameLoop);
         return;
     }
 
     updateGame(timestamp);
     updateHud();
-    updateCamera();
+    for (const player of state.players) updateCamera(player);
 
     if (import.meta.env.DEV || debugEnabled) updateDebugStats();
 
@@ -68,7 +68,7 @@ async function init() {
     
     updateMenuSelection();
     updateHud();
-    updateCamera();
+    for (const player of state.players) updateCamera(player);
 
     await new Promise(resolve => setTimeout(resolve, 600));
 

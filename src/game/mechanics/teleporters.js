@@ -93,10 +93,9 @@ export function checkTeleporters() {
                 renderer.triggerFlash('teleport-flash');
                 playSound('DSTELEPT');
 
-                // Update camera immediately so there's no frame of the old position.
-                // Phase 2 will make updateCamera per-player; today the single-pane
-                // renderer reads via state.player* proxies (player 0 only).
-                renderer.updateCamera();
+                // Update the moving player's camera immediately so there's no
+                // frame of the old position.
+                renderer.updateCamera(player);
 
                 // Disable one-shot teleporters
                 if (tp.oneShot) tp.used = true;
