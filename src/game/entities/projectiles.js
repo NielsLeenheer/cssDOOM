@@ -84,23 +84,35 @@ export function updateProjectiles() {
             continue;
         }
 
-        // Player rockets skip player collision (can't directly hit yourself,
-        // but splash damage from rocketExplosion can still self-damage)
-        if (!projectile.isPlayerRocket) {
-            // Check player collision using circular hit detection
-            const playerDeltaX = projectile.x - state.playerX;
-            const playerDeltaY = projectile.y - state.playerY;
+        // Check player collision using circular hit detection. The projectile's
+        // own firer is skipped (a player rocket can't directly hit its firer,
+        // though rocketExplosion splash can still self-damage). For enemy
+        // projectiles the firer is an enemy, so all players are checked.
+        let hitPlayer = false;
+        for (const player of state.players) {
+            if (player === projectile.source) continue;
+            if (player.isDead) continue;
+            const playerDeltaX = projectile.x - player.x;
+            const playerDeltaY = projectile.y - player.y;
             if (playerDeltaX * playerDeltaX + playerDeltaY * playerDeltaY < PROJECTILE_HIT_RADIUS * PROJECTILE_HIT_RADIUS) {
                 spawnFireballExplosion(projectile.x, projectile.y, projectile.z);
-                // Roll damage on impact: (P_Random()%8+1) * missileDamage
-                // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() missile damage
-                damagePlayer(state.players[0], (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage);
                 playSound(projectile.hitSound);
+                // Player rockets deal direct hit damage + splash; enemy projectiles
+                // roll damage on impact: (P_Random()%8+1) * missileDamage.
+                // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() missile damage.
+                if (projectile.isPlayerRocket) {
+                    damagePlayer(player, projectile.damage, projectile.source);
+                    rocketExplosion(projectile.x, projectile.y);
+                } else {
+                    damagePlayer(player, (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage, projectile.source);
+                }
                 renderer.removeProjectile(projectile.id);
                 state.projectiles.splice(index, 1);
-                continue;
+                hitPlayer = true;
+                break;
             }
         }
+        if (hitPlayer) continue;
 
         // Check enemy collision — projectiles can hit any enemy except the one
         // that fired them. This enables infighting: an Imp fireball that misses
