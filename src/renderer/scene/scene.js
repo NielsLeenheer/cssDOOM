@@ -70,7 +70,7 @@ export async function buildScene() {
     // Run culling synchronously before the first frame so the browser
     // never has to composite the entire level at once. Elements are
     // created hidden and only unhidden here if they pass culling.
-    updateCulling();
+    for (const player of state.players) updateCulling(player);
 }
 
 /**

@@ -9,10 +9,17 @@
  * For floors/ceilings, frustum checks test all four bounding box corners
  * (not just the center) to avoid incorrectly culling large surfaces that
  * partially overlap the view.
+ *
+ * Per-player: each pane has its own player position/angle and its own scene
+ * tree (in sceneStates[i]). updateCulling(player) culls a single pane.
+ * The cullingLoop iterates every player so each pane gets its own visibility
+ * pass each tick. cullingStats reflects the most recent pane's stats —
+ * adequate for SP and for the debug overlay in DM (will be made per-pane
+ * later if needed).
  */
 
 import { state } from '../../game/state.js';
-import { sceneState } from '../dom.js';
+import { dom, sceneStates } from '../dom.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
 import { spectatorActive } from '../../ui/spectator.js';
 
@@ -25,7 +32,8 @@ export const culling = {
 };
 
 // Stats updated each frame — per-step counts track how many elements
-// survived after each culling pass (in processing order)
+// survived after each culling pass (in processing order).
+// Reflects the most recent pane's call.
 export const cullingStats = {
     total: 0,
     culled: 0,
@@ -183,10 +191,13 @@ const SKY_EXEMPT_DISTANCE_SQ = 1500 * 1500;
  * Casts a ray from the player to the element and checks if it crosses any
  * sky wall segment. If so, and the element is far enough past the crossing
  * point, the element is culled.
+ *
+ * `skyGroupOf` is the per-pane sceneStates[i].skyGroupOf, passed in to keep
+ * this function pure.
  */
-function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes) {
+function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGroupOf) {
     // Nearby elements in sky sectors are visible outdoor perimeter — skip culling.
-    if (sceneState.skyGroupOf?.has(sectorIndex)) {
+    if (skyGroupOf?.has(sectorIndex)) {
         const dx2 = x - playerX, dy2 = y - playerY;
         if (dx2 * dx2 + dy2 * dy2 < SKY_EXEMPT_DISTANCE_SQ) return false;
     }
@@ -200,7 +211,7 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes) {
         // Don't cull elements in the same connected sky group as this sky
         // wall — they form the visible perimeter of the same outdoor area.
         // Elements in unrelated sky groups should still be culled.
-        if (plane.skyGroup !== undefined && sceneState.skyGroupOf?.get(sectorIndex) === plane.skyGroup) continue;
+        if (plane.skyGroup !== undefined && skyGroupOf?.get(sectorIndex) === plane.skyGroup) continue;
 
         // Only cull elements above the sky wall's floor — below that,
         // the element could be visible through a window or doorway.
@@ -235,16 +246,18 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes) {
 
 /** Debug: trace sky culling for a wall by ID. Call via traceSky('ld489'). */
 export function debugSkyTrace(wallId) {
-    const el = sceneState.wallElements.find(e => e.id === wallId);
+    // Debug helper — uses pane 0's scene state and player 0.
+    const sState = sceneStates[0];
+    const player = state.players[0];
+    const el = sState.wallElements.find(e => e.id === wallId);
     if (!el) { console.log(`Wall ${wallId} not found in wallElements`); return; }
 
-    const playerX = state.playerX, playerY = state.playerY;
+    const playerX = player.x, playerY = player.y;
     const x = el._midX, y = el._midY;
     const z = el._wall ? el._wall.topHeight : 0;
     const dx = x - playerX, dy = y - playerY;
     const totalDist = Math.sqrt(dx * dx + dy * dy);
-    const skyPlanes = sceneState.skyWallPlanes;
-    const skySectors = sceneState.skySectors;
+    const skyPlanes = sState.skyWallPlanes;
 
     console.log(`--- traceSky(${wallId}) ---`);
     console.log(`Player: (${Math.round(playerX)}, ${Math.round(playerY)})`);
@@ -287,11 +300,12 @@ export function debugSkyTrace(wallId) {
 }
 
 /**
- * Run culling checks on all scene elements. Called each frame from the game loop.
- * Elements are hidden/shown by toggling the `hidden` attribute which maps to
- * `display: none` and fully removes them from compositor work.
+ * Run culling checks on the given player's pane. Called each frame from the
+ * culling loop, once per player. Elements are hidden/shown by toggling the
+ * `hidden` attribute which maps to `display: none` and fully removes them
+ * from compositor work.
  */
-export function updateCulling() {
+export function updateCulling(player) {
     const anyCulling = culling.frustum || culling.distance || culling.backface || culling.sky;
 
     let total = 0;
@@ -301,18 +315,22 @@ export function updateCulling() {
     let frustumCulled = 0;
     let skyCulled = 0;
 
-    const playerX = state.playerX;
-    const playerY = state.playerY;
+    const playerX = player.x;
+    const playerY = player.y;
     const distSq = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
-    const skyPlanes = culling.sky ? sceneState.skyWallPlanes : null;
+    const sState = sceneStates[player.viewportIndex];
+    const skyPlanes = culling.sky ? sState.skyWallPlanes : null;
+    const skyGroupOf = sState.skyGroupOf;
 
-    // Precompute frustum parameters
-    const sinAngle = Math.sin(state.playerAngle);
-    const cosAngle = Math.cos(state.playerAngle);
-    const halfFov = Math.atan2(window.innerWidth / 2, sceneState.perspectiveValue) + FRUSTUM_MARGIN;
+    // Precompute frustum parameters. Half-FOV uses this pane's actual width
+    // so side-by-side panes each cull against their own slice of the screen.
+    const sinAngle = Math.sin(player.angle);
+    const cosAngle = Math.cos(player.angle);
+    const paneWidth = dom.viewports[player.viewportIndex].clientWidth || window.innerWidth;
+    const halfFov = Math.atan2(paneWidth / 2, sState.perspectiveValue) + FRUSTUM_MARGIN;
 
     // Cull walls
-    const walls = sceneState.wallElements;
+    const walls = sState.wallElements;
     for (let i = 0, len = walls.length; i < len; i++) {
         const el = walls[i];
         total++;
@@ -343,7 +361,7 @@ export function updateCulling() {
         }
 
         if (!hide && skyPlanes && skyPlanes.length > 0 && el._midX !== undefined) {
-            if (behindSkyWall(el._midX, el._midY, el._wall ? el._wall.topHeight : 0, el._sectorIndex, playerX, playerY, skyPlanes)) {
+            if (behindSkyWall(el._midX, el._midY, el._wall ? el._wall.topHeight : 0, el._sectorIndex, playerX, playerY, skyPlanes, skyGroupOf)) {
                 hide = true; skyCulled++;
             }
         }
@@ -353,7 +371,7 @@ export function updateCulling() {
     }
 
     // Cull surfaces (floors/ceilings)
-    const surfaces = sceneState.surfaceElements;
+    const surfaces = sState.surfaceElements;
     for (let i = 0, len = surfaces.length; i < len; i++) {
         const el = surfaces[i];
         total++;
@@ -381,7 +399,7 @@ export function updateCulling() {
         }
 
         if (!hide && skyPlanes && skyPlanes.length > 0) {
-            if (behindSkyWall(el._midX, el._midY, el._height, el._sectorIndex, playerX, playerY, skyPlanes)) {
+            if (behindSkyWall(el._midX, el._midY, el._height, el._sectorIndex, playerX, playerY, skyPlanes, skyGroupOf)) {
                 hide = true; skyCulled++;
             }
         }
@@ -391,7 +409,7 @@ export function updateCulling() {
     }
 
     // Cull things (enemies, pickups, decorations)
-    const things = sceneState.thingContainers;
+    const things = sState.thingContainers;
     for (let i = 0, len = things.length; i < len; i++) {
         const t = things[i];
         total++;
@@ -425,7 +443,7 @@ export function updateCulling() {
         }
 
         if (!hide && skyPlanes && skyPlanes.length > 0) {
-            if (behindSkyWall(t.x, t.y, 0, -1, playerX, playerY, skyPlanes)) {
+            if (behindSkyWall(t.x, t.y, 0, -1, playerX, playerY, skyPlanes, skyGroupOf)) {
                 hide = true; skyCulled++;
             }
         }
@@ -449,7 +467,7 @@ function cullingLoop() {
     frameCount++;
     if (frameCount >= CULLING_INTERVAL) {
         frameCount = 0;
-        updateCulling();
+        for (const player of state.players) updateCulling(player);
     }
     requestAnimationFrame(cullingLoop);
 }
