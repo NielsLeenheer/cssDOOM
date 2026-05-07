@@ -44,7 +44,7 @@ function gameLoop(timestamp) {
     }
 
     updateGame(timestamp);
-    updateHud();
+    for (const player of state.players) updateHud(player);
     for (const player of state.players) updateCamera(player);
 
     if (import.meta.env.DEV || debugEnabled) updateDebugStats();
@@ -67,7 +67,7 @@ async function init() {
     startCullingLoop();
     
     updateMenuSelection();
-    updateHud();
+    for (const player of state.players) updateHud(player);
     for (const player of state.players) updateCamera(player);
 
     await new Promise(resolve => setTimeout(resolve, 600));
