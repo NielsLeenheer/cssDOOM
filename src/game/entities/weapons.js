@@ -34,7 +34,7 @@ export function equipWeapon(player, slot) {
 
     player.isFiring = false;
     player.currentWeapon = slot;
-    renderer.switchWeapon(weapon.name, weapon.fireRate);
+    renderer.switchWeapon(player.viewportIndex, weapon.name, weapon.fireRate);
 }
 
 // ============================================================================
@@ -67,7 +67,7 @@ const automaticFireIntervalsByPlayer = new Map();
  *    that the fire animation has completed before allowing re-fire.
  */
 export function fireWeapon(player) {
-    if (player.isDead || player.isFiring || renderer.isWeaponSwitching()) return;
+    if (player.isDead || player.isFiring || renderer.isWeaponSwitching(player.viewportIndex)) return;
 
     const weapon = WEAPONS[player.currentWeapon];
     if (!weapon) return;
@@ -81,7 +81,7 @@ export function fireWeapon(player) {
 
     playSound(weapon.sound);
 
-    renderer.startFiring();
+    renderer.startFiring(player.viewportIndex);
 
     // Perform hitscan hit detection for this shot
     checkWeaponHit(player);
@@ -124,7 +124,7 @@ export function stopAutoFire(player) {
     if (handle) {
         clearInterval(handle);
         automaticFireIntervalsByPlayer.delete(player.index);
-        renderer.stopFiring();
+        renderer.stopFiring(player.viewportIndex);
         player.isFiring = false;
     }
 }
