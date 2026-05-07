@@ -1,0 +1,41 @@
+/* Fronteers Dark Mode '26 — promotional posters on E1M1 walls */
+
+#ld69::after,
+#ld247-fu::after,
+#ld303-fm::after,
+#ld303-bm::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
+    width: 90px;
+    height: 128px;
+    background: no-repeat center / contain;
+    opacity: 0.9;
+}
+
+#ld69::after {
+    background-image: url('/assets/promo-heydon.png');
+}
+
+#ld247-fu::after {
+    /* background-image: url('/assets/promo-harry.png'); */
+    background-image: url('/assets/promo-heydon.png');
+    width: 45px;
+    height: 64px;
+    top: 70%;
+}
+
+#ld303-fm::after {
+    /* background-image: url('/assets/promo-jake.png'); */
+    background-image: url('/assets/promo-cyd.png');
+    width: 45px;
+    height: 64px;
+}
+
+#ld303-bm::after {
+    background-image: url('/assets/promo-cyd.png');
+    width: 45px;
+    height: 64px;
+}
