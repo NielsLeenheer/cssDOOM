@@ -77,7 +77,7 @@ function updateMovingState(player) {
     const wasMoving = wasMovingByPlayer.get(player.index) ?? false;
     if (isMoving !== wasMoving) {
         wasMovingByPlayer.set(player.index, isMoving);
-        renderer.setPlayerMoving(isMoving);
+        renderer.setPlayerMoving(player.viewportIndex, isMoving);
     }
 }
 

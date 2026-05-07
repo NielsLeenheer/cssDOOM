@@ -41,7 +41,7 @@ export function checkPickups(player) {
             const keyColor = KEY_TYPES[thing.type];
             if (keyColor) {
                 player.collectedKeys.add(keyColor);
-                renderer.collectKey(keyColor);
+                renderer.collectKey(player.viewportIndex, keyColor);
                 thing.collected = true;
                 renderer.collectItem(index);
                 triggerPickupFlash(player);

@@ -64,7 +64,7 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         player.health = 0;
         player.isDead = true;
         player.deathTime = performance.now();
-        renderer.setPlayerDead(true);
+        renderer.setPlayerDead(player.viewportIndex, true);
         playSound('DSPLDETH');
     }
 }
@@ -175,7 +175,7 @@ function clearSceneState() {
     for (let index = 0; index < state.projectiles.length; index++) renderer.removeProjectile(state.projectiles[index].id);
     state.projectiles = [];
     state.nextProjectileId = 0;
-    renderer.setPlayerDead(false);
+    for (const player of state.players) renderer.setPlayerDead(player.viewportIndex, false);
 }
 
 // Level transition — keep inventory, clear keys (keys are per-level)
@@ -183,8 +183,8 @@ export function transitionToLevel() {
     clearSceneState();
     for (const player of state.players) {
         player.collectedKeys.clear();
+        renderer.clearKeys(player.viewportIndex);
     }
-    renderer.clearKeys();
     equipWeapon(state.players[0], state.players[0].currentWeapon);
 }
 
@@ -201,8 +201,8 @@ export function resetGameState() {
         player.currentWeapon = 2;
         player.ownedWeapons = new Set([1, 2]);
         player.collectedKeys.clear();
+        renderer.clearKeys(player.viewportIndex);
     }
-    renderer.clearKeys();
     clearWeaponSlots();
     equipWeapon(state.players[0], state.players[0].currentWeapon);
 }
