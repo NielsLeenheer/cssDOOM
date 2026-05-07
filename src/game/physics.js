@@ -3,6 +3,13 @@
  *
  * Uses pure geometry functions from geometry.js and the spatial grid query API
  * from spatial-grid.js.
+ *
+ * Phase 1 multiplayer status: this module still reads state.playerX/Y (in
+ * crossesLinedef) and state.floorHeight (as defaults in canMoveTo and as the
+ * eye-height in rayHitPoint). Those proxy through to state.players[0], which
+ * is correct for SP and for player 0 in DM. Phase 4 will refactor canMoveTo
+ * to take a from-position parameter and rayHitPoint to take an originZ, so
+ * each player's physics queries use their own coordinates instead of player 0's.
  */
 
 import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from './constants.js';

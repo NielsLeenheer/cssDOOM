@@ -53,7 +53,9 @@ export function initCrushers() {
             currentHeight: crusher.topHeight,
             direction: -1,
             active: false,
-            damageTimer: 0,
+            // Damage timer is tracked per-player so two players in the same
+            // crusher accumulate independently. Map<player.index, seconds>.
+            damageTimers: new Map(),
         };
 
         state.crusherState.set(crusher.sectorIndex, entry);
@@ -74,7 +76,7 @@ export function activateCrusher(sectorIndex) {
 
 /**
  * Updates all active crushers each frame. Moves the ceiling height, updates
- * the renderer with the current offset, and damages the player when crushed.
+ * the renderer with the current offset, and damages every player being crushed.
  */
 export function updateCrushers(deltaTime) {
     for (let i = 0; i < crusherEntries.length; i++) {
@@ -97,38 +99,41 @@ export function updateCrushers(deltaTime) {
         const offset = entry.topHeight - entry.currentHeight;
         renderer.setCrusherOffset(entry.sectorIndex, offset);
 
-        // Check if the player is inside the crusher sector and being crushed
-        // Player is crushed when ceiling is at or below player eye height
-        checkCrusherDamage(entry, deltaTime);
+        // Check each player for being crushed; per-player damage timer so two
+        // players in the same crusher accumulate independently.
+        for (const player of state.players) {
+            checkCrusherDamage(entry, player, deltaTime);
+        }
     }
 }
 
 /**
- * Checks if the player is standing in a crusher sector and being crushed.
+ * Checks if the given player is standing in a crusher sector and being crushed.
  * Uses a simple AABB check against the sector's bounding area by checking
  * the floor height at the player's position against the crusher's sector.
  */
-function checkCrusherDamage(entry, deltaTime) {
+function checkCrusherDamage(entry, player, deltaTime) {
     // Only damage when the ceiling is low enough to crush the player
     // Player height is approximately EYE_HEIGHT (41 units)
-    const playerCeilingClearance = entry.currentHeight - state.floorHeight;
+    const playerCeilingClearance = entry.currentHeight - player.floorHeight;
     if (playerCeilingClearance > 41) {
-        entry.damageTimer = 0;
+        entry.damageTimers.delete(player.index);
         return;
     }
 
     // Check if the player is actually in this sector
-    const playerSector = getSectorAt(state.playerX, state.playerY);
+    const playerSector = getSectorAt(player.x, player.y);
     const playerInSector = playerSector && playerSector.sectorIndex === entry.sectorIndex;
 
     if (!playerInSector) {
-        entry.damageTimer = 0;
+        entry.damageTimers.delete(player.index);
         return;
     }
 
-    entry.damageTimer += deltaTime;
-    if (entry.damageTimer >= CRUSHER_DAMAGE_INTERVAL) {
-        entry.damageTimer -= CRUSHER_DAMAGE_INTERVAL;
-        damagePlayer(state.players[0], CRUSHER_DAMAGE);
+    let timer = (entry.damageTimers.get(player.index) ?? 0) + deltaTime;
+    if (timer >= CRUSHER_DAMAGE_INTERVAL) {
+        timer -= CRUSHER_DAMAGE_INTERVAL;
+        damagePlayer(player, CRUSHER_DAMAGE);
     }
+    entry.damageTimers.set(player.index, timer);
 }

@@ -31,14 +31,14 @@ import { activateCrusher } from './crushers.js';
 import { loadMap, getNextMap, getSecretExitMap } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
 
-export function tryUseSwitch() {
+export function tryUseSwitch(player) {
     // Cast a forward ray from the player's position along their facing direction.
     // The check-point is placed at half USE_RANGE ahead — the actual distance
     // threshold is USE_RANGE, so this samples the midpoint of the interaction zone.
-    const forwardX = -Math.sin(state.playerAngle);
-    const forwardY = Math.cos(state.playerAngle);
-    const checkPointX = state.playerX + forwardX * USE_RANGE / 2;
-    const checkPointY = state.playerY + forwardY * USE_RANGE / 2;
+    const forwardX = -Math.sin(player.angle);
+    const forwardY = Math.cos(player.angle);
+    const checkPointX = player.x + forwardX * USE_RANGE / 2;
+    const checkPointY = player.y + forwardY * USE_RANGE / 2;
 
     // Iterate over map walls looking for switch textures.
     for (const wall of mapData.walls) {
@@ -84,7 +84,7 @@ export function tryUseSwitch() {
                     // sector tag matches and activate them.
                     for (const [sectorIndex, doorEntry] of state.doorState) {
                         if (mapData.sectors[sectorIndex].tag === linedef.sectorTag) {
-                            toggleDoor(sectorIndex);
+                            toggleDoor(sectorIndex, player);
                         }
                     }
                     for (const [sectorIndex, liftEntry] of state.liftState) {

@@ -87,7 +87,7 @@ export function initKeyboardInput() {
             // Strafe modifier: Z (arrows strafe instead of turn)
             case 'KeyZ': keys.strafe = true; break;
             // Use action: open doors and activate switches
-            case 'Space': tryOpenDoor(); tryUseSwitch(); tryUseLift(); break;
+            case 'Space': tryOpenDoor(state.players[0]); tryUseSwitch(state.players[0]); tryUseLift(state.players[0]); break;
             // Fire weapon: Alt or X
             case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = true; fireWeapon(state.players[0]); break;
             // Weapon selection: number keys 1-7

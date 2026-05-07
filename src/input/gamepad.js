@@ -86,9 +86,9 @@ function setupGamepad(gamepad) {
     gamepad.before('button0', () => {
         if (handleDeadRestart()) return;
         if (isMenuOpen()) return;
-        tryOpenDoor();
-        tryUseSwitch();
-        tryUseLift();
+        tryOpenDoor(state.players[0]);
+        tryUseSwitch(state.players[0]);
+        tryUseLift(state.players[0]);
     });
 
     // --- Right trigger (R2 / button7): Fire ---

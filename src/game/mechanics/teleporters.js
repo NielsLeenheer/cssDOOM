@@ -26,8 +26,11 @@ import { damageEnemy } from '../entities/combat.js';
 
 /**
  * Checks all teleporter linedefs each frame. Uses crossing detection: fires
- * when the player moves from one side of the linedef to the other, matching
+ * when any player moves from one side of the linedef to the other, matching
  * the original DOOM behaviour (linuxdoom-1.10/p_spec.c:P_CrossSpecialLine).
+ *
+ * Each teleporter maintains a per-player previousSide map so two players
+ * can independently cross the same teleporter.
  */
 export function checkTeleporters() {
     const teleporters = mapData.teleporters;
@@ -37,58 +40,68 @@ export function checkTeleporters() {
         const tp = teleporters[i];
         if (tp.used) continue;
 
-        // Compute which side of the teleporter linedef the player is on
         const dx = tp.end.x - tp.start.x;
         const dy = tp.end.y - tp.start.y;
-        const side = (state.playerX - tp.start.x) * dy - (state.playerY - tp.start.y) * dx;
-        const currentSide = side > 0;
 
-        const previousSide = tp._previousSide;
-        tp._previousSide = currentSide;
+        if (!tp._previousSidePerPlayer) tp._previousSidePerPlayer = new Map();
 
-        // First frame: just record the side, don't fire
-        if (previousSide === undefined) continue;
+        for (const player of state.players) {
+            const side = (player.x - tp.start.x) * dy - (player.y - tp.start.y) * dx;
+            const currentSide = side > 0;
 
-        if (previousSide !== currentSide) {
-            // Save departure position for fog
-            const departX = state.playerX;
-            const departY = state.playerY;
-            const departZ = state.floorHeight;
+            const previousSide = tp._previousSidePerPlayer.get(player.index);
+            tp._previousSidePerPlayer.set(player.index, currentSide);
 
-            // Telefrag: kill anything shootable at the destination
-            // Based on: linuxdoom-1.10/p_map.c:PIT_StompThing()
-            const allThings = state.things;
-            for (let j = 0, len = allThings.length; j < len; j++) {
-                const thing = allThings[j];
-                if (thing.collected) continue;
-                if (!SHOOTABLE.has(thing.type)) continue;
-                const thingRadius = thing.ai ? thing.ai.radius : BARREL_RADIUS;
-                const blockDist = PLAYER_RADIUS + thingRadius;
-                if (Math.abs(thing.x - tp.destX) < blockDist && Math.abs(thing.y - tp.destY) < blockDist) {
-                    damageEnemy(thing, 10000, null);
+            // First frame for this player: just record the side, don't fire
+            if (previousSide === undefined) continue;
+
+            if (previousSide !== currentSide) {
+                // Save departure position for fog
+                const departX = player.x;
+                const departY = player.y;
+                const departZ = player.floorHeight;
+
+                // Telefrag: kill anything shootable at the destination
+                // Based on: linuxdoom-1.10/p_map.c:PIT_StompThing()
+                const allThings = state.things;
+                for (let j = 0, len = allThings.length; j < len; j++) {
+                    const thing = allThings[j];
+                    if (thing.collected) continue;
+                    if (!SHOOTABLE.has(thing.type)) continue;
+                    const thingRadius = thing.ai ? thing.ai.radius : BARREL_RADIUS;
+                    const blockDist = PLAYER_RADIUS + thingRadius;
+                    if (Math.abs(thing.x - tp.destX) < blockDist && Math.abs(thing.y - tp.destY) < blockDist) {
+                        damageEnemy(thing, 10000, null);
+                    }
                 }
+
+                // Teleport the moving player
+                player.x = tp.destX;
+                player.y = tp.destY;
+                player.angle = (tp.destAngle - 90) * Math.PI / 180;
+                player.floorHeight = getFloorHeightAt(player.x, player.y);
+                player.z = player.floorHeight + EYE_HEIGHT;
+                // Mark this player's previous-side as the destination side so we
+                // don't immediately re-trigger the teleporter from the new position.
+                const destSide = (player.x - tp.start.x) * dy - (player.y - tp.start.y) * dx;
+                tp._previousSidePerPlayer.set(player.index, destSide > 0);
+
+                // Spawn teleport fog at departure and arrival
+                // Based on: linuxdoom-1.10/p_telept.c — spawns MT_TFOG at both ends
+                renderer.createTeleportFog(departX, departZ, departY);
+                renderer.createTeleportFog(player.x, player.floorHeight, player.y);
+                renderer.triggerFlash('teleport-flash');
+                playSound('DSTELEPT');
+
+                // Update camera immediately so there's no frame of the old position.
+                // Phase 2 will make updateCamera per-player; today the single-pane
+                // renderer reads via state.player* proxies (player 0 only).
+                renderer.updateCamera();
+
+                // Disable one-shot teleporters
+                if (tp.oneShot) tp.used = true;
+                return; // only one teleport per frame
             }
-
-            // Teleport the player
-            state.playerX = tp.destX;
-            state.playerY = tp.destY;
-            state.playerAngle = (tp.destAngle - 90) * Math.PI / 180;
-            state.floorHeight = getFloorHeightAt(state.playerX, state.playerY);
-            state.playerZ = state.floorHeight + EYE_HEIGHT;
-
-            // Spawn teleport fog at departure and arrival
-            // Based on: linuxdoom-1.10/p_telept.c — spawns MT_TFOG at both ends
-            renderer.createTeleportFog(departX, departZ, departY);
-            renderer.createTeleportFog(state.playerX, state.floorHeight, state.playerY);
-            renderer.triggerFlash('teleport-flash');
-            playSound('DSTELEPT');
-
-            // Update camera immediately so there's no frame of the old position
-            renderer.updateCamera();
-
-            // Disable one-shot teleporters
-            if (tp.oneShot) tp.used = true;
-            break; // only one teleport per frame
         }
     }
 }

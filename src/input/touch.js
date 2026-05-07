@@ -215,9 +215,9 @@ function setupPointerHandlers() {
         if (handleDeadRestart()) return;
 
         e.preventDefault();
-        tryOpenDoor();
-        tryUseSwitch();
-        tryUseLift();
+        tryOpenDoor(state.players[0]);
+        tryUseSwitch(state.players[0]);
+        tryUseLift(state.players[0]);
     });
 
     // --- Weapon cycling by tapping the ARMS panel ---

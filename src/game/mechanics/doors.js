@@ -93,16 +93,18 @@ export function initDoors() {
 
 /**
  * Toggle a door open. If already open, reset the auto-close timer.
- * The renderer handles the open/close animation.
+ * The renderer handles the open/close animation. The `player` parameter is
+ * the player attempting to use the door — checked against their collected
+ * keys for locked doors.
  */
-export function toggleDoor(sectorIndex) {
+export function toggleDoor(sectorIndex, player) {
     const doorEntry = state.doorState.get(sectorIndex);
     if (!doorEntry) return;
 
     // Check key requirement — block if player doesn't have the required key
     // Based on: linuxdoom-1.10/p_doors.c:EV_VerticalDoor()
     if (doorEntry.keyRequired && !doorEntry.open) {
-        if (!state.collectedKeys.has(doorEntry.keyRequired)) {
+        if (!player.collectedKeys.has(doorEntry.keyRequired)) {
             playSound('DSOOF');
             return;
         }
@@ -126,7 +128,7 @@ export function toggleDoor(sectorIndex) {
 
 /**
  * Close a door by resetting its state and triggering the close animation.
- * If the player is inside the door sector, reverse the door (reopen) to avoid
+ * If any player is inside the door sector, reverse the door (reopen) to avoid
  * crushing them — matching DOOM's T_VerticalDoor() blocked-check behavior.
  * Based on: linuxdoom-1.10/p_doors.c:T_VerticalDoor()
  */
@@ -134,12 +136,14 @@ function closeDoor(sectorIndex) {
     const doorEntry = state.doorState.get(sectorIndex);
     if (!doorEntry || !doorEntry.open) return;
 
-    // Check if the player is inside the door sector — if so, reverse
-    const playerSector = getSectorAt(state.playerX, state.playerY);
-    if (playerSector && playerSector.sectorIndex === sectorIndex) {
-        // Player is in the doorway — keep open and retry closing later
-        doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
-        return;
+    // Check if any player is inside the door sector — if so, reverse
+    for (const player of state.players) {
+        const playerSector = getSectorAt(player.x, player.y);
+        if (playerSector && playerSector.sectorIndex === sectorIndex) {
+            // A player is in the doorway — keep open and retry closing later
+            doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
+            return;
+        }
     }
 
     doorEntry.open = false;
@@ -158,14 +162,14 @@ function closeDoor(sectorIndex) {
  * not just walls whose linedef has a door special type.
  * Based on: linuxdoom-1.10/p_map.c:PTR_UseTraverse()
  */
-export function tryOpenDoor() {
+export function tryOpenDoor(player) {
     if (!state.doorState.size) return;
 
     // Calculate a check point in front of the player (halfway to USE_RANGE)
-    const forwardX = -Math.sin(state.playerAngle);
-    const forwardY = Math.cos(state.playerAngle);
-    const checkPointX = state.playerX + forwardX * USE_RANGE / 2;
-    const checkPointY = state.playerY + forwardY * USE_RANGE / 2;
+    const forwardX = -Math.sin(player.angle);
+    const forwardY = Math.cos(player.angle);
+    const checkPointX = player.x + forwardX * USE_RANGE / 2;
+    const checkPointY = player.y + forwardY * USE_RANGE / 2;
 
     for (const wall of mapData.walls) {
         if (!wall.isUpperWall) continue;
@@ -195,7 +199,7 @@ export function tryOpenDoor() {
         const distanceToWall = Math.sqrt((checkPointX - closestPointX) ** 2 + (checkPointY - closestPointY) ** 2);
 
         if (distanceToWall < USE_RANGE) {
-            toggleDoor(doorSectorIndex);
+            toggleDoor(doorSectorIndex, player);
             return;
         }
     }

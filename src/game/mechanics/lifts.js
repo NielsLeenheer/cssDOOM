@@ -158,10 +158,14 @@ export function updatePlayerFromLift(timestamp) {
 
 /**
  * Check all walk-over trigger lines each frame.
- * Uses crossing detection: fires when the player moves from one side of the
+ * Uses crossing detection: fires when any player moves from one side of the
  * trigger linedef to the other, matching the original DOOM behaviour
  * (linuxdoom-1.10/p_spec.c:P_CrossSpecialLine).
- * W1 types (10, 53) fire once; WR types (88, 120) fire on every crossing.
+ * W1 types (10, 53) fire once across all players; WR types (88, 120) fire
+ * on every crossing by any player.
+ *
+ * Each trigger maintains a per-player previousSide map so two players
+ * can independently cross the same line without missing fires.
  */
 export function checkWalkOverTriggers() {
     const triggers = mapData.triggers;
@@ -170,34 +174,42 @@ export function checkWalkOverTriggers() {
     for (let index = 0, count = triggers.length; index < count; index++) {
         const trigger = triggers[index];
 
-        // W1 triggers only fire once
+        // W1 triggers only fire once (across all players)
         if (trigger._triggered) continue;
 
-        // Compute which side of the trigger linedef the player is on.
-        // sign > 0 → front side, sign < 0 → back side.
         const dx = trigger.end.x - trigger.start.x;
         const dy = trigger.end.y - trigger.start.y;
-        const side = (state.playerX - trigger.start.x) * dy - (state.playerY - trigger.start.y) * dx;
-        const currentSide = side > 0;
 
-        const previousSide = trigger._previousSide;
-        trigger._previousSide = currentSide;
+        if (!trigger._previousSidePerPlayer) trigger._previousSidePerPlayer = new Map();
 
-        // First frame: just record the side, don't fire
-        if (previousSide === undefined) continue;
+        for (const player of state.players) {
+            // Compute which side of the trigger linedef the player is on.
+            // sign > 0 → front side, sign < 0 → back side.
+            const side = (player.x - trigger.start.x) * dy - (player.y - trigger.start.y) * dx;
+            const currentSide = side > 0;
 
-        // Fire when the player crosses from one side to the other
-        if (previousSide !== currentSide) {
-            // Mark W1 (one-shot) types so they don't fire again
-            if (trigger.specialType === 10 || trigger.specialType === 53 || trigger.specialType === 36) {
-                trigger._triggered = true;
-            }
+            const previousSide = trigger._previousSidePerPlayer.get(player.index);
+            trigger._previousSidePerPlayer.set(player.index, currentSide);
 
-            // Activate all lifts whose tag matches this trigger's sector tag
-            for (let liftIndex = 0, liftCount = liftEntries.length; liftIndex < liftCount; liftIndex++) {
-                if (liftEntries[liftIndex].entry.tag === trigger.sectorTag) {
-                    activateLift(liftEntries[liftIndex].sectorIndex);
+            // First frame for this player: just record the side, don't fire
+            if (previousSide === undefined) continue;
+
+            // Fire when this player crosses from one side to the other
+            if (previousSide !== currentSide) {
+                // Mark W1 (one-shot) types so they don't fire again
+                if (trigger.specialType === 10 || trigger.specialType === 53 || trigger.specialType === 36) {
+                    trigger._triggered = true;
                 }
+
+                // Activate all lifts whose tag matches this trigger's sector tag
+                for (let liftIndex = 0, liftCount = liftEntries.length; liftIndex < liftCount; liftIndex++) {
+                    if (liftEntries[liftIndex].entry.tag === trigger.sectorTag) {
+                        activateLift(liftEntries[liftIndex].sectorIndex);
+                    }
+                }
+
+                // If this trigger is now exhausted, stop processing more players
+                if (trigger._triggered) break;
             }
         }
     }
@@ -209,13 +221,13 @@ export function checkWalkOverTriggers() {
  * Lift Wait Raise) and activates any matching lifts.
  * Based on: linuxdoom-1.10/p_map.c:PTR_UseTraverse() → EV_DoPlat()
  */
-export function tryUseLift() {
+export function tryUseLift(player) {
     if (!liftEntries.length) return;
 
-    const forwardX = -Math.sin(state.playerAngle);
-    const forwardY = Math.cos(state.playerAngle);
-    const checkX = state.playerX + forwardX * USE_RANGE / 2;
-    const checkY = state.playerY + forwardY * USE_RANGE / 2;
+    const forwardX = -Math.sin(player.angle);
+    const forwardY = Math.cos(player.angle);
+    const checkX = player.x + forwardX * USE_RANGE / 2;
+    const checkY = player.y + forwardY * USE_RANGE / 2;
 
     for (const wall of mapData.walls) {
         const linedef = mapData.linedefs[wall.linedefIndex];
