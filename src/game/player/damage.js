@@ -185,7 +185,7 @@ export function transitionToLevel() {
         player.collectedKeys.clear();
     }
     renderer.clearKeys();
-    equipWeapon(state.players[0].currentWeapon);
+    equipWeapon(state.players[0], state.players[0].currentWeapon);
 }
 
 // Full reset — new game or respawn after death
@@ -204,5 +204,5 @@ export function resetGameState() {
     }
     renderer.clearKeys();
     clearWeaponSlots();
-    equipWeapon(state.players[0].currentWeapon);
+    equipWeapon(state.players[0], state.players[0].currentWeapon);
 }

@@ -9,6 +9,7 @@
  */
 
 import { input } from './index.js';
+import { state } from '../game/state.js';
 import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { registerInputProvider } from './index.js';
@@ -30,11 +31,11 @@ export function initMouseInput() {
     document.addEventListener('mousedown', event => {
         if (event.button === 0 && !spectatorActive && !isTouchDevice && !event.target.closest('#debug-menu, #menu, #hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) {
             input.fireHeld = true;
-            fireWeapon();
+            fireWeapon(state.players[0]);
         }
     });
     document.addEventListener('mouseup', event => {
-        if (event.button === 0) { input.fireHeld = false; stopAutoFire(); }
+        if (event.button === 0) { input.fireHeld = false; stopAutoFire(state.players[0]); }
     });
 
     // Request pointer lock when entering fullscreen

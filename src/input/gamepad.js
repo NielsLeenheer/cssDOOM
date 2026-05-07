@@ -96,11 +96,11 @@ function setupGamepad(gamepad) {
         if (handleDeadRestart()) return;
         if (isMenuOpen()) return;
         input.fireHeld = true;
-        fireWeapon();
+        fireWeapon(state.players[0]);
     });
     gamepad.after('r2', () => {
         input.fireHeld = false;
-        stopAutoFire();
+        stopAutoFire(state.players[0]);
     });
 
     // --- Left bumper (L1 / button4): Previous weapon ---
@@ -157,7 +157,7 @@ function cycleWeapon(direction) {
     const owned = [...state.ownedWeapons].sort((a, b) => a - b);
     const currentIndex = owned.indexOf(state.currentWeapon);
     const nextIndex = (currentIndex + direction + owned.length) % owned.length;
-    equipWeapon(owned[nextIndex]);
+    equipWeapon(state.players[0], owned[nextIndex]);
 }
 
 function handleDeadRestart() {

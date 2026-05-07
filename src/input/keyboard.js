@@ -89,12 +89,12 @@ export function initKeyboardInput() {
             // Use action: open doors and activate switches
             case 'Space': tryOpenDoor(); tryUseSwitch(); tryUseLift(); break;
             // Fire weapon: Alt or X
-            case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = true; fireWeapon(); break;
+            case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = true; fireWeapon(state.players[0]); break;
             // Weapon selection: number keys 1-7
             case 'Digit1': case 'Digit2': case 'Digit3':
             case 'Digit4': case 'Digit5': case 'Digit6': case 'Digit7':
                 const weaponSlot = parseInt(event.code[5]);
-                if (WEAPONS[weaponSlot]) equipWeapon(weaponSlot);
+                if (WEAPONS[weaponSlot]) equipWeapon(state.players[0], weaponSlot);
                 break;
             // Unrecognized key — return early without calling preventDefault
             default: return;
@@ -116,7 +116,7 @@ export function initKeyboardInput() {
             case 'KeyD': case 'Period': keys.strafeRight = false; break;
             case 'ShiftLeft': case 'ShiftRight': keys.run = false; break;
             case 'KeyZ': keys.strafe = false; break;
-            case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = false; stopAutoFire(); break;
+            case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = false; stopAutoFire(state.players[0]); break;
 
             // Meta key release: clear all movement to avoid stuck keys on macOS
             case 'MetaLeft': case 'MetaRight':

@@ -90,7 +90,7 @@ export function checkPickups(player) {
             const weaponPickup = WEAPON_PICKUPS[thing.type];
             if (weaponPickup) {
                 player.ownedWeapons.add(weaponPickup.slot);
-                equipWeapon(weaponPickup.slot);
+                equipWeapon(player, weaponPickup.slot);
                 if (weaponPickup.ammoType) {
                     const amount = (state.skillLevel === 1 || state.skillLevel === 5)
                         ? weaponPickup.amount * 2 : weaponPickup.amount;
@@ -162,7 +162,7 @@ function activatePowerup(player, name) {
     if (name === 'berserk') {
         // Berserk gives +100 health (capped at 100) and auto-switches to fist
         player.health = Math.max(player.health, 100);
-        equipWeapon(1);
+        equipWeapon(player, 1);
     }
 }
 
