@@ -5,6 +5,7 @@
 import { SHOOTABLE, ENEMY_RADIUS, EYE_HEIGHT } from '../constants.js';
 
 import { state } from '../state.js';
+import { Player } from '../player/player.js';
 import { rayHitPoint, getFloorHeightAt } from '../physics.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';
@@ -162,10 +163,10 @@ function spawnFireballExplosion(worldX, worldY, worldZ) {
 export function spawnProjectile(enemy, projectileDefinition) {
     // Resolve target position — aim at the current AI target (player or enemy)
     let targetX, targetY, targetFloorHeight;
-    if (enemy.ai.target === 'player') {
-        targetX = state.playerX;
-        targetY = state.playerY;
-        targetFloorHeight = state.floorHeight;
+    if (enemy.ai.target instanceof Player) {
+        targetX = enemy.ai.target.x;
+        targetY = enemy.ai.target.y;
+        targetFloorHeight = enemy.ai.target.floorHeight;
     } else {
         targetX = enemy.ai.target.x;
         targetY = enemy.ai.target.y;

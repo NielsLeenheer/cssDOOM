@@ -9,6 +9,7 @@ import {
 } from '../constants.js';
 
 import { state, debug } from '../state.js';
+import { Player } from '../player/player.js';
 import { canMoveTo, getFloorHeightAt, getSectorAt } from '../physics.js';
 import * as renderer from '../../renderer/index.js';
 import { hasLineOfSight } from '../line-of-sight.js';
@@ -272,25 +273,25 @@ function updateEnemyPosition(thingIndex, enemy) {
 
 /**
  * Resolves the current chase target's position. Returns {x, y} for wherever
- * the enemy should move toward and attack. If the target is 'player', uses
- * the player's position. If the target is another enemy entry, uses that
- * enemy's position.
+ * the enemy should move toward and attack. The target is either a Player
+ * reference (Phase 4 will pick the nearest visible player; Phase 1 always
+ * uses state.players[0]) or another enemy entry from state.things.
  *
  * Also handles target invalidation: if the target enemy is dead/collected,
  * reverts to targeting the player and resets threshold.
  *
  * Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines ~470-490
- * Accuracy: Exact — same "target dead → threshold=0 → P_LookForPlayers" flow,
- * except P_LookForPlayers always finds the single player in our single-player game.
+ * Accuracy: Exact — same "target dead → threshold=0 → P_LookForPlayers" flow.
  */
 function resolveTarget(enemy, deltaTime) {
     const enemyAI = enemy.ai;
 
-    if (enemyAI.target !== 'player') {
-        // Infighting target — check if it's still alive
+    if (!(enemyAI.target instanceof Player)) {
+        // Infighting target (another enemy) — check if it's still alive
         if (enemyAI.target.collected || enemyAI.target.hp <= 0) {
             // Target killed: revert to chasing the player
-            enemyAI.target = 'player';
+            // Phase 4 will replace this with nearest-visible-player selection.
+            enemyAI.target = state.players[0];
             enemyAI.threshold = 0;
         }
     }
@@ -300,9 +301,6 @@ function resolveTarget(enemy, deltaTime) {
         enemyAI.threshold -= deltaTime;
     }
 
-    if (enemyAI.target === 'player') {
-        return { x: state.playerX, y: state.playerY };
-    }
     return { x: enemyAI.target.x, y: enemyAI.target.y };
 }
 
@@ -375,7 +373,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
             // Attack decision: DOOM checks melee first, then ranged.
             // Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines 405–440
             if ((currentTime - enemyAI.lastAttack) > enemyAI.cooldown * 1000) {
-                if (debug.noEnemyAttack && enemyAI.target === 'player') break;
+                if (debug.noEnemyAttack && enemyAI.target instanceof Player) break;
 
                 // Melee attack: if enemy has a melee state and target is within MELEERANGE (64)
                 if (enemyAI.meleeRange && distSqToTarget < enemyAI.meleeRange * enemyAI.meleeRange) {
@@ -402,7 +400,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
             // the visual wind-up time before the actual hit/shot connects
             if (!enemyAI.damageDealt && enemyAI.stateTime >= enemyAI.attackDuration / 2) {
                 enemyAI.damageDealt = true;
-                const targetIsPlayer = enemyAI.target === 'player';
+                const targetIsPlayer = enemyAI.target instanceof Player;
 
                 if (enemyAI.attackIsMelee) {
                     // Melee attack: random damage roll matching DOOM's A_TroopAttack,
@@ -410,7 +408,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                     const meleeDmg = rollMeleeDamage(enemy.type);
                     if (hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)) {
                         if (targetIsPlayer) {
-                            damagePlayer(state.players[0], meleeDmg, enemy);
+                            damagePlayer(enemyAI.target, meleeDmg, enemy);
                         } else {
                             damageEnemy(enemyAI.target, meleeDmg, enemy);
                         }
@@ -459,9 +457,14 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
  * and sprite rotation calculations.
  */
 export function updateAllEnemies(deltaTime) {
-    if (state.isDead) return;
+    // Skip AI when every player is dead. In SP this is just player 0.
+    if (state.players.every(p => p.isDead)) return;
     const currentTime = performance.now();
     const allThings = state.things;
+    // Phase 1 cull reference uses player 0 only — same behavior as the previous
+    // single-player baseline. Phase 4 will widen to "nearer of all players" so
+    // enemies stay active for whichever player is closest in deathmatch.
+    const cullPlayer = state.players[0];
     for (let index = 0, length = allThings.length; index < length; index++) {
         const thing = allThings[index];
         if (!thing.ai) continue;
@@ -480,8 +483,8 @@ export function updateAllEnemies(deltaTime) {
         }
 
         // Skip enemies too far away for performance (they won't be visible anyway)
-        const deltaX = thing.x - state.playerX;
-        const deltaY = thing.y - state.playerY;
+        const deltaX = thing.x - cullPlayer.x;
+        const deltaY = thing.y - cullPlayer.y;
         if (deltaX * deltaX + deltaY * deltaY > MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE) continue;
 
         updateSingleEnemy(index, thing, deltaTime, currentTime);

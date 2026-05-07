@@ -6,6 +6,7 @@
  * layout, rotation-to-frame mapping, and animation state.
  */
 
+import { state } from '../state.js';
 import { getFloorHeightAt } from '../physics.js';
 import * as renderer from '../../renderer/index.js';
 
@@ -50,7 +51,7 @@ export function respawnEnemy(thingIndex, enemy) {
     // Reset AI state
     enemy.ai.state = 'idle';
     enemy.ai.stateTime = 0;
-    enemy.ai.target = 'player';
+    enemy.ai.target = state.players[0];
     enemy.ai.threshold = 0;
     enemy.ai.reactionTimer = 0;
     enemy.ai.damageDealt = false;

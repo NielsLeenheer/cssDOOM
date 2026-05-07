@@ -94,11 +94,13 @@ export function buildThings() {
                     // Based on: linuxdoom-1.10/p_mobj.c — MTF_AMBUSH (bit 3) means
                     // the enemy is "deaf" and only wakes from sound with LOS
                     ambush: (thing.flags & 8) !== 0,
-                    // Infighting: `target` is 'player' or a reference to another enemy entry.
-                    // `threshold` counts down each AI tick — while > 0 the enemy stays locked
-                    // on its current target and won't retarget.
+                    // Infighting: `target` is a Player reference or a reference to
+                    // another enemy entry. `threshold` counts down each AI tick —
+                    // while > 0 the enemy stays locked on its current target and
+                    // won't retarget. Phase 4 will replace state.players[0] with a
+                    // dynamic nearest-visible-player selection for deathmatch.
                     // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() retarget logic
-                    target: 'player',
+                    target: state.players[0],
                     threshold: 0,
                     ...aiStats
                 };
