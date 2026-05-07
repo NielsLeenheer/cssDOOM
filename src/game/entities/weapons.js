@@ -142,7 +142,7 @@ export function stopAutoFire(player) {
  * (can pass through at most one sound-blocking line).
  */
 function alertNearbyEnemies(player) {
-    propagateSound();
+    propagateSound(player);
 }
 
 // ============================================================================

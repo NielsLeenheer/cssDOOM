@@ -95,18 +95,25 @@ function getLineOpening(linedefIndex) {
 }
 
 /**
- * Floods sound from the player's current position through connected sectors.
- * Marks all reachable sectors so enemies can check via `isSectorAlerted()`.
+ * Floods sound from the given player's current position through connected
+ * sectors. Marks all reachable sectors so enemies can check via
+ * `isSectorAlerted()`.
  *
  * Based on: linuxdoom-1.10/p_enemy.c:P_RecursiveSound()
  * Uses BFS instead of recursion. The `soundtraversed` counter allows sound
  * to pass through at most one ML_SOUNDBLOCK line.
+ *
+ * In deathmatch each firing player calls this independently — the alerted set
+ * is cleared and re-flooded per call, so AI sees the most recent gunshot's
+ * flood. Per-frame races between simultaneous shots are acceptable because AI
+ * idle checks fire frequently enough that either player's flood will wake
+ * nearby enemies in practice.
  */
-export function propagateSound() {
+export function propagateSound(player) {
     alertedSectors.clear();
     if (!adjacency) return;
 
-    const playerSector = getSectorAt(state.playerX, state.playerY);
+    const playerSector = getSectorAt(player.x, player.y);
     if (!playerSector) return;
 
     const startIndex = playerSector.sectorIndex;
