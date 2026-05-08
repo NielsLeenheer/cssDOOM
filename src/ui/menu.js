@@ -9,6 +9,7 @@ import { dom } from '../renderer/dom.js';
 import { MAPS } from '../shared/maps.js';
 import { loadMap } from '../shared/maps.js';
 import { setMirrorMode } from '../renderer/scene/scene.js';
+import { resetMatch, clearMatch } from '../game/match.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 
@@ -68,8 +69,10 @@ function switchMode(mode) {
     // Resize the players array. SP keeps player 0, DM adds player 1.
     if (mode === 'deathmatch') {
         if (state.players.length < 2) state.players.push(new Player(1));
+        resetMatch();
     } else {
         state.players.length = 1;
+        clearMatch();
     }
 
     // The Phase 3 debug mirror is incompatible with real DM (it forces a

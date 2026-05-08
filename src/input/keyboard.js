@@ -34,6 +34,7 @@ import { tryUseSwitch } from '../game/mechanics/switches.js';
 import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spawnPlayer } from '../game/player/spawn.js';
+import { isMatchEnded, restartMatch } from '../game/match.js';
 import { loadMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
 
@@ -100,6 +101,16 @@ export function initKeyboardInput() {
 
         // Block game input while menu is open
         if (isMenuOpen()) return;
+
+        // Match-end restart: any fire / use key triggers a fresh match.
+        if (isMatchEnded()) {
+            const code = event.code;
+            if (code === 'AltLeft' || code === 'AltRight' || code === 'KeyX' || code === 'Space') {
+                restartMatch();
+                event.preventDefault();
+            }
+            return;
+        }
 
         // Tab — dev-only keyboard target switch (gated). Caught before the
         // dead-restart gate so Tab still works even if the current target

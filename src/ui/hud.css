@@ -427,6 +427,55 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
 
 
 /* ========================================================================
+   Deathmatch scoreboard + win overlay
+   ======================================================================== */
+
+#dm-scoreboard {
+    display: none;
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1100;
+    font-family: 'PressStart2P', monospace;
+    font-size: 18px;
+    color: #ffd700;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+    gap: 14px;
+    pointer-events: none;
+    align-items: center;
+}
+
+body[data-mode="deathmatch"] #dm-scoreboard {
+    display: flex;
+}
+
+.dm-score-sep {
+    opacity: 0.5;
+}
+
+#dm-win-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    align-items: center;
+    justify-content: center;
+    font-family: 'PressStart2P', monospace;
+    font-size: 32px;
+    color: #ffd700;
+    text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
+    background: rgba(0, 0, 0, 0.7);
+    pointer-events: none;
+    letter-spacing: 4px;
+}
+
+body[data-match-ended="true"] #dm-win-overlay {
+    display: flex;
+}
+
+
+/* ========================================================================
    Powerup Effects
    ======================================================================== */
 

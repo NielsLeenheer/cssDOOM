@@ -57,5 +57,15 @@ export class Player {
         // code can find the player as a damageable target.
         this.thingRef = null;
         this.thingIndex = -1;
+
+        // Deathmatch frag count. Reset to 0 by resetMatch() at the start of
+        // each match; awardFrag(victim, killer) increments the killer (or
+        // decrements the victim on suicide).
+        this.score = 0;
+
+        // Most-recent attacker, for kill attribution in awardFrag. Set by
+        // damagePlayer; meaningful only between damage and death.
+        this.lastDamagedBy = null;
+        this.lastDamagedTime = 0;
     }
 }

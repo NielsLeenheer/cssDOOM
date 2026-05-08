@@ -9,6 +9,7 @@ import { pointInPolygon } from '../geometry.js';
 import { forEachSectorAt } from '../spatial-grid.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { getSectorAt } from '../physics.js';
+import { awardFrag } from '../match.js';
 import * as renderer from '../../renderer/index.js';
 import { clearWeaponSlots } from '../../renderer/hud.js';
 
@@ -58,6 +59,11 @@ export function damagePlayer(player, damageAmount, attacker = null) {
     }
     player.health -= damageAmount;
 
+    // Record attribution so awardFrag can credit the right killer when this
+    // damage pushes health to zero.
+    player.lastDamagedBy = attacker;
+    player.lastDamagedTime = performance.now();
+
     renderer.triggerFlash(player.viewportIndex, 'hurt');
     playSound('DSPLPAIN');
 
@@ -65,6 +71,8 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         player.health = 0;
         player.isDead = true;
         player.deathTime = performance.now();
+        // DM frag attribution. SP no-ops because state.match is null.
+        awardFrag(player, attacker);
         // Mark this player's thing entry collected so AI ignores them,
         // PvP collision lets the other player walk through, and hitscan /
         // projectile loops skip the now-defunct live entry. The live

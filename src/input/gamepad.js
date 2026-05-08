@@ -32,6 +32,7 @@ import { tryUseSwitch } from '../game/mechanics/switches.js';
 import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spawnPlayer } from '../game/player/spawn.js';
+import { isMatchEnded, restartMatch } from '../game/match.js';
 import { loadMap } from '../shared/maps.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
@@ -115,6 +116,7 @@ function setupGamepad(gamepad) {
     gamepad.before('button0', () => {
         const player = playerForPad();
         if (!player) return;
+        if (isMatchEnded()) { restartMatch(); return; }
         if (handleDeadRestart(player)) return;
         if (isMenuOpen()) return;
         tryOpenDoor(player);
@@ -126,6 +128,7 @@ function setupGamepad(gamepad) {
     gamepad.before('r2', () => {
         const player = playerForPad();
         if (!player) return;
+        if (isMatchEnded()) { restartMatch(); return; }
         if (handleDeadRestart(player)) return;
         if (isMenuOpen()) return;
         inputs[playerIndex].fireHeld = true;

@@ -13,6 +13,7 @@ import { updateProjectiles } from './entities/projectiles.js';
 import { checkWalkOverTriggers } from './mechanics/lifts.js';
 import { checkTeleporters } from './mechanics/teleporters.js';
 import { updateCrushers } from './mechanics/crushers.js';
+import { matchTick } from './match.js';
 
 let previousTimestamp = 0;
 
@@ -23,6 +24,15 @@ export function updateGame(timestamp) {
         console.log('[game] deltaTime:', deltaTime.toFixed(4), 'ts:', timestamp.toFixed(1), 'prev:', previousTimestamp.toFixed(1));
     }
     previousTimestamp = timestamp;
+
+    // Tick the DM match clock and check the time-limit end condition.
+    // No-op in SP (state.match is null).
+    matchTick();
+    if (state.match?.ended) {
+        // Match ended — freeze all gameplay logic. The win overlay covers
+        // the screen; input handlers route fire-press to restartMatch().
+        return;
+    }
 
     // Single per-frame input collection — populates inputs[i] for every
     // active player slot from all registered providers.

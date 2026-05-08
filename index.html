@@ -140,6 +140,16 @@
         </div>
     </template>
 
+    <!-- DM scoreboard — shown only when body[data-mode="deathmatch"]. -->
+    <div id="dm-scoreboard">
+        <span class="dm-score" data-player="0">0</span>
+        <span class="dm-score-sep">—</span>
+        <span class="dm-score" data-player="1">0</span>
+    </div>
+
+    <!-- DM match-end overlay — shown when body[data-match-ended="true"]. -->
+    <div id="dm-win-overlay"></div>
+
     <!-- Spectator UI -->
     <div id="spectator">
         <div id="spectator-controls" class="hidden">

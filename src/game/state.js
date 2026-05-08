@@ -21,6 +21,10 @@ export const state = {
     // this when starting a match; CSS layout (body[data-mode]) follows.
     mode: 'singleplayer',
 
+    // Deathmatch match state. Null in SP. Set by resetMatch() to
+    // { fragLimit, timeLimit, startTime, ended, winner }.
+    match: null,
+
     // Runtime-mutable keyboard+mouse target slot (which player they drive).
     // Default is player 0. The dev Tab handler toggles this between 0 and 1
     // when `import.meta.env.DEV && state.mode === 'deathmatch' && no gamepads`.
