@@ -534,8 +534,7 @@ body[data-attract="true"] #attract-overlay {
 body[data-attract="true"] .hud,
 body[data-attract="true"] #spectator,
 body[data-attract="true"] #menu-button,
-body[data-attract="true"] #fullscreen-button,
-body[data-attract="true"] #help-button {
+body[data-attract="true"] #ui-buttons {
     display: none;
 }
 

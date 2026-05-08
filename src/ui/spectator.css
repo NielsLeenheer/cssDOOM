@@ -235,39 +235,20 @@ body.spectator.follow-mode #aim-line {
 
 /* ========================================================================
    Spectator Button
+   Layout (size, position, hover) is handled by the shared #ui-buttons
+   cluster in help.css — only the active-state highlight lives here.
    ======================================================================== */
 
-#spectator-button {
-    position: fixed;
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    right: calc(12px + env(safe-area-inset-right, 0px));
-    z-index: 999;
-    width: 38px;
-    height: 38px;
-    background: none;
-    border: none;
-    padding: 4px;
-    cursor: pointer;
-    transition: filter 0.15s;
-
-    & img {
-        width: 100%;
-        height: 100%;
-        filter: invert(0.55);
-        transition: filter 0.15s;
-    }
-
-    &:hover img { filter: invert(1); }
-}
-
-body.spectator #spectator-button {
-
-    & img { filter: invert(1); }
+body.spectator #spectator-button img {
+    filter: invert(1);
 }
 
 /* Spectator is single-player only. Hide entry points in deathmatch so the
-   button can't be tapped and the aim-line / controls never appear. */
-body[data-mode="deathmatch"] #spectator {
+   button can't be tapped and the aim-line / controls never appear. The
+   button now lives in #ui-buttons (outside #spectator), so it gets its
+   own hide rule below. */
+body[data-mode="deathmatch"] #spectator,
+body[data-mode="deathmatch"] #spectator-button {
     display: none;
 }
 

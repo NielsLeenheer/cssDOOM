@@ -164,6 +164,16 @@
          the kiosk idle timer fires. Any input press dismisses it. -->
     <div id="attract-overlay" class="attract-overlay">PRESS START</div>
 
+    <!-- Top-right UI button cluster — flex container so each button takes
+         the next slot and a hidden one collapses out (no manual offsets).
+         In video-wall layout the cluster is anchored to the right edge of
+         the left pane (50vw) so buttons land on a single monitor. -->
+    <div id="ui-buttons">
+        <button id="fullscreen-button" aria-label="Fullscreen"><img src="assets/icons/fullscreen.svg" alt=""></button>
+        <button id="help-button" aria-label="Help"><img src="assets/icons/help.svg" alt=""></button>
+        <button id="spectator-button" aria-label="Spectator"><img src="assets/icons/binoculars.svg" alt=""></button>
+    </div>
+
     <!-- Spectator UI -->
     <div id="spectator">
         <div id="spectator-controls" class="hidden">
@@ -188,13 +198,10 @@
                 <button class="spectator-tab" data-mode="follow"><img src="assets/icons/follow.svg" alt="Follow"></button>
             </div>
         </div>
-        <button id="spectator-button" aria-label="Spectator"><img src="assets/icons/binoculars.svg" alt=""></button>
         <div id="aim-line"></div>
     </div>
 
     <!-- Help overlay -->
-    <button id="fullscreen-button" aria-label="Fullscreen"><img src="assets/icons/fullscreen.svg" alt=""></button>
-    <button id="help-button" aria-label="Help"><img src="assets/icons/help.svg" alt=""></button>
     <div id="help-overlay" hidden>
         <div id="help-content">
             <table>

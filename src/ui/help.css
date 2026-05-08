@@ -1,35 +1,30 @@
-/* Fullscreen button — top right, next to spectator button */
+/* ========================================================================
+   Top-right UI button cluster (fullscreen, help, spectator)
+   Flex row anchored to the top-right corner. Hidden buttons (e.g. the
+   spectator button in DM) collapse out and the others slide in to fill
+   the slot — no per-button offsets to maintain.
+   ======================================================================== */
 
-#fullscreen-button {
+#ui-buttons {
     position: fixed;
     top: calc(12px + env(safe-area-inset-top, 0px));
-    right: calc(100px + env(safe-area-inset-right, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
     z-index: 999;
-    width: 38px;
-    height: 38px;
-    background: none;
-    border: none;
-    padding: 4px;
-    cursor: pointer;
-    transition: filter 0.15s;
-
-    & img {
-        width: 100%;
-        height: 100%;
-        filter: invert(0.55);
-        transition: filter 0.15s;
-    }
-
-    &:hover img { filter: invert(1); }
+    display: flex;
+    gap: 6px;
+    pointer-events: none; /* children re-enable */
 }
 
-/* Help button — top right, next to fullscreen button */
+/* In the video-wall layout (>=24/9), pin the cluster to the right edge of
+   the left pane (50vw) so all buttons sit on a single monitor instead of
+   straddling the bezel. */
+@media (min-aspect-ratio: 24/9) {
+    #ui-buttons {
+        right: calc(50vw + 12px);
+    }
+}
 
-#help-button {
-    position: fixed;
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    right: calc(56px + env(safe-area-inset-right, 0px));
-    z-index: 999;
+#ui-buttons > button {
     width: 38px;
     height: 38px;
     background: none;
@@ -37,6 +32,7 @@
     padding: 4px;
     cursor: pointer;
     transition: filter 0.15s;
+    pointer-events: auto;
 
     & img {
         width: 100%;

@@ -46,7 +46,7 @@ export function initMouseInput() {
     document.addEventListener('mousedown', event => {
         pingActivity();
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
-        if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) return;
+        if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #ui-buttons')) return;
 
         if (isMatchEnded()) { restartMatch(); return; }
 
