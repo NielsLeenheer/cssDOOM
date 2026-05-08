@@ -157,6 +157,13 @@ function transitionCeilings(fadeIn, duration, delay = 0) {
 }
 
 window.spectate = function() {
+    // Spectator is single-player only — the camera follows state.players[0]
+    // and the controls overlay isn't routed per-pane. Refuse to enter from
+    // a DM session; allow exit if somehow already active.
+    if (state.mode === 'deathmatch' && !spectatorActive) {
+        console.log('Spectator mode is disabled in deathmatch.');
+        return;
+    }
     spectatorActive = !spectatorActive;
     if (spectatorActive) {
         spectator.offsetX = 0;

@@ -63,6 +63,12 @@ document.querySelectorAll('.menu-mode').forEach(btn => {
  * so the scene rebuilds with the right number of panes.
  */
 function switchMode(mode) {
+    // Spectator is single-player only — drop out of it before swapping
+    // modes so its body classes and scene transforms don't bleed into DM.
+    if (mode === 'deathmatch' && document.body.classList.contains('spectator')) {
+        window.spectate?.();
+    }
+
     state.mode = mode;
     document.body.dataset.mode = mode;
 

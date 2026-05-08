@@ -265,6 +265,12 @@ body.spectator #spectator-button {
     & img { filter: invert(1); }
 }
 
+/* Spectator is single-player only. Hide entry points in deathmatch so the
+   button can't be tapped and the aim-line / controls never appear. */
+body[data-mode="deathmatch"] #spectator {
+    display: none;
+}
+
 
 /* ========================================================================
    Spectator Controls
