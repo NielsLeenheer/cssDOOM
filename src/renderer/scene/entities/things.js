@@ -22,8 +22,12 @@ export function buildThings() {
     if (!mapData.things) return;
 
     for (const thing of mapData.things) {
-        // Bit 4 = multiplayer only — skip in single player
-        if (thing.flags & 16) continue;
+        // Bit 4 (0x0010) = multiplayer-only. Maps mark extra weapons /
+        // ammo / powerups with this flag so they spawn in network play
+        // but not single-player. Honour that: skip MP-only things in
+        // SP, allow them through in DM (matches doom.exe -netgame).
+        // Based on: linuxdoom-1.10/p_mobj.c P_SpawnMapThing()
+        if ((thing.flags & 16) && state.mode === 'singleplayer') continue;
         // Skill level flags: bit 0 = skill 1-2, bit 1 = skill 3, bit 2 = skill 4-5
         const skillBit = state.skillLevel <= 2 ? 1 : state.skillLevel === 3 ? 2 : 4;
         if (!(thing.flags & skillBit)) continue;
