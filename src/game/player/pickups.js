@@ -25,6 +25,9 @@ import { equipWeapon } from '../entities/weapons.js';
 import { playSound } from '../../audio/audio.js';
 import * as renderer from '../../renderer/index.js';
 
+/** Item respawn delay in deathmatch — collected pickups reappear after this. */
+const DM_ITEM_RESPAWN_SECONDS = 30;
+
 export function checkPickups(player) {
     if (player.isDead) return;
 
@@ -40,6 +43,9 @@ export function checkPickups(player) {
         if (distanceSquared < PICKUP_RANGE * PICKUP_RANGE) {
             const keyColor = KEY_TYPES[thing.type];
             if (keyColor) {
+                // DM rule: every player has all keys from spawn; map keys
+                // are left in the world but never picked up.
+                if (state.mode === 'deathmatch') continue;
                 player.collectedKeys.add(keyColor);
                 renderer.collectKey(player.viewportIndex, keyColor);
                 thing.collected = true;
@@ -195,4 +201,34 @@ export function updatePowerups(player, deltaTime) {
 /** Returns true if the named powerup is currently active. */
 export function hasPowerup(player, name) {
     return player.powerups[name] > 0;
+}
+
+/**
+ * Tick every collected pickup's respawn timer (DM only). When a pickup's
+ * timer expires its `.collected` flag clears in both game state and DOM
+ * so the next checkPickups frame picks it up again.
+ *
+ * Skips:
+ *   - Player corpses (handled via spawn/respawn flow)
+ *   - Key things (DM doesn't use keys; map keys stay forever)
+ *   - Things that aren't pickups (decorations, enemies, barrels)
+ */
+export function checkItemRespawns(deltaTime) {
+    if (state.mode !== 'deathmatch') return;
+
+    const things = state.things;
+    for (let i = 0, len = things.length; i < len; i++) {
+        const thing = things[i];
+        if (!thing.collected) continue;
+        if (thing.kind === 'player') continue;
+        if (KEY_TYPES[thing.type]) continue;
+        if (!PICKUPS.has(thing.type) && !WEAPON_PICKUPS[thing.type]) continue;
+
+        thing.respawnTimer = (thing.respawnTimer ?? DM_ITEM_RESPAWN_SECONDS) - deltaTime;
+        if (thing.respawnTimer <= 0) {
+            thing.collected = false;
+            delete thing.respawnTimer;
+            renderer.uncollectItem(i);
+        }
+    }
 }

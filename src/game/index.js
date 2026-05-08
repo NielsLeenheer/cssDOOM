@@ -7,7 +7,7 @@ import { state } from './state.js';
 import { collectInputs } from '../input/index.js';
 import { updateMovement } from './movement.js';
 import { checkSectorDamage } from './player/damage.js';
-import { checkPickups, updatePowerups } from './player/pickups.js';
+import { checkPickups, updatePowerups, checkItemRespawns } from './player/pickups.js';
 import { updateAllEnemies } from './entities/ai.js';
 import { updateProjectiles } from './entities/projectiles.js';
 import { checkWalkOverTriggers } from './mechanics/lifts.js';
@@ -55,4 +55,6 @@ export function updateGame(timestamp) {
         checkPickups(player);
         updatePowerups(player, deltaTime);
     }
+    // DM only: tick the 30-second respawn timer on collected pickups.
+    checkItemRespawns(deltaTime);
 }

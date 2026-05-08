@@ -86,6 +86,13 @@ export function spawnPlayer(player) {
     renderer.setPlayerDead(player.viewportIndex, false);
     renderer.clearKeys(player.viewportIndex);
     equipWeapon(player, player.currentWeapon);
+    // DM rule: every respawn comes back with all three keys.
+    if (state.mode === 'deathmatch') {
+        for (const color of ['blue', 'yellow', 'red']) {
+            player.collectedKeys.add(color);
+            renderer.collectKey(player.viewportIndex, color);
+        }
+    }
 
     // Spawn-fog effect + sound, matching DOOM-authentic respawn feel.
     renderer.createTeleportFog(player.x, player.floorHeight, player.y);

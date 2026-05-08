@@ -235,8 +235,15 @@ export function resetGameState() {
     }
     clearWeaponSlots();
     // Each player's weapon DOM needs equipWeapon to set data-type so the
-    // right sprite renders in their pane.
+    // right sprite renders in their pane. In DM, also grant every player
+    // all three keys (DOOM-authentic — DM doesn't gate doors by keys).
     for (const player of state.players) {
         equipWeapon(player, player.currentWeapon);
+        if (state.mode === 'deathmatch') {
+            for (const color of ['blue', 'yellow', 'red']) {
+                player.collectedKeys.add(color);
+                renderer.collectKey(player.viewportIndex, color);
+            }
+        }
     }
 }
