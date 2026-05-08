@@ -17,6 +17,7 @@ import { initMouseInput } from './src/input/mouse.js';
 import { initTouchInput } from './src/input/touch.js';
 import { initGamepadInput } from './src/input/gamepad.js';
 import { initDebugMenu, updateDebugStats } from './src/ui/debug.js';
+import { attractTick, isAttractActive } from './src/ui/attract.js';
 import './src/ui/spectator.js';
 
 let debugEnabled = false;
@@ -48,6 +49,15 @@ function renderAllActivePanes() {
  */
 function gameLoop(timestamp) {
     if (!mapData) {
+        requestAnimationFrame(gameLoop);
+        return;
+    }
+
+    attractTick(timestamp);
+    if (isAttractActive()) {
+        // Skip game logic in attract mode — attractTick is rotating the
+        // camera; just render the current scene state and idle the world.
+        renderAllActivePanes();
         requestAnimationFrame(gameLoop);
         return;
     }

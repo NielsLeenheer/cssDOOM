@@ -27,6 +27,7 @@ import { inputs, registerInputProvider } from './index.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
+import { pingActivity } from '../ui/attract.js';
 import { tryOpenDoor } from '../game/mechanics/doors.js';
 import { tryUseSwitch } from '../game/mechanics/switches.js';
 import { tryUseLift } from '../game/mechanics/lifts.js';
@@ -84,6 +85,9 @@ export function initGamepadInput() {
                 const rx = parseFloat(axes1[0]) || 0;
                 padState.turnDelta = Math.abs(rx) > STICK_DEADZONE ? -rx * TURN_SENSITIVITY : 0;
             }
+            // Any stick activity counts as engagement for the attract loop —
+            // button-press paths ping separately in their own handlers.
+            if (padState.moveX || padState.moveY || padState.turnDelta) pingActivity();
         }
     });
 }
@@ -114,6 +118,7 @@ function setupGamepad(gamepad) {
 
     // --- A / Cross (button0): Use ---
     gamepad.before('button0', () => {
+        pingActivity();
         const player = playerForPad();
         if (!player) return;
         if (isMatchEnded()) { restartMatch(); return; }
@@ -126,6 +131,7 @@ function setupGamepad(gamepad) {
 
     // --- Right trigger (R2 / button7): Fire ---
     gamepad.before('r2', () => {
+        pingActivity();
         const player = playerForPad();
         if (!player) return;
         if (isMatchEnded()) { restartMatch(); return; }
@@ -142,29 +148,32 @@ function setupGamepad(gamepad) {
 
     // --- Left bumper (L1 / button4): Previous weapon ---
     gamepad.before('l1', () => {
+        pingActivity();
         if (isMenuOpen()) return;
         cycleWeapon(playerIndex, -1);
     });
 
     // --- Right bumper (R1 / button5): Next weapon ---
     gamepad.before('r1', () => {
+        pingActivity();
         if (isMenuOpen()) return;
         cycleWeapon(playerIndex, 1);
     });
 
     // --- Start (button9): Toggle menu ---
     gamepad.before('start', () => {
+        pingActivity();
         toggleMenu(!isMenuOpen());
     });
 
     // --- D-pad: alternative movement ---
-    gamepad.on('up0',    () => { padState.moveY = 1; });
+    gamepad.on('up0',    () => { pingActivity(); padState.moveY = 1; });
     gamepad.after('up0', () => { padState.moveY = 0; });
-    gamepad.on('down0',    () => { padState.moveY = -1; });
+    gamepad.on('down0',    () => { pingActivity(); padState.moveY = -1; });
     gamepad.after('down0', () => { padState.moveY = 0; });
-    gamepad.on('left0',    () => { padState.moveX = -1; });
+    gamepad.on('left0',    () => { pingActivity(); padState.moveX = -1; });
     gamepad.after('left0', () => { padState.moveX = 0; });
-    gamepad.on('right0',    () => { padState.moveX = 1; });
+    gamepad.on('right0',    () => { pingActivity(); padState.moveX = 1; });
     gamepad.after('right0', () => { padState.moveX = 0; });
 }
 

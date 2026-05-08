@@ -476,6 +476,50 @@ body[data-match-ended="true"] #dm-win-overlay {
 
 
 /* ========================================================================
+   Attract Loop
+   Shown when body[data-attract="true"] — kiosk idle prompt. Camera is
+   slow-rotated by attract.js; this overlay sits on top with a dimmed
+   background and a pulsing "PRESS START" prompt.
+   ======================================================================== */
+
+#attract-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    align-items: center;
+    justify-content: center;
+    font-family: 'PressStart2P', monospace;
+    font-size: 36px;
+    color: #ffd700;
+    text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
+    background: rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    letter-spacing: 6px;
+    animation: attract-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes attract-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+}
+
+body[data-attract="true"] #attract-overlay {
+    display: flex;
+}
+
+/* Hide HUD chrome behind the attract overlay so only the world rotates. */
+body[data-attract="true"] .hud,
+body[data-attract="true"] #dm-scoreboard,
+body[data-attract="true"] #spectator,
+body[data-attract="true"] #menu-button,
+body[data-attract="true"] #fullscreen-button,
+body[data-attract="true"] #help-button {
+    display: none;
+}
+
+
+/* ========================================================================
    Powerup Effects
    ======================================================================== */
 

@@ -37,6 +37,7 @@ import { spawnPlayer } from '../game/player/spawn.js';
 import { isMatchEnded, restartMatch } from '../game/match.js';
 import { loadMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
+import { pingActivity } from '../ui/attract.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
 const SP_RESTART_COOLDOWN_MS = 4000;
@@ -91,6 +92,7 @@ export function initKeyboardInput() {
     // Tracks which movement keys are pressed and handles discrete actions
     // (use, fire, weapon switch). Repeated key events are ignored.
     document.addEventListener('keydown', event => {
+        pingActivity();
 
         // Escape toggles the menu overlay
         if (event.code === 'Escape') {

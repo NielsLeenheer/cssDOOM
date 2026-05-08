@@ -18,6 +18,7 @@ import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { isMatchEnded, restartMatch } from '../game/match.js';
 import { spectatorActive } from '../ui/spectator.js';
+import { pingActivity } from '../ui/attract.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
 
@@ -43,6 +44,7 @@ export function initMouseInput() {
     // Fire weapon on left click (outside UI elements). In DM, fire on a
     // dead kbm-target player respawns them after the cooldown.
     document.addEventListener('mousedown', event => {
+        pingActivity();
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
         if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) return;
 
@@ -78,6 +80,7 @@ export function initMouseInput() {
     document.addEventListener('mousemove', event => {
         if (document.pointerLockElement) {
             turnDelta -= event.movementX * MOUSE_SENSITIVITY;
+            pingActivity();
         }
     });
 }
