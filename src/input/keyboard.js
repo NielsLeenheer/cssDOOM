@@ -33,8 +33,12 @@ import { tryOpenDoor } from '../game/mechanics/doors.js';
 import { tryUseSwitch } from '../game/mechanics/switches.js';
 import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
+import { spawnPlayer } from '../game/player/spawn.js';
 import { loadMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
+
+const DM_RESPAWN_COOLDOWN_MS = 2000;
+const SP_RESTART_COOLDOWN_MS = 4000;
 
 // Internal key state — not exposed to the game layer. Note these are GLOBAL
 // across players: the keyboard physically belongs to one human at a time, so
@@ -111,9 +115,21 @@ export function initKeyboardInput() {
 
         const player = kbmPlayer();
 
-        // When dead, any key restarts after a 4-second cooldown
+        // Dead handling differs by mode:
+        //   SP: any key restarts the level after a 4-second cooldown.
+        //   DM: any key respawns this player at a deathmatch start after a
+        //       2-second cooldown — the rest of the world keeps playing.
         if (player?.isDead) {
-            if (performance.now() - player.deathTime > 4000) loadMap(currentMap);
+            const cooldown = state.mode === 'deathmatch'
+                ? DM_RESPAWN_COOLDOWN_MS
+                : SP_RESTART_COOLDOWN_MS;
+            if (performance.now() - player.deathTime > cooldown) {
+                if (state.mode === 'deathmatch') {
+                    spawnPlayer(player);
+                } else {
+                    loadMap(currentMap);
+                }
+            }
             return;
         }
 

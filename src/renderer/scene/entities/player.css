@@ -6,7 +6,10 @@
         transition: filter 1s;
     }
 
+    /* Drop the camera to (just above) the floor at the corpse position.
+       Uses --player-floor (set per-pane by updateCamera) so the death drop
+       respects raised platforms / lifts where the player actually died. */
     .scene {
-        --player-z: 10;
+        --player-z: calc(var(--player-floor) + 10);
     }
 }

@@ -6,3 +6,11 @@
     background-image: url('/assets/sprites/sheets/TRED.png');
     --w: 26; --h: 97; --frames: 4;
 }
+
+/* Player corpse — non-interactive decoration spawned at death. Inherits the
+   billboard rotation from the global `.decoration img` rule in things.css.
+   image-rendering: pixelated keeps the sprite crisp at scale. */
+.decoration.corpse img {
+    image-rendering: pixelated;
+    backface-visibility: visible;
+}

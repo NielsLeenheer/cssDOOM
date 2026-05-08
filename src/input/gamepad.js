@@ -31,7 +31,11 @@ import { tryOpenDoor } from '../game/mechanics/doors.js';
 import { tryUseSwitch } from '../game/mechanics/switches.js';
 import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
+import { spawnPlayer } from '../game/player/spawn.js';
 import { loadMap } from '../shared/maps.js';
+
+const DM_RESPAWN_COOLDOWN_MS = 2000;
+const SP_RESTART_COOLDOWN_MS = 4000;
 
 const STICK_DEADZONE = 0.15;
 const TURN_SENSITIVITY = 0.04;
@@ -176,8 +180,15 @@ function cycleWeapon(playerIndex, direction) {
 
 function handleDeadRestart(player) {
     if (!player.isDead) return false;
-    if (performance.now() - player.deathTime > 4000) {
-        loadMap(currentMap);
+    const cooldown = state.mode === 'deathmatch'
+        ? DM_RESPAWN_COOLDOWN_MS
+        : SP_RESTART_COOLDOWN_MS;
+    if (performance.now() - player.deathTime > cooldown) {
+        if (state.mode === 'deathmatch') {
+            spawnPlayer(player);
+        } else {
+            loadMap(currentMap);
+        }
     }
     return true;
 }

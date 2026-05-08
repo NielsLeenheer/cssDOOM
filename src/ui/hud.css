@@ -394,6 +394,39 @@
 
 
 /* ========================================================================
+   Respawn prompt (deathmatch only)
+   ======================================================================== */
+
+.respawn-prompt {
+    position: absolute;
+    inset: 0;
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    font-family: 'PressStart2P', monospace;
+    font-size: 16px;
+    color: #ffd700;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+    letter-spacing: 2px;
+    opacity: 0;
+}
+
+@keyframes respawn-prompt-fade-in {
+    to { opacity: 1; }
+}
+
+/* Show only when this pane's player is dead AND we're in deathmatch.
+   Fades in after a 2-second delay matching the respawn cooldown so the
+   prompt appears exactly when fire is allowed to respawn. */
+body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
+    display: flex;
+    animation: respawn-prompt-fade-in 0.4s ease-out 2s forwards;
+}
+
+
+/* ========================================================================
    Powerup Effects
    ======================================================================== */
 

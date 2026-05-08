@@ -15,9 +15,9 @@ export { triggerFlash, showPowerup, flickerPowerup, hidePowerup } from './effect
 export {
     setEnemyState, resetEnemy, killEnemy,
     updateEnemyRotation, updateThingPosition, reparentThingToSector,
-    collectItem, setThingMoving,
+    collectItem, uncollectItem, setThingMoving,
     createPuff, createExplosion, createTeleportFog, createProjectile, removeProjectile,
-    createPlayerSprite,
+    createPlayerSprite, createCorpse,
 } from './scene/entities/sprites.js';
 
 // Player visuals

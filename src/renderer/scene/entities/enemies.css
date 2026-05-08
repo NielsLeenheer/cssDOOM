@@ -85,8 +85,11 @@ body.all-enemies-shadow .enemy .sprite {
     display: none;
 }
 
-/* Hide a dead player's sprite (the corpse). Phase 4 round 5 will replace
-   this with a non-blocking corpse thing for the death-cam to look at. */
+/* When a player dies, their LIVE sprite is hidden — a separate `.corpse`
+   decoration is spawned at the death point by damage.js's createCorpse so
+   the body persists at the original location even after the live player
+   respawns elsewhere. AI / hitscan / collision skip the live entry via
+   thingRef.collected. */
 .enemy.player.collected {
     visibility: hidden;
 }

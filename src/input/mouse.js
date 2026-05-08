@@ -15,7 +15,10 @@
 import { inputs, registerInputProvider } from './index.js';
 import { state } from '../game/state.js';
 import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
+import { spawnPlayer } from '../game/player/spawn.js';
 import { spectatorActive } from '../ui/spectator.js';
+
+const DM_RESPAWN_COOLDOWN_MS = 2000;
 
 const MOUSE_SENSITIVITY = 0.003;
 const isTouchDevice = matchMedia('(pointer: coarse)').matches;
@@ -36,12 +39,22 @@ export function initMouseInput() {
     // Mouse shares the keyboard target slot.
     registerInputProvider(() => state.kbmTargetPlayer, getInput);
 
-    // Fire weapon on left click (outside UI elements)
+    // Fire weapon on left click (outside UI elements). In DM, fire on a
+    // dead kbm-target player respawns them after the cooldown.
     document.addEventListener('mousedown', event => {
-        if (event.button === 0 && !spectatorActive && !isTouchDevice && !event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) {
-            inputs[state.kbmTargetPlayer].fireHeld = true;
-            fireWeapon(kbmPlayer());
+        if (event.button !== 0 || spectatorActive || isTouchDevice) return;
+        if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) return;
+
+        const player = kbmPlayer();
+        if (player?.isDead) {
+            if (state.mode === 'deathmatch'
+                && performance.now() - player.deathTime > DM_RESPAWN_COOLDOWN_MS) {
+                spawnPlayer(player);
+            }
+            return;
         }
+        inputs[state.kbmTargetPlayer].fireHeld = true;
+        fireWeapon(player);
     });
     document.addEventListener('mouseup', event => {
         if (event.button === 0) {

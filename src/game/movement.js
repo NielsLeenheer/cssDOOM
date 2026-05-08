@@ -13,6 +13,10 @@ import { inputs } from '../input/index.js';
 const wasMovingByPlayer = new Map();
 
 export function updateMovement(player, deltaTime, timestamp) {
+    // Dead players don't move — their input is gated upstream and their
+    // camera drops to floor via the .renderer.dead CSS rule. Other players
+    // continue updating independently.
+    if (player.isDead) return;
     updateLocation(player, deltaTime);
     updatePlayerFromLift(timestamp);
     updateHeight(player);

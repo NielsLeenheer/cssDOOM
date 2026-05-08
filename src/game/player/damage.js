@@ -8,6 +8,7 @@ import { playSound } from '../../audio/audio.js';
 import { pointInPolygon } from '../geometry.js';
 import { forEachSectorAt } from '../spatial-grid.js';
 import { equipWeapon } from '../entities/weapons.js';
+import { getSectorAt } from '../physics.js';
 import * as renderer from '../../renderer/index.js';
 import { clearWeaponSlots } from '../../renderer/hud.js';
 
@@ -64,10 +65,25 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         player.health = 0;
         player.isDead = true;
         player.deathTime = performance.now();
-        // Mark this player's thing entry collected so AI ignores the corpse,
-        // PvP collision lets the other player walk through it, and hitscan /
-        // projectile loops skip it.
+        // Mark this player's thing entry collected so AI ignores them,
+        // PvP collision lets the other player walk through, and hitscan /
+        // projectile loops skip the now-defunct live entry. The live
+        // sprite is hidden via .collected CSS — a separate corpse
+        // decoration takes its place at the death position so the body
+        // persists even after respawn moves the live entry elsewhere.
         if (player.thingRef) player.thingRef.collected = true;
+        if (player.thingIndex >= 0) {
+            // Hide the live player sprite (visibility:hidden via .collected CSS)
+            // and freeze its walk animation. The static corpse decoration takes
+            // visual ownership of the death point.
+            renderer.collectItem(player.thingIndex);
+            renderer.setThingMoving(player.thingIndex, false);
+        }
+
+        // Spawn a static corpse decoration at the death point.
+        const sector = getSectorAt(player.x, player.y);
+        renderer.createCorpse(player.x, player.y, player.floorHeight, sector?.sectorIndex);
+
         renderer.setPlayerDead(player.viewportIndex, true);
         playSound('DSPLDETH');
     }

@@ -52,7 +52,11 @@ function gameLoop(timestamp) {
         return;
     }
 
-    if (state.isDead) {
+    // Freeze game logic only when EVERY player is dead. In DM with one
+    // player alive, the world (enemies, doors, etc.) keeps ticking and the
+    // alive player keeps playing; the dead player's camera shows the
+    // death-cam view at their corpse until they fire to respawn.
+    if (state.players.every(p => p.isDead)) {
         for (let i = 0; i < sceneStates.length; i++) {
             if (sceneStates[i].wallElements.length === 0) continue;
             const player = state.players[i] || state.players[0];

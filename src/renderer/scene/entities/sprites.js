@@ -204,6 +204,15 @@ export function collectItem(thingIndex) {
     }
 }
 
+/** Reverse of collectItem — removes the .collected class so the sprite
+ *  re-appears. Used when a player respawns. */
+export function uncollectItem(thingIndex) {
+    for (const sState of sceneStates) {
+        const domData = sState.thingDom.get(thingIndex);
+        if (domData) domData.element.classList.remove('collected');
+    }
+}
+
 /**
  * Toggles the `.moving` class on a thing's container in every pane. Used by
  * movement.js to pause/resume player billboard sprite walk-cycle animation
@@ -322,6 +331,40 @@ export function createPlayerSprite(thingIndex, playerIndex, x, y, floorHeight, s
 
         sState.thingDom.set(thingIndex, { element: container, sprite });
         sState.thingContainers.push({ element: container, x, y, gameId: thingIndex });
+    }
+}
+
+/**
+ * Spawns a player corpse at the given position in every pane's scene tree.
+ * Static decoration (single PLAYN0 sprite, billboarded to face the viewer)
+ * — doesn't enter state.things, has no game-state interaction. Persists
+ * for the rest of the match; cleared on next teardownScene().
+ */
+export function createCorpse(x, y, floorHeight, sectorIndex) {
+    for (let i = 0; i < sceneStates.length; i++) {
+        const sState = sceneStates[i];
+        const sceneEl = dom.scenes[i];
+        if (!sceneEl) continue;
+
+        const container = document.createElement('div');
+        container.className = 'decoration corpse';
+        container.style.setProperty('--x', x);
+        container.style.setProperty('--y', y);
+        container.style.setProperty('--floor-z', floorHeight);
+
+        const img = document.createElement('img');
+        img.src = '/assets/sprites/PLAYN0.png';
+        img.draggable = false;
+        container.appendChild(img);
+
+        const sectorContainer = sectorIndex !== undefined && sectorIndex !== null
+            ? sState.sectorContainers[sectorIndex]
+            : null;
+        if (sectorContainer) {
+            sectorContainer.appendChild(container);
+        } else {
+            sceneEl.appendChild(container);
+        }
     }
 }
 
