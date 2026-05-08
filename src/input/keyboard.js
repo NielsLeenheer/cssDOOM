@@ -99,10 +99,13 @@ export function initKeyboardInput() {
 
         // Tab — dev-only keyboard target switch (gated). Caught before the
         // dead-restart gate so Tab still works even if the current target
-        // is dead.
-        if (event.code === 'Tab' && canSwitchKbmTarget()) {
-            switchKbmTarget();
+        // is dead. We always preventDefault Tab so it doesn't cycle focus
+        // through page elements regardless of whether the gate is active.
+        if (event.code === 'Tab') {
             event.preventDefault();
+            if (canSwitchKbmTarget()) {
+                switchKbmTarget();
+            }
             return;
         }
 

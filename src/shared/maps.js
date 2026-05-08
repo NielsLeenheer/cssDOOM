@@ -67,8 +67,12 @@ export async function loadMap(name) {
     await buildScene();
     buildSectorAdjacency();
 
-    // Drop camera from intro height to eye level after scene is ready
-    setTimeout(() => { state.playerZ = state.floorHeight + EYE_HEIGHT; }, 600);
+    // Drop camera from intro height to eye level after scene is ready —
+    // every active player's pane gets the drop animation (CSS transition
+    // on --player-z smooths the jump).
+    setTimeout(() => {
+        for (const p of state.players) p.z = p.floorHeight + EYE_HEIGHT;
+    }, 600);
 
     if (!isInitialLoad) {
         hideLevelTransition();
@@ -76,15 +80,62 @@ export async function loadMap(name) {
 }
 
 /**
- * Sets player position and angle from the current map's start data.
+ * Sets each player's position and angle from the current map's start data.
+ *
+ * Single-player: uses mapData.playerStart (a precomputed starting point with
+ * x/y/angle/floorHeight, where angle is in radians and floorHeight is
+ * preset by the map exporter).
+ *
+ * Deathmatch: each player gets a different `type === 11` thing (DOOM
+ * deathmatch-start markers; angle in degrees, no floorHeight). With fewer
+ * starts than players, players cycle through what's available. Floor
+ * height for DM spawns falls back to playerStart's value — the first
+ * updateHeight() frame will resample to the actual sector floor.
  */
 function applyPlayerStart() {
-    state.playerX = mapData.playerStart.x;
-    state.playerY = mapData.playerStart.y;
-    state.playerAngle = mapData.playerStart.angle - Math.PI / 2;
-    state.floorHeight = mapData.playerStart.floorHeight || 0;
+    if (state.mode === 'deathmatch') {
+        applyDeathmatchStarts();
+    } else {
+        applySinglePlayerStart();
+    }
+}
+
+function applySinglePlayerStart() {
+    const player = state.players[0];
+    player.x = mapData.playerStart.x;
+    player.y = mapData.playerStart.y;
+    player.angle = mapData.playerStart.angle - Math.PI / 2;
+    player.floorHeight = mapData.playerStart.floorHeight || 0;
     // Start camera high, then drop to eye height for intro effect
-    state.playerZ = state.floorHeight + 80;
+    player.z = player.floorHeight + 80;
+}
+
+function applyDeathmatchStarts() {
+    const dmStarts = (mapData.things || []).filter(t => t.type === 11);
+    const fallbackFloor = mapData.playerStart?.floorHeight || 0;
+
+    for (let i = 0; i < state.players.length; i++) {
+        const player = state.players[i];
+        const start = dmStarts.length > 0 ? dmStarts[i % dmStarts.length] : null;
+
+        if (start) {
+            player.x = start.x;
+            player.y = start.y;
+            // DM start angles are degrees, 0=east. State playerAngle is
+            // radians, 0=north — same conversion as mapData.playerStart minus
+            // π/2 north adjustment.
+            player.angle = (start.angle * Math.PI / 180) - Math.PI / 2;
+            player.floorHeight = fallbackFloor;
+        } else if (mapData.playerStart) {
+            // No DM starts in this map — both players spawn together at
+            // playerStart. Rare, but graceful fallback.
+            player.x = mapData.playerStart.x;
+            player.y = mapData.playerStart.y;
+            player.angle = mapData.playerStart.angle - Math.PI / 2;
+            player.floorHeight = fallbackFloor;
+        }
+        player.z = player.floorHeight + 80;
+    }
 }
 
 export function getNextMap() {

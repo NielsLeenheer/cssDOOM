@@ -184,8 +184,10 @@ export function transitionToLevel() {
     for (const player of state.players) {
         player.collectedKeys.clear();
         renderer.clearKeys(player.viewportIndex);
+        // Each player's weapon DOM needs equipWeapon to set data-type so
+        // the right sprite renders in their pane.
+        equipWeapon(player, player.currentWeapon);
     }
-    equipWeapon(state.players[0], state.players[0].currentWeapon);
 }
 
 // Full reset — new game or respawn after death
@@ -204,5 +206,9 @@ export function resetGameState() {
         renderer.clearKeys(player.viewportIndex);
     }
     clearWeaponSlots();
-    equipWeapon(state.players[0], state.players[0].currentWeapon);
+    // Each player's weapon DOM needs equipWeapon to set data-type so the
+    // right sprite renders in their pane.
+    for (const player of state.players) {
+        equipWeapon(player, player.currentWeapon);
+    }
 }

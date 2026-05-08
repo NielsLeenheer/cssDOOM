@@ -28,13 +28,21 @@ export function updateGame(timestamp) {
     // active player slot from all registered providers.
     collectInputs();
 
-    updateMovement(state.players[0], deltaTime, timestamp);
-    checkSectorDamage(state.players[0], deltaTime);
+    // Per-player updates (movement, sector damage, pickups, powerups).
+    // World updates (enemies, projectiles, doors, teleporters, crushers)
+    // run once per frame; their internal logic iterates state.players where
+    // it needs to touch each player.
+    for (const player of state.players) {
+        updateMovement(player, deltaTime, timestamp);
+        checkSectorDamage(player, deltaTime);
+    }
     updateAllEnemies(deltaTime);
     updateProjectiles(deltaTime);
     checkWalkOverTriggers();
     checkTeleporters();
     updateCrushers(deltaTime);
-    checkPickups(state.players[0]);
-    updatePowerups(state.players[0], deltaTime);
+    for (const player of state.players) {
+        checkPickups(player);
+        updatePowerups(player, deltaTime);
+    }
 }

@@ -1,12 +1,14 @@
 /**
- * Menu — level picker and skill selection overlay.
+ * Menu — level / skill / mode selection overlay.
  */
 
 import { state } from '../game/state.js';
+import { Player } from '../game/player/player.js';
 import { currentMap } from '../shared/maps.js';
 import { dom } from '../renderer/dom.js';
 import { MAPS } from '../shared/maps.js';
 import { loadMap } from '../shared/maps.js';
+import { setMirrorMode } from '../renderer/scene/scene.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 
@@ -42,12 +44,53 @@ document.querySelectorAll('.menu-skill').forEach(btn => {
     });
 });
 
+// Mode buttons
+document.querySelectorAll('.menu-mode').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        if (mode === state.mode) return;
+        switchMode(mode);
+        updateMenuSelection();
+        toggleMenu(false);
+    });
+});
+
+/**
+ * Switch between single-player and deathmatch. Resizes state.players,
+ * updates body[data-mode] (drives split-screen CSS), turns off the debug
+ * pane-1 mirror (incompatible with real DM), and reloads the current map
+ * so the scene rebuilds with the right number of panes.
+ */
+function switchMode(mode) {
+    state.mode = mode;
+    document.body.dataset.mode = mode;
+
+    // Resize the players array. SP keeps player 0, DM adds player 1.
+    if (mode === 'deathmatch') {
+        if (state.players.length < 2) state.players.push(new Player(1));
+    } else {
+        state.players.length = 1;
+    }
+
+    // The Phase 3 debug mirror is incompatible with real DM (it forces a
+    // mirror of player 0 into pane 1; DM wants player 1's own view there).
+    setMirrorMode(false);
+
+    // Force a full game state reset by marking player 0 dead before reload.
+    // loadMap's resetGameState path then resets every player's stats.
+    state.players[0].isDead = true;
+    loadMap(currentMap);
+}
+
 export function updateMenuSelection() {
     document.querySelectorAll('.menu-level').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.map === currentMap);
     });
     document.querySelectorAll('.menu-skill').forEach(btn => {
         btn.classList.toggle('active', parseInt(btn.dataset.skill) === state.skillLevel);
+    });
+    document.querySelectorAll('.menu-mode').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === state.mode);
     });
 }
 
