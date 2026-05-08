@@ -70,6 +70,14 @@ body.all-enemies-shadow .enemy .sprite {
     backface-visibility: visible;
 }
 
+/* DM color variants — the WAD only ships green; extract-graphics.js applies
+   DOOM's translation tables at build time to produce -indigo / -brown / -red
+   variants. P0 stays green; P1 is red — highest contrast against the
+   default green so the opposing player reads at speed and at distance. */
+.enemy.player[data-player-index="1"] .sprite[data-type="player"] {
+    background-image: url('/assets/sprites/sheets/PLAY-red.png');
+}
+
 .enemy.player {
     backface-visibility: visible;
 }
