@@ -31,7 +31,6 @@ export function resetMatch({
     for (const p of state.players) p.score = 0;
     document.body.removeAttribute('data-match-ended');
     setWinOverlayText('');
-    updateScoreboard();
 }
 
 /** Clears any DM match state — called when leaving DM mode. */
@@ -57,7 +56,6 @@ export function awardFrag(victim, killer) {
     } else {
         victim.score--;
     }
-    updateScoreboard();
     checkFragLimit();
 }
 
@@ -125,13 +123,3 @@ export function restartMatch() {
     loadMap(currentMap);
 }
 
-function updateScoreboard() {
-    // Write into the global #dm-scoreboard *and* every per-pane
-    // .pane-scoreboard copy (used in video-wall layouts).
-    for (const scoreboard of document.querySelectorAll('.dm-scoreboard')) {
-        for (const player of state.players) {
-            const el = scoreboard.querySelector(`[data-player="${player.index}"]`);
-            if (el) el.textContent = String(player.score);
-        }
-    }
-}

@@ -92,6 +92,15 @@
                         <div class="slot" data-slot="6"></div>
                         <div class="slot" data-slot="7"></div>
                     </div>
+                    <!-- DM frags counter — replaces the ARMS box in
+                         deathmatch. Two-digit big-red score with optional
+                         minus, plus the "FRAGS" panel texture overlay.
+                         Display range clamped to -9..99 in hud.js;
+                         underlying player.score is uncapped. -->
+                    <div class="hud-section hud-section-frags">
+                        <div class="frags-digit frags-tens"></div>
+                        <div class="frags-digit frags-ones"></div>
+                    </div>
                     <div class="hud-section hud-section-face">
                         <div class="face-sprite"></div>
                     </div>
@@ -143,25 +152,10 @@
                  the bezel between two displays splits the screen and
                  centred text would land on it. Sit outside .hud so the
                  attract-mode HUD-hide rule doesn't suppress them. -->
-            <div class="pane-scoreboard dm-scoreboard">
-                <span class="dm-score" data-player="0">0</span>
-                <span class="dm-score-sep">—</span>
-                <span class="dm-score" data-player="1">0</span>
-            </div>
             <div class="pane-attract attract-overlay">PRESS START</div>
             <div class="pane-win dm-win-overlay"></div>
         </div>
     </template>
-
-    <!-- DM scoreboard — shown only when body[data-mode="deathmatch"].
-         The .dm-scoreboard class is shared with per-pane copies in the
-         pane template so JS update loops can target both with a single
-         querySelectorAll. -->
-    <div id="dm-scoreboard" class="dm-scoreboard">
-        <span class="dm-score" data-player="0">0</span>
-        <span class="dm-score-sep">—</span>
-        <span class="dm-score" data-player="1">0</span>
-    </div>
 
     <!-- DM match-end overlay — shown when body[data-match-ended="true"]. -->
     <div id="dm-win-overlay" class="dm-win-overlay"></div>

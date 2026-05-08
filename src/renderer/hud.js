@@ -30,6 +30,9 @@ function freshPrev() {
         ammo: -1, health: -1, armor: -1, faceRow: -1,
         bullets: -1, shells: -1, rockets: -1, cells: -1,
         maxBullets: -1, maxShells: -1, maxRockets: -1, maxCells: -1,
+        // NaN sentinel — different from any real score so the first
+        // updateHud always writes the digit elements.
+        frags: NaN,
     };
 }
 
@@ -92,6 +95,40 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
     for (let weaponSlot = 2; weaponSlot <= 7; weaponSlot++) {
         rendererEl.classList.toggle(WEAPON_CLASSES[weaponSlot], player.ownedWeapons.has(weaponSlot));
     }
+
+    // DM frags counter (only meaningful in deathmatch; cheap to update
+    // unconditionally — display clamps to -9..99 even though player.score
+    // is uncapped).
+    if (player.score !== prev.frags) {
+        prev.frags = player.score;
+        updateFragsDisplay(viewportIndex, player.score);
+    }
+}
+
+function updateFragsDisplay(viewportIndex, score) {
+    const display = Math.max(-9, Math.min(99, score));
+    const isNeg = display < 0;
+    const abs = Math.abs(display);
+    const tens = Math.floor(abs / 10);
+    const ones = abs % 10;
+
+    const status = dom.statusElements[viewportIndex];
+    const tensEl = status.querySelector('.frags-tens');
+    const onesEl = status.querySelector('.frags-ones');
+    if (!tensEl || !onesEl) return;
+
+    if (isNeg) {
+        tensEl.dataset.glyph = 'minus';
+        tensEl.style.backgroundImage = `url('/assets/hud/STTMINUS.png')`;
+    } else if (tens > 0) {
+        tensEl.dataset.glyph = 'digit';
+        tensEl.style.backgroundImage = `url('/assets/hud/STTNUM${tens}.png')`;
+    } else {
+        // Single-digit positive — leave the tens slot blank.
+        tensEl.dataset.glyph = '';
+        tensEl.style.backgroundImage = '';
+    }
+    onesEl.style.backgroundImage = `url('/assets/hud/STTNUM${ones}.png')`;
 }
 
 export function clearWeaponSlots() {

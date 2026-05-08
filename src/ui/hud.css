@@ -61,6 +61,7 @@
 .hud-section-ammo       { width: calc(48px  * var(--scale)); background-position-x: 0; }
 .hud-section-health     { width: calc(58px  * var(--scale)); background-position-x: calc(-48px  * var(--scale)); }
 .hud-section-arms       { width: calc(37px  * var(--scale)); background-position-x: calc(-106px * var(--scale)); }
+.hud-section-frags      { width: calc(37px  * var(--scale)); background-position-x: calc(-106px * var(--scale)); }
 .hud-section-face       { width: calc(36px  * var(--scale)); background-position-x: calc(-143px * var(--scale)); }
 .hud-section-armor      { width: calc(57px  * var(--scale)); background-position-x: calc(-179px * var(--scale)); }
 .hud-section-keys       { width: calc(13px  * var(--scale)); background-position-x: calc(-236px * var(--scale)); }
@@ -240,6 +241,51 @@
         calc(-2px * var(--scale)) 0,
         calc(-106px * var(--scale)) 0;
     background-repeat: no-repeat;
+}
+
+
+/* ========================================================================
+   Frags (DM only — replaces ARMS)
+
+   STBAR.png has the "FRAG" label baked into the arms slot already; in SP
+   the STARMS overlay covers it with "ARMS" + slot grid. In DM we skip the
+   STARMS overlay so the FRAG label shows through, and we render the
+   per-pane score on top with the big red tall digits (STTNUM*, STTMINUS).
+
+   Digit display is clamped to -9..99 in hud.js; player.score is uncapped.
+   ======================================================================== */
+
+/* STBAR slice + width set above next to the other section rules. The base
+   .hud-section already paints STBAR with no overlay, which is exactly
+   what FRAGS needs — the "FRAG" label is already baked into STBAR at
+   x=106. SP keeps STARMS overlaying that to show "ARMS" + slots; in DM
+   we hide the arms section so the FRAG label is visible. */
+.hud-section-frags { display: none; }
+
+body[data-mode="deathmatch"] .hud-section-arms { display: none; }
+body[data-mode="deathmatch"] .hud-section-frags { display: block; }
+
+.frags-digit {
+    position: absolute;
+    width: calc(14px * var(--scale));
+    height: calc(16px * var(--scale));
+    top: calc(3px * var(--scale)); /* matches ammo/health/armor digits */
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+    image-rendering: pixelated;
+}
+
+/* Right-align the two-digit pair within the 37-wide section so single
+   digits sit in the ones column rather than the tens. */
+.frags-tens { left: calc(4px * var(--scale)); }
+.frags-ones { left: calc(19px * var(--scale)); }
+
+/* The minus sprite (STTMINUS) is 8×6, much smaller than digits (14×16).
+   When the tens slot holds a minus, scale it to its native size and
+   centre it in the slot box. */
+.frags-tens[data-glyph="minus"] {
+    background-size: calc(8px * var(--scale)) calc(6px * var(--scale));
+    background-position: center;
 }
 
 .slot {
@@ -427,32 +473,8 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
 
 
 /* ========================================================================
-   Deathmatch scoreboard + win overlay
+   Deathmatch win overlay (per-pane FRAGS counter lives in the HUD bar)
    ======================================================================== */
-
-#dm-scoreboard {
-    display: none;
-    position: fixed;
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1100;
-    font-family: 'PressStart2P', monospace;
-    font-size: 18px;
-    color: #ffd700;
-    text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
-    gap: 14px;
-    pointer-events: none;
-    align-items: center;
-}
-
-body[data-mode="deathmatch"] #dm-scoreboard {
-    display: flex;
-}
-
-.dm-score-sep {
-    opacity: 0.5;
-}
 
 #dm-win-overlay {
     display: none;
@@ -510,8 +532,6 @@ body[data-attract="true"] #attract-overlay {
 
 /* Hide HUD chrome behind the attract overlay so only the world rotates. */
 body[data-attract="true"] .hud,
-body[data-attract="true"] #dm-scoreboard,
-body[data-attract="true"] .pane-scoreboard,
 body[data-attract="true"] #spectator,
 body[data-attract="true"] #menu-button,
 body[data-attract="true"] #fullscreen-button,
@@ -539,7 +559,6 @@ body[data-attract="true"] #help-button {
    and hides the globals.
    ======================================================================== */
 
-.pane-scoreboard,
 .pane-attract,
 .pane-win {
     display: none;
@@ -547,7 +566,6 @@ body[data-attract="true"] #help-button {
 
 @media (min-aspect-ratio: 24/9) {
     /* Hide the screen-spanning globals — bezel would split them. */
-    #dm-scoreboard,
     #attract-overlay,
     #dm-win-overlay {
         display: none !important;
@@ -556,29 +574,6 @@ body[data-attract="true"] #help-button {
     /* Show pane-local copies. .renderer is already position:absolute (in
        viewport.css) so it establishes a positioning context for the
        absolute children below — no extra anchor rule needed. */
-
-    body[data-mode="deathmatch"] .pane-scoreboard {
-        display: flex;
-        position: absolute;
-        top: calc(12px + env(safe-area-inset-top, 0px));
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1100;
-        font-family: 'PressStart2P', monospace;
-        font-size: 18px;
-        color: #ffd700;
-        text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
-        gap: 14px;
-        pointer-events: none;
-        align-items: center;
-    }
-
-    /* Hide scoreboard during attract — world rotation only, no clutter.
-       Same intent as the global rule above; restated here so the
-       videowall .pane-scoreboard show-rule doesn't undo it. */
-    body[data-attract="true"] .pane-scoreboard {
-        display: none;
-    }
 
     body[data-attract="true"] .pane-attract {
         display: flex;
