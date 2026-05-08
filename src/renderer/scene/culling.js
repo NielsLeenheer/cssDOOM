@@ -18,10 +18,8 @@
  * later if needed).
  */
 
-import { state } from '../../game/state.js';
 import { dom, sceneStates } from '../dom.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
-import { spectatorActive } from '../../ui/spectator.js';
 
 // Culling flags — toggled by the debug menu
 export const culling = {
@@ -244,15 +242,17 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
     return false;
 }
 
-/** Debug: trace sky culling for a wall by ID. Call via traceSky('ld489'). */
-export function debugSkyTrace(wallId) {
-    // Debug helper — uses pane 0's scene state and player 0.
+/**
+ * Debug: trace sky culling for a wall by ID. Caller passes the player position
+ * to test against (typically state.players[0]). Bound to window.traceSky in
+ * src/ui/debug.js with player[0] injected.
+ */
+export function debugSkyTrace(wallId, playerX, playerY) {
+    // Debug helper — uses pane 0's scene state.
     const sState = sceneStates[0];
-    const player = state.players[0];
     const el = sState.wallElements.find(e => e.id === wallId);
     if (!el) { console.log(`Wall ${wallId} not found in wallElements`); return; }
 
-    const playerX = player.x, playerY = player.y;
     const x = el._midX, y = el._midY;
     const z = el._wall ? el._wall.topHeight : 0;
     const dx = x - playerX, dy = y - playerY;
@@ -304,8 +304,13 @@ export function debugSkyTrace(wallId) {
  * culling loop, once per player. Elements are hidden/shown by toggling the
  * `hidden` attribute which maps to `display: none` and fully removes them
  * from compositor work.
+ *
+ * Callers pass `worldThings` (typically state.things) so the culler can look
+ * up live positions of dynamic things, and `spectatorActive` to skip ceiling
+ * culling in spectator mode. Both are plain data — culling.js no longer
+ * imports from src/game/ or src/ui/.
  */
-export function updateCulling(player, viewportIndex = player.viewportIndex) {
+export function updateCulling(player, worldThings, spectatorActive, viewportIndex = player.viewportIndex) {
     const anyCulling = culling.frustum || culling.distance || culling.backface || culling.sky;
 
     let total = 0;
@@ -417,7 +422,7 @@ export function updateCulling(player, viewportIndex = player.viewportIndex) {
         // Skip dead/collected things — but ensure visibility is restored
         // so death/explosion animations can play even if the thing was
         // previously culled offscreen.
-        const gameEntry = t.gameId !== undefined ? state.things[t.gameId] : null;
+        const gameEntry = t.gameId !== undefined ? worldThings[t.gameId] : null;
         if (gameEntry?.collected) {
             if (t.element.hidden) t.element.hidden = false;
             continue;
@@ -466,25 +471,5 @@ export function updateCulling(player, viewportIndex = player.viewportIndex) {
     cullingStats.afterSky = cullingStats.afterFrustum - skyCulled;
 }
 
-const CULLING_INTERVAL = 3; // Run every N frames
-let frameCount = 0;
-
-function cullingLoop() {
-    frameCount++;
-    if (frameCount >= CULLING_INTERVAL) {
-        frameCount = 0;
-        // Cull every pane that has a built scene tree. Pane index i uses
-        // state.players[i] when present; panes beyond the player count
-        // (mirror mode) fall back to player 0 — the same view rendered twice.
-        for (let i = 0; i < sceneStates.length; i++) {
-            if (sceneStates[i].wallElements.length === 0) continue;
-            const player = state.players[i] || state.players[0];
-            updateCulling(player, i);
-        }
-    }
-    requestAnimationFrame(cullingLoop);
-}
-
-export function startCullingLoop() {
-    requestAnimationFrame(cullingLoop);
-}
+/** How often the culling loop runs, in frames. Used by the loop owner. */
+export const CULLING_INTERVAL = 3;

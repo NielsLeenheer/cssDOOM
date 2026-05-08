@@ -1,45 +1,79 @@
 /**
- * Renderer public API — the single entry point for the game layer.
+ * Renderer public API — game code's single entry point into rendering.
  *
- * Every renderer function that the game layer needs is re-exported here.
- * Game code should never import from renderer sub-modules directly.
+ * The flat-namespace exports below mirror what was here before the
+ * orchestrator refactor. Each is a thin re-export of an Orchestrator method,
+ * so existing call sites (`import * as renderer from '../renderer/index.js'`)
+ * keep working unchanged. New call sites can also import the orchestrator
+ * directly via `import { orchestrator } from '../renderer/orchestrator.js'`.
+ *
+ * The orchestrator owns the routing — per-player commands route to a single
+ * DomRenderer target by paneIndex; world commands call the underlying
+ * helpers once. Future targets (BroadcastSink for two-window mode) are
+ * registered against the orchestrator without changing this file.
  */
 
-// Camera
-export { updateCamera } from './scene/camera.js';
+import { orchestrator } from './orchestrator.js';
 
-// Effects
-export { triggerFlash, showPowerup, flickerPowerup, hidePowerup } from './effects.js';
+// ── Camera & HUD ──────────────────────────────────────────────────────────
+export const updateCamera = (player, paneIndex) => orchestrator.updateCamera(player, paneIndex);
 
-// Sprites & things
-export {
-    setEnemyState, resetEnemy, killEnemy,
-    updateEnemyRotation, updateThingPosition, reparentThingToSector,
-    collectItem, uncollectItem, setThingMoving,
-    createPuff, createExplosion, createTeleportFog, createProjectile, removeProjectile,
-    createPlayerSprite, createCorpse, playPlayerAttack,
-} from './scene/entities/sprites.js';
+// ── Effects ───────────────────────────────────────────────────────────────
+export const triggerFlash = (paneIndex, type) => orchestrator.triggerFlash(paneIndex, type);
+export const showPowerup = (paneIndex, name) => orchestrator.showPowerup(paneIndex, name);
+export const flickerPowerup = (paneIndex, name) => orchestrator.flickerPowerup(paneIndex, name);
+export const hidePowerup = (paneIndex, name) => orchestrator.hidePowerup(paneIndex, name);
 
-// Player visuals
-export { setPlayerDead, clearKeys, setPlayerMoving, collectKey } from './scene/entities/player.js';
+// ── Sprites & things (world commands) ─────────────────────────────────────
+export const setEnemyState = (...args) => orchestrator.setEnemyState(...args);
+export const resetEnemy = (...args) => orchestrator.resetEnemy(...args);
+export const killEnemy = (...args) => orchestrator.killEnemy(...args);
+export const updateEnemyRotation = (...args) => orchestrator.updateEnemyRotation(...args);
+export const updateThingPosition = (...args) => orchestrator.updateThingPosition(...args);
+export const reparentThingToSector = (...args) => orchestrator.reparentThingToSector(...args);
+export const collectItem = (...args) => orchestrator.collectItem(...args);
+export const uncollectItem = (...args) => orchestrator.uncollectItem(...args);
+export const setThingMoving = (...args) => orchestrator.setThingMoving(...args);
+export const createPuff = (...args) => orchestrator.createPuff(...args);
+export const createExplosion = (...args) => orchestrator.createExplosion(...args);
+export const createTeleportFog = (...args) => orchestrator.createTeleportFog(...args);
+export const createProjectile = (...args) => orchestrator.createProjectile(...args);
+export const removeProjectile = (...args) => orchestrator.removeProjectile(...args);
+export const createPlayerSprite = (...args) => orchestrator.createPlayerSprite(...args);
+export const createCorpse = (...args) => orchestrator.createCorpse(...args);
+export const playPlayerAttack = (...args) => orchestrator.playPlayerAttack(...args);
 
-// Weapon visuals
-export { isWeaponSwitching, switchWeapon, startFiring, stopFiring } from './weapons.js';
+// ── Thing DOM construction ────────────────────────────────────────────────
+export const buildThing = (...args) => orchestrator.buildThing(...args);
 
-// Doors
-export { buildDoor, setDoorState } from './scene/mechanics/doors.js';
+// ── Player visuals ────────────────────────────────────────────────────────
+export const setPlayerDead = (paneIndex, ...args) => orchestrator.setPlayerDead(paneIndex, ...args);
+export const clearKeys = (paneIndex) => orchestrator.clearKeys(paneIndex);
+export const setPlayerMoving = (paneIndex, isMoving) => orchestrator.setPlayerMoving(paneIndex, isMoving);
+export const collectKey = (paneIndex, ...args) => orchestrator.collectKey(paneIndex, ...args);
 
-// Lifts
-export { buildLift, setLiftState } from './scene/mechanics/lifts.js';
+// ── Weapon visuals ────────────────────────────────────────────────────────
+export const switchWeapon = (paneIndex, weaponName, fireRate) => orchestrator.switchWeapon(paneIndex, weaponName, fireRate);
+export const startFiring = (paneIndex) => orchestrator.startFiring(paneIndex);
+export const stopFiring = (paneIndex) => orchestrator.stopFiring(paneIndex);
 
-// Crushers
-export { buildCrusher, setCrusherOffset } from './scene/mechanics/crushers.js';
+// ── Mechanics ─────────────────────────────────────────────────────────────
+export const buildDoor = (...args) => orchestrator.buildDoor(...args);
+export const setDoorState = (...args) => orchestrator.setDoorState(...args);
+export const buildLift = (...args) => orchestrator.buildLift(...args);
+export const setLiftState = (...args) => orchestrator.setLiftState(...args);
+export const buildCrusher = (...args) => orchestrator.buildCrusher(...args);
+export const setCrusherOffset = (...args) => orchestrator.setCrusherOffset(...args);
+export const toggleSwitchState = (...args) => orchestrator.toggleSwitchState(...args);
 
-// Switches
-export { toggleSwitchState } from './scene/mechanics/switches.js';
+// ── Surfaces ──────────────────────────────────────────────────────────────
+export const lowerTaggedFloor = (...args) => orchestrator.lowerTaggedFloor(...args);
 
-// Surfaces
-export { lowerTaggedFloor } from './scene/surfaces/floors.js';
+// ── Scene controls ────────────────────────────────────────────────────────
+export const clonePanes = (paneCount) => orchestrator.clonePanes(paneCount);
+export const setMirrorMode = (value) => orchestrator.setMirrorMode(value);
+export const isMirrorMode = () => orchestrator.isMirrorMode();
+export const viewportsForEffect = (playerIndex) => orchestrator.viewportsForEffect(playerIndex);
 
-// Scene rebuild controls (used by the pane-mirror debug toggle and Phase 4 mode change)
-export { setMirrorMode, isMirrorMode, viewportsForEffect } from './scene/scene.js';
+// Direct access for code that benefits from instance-shaped API
+export { orchestrator };

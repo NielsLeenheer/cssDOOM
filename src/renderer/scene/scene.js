@@ -13,26 +13,25 @@
  * sceneState arrays/Maps then point at the cloned elements via a
  * source→clone Map populated during the recursive clone walk. Each pane has
  * its own DOM tree so culling and visibility toggle independently.
+ *
+ * buildScene() builds only the static renderer DOM (sectors, walls, floors,
+ * ceilings, player). Things, doors, lifts, crushers are added separately as
+ * renderer commands invoked by game-side init code. Cloning to other panes
+ * is also a separate command (cloneSceneToOtherPanes). The orchestration of
+ * "build scene + populate dynamic things + clone + initial render" lives in
+ * the caller (src/shared/maps.js loadMap), not in this file.
  */
 
 import { dom, sceneState, sceneStates } from '../dom.js';
-import { state } from '../../game/state.js';
-import { clearSpatialGrid, buildSpatialGrid } from '../../game/spatial-grid.js';
-import { initDoors } from '../../game/mechanics/doors.js';
-import { initLifts } from '../../game/mechanics/lifts.js';
-import { initCrushers } from '../../game/mechanics/crushers.js';
-import { updateCamera } from './camera.js';
 import { buildSectorContainers } from './sectors.js';
-import { updateCulling } from './culling.js';
 import { buildWalls } from './surfaces/walls.js';
 import { buildFloors } from './surfaces/floors.js';
 import { buildCeilings } from './surfaces/ceilings.js';
-import { buildThings } from './entities/things.js';
 import { buildPlayer } from './entities/player.js';
 
 // Module-level flag for the Phase 3 pane-1 mirror debug toggle. When on:
-//   1. buildScene clones pane 0's tree into the remaining panes (so pane 1
-//      has a renderable scene even when state.players.length === 1).
+//   1. The caller should build extra panes by passing paneCount === sceneStates.length
+//      (so pane 1 has a renderable scene even when state.players.length === 1).
 //   2. Per-player visual effects (flash, powerup, weapon-switch, firing,
 //      head-bob, key collect, dead state) fan out from player 0 to pane 1
 //      via viewportsForEffect() below — so pane 1 visually mirrors pane 0.
@@ -41,10 +40,6 @@ import { buildPlayer } from './entities/player.js';
 let mirrorMode = false;
 export function setMirrorMode(value) { mirrorMode = value; }
 export function isMirrorMode() { return mirrorMode; }
-
-function panesToBuild() {
-    return mirrorMode ? sceneStates.length : state.players.length;
-}
 
 /**
  * Yields the list of viewport indices that a per-player visual effect should
@@ -59,8 +54,8 @@ export function viewportsForEffect(playerIndex) {
 
 /**
  * Tears down the current scene in every pane, releasing DOM nodes and GPU
- * resources. Call before buildScene() with a yield in between to let the
- * browser GC.
+ * resources. Game-side state (spatial grid, doorState, etc.) must be cleared
+ * separately by the caller — this function only owns renderer state.
  */
 export function teardownScene() {
     for (let i = 0; i < sceneStates.length; i++) {
@@ -80,11 +75,18 @@ export function teardownScene() {
         // Atomic DOM clear — single reflow instead of one per child removal
         dom.scenes[i].replaceChildren();
     }
-    clearSpatialGrid();
     const oldSvg = document.getElementById('clip-svgs');
     if (oldSvg) oldSvg.remove();
 }
 
+/**
+ * Builds the static renderer DOM for pane 0: sector containers, walls,
+ * floors, ceilings, and the player billboard. Things, doors, lifts, and
+ * crushers are NOT built here — the caller invokes those as renderer
+ * commands after this function returns and before cloning to other panes.
+ *
+ * Async because it preloads textures before returning.
+ */
 export async function buildScene() {
     const viewportWidth = window.innerWidth;
     const perspectiveValue = viewportWidth / 2;
@@ -97,33 +99,20 @@ export async function buildScene() {
     buildWalls();
     buildFloors();
     buildCeilings();
-    buildThings();
     buildPlayer();
 
     await preloadTextures();
+}
 
-    initDoors();
-    initLifts();
-    initCrushers();
-    buildSpatialGrid();
-
-    // Clone pane 0's scene tree into the remaining panes if we need them.
-    if (panesToBuild() > 1) {
-        cloneSceneToOtherPanes();
-    }
-
-    for (const player of state.players) updateCamera(player);
-    // For panes beyond state.players (mirror mode), point them at player 0.
-    for (let i = state.players.length; i < panesToBuild(); i++) {
-        updateCamera(state.players[0], i);
-    }
-
-    // Run culling synchronously before the first frame so the browser
-    // never has to composite the entire level at once. Elements are
-    // created hidden and only unhidden here if they pass culling.
-    for (const player of state.players) updateCulling(player);
-    for (let i = state.players.length; i < panesToBuild(); i++) {
-        updateCulling(state.players[0], i);
+/**
+ * Clones pane 0's fully-built scene tree into panes 1..paneCount-1. The
+ * caller must invoke this only after all renderer commands that mutate
+ * pane 0's DOM (buildThing, buildDoor, buildLift, buildCrusher) have run,
+ * so the clone captures the final state.
+ */
+export function clonePanes(paneCount) {
+    if (paneCount > 1) {
+        cloneSceneToOtherPanes(paneCount);
     }
 }
 
@@ -141,11 +130,11 @@ export async function buildScene() {
  * Renderer functions that need to find these elements across all panes use
  * `[data-orig-id="..."]` (see toggleSwitchState).
  */
-function cloneSceneToOtherPanes() {
+function cloneSceneToOtherPanes(paneCount) {
     const sourceSceneEl = dom.scenes[0];
     const sourceSceneState = sceneStates[0];
 
-    for (let pi = 1; pi < panesToBuild(); pi++) {
+    for (let pi = 1; pi < paneCount; pi++) {
         const targetSceneEl = dom.scenes[pi];
         const targetSceneState = sceneStates[pi];
         const cloneMap = new Map();

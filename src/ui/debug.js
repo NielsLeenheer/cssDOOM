@@ -90,7 +90,10 @@ window.load = async function (slot = 0) {
     console.log(`Loaded slot ${slot}: ${data.map} (${Math.round(data.x)}, ${Math.round(data.y)})`);
 };
 
-window.traceSky = debugSkyTrace;
+window.traceSky = (wallId) => {
+    const p = state.players[0];
+    debugSkyTrace(wallId, p.x, p.y);
+};
 
 /** Dump player position, angle, sector, and current map */
 window.dump = function () {

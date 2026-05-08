@@ -7,7 +7,7 @@ import { mapData } from './src/shared/maps.js';
 import { updateGame } from './src/game/index.js';
 import { loadMap } from './src/shared/maps.js';
 import { updateCamera } from './src/renderer/scene/camera.js';
-import { startCullingLoop } from './src/renderer/scene/culling.js';
+import { updateCulling, CULLING_INTERVAL } from './src/renderer/scene/culling.js';
 import { updateHud } from './src/renderer/hud.js';
 import { sceneStates } from './src/renderer/dom.js';
 import { updateMenuSelection, loadSavedMode, applyMode } from './src/ui/menu.js';
@@ -18,6 +18,7 @@ import { initTouchInput } from './src/input/touch.js';
 import { initGamepadInput } from './src/input/gamepad.js';
 import { initDebugMenu, updateDebugStats } from './src/ui/debug.js';
 import { attractTick, isAttractActive } from './src/ui/attract.js';
+import { spectatorActive } from './src/ui/spectator.js';
 import './src/ui/spectator.js';
 
 let debugEnabled = false;
@@ -42,6 +43,27 @@ function renderAllActivePanes() {
         updateHud(player, i);
         updateCamera(player, i);
     }
+}
+
+/**
+ * Culling loop. Runs every CULLING_INTERVAL frames per pane, hiding
+ * off-screen elements. Lives at the orchestration layer (not inside the
+ * renderer module) because it iterates game state — state.players for the
+ * camera position, state.things for live thing positions, and the spectator
+ * toggle for ceiling-skip behavior.
+ */
+let cullingFrameCount = 0;
+function cullingLoop() {
+    cullingFrameCount++;
+    if (cullingFrameCount >= CULLING_INTERVAL) {
+        cullingFrameCount = 0;
+        for (let i = 0; i < sceneStates.length; i++) {
+            if (sceneStates[i].wallElements.length === 0) continue;
+            const player = state.players[i] || state.players[0];
+            updateCulling(player, state.things, spectatorActive, i);
+        }
+    }
+    requestAnimationFrame(cullingLoop);
 }
 
 /**
@@ -101,7 +123,7 @@ async function init() {
     applyMode(loadSavedMode());
 
     await loadMap('E1M1');
-    startCullingLoop();
+    requestAnimationFrame(cullingLoop);
 
     updateMenuSelection();
     renderAllActivePanes();

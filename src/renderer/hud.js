@@ -14,7 +14,6 @@
  */
 
 import { dom } from './dom.js';
-import { state } from '../game/state.js';
 import { WEAPONS } from '../game/constants.js';
 
 const AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];

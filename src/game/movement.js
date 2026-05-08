@@ -9,6 +9,7 @@ import { playSound } from '../audio/audio.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
 import { inputs } from '../input/index.js';
+import { state } from './state.js';
 
 const wasMovingByPlayer = new Map();
 
@@ -100,7 +101,7 @@ function updateLocation(player, deltaTime) {
         renderer.updateThingPosition(player.thingIndex, player.x, player.y, player.floorHeight);
         const sector = getSectorAt(player.x, player.y);
         if (sector) renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
-        renderer.updateEnemyRotation(player.thingIndex, player.thingRef);
+        renderer.updateEnemyRotation(player.thingIndex, player.thingRef, state.players);
     }
 }
 

@@ -42,6 +42,11 @@ export class Player {
         this.ownedWeapons = new Set([1, 2]);  // Fist + Pistol
         // True while the weapon fire animation is playing, prevents re-firing.
         this.isFiring = false;
+        // performance.now() timestamp at which the weapon-switch animation ends.
+        // While now() < weaponSwitchUntil, fireWeapon refuses to fire. Set by
+        // equipWeapon when the slot actually changes; matches the CSS animation
+        // duration (WEAPON_SWITCH_MS in constants.js).
+        this.weaponSwitchUntil = 0;
         // Accumulates time spent standing on a damaging sector (e.g. nukage).
         // Damage is applied once per second, then the timer resets.
         this.sectorDamageTimer = 0;

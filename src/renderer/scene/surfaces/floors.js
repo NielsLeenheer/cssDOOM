@@ -4,7 +4,6 @@
 
 import { mapData } from '../../../shared/maps.js';
 import { sceneState, sceneStates } from '../../dom.js';
-import { playSound } from '../../../audio/audio.js';
 import { buildHorizontalSurface } from './horizontal.js';
 
 export function buildFloors() {
@@ -65,6 +64,4 @@ export function lowerTaggedFloor(tag) {
             }
         }
     }
-
-    playSound('DSPSTART');
 }

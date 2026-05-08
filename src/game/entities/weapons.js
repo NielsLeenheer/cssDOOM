@@ -7,7 +7,7 @@ import {
     WEAPONS, SHOOTABLE, EYE_HEIGHT,
     PLAYER_ROCKET_SPEED, PLAYER_ROCKET_RADIUS,
     ROCKET_SPLASH_DAMAGE, PLAYER_RADIUS,
-    BARREL_RADIUS,
+    BARREL_RADIUS, WEAPON_SWITCH_MS,
 } from '../constants.js';
 import { getFloorHeightAt, rayHitPoint } from '../physics.js';
 import { hasLineOfSight } from '../line-of-sight.js';
@@ -32,8 +32,13 @@ export function equipWeapon(player, slot) {
     const weapon = WEAPONS[slot];
     if (!weapon || !player.ownedWeapons.has(slot)) return;
 
+    const isSwitching = slot !== player.currentWeapon;
+
     player.isFiring = false;
     player.currentWeapon = slot;
+    if (isSwitching) {
+        player.weaponSwitchUntil = performance.now() + WEAPON_SWITCH_MS;
+    }
     renderer.switchWeapon(player.viewportIndex, weapon.name, weapon.fireRate);
 }
 
@@ -67,7 +72,7 @@ const automaticFireIntervalsByPlayer = new Map();
  *    that the fire animation has completed before allowing re-fire.
  */
 export function fireWeapon(player) {
-    if (player.isDead || player.isFiring || renderer.isWeaponSwitching(player.viewportIndex)) return;
+    if (player.isDead || player.isFiring || performance.now() < player.weaponSwitchUntil) return;
 
     const weapon = WEAPONS[player.currentWeapon];
     if (!weapon) return;

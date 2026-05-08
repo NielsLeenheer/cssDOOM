@@ -286,4 +286,5 @@ function checkBossDeath() {
         if (allThings[i].type === 3003 && !allThings[i].collected) return;
     }
     renderer.lowerTaggedFloor(666);
+    playSound('DSPSTART');
 }

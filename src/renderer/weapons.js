@@ -10,11 +10,6 @@
 import { dom } from './dom.js';
 import { viewportsForEffect } from './scene/scene.js';
 
-/** Returns true if the given player's weapon element is mid-switch. */
-export function isWeaponSwitching(playerIndex) {
-    return dom.weaponElements[playerIndex].classList.contains('switching');
-}
-
 /**
  * Switch to a new weapon for the given player. If the weapon is different
  * from the current one and no switch is already in progress, plays a

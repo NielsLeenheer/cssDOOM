@@ -14,7 +14,6 @@
  */
 
 import { dom, sceneStates } from '../../dom.js';
-import { state as gameState } from '../../../game/state.js';
 
 // ============================================================================
 // Sprite Sheet Layout
@@ -132,8 +131,8 @@ export function playPlayerAttack(thingIndex) {
 
 /**
  * Computes the DOOM sprite rotation frame (1-8) based on the viewing angle
- * from each pane's player to the enemy relative to the enemy's facing
- * direction, and updates each pane's sprite sheet row and mirror.
+ * from each viewer to the enemy relative to the enemy's facing direction,
+ * and updates each pane's sprite sheet row and mirror.
  *
  * DOOM sprites have 8 rotation angles. The sprite sheet has 5 rows (1-5).
  * Rotations 6-8 reuse rows 3-1 with horizontal mirroring.
@@ -142,9 +141,13 @@ export function playPlayerAttack(thingIndex) {
  * pane simultaneously faces player 2 in the right pane via different sprite
  * frames. The per-pane domData carries its own _lastHeading / _lastMirror
  * cache so unchanged rotations skip CSS writes.
+ *
+ * `viewers` is an iterable of objects with `{ x, y, viewportIndex }` —
+ * typically state.players, but kept as a plain-data parameter so this module
+ * stays game-state-free.
  */
-export function updateEnemyRotation(thingIndex, enemy) {
-    for (const player of gameState.players) {
+export function updateEnemyRotation(thingIndex, enemy, viewers) {
+    for (const player of viewers) {
         const sState = sceneStates[player.viewportIndex];
         const domData = sState.thingDom.get(thingIndex);
         if (!domData?.sprite) continue;

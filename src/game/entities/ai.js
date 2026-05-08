@@ -542,6 +542,6 @@ export function updateAllEnemies(deltaTime) {
         if (nearestDistSq > maxRenderDistSq) continue;
 
         updateSingleEnemy(index, thing, deltaTime, currentTime);
-        renderer.updateEnemyRotation(index, thing);
+        renderer.updateEnemyRotation(index, thing, state.players);
     }
 }

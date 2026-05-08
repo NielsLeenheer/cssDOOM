@@ -186,6 +186,10 @@ export const WEAPONS = {
     6: { name: 'CHAINSAW', ammoType: null,       ammoPerShot: 0,  fireRate: 229,  sound: 'DSSAWHIT', damageType: 'melee',   range: 80 },
 };
 
+// Duration of the weapon-switch animation. Gates firing in game logic and must
+// match the `weapon-switch` keyframe duration in src/ui/weapons.css.
+export const WEAPON_SWITCH_MS = 400;
+
 // ============================================================================
 // Thing Health
 // Hit points for shootable things. When reduced to zero the thing dies
