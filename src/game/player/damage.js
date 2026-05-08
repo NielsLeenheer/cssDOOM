@@ -75,22 +75,30 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         awardFrag(player, attacker);
         // Mark this player's thing entry collected so AI ignores them,
         // PvP collision lets the other player walk through, and hitscan /
-        // projectile loops skip the now-defunct live entry. The live
-        // sprite is hidden via .collected CSS — a separate corpse
-        // decoration takes its place at the death position so the body
-        // persists even after respawn moves the live entry elsewhere.
+        // projectile loops skip the now-defunct live entry.
         if (player.thingRef) player.thingRef.collected = true;
         if (player.thingIndex >= 0) {
-            // Hide the live player sprite (visibility:hidden via .collected CSS)
-            // and freeze its walk animation. The static corpse decoration takes
-            // visual ownership of the death point.
-            renderer.collectItem(player.thingIndex);
+            // Stop the walk cycle and play the death animation on the live
+            // sprite (PLAYH→PLAYN, row 6 of the sheet). After the animation
+            // finishes, hide the live sprite and place a static corpse
+            // decoration at the death point so the body persists when the
+            // player respawns elsewhere.
             renderer.setThingMoving(player.thingIndex, false);
-        }
+            renderer.killEnemy(player.thingIndex, -1);
 
-        // Spawn a static corpse decoration at the death point.
-        const sector = getSectorAt(player.x, player.y);
-        renderer.createCorpse(player.x, player.y, player.floorHeight, sector?.sectorIndex);
+            const deathX = player.x;
+            const deathY = player.y;
+            const deathFloor = player.floorHeight;
+            const deathSectorIndex = getSectorAt(deathX, deathY)?.sectorIndex;
+            const playerIndex = player.index;
+            const thingIndex = player.thingIndex;
+            // 7 frames × 100ms (matches sprites.css 'sprite-stop' timing
+            // for [data-state="dead"]).
+            setTimeout(() => {
+                renderer.collectItem(thingIndex);
+                renderer.createCorpse(deathX, deathY, deathFloor, deathSectorIndex, playerIndex);
+            }, 700);
+        }
 
         renderer.setPlayerDead(player.viewportIndex, true);
         playSound('DSPLDETH');

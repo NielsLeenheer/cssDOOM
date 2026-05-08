@@ -17,7 +17,7 @@ export {
     updateEnemyRotation, updateThingPosition, reparentThingToSector,
     collectItem, uncollectItem, setThingMoving,
     createPuff, createExplosion, createTeleportFog, createProjectile, removeProjectile,
-    createPlayerSprite, createCorpse,
+    createPlayerSprite, createCorpse, playPlayerAttack,
 } from './scene/entities/sprites.js';
 
 // Player visuals

@@ -83,6 +83,12 @@ export function fireWeapon(player) {
 
     renderer.startFiring(player.viewportIndex);
 
+    // Trigger the attack pose on this player's billboard sprite so the
+    // opposing player sees them firing (front-facing PLAYE/F frames, row
+    // 5 of the PLAY sheet). The renderer auto-returns to walk after the
+    // animation duration.
+    if (player.thingIndex >= 0) renderer.playPlayerAttack(player.thingIndex);
+
     // Perform hitscan hit detection for this shot
     checkWeaponHit(player);
 

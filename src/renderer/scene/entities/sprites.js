@@ -30,6 +30,7 @@ const SPRITE_LAYOUT = {
     58:   { atkRow: 5, atkFrames: 3, dieRow: 6, dieFrames: 6, walkFrames: 2 }, // Spectre (same as Demon)
     3003: { atkRow: 5, atkFrames: 3, dieRow: 6, dieFrames: 7, walkFrames: 2 }, // Baron
     2035: { atkRow: -1, atkFrames: 0, dieRow: 1, dieFrames: 5, walkFrames: 2 }, // Barrel
+    [-1]: { atkRow: 5, atkFrames: 2, dieRow: 6, dieFrames: 7, walkFrames: 4 }, // Player (kind:'player', type:-1)
 };
 
 // ============================================================================
@@ -90,6 +91,43 @@ export function killEnemy(thingIndex, thingType) {
         setSpriteFrame(domData.sprite, layout.dieRow, layout.dieFrames, 1);
         setSpriteState(domData.sprite, 'dead');
     }
+}
+
+// Player attack animation — when this player fires their weapon, the
+// opposing player's view briefly sees them in the attack pose. Layout
+// row 5 holds two front-facing frames (PLAY E1/F1).
+const PLAYER_ATTACK_DURATION_MS = 600;
+const playerAttackTimers = new Map(); // thingIndex → timeout handle
+
+export function playPlayerAttack(thingIndex) {
+    const layout = SPRITE_LAYOUT[-1];
+    if (!layout) return;
+    for (const sState of sceneStates) {
+        const domData = sState.thingDom.get(thingIndex);
+        if (!domData?.sprite) continue;
+        setSpriteFrame(domData.sprite, layout.atkRow, layout.atkFrames, 1);
+        setSpriteState(domData.sprite, 'attacking');
+    }
+    const prev = playerAttackTimers.get(thingIndex);
+    if (prev) clearTimeout(prev);
+    playerAttackTimers.set(thingIndex, setTimeout(() => {
+        // Return to walk cycle. Clear the rotation-cache fields so the
+        // next updateEnemyRotation tick rewrites --heading: without this,
+        // the sprite would stay on row 5 (attack) and the walk cycle
+        // would animate through PLAYE, PLAYF, blank, blank — visible as
+        // a flicker / "disappearing" sprite.
+        for (const sState of sceneStates) {
+            const domData = sState.thingDom.get(thingIndex);
+            if (!domData?.sprite) continue;
+            // Don't override the dead state (player died mid-attack-anim).
+            if (domData.sprite.dataset.state === 'dead') continue;
+            setSpriteState(domData.sprite, null);
+            setSpriteFrame(domData.sprite, undefined, layout.walkFrames);
+            domData._lastHeading = undefined;
+            domData._lastMirror = undefined;
+        }
+        playerAttackTimers.delete(thingIndex);
+    }, PLAYER_ATTACK_DURATION_MS));
 }
 
 /**
@@ -154,6 +192,11 @@ export function resetEnemy(thingIndex, thingType, x, y, floorHeight) {
                 domData.sprite.style.setProperty('--frames', layout.walkFrames);
             }
         }
+        // Force the next updateEnemyRotation tick to rewrite --heading:
+        // killEnemy left it on the death row (6), which would otherwise
+        // stick if the post-respawn rotation matches the cached value.
+        domData._lastHeading = undefined;
+        domData._lastMirror = undefined;
         domData.element.style.setProperty('--x', x);
         domData.element.style.setProperty('--y', y);
         domData.element.style.setProperty('--floor-z', floorHeight);
@@ -334,13 +377,21 @@ export function createPlayerSprite(thingIndex, playerIndex, x, y, floorHeight, s
     }
 }
 
+// Map player index → corpse sprite suffix. Mirror the DM color choice in
+// enemies.css: P0 = green default (no suffix), P1 = red.
+const PLAYER_CORPSE_VARIANT = ['', '-red'];
+
 /**
  * Spawns a player corpse at the given position in every pane's scene tree.
  * Static decoration (single PLAYN0 sprite, billboarded to face the viewer)
  * — doesn't enter state.things, has no game-state interaction. Persists
  * for the rest of the match; cleared on next teardownScene().
+ *
+ * `playerIndex` selects the recolored variant so a red player drops a red
+ * corpse instead of reverting to the default green sprite.
  */
-export function createCorpse(x, y, floorHeight, sectorIndex) {
+export function createCorpse(x, y, floorHeight, sectorIndex, playerIndex = 0) {
+    const variant = PLAYER_CORPSE_VARIANT[playerIndex] ?? '';
     for (let i = 0; i < sceneStates.length; i++) {
         const sState = sceneStates[i];
         const sceneEl = dom.scenes[i];
@@ -353,7 +404,7 @@ export function createCorpse(x, y, floorHeight, sectorIndex) {
         container.style.setProperty('--floor-z', floorHeight);
 
         const img = document.createElement('img');
-        img.src = '/assets/sprites/PLAYN0.png';
+        img.src = `/assets/sprites/PLAYN0${variant}.png`;
         img.draggable = false;
         container.appendChild(img);
 

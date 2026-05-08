@@ -72,11 +72,13 @@ export function spawnPlayer(player) {
         player.thingRef.facing = Math.PI / 2 + player.angle;
     }
     if (player.thingIndex >= 0) {
-        // Reveal the live sprite (was hidden on death by collectItem) and
-        // teleport it to the new spawn point. The corpse decoration spawned
-        // at the death point is a separate element and stays put.
+        // Reveal the live sprite (was hidden on death by collectItem),
+        // clear the death animation state (data-state="dead" + .dead
+        // class on container), and teleport it to the new spawn point.
+        // The corpse decoration spawned at the death point is a separate
+        // element and stays put.
         renderer.uncollectItem(player.thingIndex);
-        renderer.updateThingPosition(player.thingIndex, player.x, player.y, player.floorHeight);
+        renderer.resetEnemy(player.thingIndex, -1, player.x, player.y, player.floorHeight);
         const sector = getSectorAt(player.x, player.y);
         if (sector) renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
     }
