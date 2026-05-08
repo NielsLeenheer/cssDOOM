@@ -154,11 +154,18 @@
                  attract-mode HUD-hide rule doesn't suppress them. -->
             <div class="pane-attract attract-overlay">PRESS START</div>
             <div class="pane-win dm-win-overlay"></div>
+            <div class="pane-timer dm-timer"></div>
         </div>
     </template>
 
     <!-- DM match-end overlay — shown when body[data-match-ended="true"]. -->
     <div id="dm-win-overlay" class="dm-win-overlay"></div>
+
+    <!-- DM countdown timer — shown only in the last 60 s of a match
+         (body[data-timer-active="true"]). The .dm-timer class is shared
+         with per-pane copies in the pane template so videowall layout
+         can duplicate the readout on each display. -->
+    <div id="dm-timer" class="dm-timer"></div>
 
     <!-- Attract-mode overlay — shown when body[data-attract="true"] after
          the kiosk idle timer fires. Any input press dismisses it. -->

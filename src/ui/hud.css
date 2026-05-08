@@ -498,6 +498,37 @@ body[data-match-ended="true"] #dm-win-overlay {
 
 
 /* ========================================================================
+   Deathmatch countdown timer (last 60 s)
+   Shown when body[data-timer-active="true"]. Top-centre m:ss readout in
+   DOOM red; fades in / out via the body attribute and pulses for the
+   final 10 s. The .dm-timer class is shared with per-pane copies so the
+   videowall layout can duplicate it on each display.
+   ======================================================================== */
+
+.dm-timer {
+    display: none;
+    font-family: 'PressStart2P', monospace;
+    font-size: 28px;
+    color: #dc0000;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+    letter-spacing: 4px;
+    pointer-events: none;
+}
+
+#dm-timer {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1100;
+}
+
+body[data-mode="deathmatch"][data-timer-active="true"] #dm-timer {
+    display: block;
+}
+
+
+/* ========================================================================
    Attract Loop
    Shown when body[data-attract="true"] — kiosk idle prompt. Camera is
    slow-rotated by attract.js; this overlay sits on top with a dimmed
@@ -560,14 +591,16 @@ body[data-attract="true"] #ui-buttons {
    ======================================================================== */
 
 .pane-attract,
-.pane-win {
+.pane-win,
+.pane-timer {
     display: none;
 }
 
 @media (min-aspect-ratio: 24/9) {
     /* Hide the screen-spanning globals — bezel would split them. */
     #attract-overlay,
-    #dm-win-overlay {
+    #dm-win-overlay,
+    #dm-timer {
         display: none !important;
     }
 
@@ -606,6 +639,15 @@ body[data-attract="true"] #ui-buttons {
         background: rgba(0, 0, 0, 0.7);
         pointer-events: none;
         letter-spacing: 4px;
+    }
+
+    body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
+        display: block;
+        position: absolute;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1100;
     }
 }
 
