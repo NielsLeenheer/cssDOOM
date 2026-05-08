@@ -1,15 +1,20 @@
 /* Player */
 
 .renderer.dead {
-    .viewport {
-        filter: sepia(0.5) saturate(2) hue-rotate(-20deg);
-        transition: filter 1s;
-    }
-
     /* Drop the camera to (just above) the floor at the corpse position.
        Uses --player-floor (set per-pane by updateCamera) so the death drop
        respects raised platforms / lifts where the player actually died. */
     .scene {
         --player-z: calc(var(--player-floor) + 10);
+    }
+
+    /* Bloodied screen tint. Fades up when the player dies, fades back
+       out on respawn. We use a translucent red overlay rather than a
+       CSS filter on the viewport — Firefox struggled to repaint the
+       full 3D-transformed scene under sepia/saturate/hue-rotate every
+       frame and showed flicker. A simple compositor-blended layer is
+       essentially free. */
+    .death-overlay {
+        opacity: 0.35;
     }
 }

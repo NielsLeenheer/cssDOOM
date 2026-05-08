@@ -410,7 +410,7 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
    Overlays
    ======================================================================== */
 
-.damage-overlay, .pickup-overlay, .teleport-overlay {
+.damage-overlay, .pickup-overlay, .teleport-overlay, .death-overlay {
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -420,6 +420,10 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
 .damage-overlay { background: red; }
 .pickup-overlay { background: gold; }
 .teleport-overlay { background: #00ff00; }
+/* Death tint stays on for the whole death state (toggled by
+   .renderer.dead in player.css). 1 s fade in/out matches the previous
+   filter transition. */
+.death-overlay { background: #b00000; transition: opacity 1s; }
 
 @keyframes flash-overlay {
     0%   { opacity: 0.35; }
