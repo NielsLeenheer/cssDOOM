@@ -4,7 +4,7 @@
  */
 
 import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED, PLAYER_RADIUS } from './constants.js';
-import { canMoveTo, getFloorHeightAt } from './physics.js';
+import { canMoveTo, getFloorHeightAt, getSectorAt } from './physics.js';
 import { playSound } from '../audio/audio.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
@@ -64,17 +64,39 @@ function updateLocation(player, deltaTime) {
         // Pass this player's own current position and floor height — without
         // them, canMoveTo defaults to state's proxy (player 0), which means
         // player 1's step-up/cross checks would use player 0's coordinates.
+        // excludeThing is the player's own entry in state.things so PvP
+        // collision works without the player blocking themselves.
         const fromX = player.x;
         const fromY = player.y;
         const floor = player.floorHeight;
-        if (canMoveTo(desiredX, desiredY, PLAYER_RADIUS, floor, Infinity, null, fromX, fromY)) {
+        const exclude = player.thingRef;
+        if (canMoveTo(desiredX, desiredY, PLAYER_RADIUS, floor, Infinity, exclude, fromX, fromY)) {
             player.x = desiredX;
             player.y = desiredY;
-        } else if (canMoveTo(desiredX, player.y, PLAYER_RADIUS, floor, Infinity, null, fromX, fromY)) {
+        } else if (canMoveTo(desiredX, player.y, PLAYER_RADIUS, floor, Infinity, exclude, fromX, fromY)) {
             player.x = desiredX;
-        } else if (canMoveTo(player.x, desiredY, PLAYER_RADIUS, floor, Infinity, null, fromX, fromY)) {
+        } else if (canMoveTo(player.x, desiredY, PLAYER_RADIUS, floor, Infinity, exclude, fromX, fromY)) {
             player.y = desiredY;
         }
+    }
+
+    // Sync this player's thing entry so other players' canMoveTo and any
+    // hitscan / projectile / AI loop sees the up-to-date position. Also
+    // updates the player's billboard sprite in every pane so the opposing
+    // player sees them at the right place + facing direction, parented to
+    // the right sector for lighting.
+    if (player.thingRef && player.thingIndex >= 0) {
+        player.thingRef.x = player.x;
+        player.thingRef.y = player.y;
+        player.thingRef.floorHeight = player.floorHeight;
+        // Convert player.angle (north-convention) to thing-facing
+        // (east-convention) for updateEnemyRotation's billboard math.
+        player.thingRef.facing = Math.PI / 2 + player.angle;
+
+        renderer.updateThingPosition(player.thingIndex, player.x, player.y, player.floorHeight);
+        const sector = getSectorAt(player.x, player.y);
+        if (sector) renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
+        renderer.updateEnemyRotation(player.thingIndex, player.thingRef);
     }
 }
 
@@ -84,7 +106,15 @@ function updateMovingState(player) {
     const wasMoving = wasMovingByPlayer.get(player.index) ?? false;
     if (isMoving !== wasMoving) {
         wasMovingByPlayer.set(player.index, isMoving);
+        // Local: toggle `.moving` on the player's renderer (drives weapon
+        // bob and head-bob in their own pane).
         renderer.setPlayerMoving(player.viewportIndex, isMoving);
+        // Cross-pane: toggle `.moving` on the player's thing container in
+        // every pane so the billboard sprite's walk cycle pauses/resumes
+        // for the OPPOSING player's view.
+        if (player.thingIndex >= 0) {
+            renderer.setThingMoving(player.thingIndex, isMoving);
+        }
     }
 }
 

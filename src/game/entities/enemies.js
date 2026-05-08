@@ -8,6 +8,7 @@
 
 import { state } from '../state.js';
 import { getFloorHeightAt } from '../physics.js';
+import { findVisibleTargetForEnemy } from './ai.js';
 import * as renderer from '../../renderer/index.js';
 
 // ============================================================================
@@ -51,7 +52,7 @@ export function respawnEnemy(thingIndex, enemy) {
     // Reset AI state
     enemy.ai.state = 'idle';
     enemy.ai.stateTime = 0;
-    enemy.ai.target = state.players[0];
+    enemy.ai.target = findVisibleTargetForEnemy(enemy);
     enemy.ai.threshold = 0;
     enemy.ai.reactionTimer = 0;
     enemy.ai.damageDealt = false;

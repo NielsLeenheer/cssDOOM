@@ -204,6 +204,20 @@ export function collectItem(thingIndex) {
     }
 }
 
+/**
+ * Toggles the `.moving` class on a thing's container in every pane. Used by
+ * movement.js to pause/resume player billboard sprite walk-cycle animation
+ * across panes when the represented player starts/stops moving.
+ */
+export function setThingMoving(thingIndex, moving) {
+    for (const sState of sceneStates) {
+        const domData = sState.thingDom.get(thingIndex);
+        if (domData?.element) {
+            domData.element.classList.toggle('moving', moving);
+        }
+    }
+}
+
 /** Spawn a bullet puff in every pane. Each copy self-removes after its animation. */
 export function createPuff(x, z, y) {
     for (const scene of dom.scenes) {
@@ -269,6 +283,45 @@ export function createProjectile(projectileId, { type, width, height, sprite, st
         el.style.setProperty('--duration', `${duration}s`);
         dom.scenes[i].appendChild(el);
         sceneStates[i].projectileDom.set(projectileId, el);
+    }
+}
+
+/**
+ * Creates a player billboard sprite for the given player thing in every
+ * pane's scene tree, registers in each pane's sceneStates[i].thingDom keyed
+ * by thingIndex. Each pane sees the sprite from its viewer's perspective via
+ * updateEnemyRotation. CSS hides each player's own sprite in their own pane
+ * (.pane[data-player="N"] .enemy.player[data-player-index="N"] { display:none }).
+ */
+export function createPlayerSprite(thingIndex, playerIndex, x, y, floorHeight, sectorIndex) {
+    for (let i = 0; i < sceneStates.length; i++) {
+        const sState = sceneStates[i];
+        const sceneEl = dom.scenes[i];
+        if (!sceneEl) continue;
+
+        const container = document.createElement('div');
+        container.className = 'enemy player';
+        container.dataset.playerIndex = String(playerIndex);
+        container.style.setProperty('--x', x);
+        container.style.setProperty('--y', y);
+        container.style.setProperty('--floor-z', floorHeight);
+
+        const sprite = document.createElement('div');
+        sprite.className = 'sprite';
+        sprite.dataset.type = 'player';
+        container.appendChild(sprite);
+
+        const sectorContainer = sectorIndex !== undefined && sectorIndex !== null
+            ? sState.sectorContainers[sectorIndex]
+            : null;
+        if (sectorContainer) {
+            sectorContainer.appendChild(container);
+        } else {
+            sceneEl.appendChild(container);
+        }
+
+        sState.thingDom.set(thingIndex, { element: container, sprite });
+        sState.thingContainers.push({ element: container, x, y, gameId: thingIndex });
     }
 }
 

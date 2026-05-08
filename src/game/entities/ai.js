@@ -272,13 +272,44 @@ function updateEnemyPosition(thingIndex, enemy) {
 }
 
 /**
+ * Picks the best player target for an enemy: the nearest living visible
+ * player, or — if none has line-of-sight — the nearest living player by
+ * distance. Falls back to state.players[0] if every player is dead (rare;
+ * AI is gated upstream when all players die).
+ *
+ * Based on: linuxdoom-1.10/p_enemy.c:P_LookForPlayers().
+ */
+export function findVisibleTargetForEnemy(enemy) {
+    let bestVisible = null;
+    let bestVisibleDistSq = Infinity;
+    let bestAny = null;
+    let bestAnyDistSq = Infinity;
+    for (const player of state.players) {
+        if (player.isDead) continue;
+        const dx = player.x - enemy.x;
+        const dy = player.y - enemy.y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq < bestAnyDistSq) {
+            bestAny = player;
+            bestAnyDistSq = distSq;
+        }
+        if (distSq < bestVisibleDistSq && hasLineOfSight(enemy.x, enemy.y, player.x, player.y)) {
+            bestVisible = player;
+            bestVisibleDistSq = distSq;
+        }
+    }
+    return bestVisible || bestAny || state.players[0];
+}
+
+/**
  * Resolves the current chase target's position. Returns {x, y} for wherever
  * the enemy should move toward and attack. The target is either a Player
- * reference (Phase 4 will pick the nearest visible player; Phase 1 always
- * uses state.players[0]) or another enemy entry from state.things.
+ * reference (chosen by findVisibleTargetForEnemy on retarget) or another
+ * enemy entry from state.things.
  *
- * Also handles target invalidation: if the target enemy is dead/collected,
- * reverts to targeting the player and resets threshold.
+ * Handles target invalidation: if the target Player has died, or the
+ * infighting enemy target is dead/collected, re-acquires via
+ * findVisibleTargetForEnemy and resets the lock threshold.
  *
  * Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines ~470-490
  * Accuracy: Exact — same "target dead → threshold=0 → P_LookForPlayers" flow.
@@ -286,12 +317,17 @@ function updateEnemyPosition(thingIndex, enemy) {
 function resolveTarget(enemy, deltaTime) {
     const enemyAI = enemy.ai;
 
-    if (!(enemyAI.target instanceof Player)) {
+    if (enemyAI.target instanceof Player) {
+        // Player target — re-acquire if they died (DM scenario; SP is gated
+        // upstream so this only fires when one of N players dies).
+        if (enemyAI.target.isDead) {
+            enemyAI.target = findVisibleTargetForEnemy(enemy);
+            enemyAI.threshold = 0;
+        }
+    } else {
         // Infighting target (another enemy) — check if it's still alive
         if (enemyAI.target.collected || enemyAI.target.hp <= 0) {
-            // Target killed: revert to chasing the player
-            // Phase 4 will replace this with nearest-visible-player selection.
-            enemyAI.target = state.players[0];
+            enemyAI.target = findVisibleTargetForEnemy(enemy);
             enemyAI.threshold = 0;
         }
     }
@@ -324,22 +360,37 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
 
     switch (enemyAI.state) {
         case 'idle':
-            // Periodically check if the player is visible or gunfire was heard
+            // Periodically check if any player is visible or gunfire was heard
             enemyAI.losTimer += deltaTime;
             if (enemyAI.losTimer >= LINE_OF_SIGHT_CHECK_INTERVAL) {
                 enemyAI.losTimer = 0;
-                // Wake up if: player visible within sight range, OR sector heard gunfire
+                // Re-evaluate target — pick the nearest visible (or just nearest)
+                // living player. In SP this stays on player 0; in DM enemies wake
+                // to whichever player they spot first.
+                // Based on: linuxdoom-1.10/p_enemy.c:P_LookForPlayers().
+                if (enemyAI.target instanceof Player) {
+                    enemyAI.target = findVisibleTargetForEnemy(enemy);
+                }
+                const wakeTargetX = enemyAI.target.x;
+                const wakeTargetY = enemyAI.target.y;
+                const wdx = wakeTargetX - enemy.x;
+                const wdy = wakeTargetY - enemy.y;
+                const wakeDistSq = wdx * wdx + wdy * wdy;
+
+                // Wake up if: target visible within sight range, OR sector heard gunfire.
                 // Based on: linuxdoom-1.10/p_enemy.c:A_Look() — checks soundtarget first,
-                // then checks line of sight within alldirections range
+                // then checks line of sight within alldirections range.
                 let shouldWake = false;
-                if (distSqToTarget < enemyAI.sightRange * enemyAI.sightRange && hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)) {
+                if (wakeDistSq < enemyAI.sightRange * enemyAI.sightRange
+                    && hasLineOfSight(enemy.x, enemy.y, wakeTargetX, wakeTargetY)) {
                     shouldWake = true;
                 } else {
                     const sector = getSectorAt(enemy.x, enemy.y);
                     if (sector && isSectorAlerted(sector.sectorIndex)) {
                         // MF_AMBUSH (deaf) enemies only wake from sound if they
-                        // can see the player. Based on: linuxdoom-1.10/p_enemy.c:A_Look()
-                        if (!enemyAI.ambush || hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)) {
+                        // can see the target. Based on: linuxdoom-1.10/p_enemy.c:A_Look()
+                        if (!enemyAI.ambush
+                            || hasLineOfSight(enemy.x, enemy.y, wakeTargetX, wakeTargetY)) {
                             shouldWake = true;
                         }
                     }
@@ -347,7 +398,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                 if (shouldWake) {
                     setEnemyState(thingIndex, enemy, 'chasing');
                     // Reaction time: delay before the enemy can first attack after
-                    // spotting the player. Based on: linuxdoom-1.10/p_enemy.c:A_Chase()
+                    // spotting a target. Based on: linuxdoom-1.10/p_enemy.c:A_Chase()
                     // which checks reactiontime > 0 before allowing missile attacks.
                     enemyAI.reactionTimer = enemyAI.reactionTime;
                     // Throttle alert sounds so multiple enemies waking up at once
@@ -457,14 +508,11 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
  * and sprite rotation calculations.
  */
 export function updateAllEnemies(deltaTime) {
-    // Skip AI when every player is dead. In SP this is just player 0.
+    // Skip AI when every player is dead.
     if (state.players.every(p => p.isDead)) return;
     const currentTime = performance.now();
     const allThings = state.things;
-    // Phase 1 cull reference uses player 0 only — same behavior as the previous
-    // single-player baseline. Phase 4 will widen to "nearer of all players" so
-    // enemies stay active for whichever player is closest in deathmatch.
-    const cullPlayer = state.players[0];
+    const maxRenderDistSq = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
     for (let index = 0, length = allThings.length; index < length; index++) {
         const thing = allThings[index];
         if (!thing.ai) continue;
@@ -482,10 +530,16 @@ export function updateAllEnemies(deltaTime) {
             continue;
         }
 
-        // Skip enemies too far away for performance (they won't be visible anyway)
-        const deltaX = thing.x - cullPlayer.x;
-        const deltaY = thing.y - cullPlayer.y;
-        if (deltaX * deltaX + deltaY * deltaY > MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE) continue;
+        // Skip enemies too far away from EVERY player for performance.
+        // In DM, an enemy stays active if either player is within range.
+        let nearestDistSq = Infinity;
+        for (const p of state.players) {
+            const dx = thing.x - p.x;
+            const dy = thing.y - p.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq < nearestDistSq) nearestDistSq = distSq;
+        }
+        if (nearestDistSq > maxRenderDistSq) continue;
 
         updateSingleEnemy(index, thing, deltaTime, currentTime);
         renderer.updateEnemyRotation(index, thing);

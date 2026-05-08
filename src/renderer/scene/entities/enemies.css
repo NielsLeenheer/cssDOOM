@@ -51,6 +51,47 @@ body.all-enemies-shadow .enemy .sprite {
 }
 
 /* ========================================================================
+   Other player (DM) — billboard sprite of the opposing player.
+   PLAY.png has 5 rotation rows × 4 walk frames; rotations 6-8 reuse rows
+   3-1 mirrored, handled by updateEnemyRotation's --mirror scale.
+   ======================================================================== */
+
+.sprite[data-type="player"] {
+    background-image: url('/assets/sprites/sheets/PLAY.png');
+    --w: 45; --h: 56; --frames: 4; --rows: 5;
+    /* Walk cycle pauses by default — only animates while the represented
+       player is moving. The `.moving` class on the .enemy.player container
+       is toggled by movement.js via renderer.setThingMoving each time the
+       player's moveX/moveY transitions to/from zero. */
+    animation-play-state: paused;
+    /* Override the global `.scene * { backface-visibility: hidden }` so the
+       billboard renders from any viewing angle. Same trick the spectator
+       player marker uses for the same reason. */
+    backface-visibility: visible;
+}
+
+.enemy.player {
+    backface-visibility: visible;
+}
+
+.enemy.player.moving .sprite {
+    animation-play-state: running;
+}
+
+/* Hide each player's own sprite in their own pane — you don't want to see
+   your own body floating in your own first-person view. */
+.pane[data-player="0"] .enemy.player[data-player-index="0"],
+.pane[data-player="1"] .enemy.player[data-player-index="1"] {
+    display: none;
+}
+
+/* Hide a dead player's sprite (the corpse). Phase 4 round 5 will replace
+   this with a non-blocking corpse thing for the death-cam to look at. */
+.enemy.player.collected {
+    visibility: hidden;
+}
+
+/* ========================================================================
    Destructibles — barrel idle (row 0) + explosion (row 1)
    ======================================================================== */
 

@@ -50,5 +50,12 @@ export class Player {
         // Active powerups — each key is a powerup name, value is remaining
         // duration in seconds. Based on: linuxdoom-1.10/d_player.h:player_t.powers[]
         this.powerups = {};
+
+        // Reference to this player's entry in state.things — set by
+        // addPlayerThings() at scene-build time so canMoveTo's thing-collision
+        // loop can skip self via excludeThing, and so AI / hitscan / projectile
+        // code can find the player as a damageable target.
+        this.thingRef = null;
+        this.thingIndex = -1;
     }
 }

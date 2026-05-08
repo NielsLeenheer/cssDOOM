@@ -10,7 +10,7 @@
  * own either — it delegates to them.
  */
 
-import { EYE_HEIGHT } from '../game/constants.js';
+import { EYE_HEIGHT, PLAYER_RADIUS } from '../game/constants.js';
 
 export const MAPS = ['E1M1', 'E1M2', 'E1M3', 'E1M4', 'E1M5', 'E1M6', 'E1M7', 'E1M8', 'E1M9'];
 import { state } from '../game/state.js';
@@ -18,6 +18,8 @@ import { transitionToLevel, resetGameState } from '../game/player/damage.js';
 import { teardownScene, buildScene } from '../renderer/scene/scene.js';
 import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
 import { buildSectorAdjacency } from '../game/sound-propagation.js';
+import { getSectorAt } from '../game/physics.js';
+import * as renderer from '../renderer/index.js';
 
 /** The currently loaded map's parsed JSON data. Null until a map is loaded. */
 export let mapData = null;
@@ -65,6 +67,7 @@ export async function loadMap(name) {
     }
 
     await buildScene();
+    addPlayerThings();
     buildSectorAdjacency();
 
     // Drop camera from intro height to eye level after scene is ready —
@@ -135,6 +138,39 @@ function applyDeathmatchStarts() {
             player.floorHeight = fallbackFloor;
         }
         player.z = player.floorHeight + 80;
+    }
+}
+
+/**
+ * Pushes a thing entry into state.things for every active player. Lets
+ * physics.canMoveTo's solid-thing loop see the player as a collider (skipped
+ * via excludeThing for the moving player), and lets hitscan/projectile/AI
+ * code treat the player as a damageable target. Each entry's x/y is synced
+ * from player.x/y by movement.js after each position update.
+ */
+function addPlayerThings() {
+    for (const player of state.players) {
+        const sector = getSectorAt(player.x, player.y);
+        const sectorIndex = sector?.sectorIndex;
+        const thingRef = {
+            kind: 'player',
+            player,
+            x: player.x,
+            y: player.y,
+            floorHeight: player.floorHeight,
+            // Convert the player's north-convention angle (state.playerAngle:
+            // 0=north) to the thing facing convention (atan2 east-radians:
+            // 0=east) for updateEnemyRotation's billboard math.
+            facing: Math.PI / 2 + player.angle,
+            type: -1,
+            solidRadius: PLAYER_RADIUS,
+            collected: player.isDead || false,
+        };
+        const thingIndex = state.things.length;
+        state.things.push(thingRef);
+        player.thingRef = thingRef;
+        player.thingIndex = thingIndex;
+        renderer.createPlayerSprite(thingIndex, player.index, player.x, player.y, player.floorHeight, sectorIndex);
     }
 }
 

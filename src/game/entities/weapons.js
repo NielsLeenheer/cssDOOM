@@ -187,6 +187,9 @@ function rollWeaponDamage(player, damageType) {
  * Finds the closest shootable thing along a ray from the player's position.
  * Used by hitscan weapons (pistol, shotgun, chaingun) and melee weapons.
  *
+ * Includes other players (kind:'player' things) as valid targets — the
+ * firing player's own thing is excluded so you can't hitscan yourself.
+ *
  * The ray is defined by a direction vector (dirX, dirY) and a maximum range.
  * A dot product threshold of 0.99 (~8° cone) determines if a thing is close
  * enough to the ray to be considered a hit.
@@ -194,12 +197,14 @@ function rollWeaponDamage(player, damageType) {
 function findHitscanTarget(player, dirX, dirY, range) {
     let closestDistance = Infinity;
     let closestThing = null;
+    const ownThing = player.thingRef;
 
     const allThings = state.things;
     for (let index = 0, length = allThings.length; index < length; index++) {
         const thing = allThings[index];
         if (thing.collected) continue;
-        if (!SHOOTABLE.has(thing.type)) continue;
+        if (thing === ownThing) continue;
+        if (!SHOOTABLE.has(thing.type) && thing.kind !== 'player') continue;
 
         const deltaX = thing.x - player.x;
         const deltaY = thing.y - player.y;
@@ -216,6 +221,19 @@ function findHitscanTarget(player, dirX, dirY, range) {
     }
 
     return closestThing;
+}
+
+/**
+ * Routes damage from a hitscan/melee hit to the right damage function based
+ * on whether the target is another player (damagePlayer) or an enemy/barrel
+ * (damageEnemy). Source is always the firing Player ref.
+ */
+function damageHitscanTarget(target, amount, source) {
+    if (target.kind === 'player') {
+        damagePlayer(target.player, amount, source);
+    } else {
+        damageEnemy(target, amount, source);
+    }
 }
 
 /**
@@ -260,7 +278,7 @@ function checkWeaponHit(player) {
             const target = findHitscanTarget(player, pelletDirX, pelletDirY, weapon.range);
             if (target && hasLineOfSight(player.x, player.y, target.x, target.y)) {
                 spawnPuff(player, target.x, target.y, getFloorHeightAt(target.x, target.y));
-                damageEnemy(target, rollWeaponDamage(player, 'hitscan'), player);
+                damageHitscanTarget(target, rollWeaponDamage(player, 'hitscan'), player);
             } else {
                 const wallHit = rayHitPoint(player.x, player.y, pelletDirX, pelletDirY, weapon.range);
                 if (wallHit) spawnPuff(player, wallHit.x, wallHit.y);
@@ -274,7 +292,7 @@ function checkWeaponHit(player) {
 
     if (target && hasLineOfSight(player.x, player.y, target.x, target.y)) {
         if (weapon.hitscan) spawnPuff(player, target.x, target.y, getFloorHeightAt(target.x, target.y));
-        damageEnemy(target, rollWeaponDamage(player, weapon.damageType), player);
+        damageHitscanTarget(target, rollWeaponDamage(player, weapon.damageType), player);
         return;
     }
 

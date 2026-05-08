@@ -64,6 +64,10 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         player.health = 0;
         player.isDead = true;
         player.deathTime = performance.now();
+        // Mark this player's thing entry collected so AI ignores the corpse,
+        // PvP collision lets the other player walk through it, and hitscan /
+        // projectile loops skip it.
+        if (player.thingRef) player.thingRef.collected = true;
         renderer.setPlayerDead(player.viewportIndex, true);
         playSound('DSPLDETH');
     }
