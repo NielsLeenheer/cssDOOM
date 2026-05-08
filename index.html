@@ -54,89 +54,82 @@
 
     <!-- Game container — split-screen wrapper.
          Single pane visible in body.mode-singleplayer; both panes flex 50/50
-         in body.mode-deathmatch. Each pane owns its own .renderer subtree;
-         the HUD is cloned from the <template> below into each .renderer at
-         dom.js module load. -->
+         in body.mode-deathmatch. Each pane is an empty container at parse
+         time; dom.js clones <template id="pane-template"> into every .pane
+         at module load, so per-pane markup lives in one place. -->
     <div id="game">
-        <div class="pane" data-player="0">
-            <div class="renderer">
-                <div class="viewport">
-                    <div class="scene"></div>
-                </div>
-                <!-- HUD cloned from <template id="hud-template"> at boot -->
-            </div>
-        </div>
-        <div class="pane" data-player="1">
-            <div class="renderer">
-                <div class="viewport">
-                    <div class="scene"></div>
-                </div>
-                <!-- HUD cloned from <template id="hud-template"> at boot -->
-            </div>
-        </div>
+        <div class="pane" data-player="0"></div>
+        <div class="pane" data-player="1"></div>
     </div>
 
-    <!-- HUD template — cloned into each pane's .renderer at dom.js load. -->
-    <template id="hud-template">
-        <div class="hud">
-        <!-- Status bar -->
-        <div class="status">
-            <div class="hud-section hud-section-ammo">
-                <output class="hud-number" value=" 50"></output>
+    <!-- Pane template — cloned into each .pane at dom.js load. Owns the
+         full per-pane subtree: viewport (which carries CSS perspective),
+         scene (the 3D world container), HUD overlay, and color overlays. -->
+    <template id="pane-template">
+        <div class="renderer">
+            <div class="viewport">
+                <div class="scene"></div>
             </div>
-            <div class="hud-section hud-section-health">
-                <div class="hud-pct">
-                    <output class="hud-number" value="100"></output>
+            <div class="hud">
+                <!-- Status bar -->
+                <div class="status">
+                    <div class="hud-section hud-section-ammo">
+                        <output class="hud-number" value=" 50"></output>
+                    </div>
+                    <div class="hud-section hud-section-health">
+                        <div class="hud-pct">
+                            <output class="hud-number" value="100"></output>
+                        </div>
+                    </div>
+                    <div class="hud-section hud-section-arms">
+                        <div class="slot" data-slot="2"></div>
+                        <div class="slot" data-slot="3"></div>
+                        <div class="slot" data-slot="4"></div>
+                        <div class="slot" data-slot="5"></div>
+                        <div class="slot" data-slot="6"></div>
+                        <div class="slot" data-slot="7"></div>
+                    </div>
+                    <div class="hud-section hud-section-face">
+                        <div class="face-sprite"></div>
+                    </div>
+                    <div class="hud-section hud-section-armor">
+                        <div class="hud-pct">
+                            <output class="hud-number" value="  0"></output>
+                        </div>
+                    </div>
+                    <div class="hud-section hud-section-keys">
+                        <div class="key key-blue"></div>
+                        <div class="key key-yellow"></div>
+                        <div class="key key-red"></div>
+                    </div>
+                    <div class="hud-section hud-section-ammo-types">
+                        <div class="ammo-row" data-ammo="bullets">
+                            <output class="small-number ammo-cur"></output>
+                            <output class="small-number ammo-max"></output>
+                        </div>
+                        <div class="ammo-row" data-ammo="shells">
+                            <output class="small-number ammo-cur"></output>
+                            <output class="small-number ammo-max"></output>
+                        </div>
+                        <div class="ammo-row" data-ammo="rockets">
+                            <output class="small-number ammo-cur"></output>
+                            <output class="small-number ammo-max"></output>
+                        </div>
+                        <div class="ammo-row" data-ammo="cells">
+                            <output class="small-number ammo-cur"></output>
+                            <output class="small-number ammo-max"></output>
+                        </div>
+                    </div>
                 </div>
-            </div>
-            <div class="hud-section hud-section-arms">
-                <div class="slot" data-slot="2"></div>
-                <div class="slot" data-slot="3"></div>
-                <div class="slot" data-slot="4"></div>
-                <div class="slot" data-slot="5"></div>
-                <div class="slot" data-slot="6"></div>
-                <div class="slot" data-slot="7"></div>
-            </div>
-            <div class="hud-section hud-section-face">
-                <div class="face-sprite"></div>
-            </div>
-            <div class="hud-section hud-section-armor">
-                <div class="hud-pct">
-                    <output class="hud-number" value="  0"></output>
-                </div>
-            </div>
-            <div class="hud-section hud-section-keys">
-                <div class="key key-blue"></div>
-                <div class="key key-yellow"></div>
-                <div class="key key-red"></div>
-            </div>
-            <div class="hud-section hud-section-ammo-types">
-                <div class="ammo-row" data-ammo="bullets">
-                    <output class="small-number ammo-cur"></output>
-                    <output class="small-number ammo-max"></output>
-                </div>
-                <div class="ammo-row" data-ammo="shells">
-                    <output class="small-number ammo-cur"></output>
-                    <output class="small-number ammo-max"></output>
-                </div>
-                <div class="ammo-row" data-ammo="rockets">
-                    <output class="small-number ammo-cur"></output>
-                    <output class="small-number ammo-max"></output>
-                </div>
-                <div class="ammo-row" data-ammo="cells">
-                    <output class="small-number ammo-cur"></output>
-                    <output class="small-number ammo-max"></output>
-                </div>
-            </div>
-        </div>
 
-        <!-- Weapon (after status bar for CSS anchor positioning) -->
-        <div class="weapon"></div>
+                <!-- Weapon (after status bar for CSS anchor positioning) -->
+                <div class="weapon"></div>
 
-        <!-- Overlays for color effects -->
-        <div class="damage-overlay"></div>
-        <div class="pickup-overlay"></div>
-        <div class="teleport-overlay"></div>
+                <!-- Overlays for color effects -->
+                <div class="damage-overlay"></div>
+                <div class="pickup-overlay"></div>
+                <div class="teleport-overlay"></div>
+            </div>
         </div>
     </template>
 

@@ -1,32 +1,33 @@
 /**
  * Cached DOM element references and renderer-specific state.
  *
- * Per-pane: every pane has its own .renderer subtree (.viewport, .scene,
- * .hud, .status, .weapon, overlays). The HUD subtree is defined once in
- * #hud-template and cloned into each pane at module load so the markup stays
- * in one place.
+ * Per-pane: every pane has its own full subtree (.renderer > .viewport >
+ * .scene plus .hud and overlays). The whole subtree is defined once in
+ * #pane-template and cloned into each .pane at module load — that keeps
+ * per-pane markup in a single source of truth and means the panes
+ * themselves are empty containers in the parsed HTML.
  *
  * Arrays (`dom.renderers`, `dom.scenes`, `dom.viewports`, `dom.statusElements`,
- * `dom.weaponElements`) are length 1 in single-player and length 2 in
- * deathmatch (both DOM trees exist in the HTML; the inactive pane is hidden
- * via body.mode-singleplayer in CSS). The legacy singletons (`dom.renderer`,
- * `dom.scene`, etc.) point at pane 0 — they remain as migration aliases until
- * every reader uses an indexed form.
+ * `dom.weaponElements`) are length matching the number of .pane elements in
+ * HTML (currently 2). Whether pane 1 is visible is controlled by
+ * body.mode-singleplayer / body.mode-deathmatch in CSS. The legacy singletons
+ * (`dom.renderer`, `dom.scene`, etc.) point at pane 0 — they remain as
+ * migration aliases until every reader uses an indexed form.
  *
  * UI elements that are NOT per-pane (menu, fullscreen control) stay as
  * single references.
  */
 
-// Clone the HUD template into each pane's .renderer before any querySelector
-// for HUD elements runs. Both panes always exist in the HTML; whether pane 1
-// is visible is controlled by body.mode-* in CSS.
-const hudTemplate = document.querySelector('#hud-template');
-const paneRenderers = [...document.querySelectorAll('.pane > .renderer')];
-for (const r of paneRenderers) {
-    r.appendChild(hudTemplate.content.cloneNode(true));
+// Clone the pane template into each .pane before any querySelector for
+// per-pane elements runs. Both panes always exist in the HTML; whether
+// pane 1 is visible is controlled by body.mode-* in CSS.
+const paneTemplate = document.querySelector('#pane-template');
+const panes = [...document.querySelectorAll('.pane')];
+for (const pane of panes) {
+    pane.appendChild(paneTemplate.content.cloneNode(true));
 }
 
-const renderers = paneRenderers;
+const renderers = [...document.querySelectorAll('.renderer')];
 const scenes = [...document.querySelectorAll('.scene')];
 const viewports = [...document.querySelectorAll('.viewport')];
 const statusElements = [...document.querySelectorAll('.status')];
