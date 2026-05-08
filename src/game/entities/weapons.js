@@ -369,21 +369,21 @@ function spawnPlayerRocket(player, forwardX, forwardY) {
  * Based on: linuxdoom-1.10/p_map.c:P_RadiusAttack()
  * Accuracy: Exact — uses DOOM's subtractive falloff: damage = splashDamage - dist.
  */
-export function rocketExplosion(impactX, impactY) {
+export function rocketExplosion(impactX, impactY, attacker = null) {
     // Based on: linuxdoom-1.10/p_map.c:PIT_RadiusAttack()
     // DOOM uses Chebyshev distance (max of abs deltas) minus target radius
 
     // Damage every player within splash radius (rockets can self-damage).
-    // The firing player is not threaded through this signature in Phase 1;
-    // attacker is left null and will be wired up when Phase 4 adds firer
-    // tracking on the rocket projectile.
+    // `attacker` is the firing Player ref so frag attribution works for
+    // splash kills — without it, awardFrag treats the kill as a suicide
+    // and decrements the victim's score instead of giving the killer +1.
     for (const player of state.players) {
         const playerDX = Math.abs(player.x - impactX);
         const playerDY = Math.abs(player.y - impactY);
         const playerDist = Math.max(0, Math.max(playerDX, playerDY) - PLAYER_RADIUS);
         if (playerDist < ROCKET_SPLASH_DAMAGE
             && hasLineOfSight(impactX, impactY, player.x, player.y)) {
-            damagePlayer(player, ROCKET_SPLASH_DAMAGE - playerDist);
+            damagePlayer(player, ROCKET_SPLASH_DAMAGE - playerDist, attacker);
         }
     }
 
@@ -402,7 +402,7 @@ export function rocketExplosion(impactX, impactY) {
 
         if (!hasLineOfSight(impactX, impactY, thing.x, thing.y)) continue;
 
-        damageEnemy(thing, ROCKET_SPLASH_DAMAGE - dist, null);
+        damageEnemy(thing, ROCKET_SPLASH_DAMAGE - dist, attacker);
     }
 }
 

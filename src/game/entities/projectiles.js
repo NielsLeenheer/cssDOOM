@@ -62,7 +62,7 @@ export function updateProjectiles() {
             const impactY = hitPoint ? hitPoint.y - dirY * 25 : projectile.y;
             spawnFireballExplosion(impactX, impactY, projectile.z);
             playSound(projectile.hitSound);
-            if (projectile.isPlayerRocket) rocketExplosion(impactX, impactY);
+            if (projectile.isPlayerRocket) rocketExplosion(impactX, impactY, projectile.source);
             renderer.removeProjectile(projectile.id);
             state.projectiles.splice(index, 1);
             continue;
@@ -78,7 +78,7 @@ export function updateProjectiles() {
         if (newZ <= floorHeight) {
             spawnFireballExplosion(newX, newY, floorHeight);
             playSound(projectile.hitSound);
-            if (projectile.isPlayerRocket) rocketExplosion(newX, newY);
+            if (projectile.isPlayerRocket) rocketExplosion(newX, newY, projectile.source);
             renderer.removeProjectile(projectile.id);
             state.projectiles.splice(index, 1);
             continue;
@@ -102,7 +102,7 @@ export function updateProjectiles() {
                 // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() missile damage.
                 if (projectile.isPlayerRocket) {
                     damagePlayer(player, projectile.damage, projectile.source);
-                    rocketExplosion(projectile.x, projectile.y);
+                    rocketExplosion(projectile.x, projectile.y, projectile.source);
                 } else {
                     damagePlayer(player, (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage, projectile.source);
                 }
@@ -134,7 +134,7 @@ export function updateProjectiles() {
                 // Player rockets deal direct hit damage + splash damage in a radius
                 if (projectile.isPlayerRocket) {
                     damageEnemy(thing, projectile.damage, projectile.source);
-                    rocketExplosion(projectile.x, projectile.y);
+                    rocketExplosion(projectile.x, projectile.y, projectile.source);
                 } else {
                     // Roll damage on impact: (P_Random()%8+1) * missileDamage
                     damageEnemy(thing, (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage, projectile.source);
