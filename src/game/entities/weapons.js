@@ -17,7 +17,7 @@ import { playSound } from '../../audio/audio.js';
 import { setEnemyState } from './enemies.js';
 import { damageEnemy } from './combat.js';
 import * as renderer from '../../renderer/index.js';
-import { input } from '../../input/index.js';
+import { inputs } from '../../input/index.js';
 import { propagateSound } from '../sound-propagation.js';
 
 // ============================================================================
@@ -92,10 +92,11 @@ export function fireWeapon(player) {
     // Continuous-fire weapons (chaingun): set up an auto-fire interval that
     // keeps shooting at the weapon's fire rate while the fire button is held.
     // Each interval tick deducts ammo, plays the fire sound, and runs hit detection.
-    if (weapon.continuous && input.fireHeld) {
+    const playerInput = inputs[player.index];
+    if (weapon.continuous && playerInput.fireHeld) {
         stopAutoFire(player);
         const handle = setInterval(() => {
-            if (!input.fireHeld || player.isDead || (weapon.ammoType && player.ammo[weapon.ammoType] < weapon.ammoPerShot)) {
+            if (!playerInput.fireHeld || player.isDead || (weapon.ammoType && player.ammo[weapon.ammoType] < weapon.ammoPerShot)) {
                 stopAutoFire(player);
                 return;
             }
@@ -110,7 +111,7 @@ export function fireWeapon(player) {
         // If the fire button is still held, immediately fire again.
         setTimeout(() => {
             player.isFiring = false;
-            if (input.fireHeld) fireWeapon(player);
+            if (playerInput.fireHeld) fireWeapon(player);
         }, weapon.fireRate);
     }
 }

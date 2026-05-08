@@ -46,7 +46,8 @@ let touchControls;
 export function initTouchInput() {
     if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) return;
 
-    registerInputProvider(getInput);
+    // Touch is single-player only — always targets slot 0.
+    registerInputProvider(() => 0, getInput);
     createTouchUI();
     setupPointerHandlers();
 }

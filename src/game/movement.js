@@ -8,12 +8,11 @@ import { canMoveTo, getFloorHeightAt } from './physics.js';
 import { playSound } from '../audio/audio.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
-import { input, collectInput } from '../input/index.js';
+import { inputs } from '../input/index.js';
 
 const wasMovingByPlayer = new Map();
 
 export function updateMovement(player, deltaTime, timestamp) {
-    collectInput();
     updateLocation(player, deltaTime);
     updatePlayerFromLift(timestamp);
     updateHeight(player);
@@ -21,6 +20,7 @@ export function updateMovement(player, deltaTime, timestamp) {
 }
 
 function updateLocation(player, deltaTime) {
+    const input = inputs[player.index];
 
     // Speed modifier
     const speed = input.run ? MOVE_SPEED * RUN_MULTIPLIER : MOVE_SPEED;
@@ -73,6 +73,7 @@ function updateLocation(player, deltaTime) {
 }
 
 function updateMovingState(player) {
+    const input = inputs[player.index];
     const isMoving = input.moveX !== 0 || input.moveY !== 0;
     const wasMoving = wasMovingByPlayer.get(player.index) ?? false;
     if (isMoving !== wasMoving) {

@@ -14,13 +14,18 @@
  *                Alt (L/R) / X  = fire weapon
  *                1-7            = select weapon by slot number
  *
+ * Per-player: keyboard drives whichever player is currently in
+ * `state.kbmTargetPlayer` (default 0). The Tab key (gated to dev + DM mode +
+ * zero gamepads) toggles the target between 0 and 1, clearing held-key
+ * state on the previous target so a held W or fire-button doesn't leak.
+ *
  * When the player is dead, any keypress reloads the current map.
  * When the window loses focus, all movement keys are released to prevent
  * stuck-key issues. The Meta key also clears all movement state, since
  * keyup events are suppressed while Meta is held on macOS.
  */
 
-import { input } from './index.js';
+import { inputs, registerInputProvider, clearInputSlot } from './index.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { WEAPONS } from '../game/constants.js';
@@ -30,20 +35,52 @@ import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { loadMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
-import { registerInputProvider } from './index.js';
 
-// Internal key state — not exposed to the game layer
+// Internal key state — not exposed to the game layer. Note these are GLOBAL
+// across players: the keyboard physically belongs to one human at a time, so
+// only the current `state.kbmTargetPlayer` reads them.
 const keys = {
     up: false, down: false, left: false, right: false,
     strafeLeft: false, strafeRight: false, run: false, strafe: false,
 };
+
+/** The player object currently driven by keyboard input. */
+function kbmPlayer() {
+    return state.players[state.kbmTargetPlayer];
+}
+
+/**
+ * Returns true if the dev Tab handler is allowed to switch keyboard
+ * targets right now. Gated so the affordance only exists during local
+ * development of deathmatch mode without gamepads.
+ */
+function canSwitchKbmTarget() {
+    if (!import.meta.env.DEV) return false;
+    if (state.mode !== 'deathmatch') return false;
+    const connectedGamepads = navigator.getGamepads().filter(Boolean);
+    return connectedGamepads.length === 0;
+}
+
+function switchKbmTarget() {
+    const previous = state.kbmTargetPlayer;
+    // Release any held keyboard state so a stuck W doesn't follow us.
+    keys.up = keys.down = keys.left = keys.right = false;
+    keys.strafeLeft = keys.strafeRight = keys.run = keys.strafe = false;
+    // Zero the previous slot's input + fireHeld so chaingun auto-fire
+    // doesn't keep ticking on the abandoned player.
+    clearInputSlot(previous);
+    state.kbmTargetPlayer = previous === 0 ? 1 : 0;
+    document.body.dataset.kbmTarget = String(state.kbmTargetPlayer);
+}
 
 /**
  * Initializes keyboard event listeners.
  * Should be called once during application startup.
  */
 export function initKeyboardInput() {
-    registerInputProvider(getInput);
+    // Keyboard input is routed to whatever slot kbmTargetPlayer points at.
+    registerInputProvider(() => state.kbmTargetPlayer, getInput);
+    document.body.dataset.kbmTarget = String(state.kbmTargetPlayer);
 
     // Keyboard: key down
     // Tracks which movement keys are pressed and handles discrete actions
@@ -60,9 +97,20 @@ export function initKeyboardInput() {
         // Block game input while menu is open
         if (isMenuOpen()) return;
 
+        // Tab — dev-only keyboard target switch (gated). Caught before the
+        // dead-restart gate so Tab still works even if the current target
+        // is dead.
+        if (event.code === 'Tab' && canSwitchKbmTarget()) {
+            switchKbmTarget();
+            event.preventDefault();
+            return;
+        }
+
+        const player = kbmPlayer();
+
         // When dead, any key restarts after a 4-second cooldown
-        if (state.isDead) {
-            if (performance.now() - state.deathTime > 4000) loadMap(currentMap);
+        if (player?.isDead) {
+            if (performance.now() - player.deathTime > 4000) loadMap(currentMap);
             return;
         }
 
@@ -87,14 +135,17 @@ export function initKeyboardInput() {
             // Strafe modifier: Z (arrows strafe instead of turn)
             case 'KeyZ': keys.strafe = true; break;
             // Use action: open doors and activate switches
-            case 'Space': tryOpenDoor(state.players[0]); tryUseSwitch(state.players[0]); tryUseLift(state.players[0]); break;
+            case 'Space': tryOpenDoor(player); tryUseSwitch(player); tryUseLift(player); break;
             // Fire weapon: Alt or X
-            case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = true; fireWeapon(state.players[0]); break;
+            case 'AltLeft': case 'AltRight': case 'KeyX':
+                inputs[state.kbmTargetPlayer].fireHeld = true;
+                fireWeapon(player);
+                break;
             // Weapon selection: number keys 1-7
             case 'Digit1': case 'Digit2': case 'Digit3':
             case 'Digit4': case 'Digit5': case 'Digit6': case 'Digit7':
                 const weaponSlot = parseInt(event.code[5]);
-                if (WEAPONS[weaponSlot]) equipWeapon(state.players[0], weaponSlot);
+                if (WEAPONS[weaponSlot]) equipWeapon(player, weaponSlot);
                 break;
             // Unrecognized key — return early without calling preventDefault
             default: return;
@@ -107,6 +158,7 @@ export function initKeyboardInput() {
     // Also handles the macOS Meta key quirk where held Meta suppresses
     // other keyup events, causing stuck movement keys.
     document.addEventListener('keyup', event => {
+        const player = kbmPlayer();
         switch (event.code) {
             case 'ArrowUp': case 'KeyW': keys.up = false; break;
             case 'ArrowDown': case 'KeyS': keys.down = false; break;
@@ -116,7 +168,10 @@ export function initKeyboardInput() {
             case 'KeyD': case 'Period': keys.strafeRight = false; break;
             case 'ShiftLeft': case 'ShiftRight': keys.run = false; break;
             case 'KeyZ': keys.strafe = false; break;
-            case 'AltLeft': case 'AltRight': case 'KeyX': input.fireHeld = false; stopAutoFire(state.players[0]); break;
+            case 'AltLeft': case 'AltRight': case 'KeyX':
+                inputs[state.kbmTargetPlayer].fireHeld = false;
+                if (player) stopAutoFire(player);
+                break;
 
             // Meta key release: clear all movement to avoid stuck keys on macOS
             case 'MetaLeft': case 'MetaRight':

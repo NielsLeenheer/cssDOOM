@@ -12,15 +12,18 @@
  *   Start:             toggle menu
  *   D-pad:             move (alternative to left stick)
  *
- * Registers an input provider that supplies moveX, moveY, and turnDelta
- * to the unified input system.
+ * Per-player: each connected gamepad drives a player slot equal to its
+ * `gamepad.index` (gamepad 0 → state.players[0], gamepad 1 → state.players[1]).
+ * Each gamepad has its own analog state so two pads contribute to two
+ * different input slots independently. fireHeld is set on the gamepad's
+ * own slot.
  *
  * Uses gamecontroller.js which handles connection/disconnection, polling,
  * and deadzone management via the Gamepad API.
  */
 
 import 'gamecontroller.js';
-import { input } from './index.js';
+import { inputs, registerInputProvider } from './index.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
@@ -29,15 +32,12 @@ import { tryUseSwitch } from '../game/mechanics/switches.js';
 import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { loadMap } from '../shared/maps.js';
-import { registerInputProvider } from './index.js';
 
 const STICK_DEADZONE = 0.15;
 const TURN_SENSITIVITY = 0.04;
 
-// Module-local analog state
-let moveX = 0, moveY = 0, turnDelta = 0;
-
-let connected = false;
+/** Per-gamepad analog state, keyed by gamepad.index. */
+const padStates = new Map();
 
 /**
  * Initialise gamepad input. The gamecontroller.js library auto-detects
@@ -46,32 +46,46 @@ let connected = false;
 export function initGamepadInput() {
     if (!window.gameControl) return;
 
-    registerInputProvider(getInput);
-
     window.gameControl.on('connect', gamepad => {
-        connected = true;
         setupGamepad(gamepad);
     });
 
-    window.gameControl.on('disconnect', () => {
-        connected = false;
-        moveX = 0;
-        moveY = 0;
-        turnDelta = 0;
+    window.gameControl.on('disconnect', gamepad => {
+        const padState = padStates.get(gamepad.index);
+        if (padState) {
+            padState.moveX = 0;
+            padState.moveY = 0;
+            padState.turnDelta = 0;
+        }
+        const slot = inputs[gamepad.index];
+        if (slot) slot.fireHeld = false;
+    });
+
+    // Single global afterCycle handler that walks all known gamepads each
+    // polling tick and updates their padState from raw axes.
+    window.gameControl.on('afterCycle', () => {
+        for (const [index, padState] of padStates) {
+            const pad = window.gameControl.gamepads?.[index];
+            if (!pad) continue;
+            const axes0 = pad.axeValues[0];
+            if (axes0) {
+                const lx = parseFloat(axes0[0]) || 0;
+                const ly = parseFloat(axes0[1]) || 0;
+                padState.moveX = Math.abs(lx) > STICK_DEADZONE ? lx : 0;
+                padState.moveY = Math.abs(ly) > STICK_DEADZONE ? -ly : 0; // invert Y
+            }
+            const axes1 = pad.axeValues[1];
+            if (axes1) {
+                const rx = parseFloat(axes1[0]) || 0;
+                padState.turnDelta = Math.abs(rx) > STICK_DEADZONE ? -rx * TURN_SENSITIVITY : 0;
+            }
+        }
     });
 }
 
-/** Returns true if a gamepad is currently connected. */
+/** Returns true if any gamepad is currently connected. */
 export function isGamepadConnected() {
-    return connected;
-}
-
-// ============================================================================
-// Input Provider
-// ============================================================================
-
-function getInput() {
-    return { moveX, moveY, turnDelta };
+    return padStates.size > 0;
 }
 
 // ============================================================================
@@ -79,40 +93,56 @@ function getInput() {
 // ============================================================================
 
 function setupGamepad(gamepad) {
+    const playerIndex = gamepad.index;
+    const padState = { moveX: 0, moveY: 0, turnDelta: 0 };
+    padStates.set(playerIndex, padState);
+
+    // Per-gamepad provider — contributes to its own player slot.
+    registerInputProvider(() => playerIndex, () => padState);
+
     // Set deadzone threshold for analog sticks
     gamepad.set('axeThreshold', STICK_DEADZONE);
 
+    /** The player driven by this gamepad. May be undefined if SP and the
+     *  gamepad's slot is beyond state.players.length. */
+    const playerForPad = () => state.players[playerIndex];
+
     // --- A / Cross (button0): Use ---
     gamepad.before('button0', () => {
-        if (handleDeadRestart()) return;
+        const player = playerForPad();
+        if (!player) return;
+        if (handleDeadRestart(player)) return;
         if (isMenuOpen()) return;
-        tryOpenDoor(state.players[0]);
-        tryUseSwitch(state.players[0]);
-        tryUseLift(state.players[0]);
+        tryOpenDoor(player);
+        tryUseSwitch(player);
+        tryUseLift(player);
     });
 
     // --- Right trigger (R2 / button7): Fire ---
     gamepad.before('r2', () => {
-        if (handleDeadRestart()) return;
+        const player = playerForPad();
+        if (!player) return;
+        if (handleDeadRestart(player)) return;
         if (isMenuOpen()) return;
-        input.fireHeld = true;
-        fireWeapon(state.players[0]);
+        inputs[playerIndex].fireHeld = true;
+        fireWeapon(player);
     });
     gamepad.after('r2', () => {
-        input.fireHeld = false;
-        stopAutoFire(state.players[0]);
+        const player = playerForPad();
+        inputs[playerIndex].fireHeld = false;
+        if (player) stopAutoFire(player);
     });
 
     // --- Left bumper (L1 / button4): Previous weapon ---
     gamepad.before('l1', () => {
         if (isMenuOpen()) return;
-        cycleWeapon(-1);
+        cycleWeapon(playerIndex, -1);
     });
 
     // --- Right bumper (R1 / button5): Next weapon ---
     gamepad.before('r1', () => {
         if (isMenuOpen()) return;
-        cycleWeapon(1);
+        cycleWeapon(playerIndex, 1);
     });
 
     // --- Start (button9): Toggle menu ---
@@ -121,48 +151,32 @@ function setupGamepad(gamepad) {
     });
 
     // --- D-pad: alternative movement ---
-    gamepad.on('up0', () => { moveY = 1; });
-    gamepad.after('up0', () => { moveY = 0; });
-    gamepad.on('down0', () => { moveY = -1; });
-    gamepad.after('down0', () => { moveY = 0; });
-    gamepad.on('left0', () => { moveX = -1; });
-    gamepad.after('left0', () => { moveX = 0; });
-    gamepad.on('right0', () => { moveX = 1; });
-    gamepad.after('right0', () => { moveX = 0; });
-
-    // --- Analog stick polling: read raw axes each frame ---
-    window.gameControl.on('afterCycle', () => {
-        // Left stick (axes 0): movement
-        const axes0 = gamepad.axeValues[0];
-        if (axes0) {
-            const lx = parseFloat(axes0[0]) || 0;
-            const ly = parseFloat(axes0[1]) || 0;
-            moveX = Math.abs(lx) > STICK_DEADZONE ? lx : 0;
-            moveY = Math.abs(ly) > STICK_DEADZONE ? -ly : 0; // invert Y
-        }
-
-        // Right stick (axes 1): turning
-        if (gamepad.axeValues[1]) {
-            const rx = parseFloat(gamepad.axeValues[1][0]) || 0;
-            turnDelta = Math.abs(rx) > STICK_DEADZONE ? -rx * TURN_SENSITIVITY : 0;
-        }
-    });
+    gamepad.on('up0',    () => { padState.moveY = 1; });
+    gamepad.after('up0', () => { padState.moveY = 0; });
+    gamepad.on('down0',    () => { padState.moveY = -1; });
+    gamepad.after('down0', () => { padState.moveY = 0; });
+    gamepad.on('left0',    () => { padState.moveX = -1; });
+    gamepad.after('left0', () => { padState.moveX = 0; });
+    gamepad.on('right0',    () => { padState.moveX = 1; });
+    gamepad.after('right0', () => { padState.moveX = 0; });
 }
 
 // ============================================================================
 // Helpers
 // ============================================================================
 
-function cycleWeapon(direction) {
-    const owned = [...state.ownedWeapons].sort((a, b) => a - b);
-    const currentIndex = owned.indexOf(state.currentWeapon);
+function cycleWeapon(playerIndex, direction) {
+    const player = state.players[playerIndex];
+    if (!player) return;
+    const owned = [...player.ownedWeapons].sort((a, b) => a - b);
+    const currentIndex = owned.indexOf(player.currentWeapon);
     const nextIndex = (currentIndex + direction + owned.length) % owned.length;
-    equipWeapon(state.players[0], owned[nextIndex]);
+    equipWeapon(player, owned[nextIndex]);
 }
 
-function handleDeadRestart() {
-    if (!state.isDead) return false;
-    if (performance.now() - state.deathTime > 4000) {
+function handleDeadRestart(player) {
+    if (!player.isDead) return false;
+    if (performance.now() - player.deathTime > 4000) {
         loadMap(currentMap);
     }
     return true;

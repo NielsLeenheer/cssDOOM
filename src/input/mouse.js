@@ -5,14 +5,17 @@
  * fullscreen and grants pointer lock, allowing mouse movement to turn the
  * player. Left click fires the current weapon.
  *
+ * Per-player: mouse drives the same target slot as keyboard
+ * (`state.kbmTargetPlayer`) — keyboard and mouse are one logical input
+ * combo (FPS-standard WASD + mouselook), so they switch together.
+ *
  * Ignores clicks on touch devices to prevent accidental firing from taps.
  */
 
-import { input } from './index.js';
+import { inputs, registerInputProvider } from './index.js';
 import { state } from '../game/state.js';
 import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spectatorActive } from '../ui/spectator.js';
-import { registerInputProvider } from './index.js';
 
 const MOUSE_SENSITIVITY = 0.003;
 const isTouchDevice = matchMedia('(pointer: coarse)').matches;
@@ -20,22 +23,32 @@ const isTouchDevice = matchMedia('(pointer: coarse)').matches;
 // Accumulated mouse turn delta (consumed each frame by the provider)
 let turnDelta = 0;
 
+/** The player object currently driven by mouse input (same as keyboard). */
+function kbmPlayer() {
+    return state.players[state.kbmTargetPlayer];
+}
+
 /**
  * Initializes mouse event listeners.
  * Should be called once during application startup.
  */
 export function initMouseInput() {
-    registerInputProvider(getInput);
+    // Mouse shares the keyboard target slot.
+    registerInputProvider(() => state.kbmTargetPlayer, getInput);
 
     // Fire weapon on left click (outside UI elements)
     document.addEventListener('mousedown', event => {
         if (event.button === 0 && !spectatorActive && !isTouchDevice && !event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #help-button, #fullscreen-button')) {
-            input.fireHeld = true;
-            fireWeapon(state.players[0]);
+            inputs[state.kbmTargetPlayer].fireHeld = true;
+            fireWeapon(kbmPlayer());
         }
     });
     document.addEventListener('mouseup', event => {
-        if (event.button === 0) { input.fireHeld = false; stopAutoFire(state.players[0]); }
+        if (event.button === 0) {
+            inputs[state.kbmTargetPlayer].fireHeld = false;
+            const player = kbmPlayer();
+            if (player) stopAutoFire(player);
+        }
     });
 
     // Request pointer lock when entering fullscreen

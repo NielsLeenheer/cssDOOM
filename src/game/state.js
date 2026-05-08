@@ -17,6 +17,15 @@ export const state = {
     // Skill level 1-5 (maps to DOOM flag bits for thing spawning)
     skillLevel: 1,
 
+    // Game mode. Currently 'singleplayer' or 'deathmatch'. The menu sets
+    // this when starting a match; CSS layout (body[data-mode]) follows.
+    mode: 'singleplayer',
+
+    // Runtime-mutable keyboard+mouse target slot (which player they drive).
+    // Default is player 0. The dev Tab handler toggles this between 0 and 1
+    // when `import.meta.env.DEV && state.mode === 'deathmatch' && no gamepads`.
+    kbmTargetPlayer: 0,
+
     // ── Players ───────────────────────────────────────────────────────
     // Length 1 in single-player, 2 in deathmatch. Per-player fields like
     // position, health, weapons live here. Legacy `state.playerX` etc.

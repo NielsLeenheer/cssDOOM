@@ -1,62 +1,119 @@
 /**
  * Input Manager
  *
- * Provides a unified input abstraction so the game layer reads a single
- * `input` object regardless of how many input sources exist.
+ * Provides a unified per-player input abstraction so the game layer reads
+ * `inputs[player.index]` regardless of how many input sources exist or
+ * which player they target.
  *
- * Each input module (keyboard, touch, gamepad, etc.) registers a provider
- * function via `registerInputProvider()`. The provider returns the module's
- * current contribution to the input state:
+ * Each input module (keyboard, mouse, gamepad, touch) registers a provider
+ * via `registerInputProvider(getPlayerIndex, getInput)`:
  *
- *   { moveX, moveY, turn, turnDelta, run }
+ *   getPlayerIndex(): returns the player slot this provider currently
+ *                     targets (0 or 1). Dynamic — keyboard/mouse share a
+ *                     mutable `state.kbmTargetPlayer` so the dev Tab
+ *                     handler can switch which player they drive.
+ *   getInput():       returns the current contribution as
+ *                     { moveX, moveY, turn, turnDelta, run }.
  *
- *   moveX:     -1 to 1, strafe (negative = left, positive = right)
- *   moveY:     -1 to 1, forward/backward (positive = forward)
- *   turn:      -1 to 1, rate-based turning applied with turnSpeed * deltaTime
- *   turnDelta: radians, absolute rotation added this frame (mouse, analog stick)
- *   run:       boolean, whether the run modifier is active
+ * `collectInputs()` is called once per frame from the game loop. It zeros
+ * the per-frame fields on every input slot, sums all provider contributions
+ * routed by their declared player index, and clamps the per-axis totals.
  *
- * `collectInput()` is called once per frame before movement. It resets
- * the input state, sums all provider contributions, and clamps the result.
- * Adding a new input method requires only writing the module and calling
- * `registerInputProvider` — no changes to the game layer.
+ * `fireHeld` lives on each slot and is NOT reset by collectInputs — it is
+ * set/cleared by event handlers (keydown/keyup, gamepad before/after) and
+ * persists across frames so chaingun auto-fire can poll it.
  */
+
+const NUM_INPUT_SLOTS = 2;
 
 const providers = [];
 
-/**
- * Unified input state — owned by the input layer, read by the game layer.
- * Populated each frame by collectInput() from all registered providers.
- */
-export const input = { moveX: 0, moveY: 0, turn: 0, turnDelta: 0, run: false, fireHeld: false };
-
-/**
- * Register an input provider function. The function will be called each
- * frame and should return an object with any subset of the input fields.
- */
-export function registerInputProvider(provider) {
-    providers.push(provider);
+function makeSlot() {
+    return { moveX: 0, moveY: 0, turn: 0, turnDelta: 0, run: false, fireHeld: false };
 }
 
 /**
- * Collect input from all registered providers into the input state.
- * Called once per frame before movement processing.
+ * Per-player input slots. inputs[i] is the unified input state for the
+ * player at state.players[i].
  */
-export function collectInput() {
-    let moveX = 0, moveY = 0, turn = 0, turnDelta = 0, run = false;
+export const inputs = Array.from({ length: NUM_INPUT_SLOTS }, makeSlot);
 
-    for (let i = 0; i < providers.length; i++) {
-        const p = providers[i]();
-        moveX += p.moveX || 0;
-        moveY += p.moveY || 0;
-        turn += p.turn || 0;
-        turnDelta += p.turnDelta || 0;
-        if (p.run) run = true;
+/**
+ * Migration alias — `input` points at slot 0. Will be removed once every
+ * caller reads `inputs[player.index]` directly.
+ */
+export const input = inputs[0];
+
+/**
+ * Register an input provider.
+ *
+ * @param {() => number|null} getPlayerIndex  Returns the target slot index
+ *   (or null if the provider is currently unbound — its contribution is
+ *   skipped). Called every frame by collectInputs so the target can be
+ *   runtime-mutable.
+ * @param {() => object} getInput  Returns the provider's contribution to
+ *   the input state for this frame.
+ */
+export function registerInputProvider(getPlayerIndex, getInput) {
+    providers.push({ getPlayerIndex, getInput });
+}
+
+/**
+ * Per-frame input collection. Called once from the game loop before any
+ * movement update so all players' input slots are fresh for the frame.
+ */
+export function collectInputs() {
+    for (const slot of inputs) {
+        slot.moveX = 0;
+        slot.moveY = 0;
+        slot.turn = 0;
+        slot.turnDelta = 0;
+        slot.run = false;
+        // fireHeld intentionally not reset — it's event-driven and persists.
     }
 
-    input.moveX = Math.max(-1, Math.min(1, moveX));
-    input.moveY = Math.max(-1, Math.min(1, moveY));
-    input.turn = Math.max(-1, Math.min(1, turn));
-    input.turnDelta = turnDelta;
-    input.run = run;
+    for (let i = 0; i < providers.length; i++) {
+        const { getPlayerIndex, getInput } = providers[i];
+        const playerIndex = getPlayerIndex();
+        if (playerIndex == null) continue;
+        const slot = inputs[playerIndex];
+        if (!slot) continue;
+        const p = getInput();
+        slot.moveX += p.moveX || 0;
+        slot.moveY += p.moveY || 0;
+        slot.turn += p.turn || 0;
+        slot.turnDelta += p.turnDelta || 0;
+        if (p.run) slot.run = true;
+    }
+
+    for (const slot of inputs) {
+        slot.moveX = Math.max(-1, Math.min(1, slot.moveX));
+        slot.moveY = Math.max(-1, Math.min(1, slot.moveY));
+        slot.turn = Math.max(-1, Math.min(1, slot.turn));
+    }
+}
+
+/**
+ * Backwards-compat alias for collectInputs(). Was the only entry point in
+ * the single-player era; many callers still use this name. It's now a thin
+ * wrapper over collectInputs and can be removed once all callers update.
+ */
+export function collectInput() {
+    collectInputs();
+}
+
+/**
+ * Clear the held / pending state on a single input slot. Called by the
+ * dev Tab handler when switching keyboard target so a held W or pending
+ * mouse delta on the previous target doesn't leak into the new one.
+ */
+export function clearInputSlot(playerIndex) {
+    const slot = inputs[playerIndex];
+    if (!slot) return;
+    slot.moveX = 0;
+    slot.moveY = 0;
+    slot.turn = 0;
+    slot.turnDelta = 0;
+    slot.run = false;
+    slot.fireHeld = false;
 }

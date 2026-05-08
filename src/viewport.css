@@ -36,6 +36,17 @@ body[data-mode="singleplayer"] .pane[data-player="1"] {
     display: none;
 }
 
+/* Keyboard+mouse target indicator — yellow outline on the pane whose
+   player is currently driven by keyboard+mouse. Only shown in deathmatch
+   so single-player play (the only place keyboard always points at pane 0)
+   stays visually clean. The dev Tab handler updates body[data-kbm-target]
+   between "0" and "1" when the mirror/DM path with no gamepads is active. */
+body[data-mode="deathmatch"][data-kbm-target="0"] .pane[data-player="0"] .renderer,
+body[data-mode="deathmatch"][data-kbm-target="1"] .pane[data-player="1"] .renderer {
+    outline: 2px solid #ffd700;
+    outline-offset: -2px;
+}
+
 /* The .renderer fills its pane; .viewport and .hud both inset:0 it. */
 .renderer {
     position: absolute;

@@ -4,6 +4,7 @@
 
 import { MAX_FRAME_DELTA_TIME } from './constants.js';
 import { state } from './state.js';
+import { collectInputs } from '../input/index.js';
 import { updateMovement } from './movement.js';
 import { checkSectorDamage } from './player/damage.js';
 import { checkPickups, updatePowerups } from './player/pickups.js';
@@ -22,6 +23,10 @@ export function updateGame(timestamp) {
         console.log('[game] deltaTime:', deltaTime.toFixed(4), 'ts:', timestamp.toFixed(1), 'prev:', previousTimestamp.toFixed(1));
     }
     previousTimestamp = timestamp;
+
+    // Single per-frame input collection — populates inputs[i] for every
+    // active player slot from all registered providers.
+    collectInputs();
 
     updateMovement(state.players[0], deltaTime, timestamp);
     checkSectorDamage(state.players[0], deltaTime);
