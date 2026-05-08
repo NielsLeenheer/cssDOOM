@@ -92,12 +92,12 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             const deathSectorIndex = getSectorAt(deathX, deathY)?.sectorIndex;
             const playerIndex = player.index;
             const thingIndex = player.thingIndex;
-            // 7 frames × 100ms (matches sprites.css 'sprite-stop' timing
-            // for [data-state="dead"]).
+            // 7 frames × 200ms (matches the player-specific override in
+            // enemies.css — slower than the enemy death animation).
             setTimeout(() => {
                 renderer.collectItem(thingIndex);
                 renderer.createCorpse(deathX, deathY, deathFloor, deathSectorIndex, playerIndex);
-            }, 700);
+            }, 1400);
         }
 
         renderer.setPlayerDead(player.viewportIndex, true);

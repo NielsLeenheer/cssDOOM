@@ -99,6 +99,14 @@ body.all-enemies-shadow .enemy .sprite {
     animation-play-state: running;
 }
 
+/* Slower, more cinematic death sequence for the player than for enemies.
+   The shared sprite-stop rule uses 100 ms/frame; player gets 200 ms/frame
+   so the fall reads at a glance. damage.js's setTimeout for hiding the
+   live sprite + spawning the static corpse is kept in sync below. */
+.sprite[data-type="player"][data-state="dead"] {
+    animation-duration: calc(var(--frames) * 200ms);
+}
+
 /* Hide each player's own sprite in their own pane — you don't want to see
    your own body floating in your own first-person view. */
 .pane[data-player="0"] .enemy.player[data-player-index="0"],
