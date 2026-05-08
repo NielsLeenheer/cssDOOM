@@ -23,6 +23,7 @@ import { state } from '../game/state.js';
 import { loadMap } from '../shared/maps.js';
 import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
+import { resetMatch } from '../game/match.js';
 import { isMenuOpen } from './menu.js';
 
 const IDLE_MS = 60_000;
@@ -81,6 +82,12 @@ export function attractTick(timestamp) {
 async function enterAttract() {
     entering = true;
     document.body.dataset.attract = 'true';
+
+    // Treat attract as "match abandoned" — zero scores and restart the
+    // timer so when the next pair of players walks up, they get a fully
+    // fresh match. (resetGameState in loadMap already handles health,
+    // ammo, weapons, projectiles, corpses; map rebuild restores pickups.)
+    resetMatch();
 
     // Always reload E1M1 — guarantees a clean attract view (both players
     // at fresh DM starts, full health, no in-flight projectiles, no

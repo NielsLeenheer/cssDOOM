@@ -10,7 +10,7 @@ import { updateCamera } from './src/renderer/scene/camera.js';
 import { startCullingLoop } from './src/renderer/scene/culling.js';
 import { updateHud } from './src/renderer/hud.js';
 import { sceneStates } from './src/renderer/dom.js';
-import { updateMenuSelection } from './src/ui/menu.js';
+import { updateMenuSelection, loadSavedMode, applyMode } from './src/ui/menu.js';
 import { hideInitialOverlay } from './src/ui/overlay.js';
 import { initKeyboardInput } from './src/input/keyboard.js';
 import { initMouseInput } from './src/input/mouse.js';
@@ -94,6 +94,11 @@ async function init() {
     initMouseInput();
     initTouchInput();
     initGamepadInput();
+
+    // Restore the previously chosen mode (default singleplayer) before the
+    // initial map load so the scene is built with the right pane count and
+    // DM gets player 2 + match state from the first frame.
+    applyMode(loadSavedMode());
 
     await loadMap('E1M1');
     startCullingLoop();

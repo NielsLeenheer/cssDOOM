@@ -56,19 +56,25 @@ document.querySelectorAll('.menu-mode').forEach(btn => {
     });
 });
 
-/**
- * Switch between single-player and deathmatch. Resizes state.players,
- * updates body[data-mode] (drives split-screen CSS), turns off the debug
- * pane-1 mirror (incompatible with real DM), and reloads the current map
- * so the scene rebuilds with the right number of panes.
- */
-function switchMode(mode) {
-    // Spectator is single-player only — drop out of it before swapping
-    // modes so its body classes and scene transforms don't bleed into DM.
-    if (mode === 'deathmatch' && document.body.classList.contains('spectator')) {
-        window.spectate?.();
-    }
+const MODE_STORAGE_KEY = 'cssdoom-mode';
 
+/**
+ * Reads the saved mode from localStorage, falling back to 'singleplayer'.
+ * Called from boot (index.js) before the initial loadMap so the scene is
+ * built with the right pane count from the start.
+ */
+export function loadSavedMode() {
+    const saved = localStorage.getItem(MODE_STORAGE_KEY);
+    return saved === 'deathmatch' ? 'deathmatch' : 'singleplayer';
+}
+
+/**
+ * Applies a mode to global state without triggering a map reload.
+ * Shared between boot-time restore and runtime switching: switchMode
+ * calls this and then loads the map; the init path calls this then runs
+ * its own initial loadMap('E1M1').
+ */
+export function applyMode(mode) {
     state.mode = mode;
     document.body.dataset.mode = mode;
 
@@ -84,6 +90,22 @@ function switchMode(mode) {
     // The Phase 3 debug mirror is incompatible with real DM (it forces a
     // mirror of player 0 into pane 1; DM wants player 1's own view there).
     setMirrorMode(false);
+}
+
+/**
+ * Switch between single-player and deathmatch at runtime. Persists the
+ * choice to localStorage so a refresh restores it, then reloads the
+ * current map with the new mode applied.
+ */
+function switchMode(mode) {
+    // Spectator is single-player only — drop out of it before swapping
+    // modes so its body classes and scene transforms don't bleed into DM.
+    if (mode === 'deathmatch' && document.body.classList.contains('spectator')) {
+        window.spectate?.();
+    }
+
+    applyMode(mode);
+    localStorage.setItem(MODE_STORAGE_KEY, mode);
 
     // Force a full game state reset by marking player 0 dead before reload.
     // loadMap's resetGameState path then resets every player's stats.
