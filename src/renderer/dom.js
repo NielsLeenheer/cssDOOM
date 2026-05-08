@@ -10,9 +10,9 @@
  * Arrays (`dom.renderers`, `dom.scenes`, `dom.viewports`, `dom.statusElements`,
  * `dom.weaponElements`) are length matching the number of .pane elements in
  * HTML (currently 2). Whether pane 1 is visible is controlled by
- * body.mode-singleplayer / body.mode-deathmatch in CSS. The legacy singletons
- * (`dom.renderer`, `dom.scene`, etc.) point at pane 0 — they remain as
- * migration aliases until every reader uses an indexed form.
+ * body[data-mode="singleplayer"] / body[data-mode="deathmatch"] in CSS. The
+ * legacy singletons (`dom.renderer`, `dom.scene`, etc.) point at pane 0 —
+ * they remain as migration aliases until every reader uses an indexed form.
  *
  * UI elements that are NOT per-pane (menu, fullscreen control) stay as
  * single references.

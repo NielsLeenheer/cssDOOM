@@ -22,7 +22,9 @@
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="stylesheet" href="index.css">
 </head>
-<body class="mode-singleplayer">
+
+<body data-mode="singleplayer">
+
     <!-- Doom "fuzz" effect for Spectre — displaces pixels using animated noise -->
     <svg width="0" height="0" aria-hidden="true">
         <filter id="fuzz" x="-10%" y="-10%" width="120%" height="120%">
@@ -53,8 +55,9 @@
     <div id="loading-overlay" class="visible"></div>
 
     <!-- Game container — split-screen wrapper.
-         Single pane visible in body.mode-singleplayer; both panes flex 50/50
-         in body.mode-deathmatch. Each pane is an empty container at parse
+         Single pane visible when body[data-mode="singleplayer"]; both panes
+         flex 50/50 when body[data-mode="deathmatch"]. Each pane is an empty
+         container at parse
          time; dom.js clones <template id="pane-template"> into every .pane
          at module load, so per-pane markup lives in one place. -->
     <div id="game">

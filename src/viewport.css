@@ -1,8 +1,9 @@
 /* ==========================================================================
    Game container — split-screen wrapper around the panes
    ==========================================================================
-   Both panes always exist in the DOM. body.mode-singleplayer hides pane 1
-   so SP fills the screen with pane 0; body.mode-deathmatch splits 50/50.
+   Both panes always exist in the DOM. body[data-mode="singleplayer"] hides
+   pane 1 so SP fills the screen with pane 0; body[data-mode="deathmatch"]
+   splits 50/50.
 */
 
 #game {
@@ -23,15 +24,15 @@
     container-name: pane;
 }
 
-body.mode-deathmatch .pane {
+body[data-mode="deathmatch"] .pane {
     flex: 1 1 50%;
 }
 
-body.mode-singleplayer .pane[data-player="0"] {
+body[data-mode="singleplayer"] .pane[data-player="0"] {
     flex: 1;
 }
 
-body.mode-singleplayer .pane[data-player="1"] {
+body[data-mode="singleplayer"] .pane[data-player="1"] {
     display: none;
 }
 

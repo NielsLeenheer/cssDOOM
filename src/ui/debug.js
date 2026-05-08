@@ -24,16 +24,14 @@ import { forEachWallInAABB } from '../game/spatial-grid.js';
  */
 window.enablePane1Mirror = async function () {
     setMirrorMode(true);
-    document.body.classList.remove('mode-singleplayer');
-    document.body.classList.add('mode-deathmatch');
+    document.body.dataset.mode = 'deathmatch';
     await loadMap(currentMap);
     console.log('Pane 1 mirror enabled. Reload or call disablePane1Mirror() to undo.');
 };
 
 window.disablePane1Mirror = async function () {
     setMirrorMode(false);
-    document.body.classList.remove('mode-deathmatch');
-    document.body.classList.add('mode-singleplayer');
+    document.body.dataset.mode = 'singleplayer';
     await loadMap(currentMap);
     console.log('Pane 1 mirror disabled.');
 };
