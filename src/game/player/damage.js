@@ -215,6 +215,16 @@ export function transitionToLevel() {
         // Each player's weapon DOM needs equipWeapon to set data-type so
         // the right sprite renders in their pane.
         equipWeapon(player, player.currentWeapon);
+        // DM rule: every player carries all three keys at all times. SP
+        // gates doors by collected keys; DM doesn't, so on a level change
+        // we re-grant them here just like resetGameState does for the
+        // dead/initial path.
+        if (state.mode === 'deathmatch') {
+            for (const color of ['blue', 'yellow', 'red']) {
+                player.collectedKeys.add(color);
+                renderer.collectKey(player.viewportIndex, color);
+            }
+        }
     }
 }
 
