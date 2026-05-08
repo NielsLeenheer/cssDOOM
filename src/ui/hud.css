@@ -530,10 +530,11 @@ body[data-attract="true"] #attract-overlay {
     display: flex;
 }
 
-/* Hide HUD chrome behind the attract overlay so only the world rotates. */
+/* Hide HUD chrome behind the attract overlay so only the world rotates.
+   The cssDOOM logo (#menu-button) stays visible — it's part of the
+   branding for the kiosk and shouldn't disappear when idle. */
 body[data-attract="true"] .hud,
 body[data-attract="true"] #spectator,
-body[data-attract="true"] #menu-button,
 body[data-attract="true"] #ui-buttons {
     display: none;
 }
