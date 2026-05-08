@@ -193,7 +193,7 @@
     & .menu-mode-label {
         font-family: 'PressStart2P', monospace;
         font-size: 12px;
-        color: #cfcfcf;
+        color: #dc0000; /* DOOM red — matches the level-selector digit sprite */
         text-transform: uppercase;
         letter-spacing: 1px;
         padding: 4px 0;
