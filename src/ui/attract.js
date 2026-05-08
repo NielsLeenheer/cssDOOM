@@ -116,4 +116,9 @@ function exitAttract() {
     attractActive = false;
     delete document.body.dataset.attract;
     lastActivityAt = performance.now();
+    // Restart the match clock — the wall-clock timer kept advancing while
+    // attract was running but matchTick was paused, so without this the
+    // very next updateGame frame would see elapsed > timeLimit and call
+    // endMatch() ("TIE" flash) before the player even moves.
+    if (state.match) state.match.startTime = performance.now();
 }
