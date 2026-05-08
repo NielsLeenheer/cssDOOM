@@ -511,11 +511,107 @@ body[data-attract="true"] #attract-overlay {
 /* Hide HUD chrome behind the attract overlay so only the world rotates. */
 body[data-attract="true"] .hud,
 body[data-attract="true"] #dm-scoreboard,
+body[data-attract="true"] .pane-scoreboard,
 body[data-attract="true"] #spectator,
 body[data-attract="true"] #menu-button,
 body[data-attract="true"] #fullscreen-button,
 body[data-attract="true"] #help-button {
     display: none;
+}
+
+
+/* ========================================================================
+   Video-wall layout (≥ 24/9 aspect ratio)
+
+   At CSS Day the kiosk may run on two side-by-side monitors driven by a
+   video-wall controller, so the browser window spans both screens with a
+   bezel down the middle. Anything centred horizontally (PRESS START, the
+   match-end overlay, the scoreboard) would land on the bezel and become
+   unreadable. In this layout we treat each pane as its own "monitor":
+   hide the global centred copies and reveal the per-pane copies
+   (template-rendered inside each .renderer) so each display gets its own
+   centred text.
+
+   The threshold (24/9 ≈ 2.67) is wider than common ultrawide ratios
+   (21/9 = 2.33) so dev windows don't accidentally trip it.
+
+   Pane copies are display:none by default; the media query flips them on
+   and hides the globals.
+   ======================================================================== */
+
+.pane-scoreboard,
+.pane-attract,
+.pane-win {
+    display: none;
+}
+
+@media (min-aspect-ratio: 24/9) {
+    /* Hide the screen-spanning globals — bezel would split them. */
+    #dm-scoreboard,
+    #attract-overlay,
+    #dm-win-overlay {
+        display: none !important;
+    }
+
+    /* Show pane-local copies. .renderer is already position:absolute (in
+       viewport.css) so it establishes a positioning context for the
+       absolute children below — no extra anchor rule needed. */
+
+    body[data-mode="deathmatch"] .pane-scoreboard {
+        display: flex;
+        position: absolute;
+        top: calc(12px + env(safe-area-inset-top, 0px));
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1100;
+        font-family: 'PressStart2P', monospace;
+        font-size: 18px;
+        color: #ffd700;
+        text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+        gap: 14px;
+        pointer-events: none;
+        align-items: center;
+    }
+
+    /* Hide scoreboard during attract — world rotation only, no clutter.
+       Same intent as the global rule above; restated here so the
+       videowall .pane-scoreboard show-rule doesn't undo it. */
+    body[data-attract="true"] .pane-scoreboard {
+        display: none;
+    }
+
+    body[data-attract="true"] .pane-attract {
+        display: flex;
+        position: absolute;
+        inset: 0;
+        z-index: 1300;
+        align-items: center;
+        justify-content: center;
+        font-family: 'PressStart2P', monospace;
+        font-size: 36px;
+        color: #ffd700;
+        text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
+        background: rgba(0, 0, 0, 0.45);
+        pointer-events: none;
+        letter-spacing: 6px;
+        animation: attract-pulse 1.6s ease-in-out infinite;
+    }
+
+    body[data-match-ended="true"] .pane-win {
+        display: flex;
+        position: absolute;
+        inset: 0;
+        z-index: 1200;
+        align-items: center;
+        justify-content: center;
+        font-family: 'PressStart2P', monospace;
+        font-size: 32px;
+        color: #ffd700;
+        text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
+        background: rgba(0, 0, 0, 0.7);
+        pointer-events: none;
+        letter-spacing: 4px;
+    }
 }
 
 

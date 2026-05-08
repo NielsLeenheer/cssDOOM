@@ -221,3 +221,23 @@
     height: 19px;
     flex-shrink: 0;
 }
+
+
+/* ========================================================================
+   Video-wall layout (≥ 24/9 aspect ratio)
+
+   Background still spans both displays; menu contents are pulled into the
+   left half so they sit on a single monitor instead of straddling the
+   bezel.
+   ======================================================================== */
+
+@media (min-aspect-ratio: 24/9) {
+    #menu-overlay {
+        justify-content: flex-start;
+    }
+    #menu-content {
+        width: 50vw;
+        justify-content: center;
+        padding-left: 20px;
+    }
+}

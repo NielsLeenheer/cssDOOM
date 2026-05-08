@@ -30,8 +30,7 @@ export function resetMatch({
     };
     for (const p of state.players) p.score = 0;
     document.body.removeAttribute('data-match-ended');
-    const overlay = document.getElementById('dm-win-overlay');
-    if (overlay) overlay.textContent = '';
+    setWinOverlayText('');
     updateScoreboard();
 }
 
@@ -39,8 +38,7 @@ export function resetMatch({
 export function clearMatch() {
     state.match = null;
     document.body.removeAttribute('data-match-ended');
-    const overlay = document.getElementById('dm-win-overlay');
-    if (overlay) overlay.textContent = '';
+    setWinOverlayText('');
 }
 
 /**
@@ -101,13 +99,18 @@ function endMatch() {
     state.match.winner = tied ? null : winner;
 
     document.body.dataset.matchEnded = 'true';
-    const overlay = document.getElementById('dm-win-overlay');
-    if (overlay) {
-        if (tied || !winner) {
-            overlay.textContent = 'TIE';
-        } else {
-            overlay.textContent = `PLAYER ${winner.index + 1} WINS`;
-        }
+    setWinOverlayText(tied || !winner ? 'TIE' : `PLAYER ${winner.index + 1} WINS`);
+}
+
+/**
+ * Writes the same text into every win-overlay element. The global
+ * #dm-win-overlay covers the full screen for normal layouts; pane-local
+ * .pane-win copies (in the pane template) take over in video-wall layouts
+ * so the message lands inside each display rather than on the bezel.
+ */
+function setWinOverlayText(text) {
+    for (const el of document.querySelectorAll('.dm-win-overlay')) {
+        el.textContent = text;
     }
 }
 
@@ -123,10 +126,12 @@ export function restartMatch() {
 }
 
 function updateScoreboard() {
-    const scoreboard = document.getElementById('dm-scoreboard');
-    if (!scoreboard) return;
-    for (const player of state.players) {
-        const el = scoreboard.querySelector(`[data-player="${player.index}"]`);
-        if (el) el.textContent = String(player.score);
+    // Write into the global #dm-scoreboard *and* every per-pane
+    // .pane-scoreboard copy (used in video-wall layouts).
+    for (const scoreboard of document.querySelectorAll('.dm-scoreboard')) {
+        for (const player of state.players) {
+            const el = scoreboard.querySelector(`[data-player="${player.index}"]`);
+            if (el) el.textContent = String(player.score);
+        }
     }
 }

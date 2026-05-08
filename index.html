@@ -137,22 +137,38 @@
                      player is dead, after a 2-second cooldown. -->
                 <div class="respawn-prompt">PRESS FIRE TO RESPAWN</div>
             </div>
+
+            <!-- Per-pane copies of global text overlays. Hidden by default;
+                 shown only in video-wall layout (≥24/9 aspect ratio) where
+                 the bezel between two displays splits the screen and
+                 centred text would land on it. Sit outside .hud so the
+                 attract-mode HUD-hide rule doesn't suppress them. -->
+            <div class="pane-scoreboard dm-scoreboard">
+                <span class="dm-score" data-player="0">0</span>
+                <span class="dm-score-sep">—</span>
+                <span class="dm-score" data-player="1">0</span>
+            </div>
+            <div class="pane-attract attract-overlay">PRESS START</div>
+            <div class="pane-win dm-win-overlay"></div>
         </div>
     </template>
 
-    <!-- DM scoreboard — shown only when body[data-mode="deathmatch"]. -->
-    <div id="dm-scoreboard">
+    <!-- DM scoreboard — shown only when body[data-mode="deathmatch"].
+         The .dm-scoreboard class is shared with per-pane copies in the
+         pane template so JS update loops can target both with a single
+         querySelectorAll. -->
+    <div id="dm-scoreboard" class="dm-scoreboard">
         <span class="dm-score" data-player="0">0</span>
         <span class="dm-score-sep">—</span>
         <span class="dm-score" data-player="1">0</span>
     </div>
 
     <!-- DM match-end overlay — shown when body[data-match-ended="true"]. -->
-    <div id="dm-win-overlay"></div>
+    <div id="dm-win-overlay" class="dm-win-overlay"></div>
 
     <!-- Attract-mode overlay — shown when body[data-attract="true"] after
          the kiosk idle timer fires. Any input press dismisses it. -->
-    <div id="attract-overlay">PRESS START</div>
+    <div id="attract-overlay" class="attract-overlay">PRESS START</div>
 
     <!-- Spectator UI -->
     <div id="spectator">
