@@ -44,26 +44,29 @@ window.teleportTo = function(name) {
         return typeName === name;
     });
     if (!thing) { console.log(`No "${name}" found on this map`); return; }
-    state.playerX = thing.x;
-    state.playerY = thing.y;
+    const player = state.players[0];
+    player.x = thing.x;
+    player.y = thing.y;
     console.log(`Teleported to ${name} at (${thing.x}, ${thing.y})`);
 };
 
 window.teleport = (positionX, positionY, angleDegrees) => {
-    state.playerX = positionX;
-    state.playerY = positionY;
-    if (angleDegrees !== undefined) state.playerAngle = angleDegrees * Math.PI / 180;
-    state.floorHeight = getFloorHeightAt(state.playerX, state.playerY);
-    state.playerZ = state.floorHeight + EYE_HEIGHT;
-    updateCamera(state.players[0]);
+    const player = state.players[0];
+    player.x = positionX;
+    player.y = positionY;
+    if (angleDegrees !== undefined) player.angle = angleDegrees * Math.PI / 180;
+    player.floorHeight = getFloorHeightAt(player.x, player.y);
+    player.z = player.floorHeight + EYE_HEIGHT;
+    updateCamera(player);
 };
 
 window.save = function (slot = 0) {
+    const player = state.players[0];
     const data = {
         map: currentMap,
-        x: state.playerX,
-        y: state.playerY,
-        angle: state.playerAngle,
+        x: player.x,
+        y: player.y,
+        angle: player.angle,
     };
     localStorage.setItem(`cssdoom-save-${slot}`, JSON.stringify(data));
     console.log(`Saved slot ${slot}: ${currentMap} (${Math.round(data.x)}, ${Math.round(data.y)})`);
@@ -77,12 +80,13 @@ window.load = async function (slot = 0) {
         console.log(`Switching to ${data.map}...`);
         await loadMap(data.map);
     }
-    state.playerX = data.x;
-    state.playerY = data.y;
-    state.playerAngle = data.angle;
-    state.floorHeight = getFloorHeightAt(state.playerX, state.playerY);
-    state.playerZ = state.floorHeight + EYE_HEIGHT;
-    updateCamera(state.players[0]);
+    const player = state.players[0];
+    player.x = data.x;
+    player.y = data.y;
+    player.angle = data.angle;
+    player.floorHeight = getFloorHeightAt(player.x, player.y);
+    player.z = player.floorHeight + EYE_HEIGHT;
+    updateCamera(player);
     console.log(`Loaded slot ${slot}: ${data.map} (${Math.round(data.x)}, ${Math.round(data.y)})`);
 };
 
@@ -90,14 +94,15 @@ window.traceSky = debugSkyTrace;
 
 /** Dump player position, angle, sector, and current map */
 window.dump = function () {
-    const sector = getSectorAt(state.playerX, state.playerY);
-    const angleDeg = ((state.playerAngle * 180 / Math.PI) % 360 + 360) % 360;
-    const lookX = -Math.sin(state.playerAngle);
-    const lookY = Math.cos(state.playerAngle);
+    const player = state.players[0];
+    const sector = getSectorAt(player.x, player.y);
+    const angleDeg = ((player.angle * 180 / Math.PI) % 360 + 360) % 360;
+    const lookX = -Math.sin(player.angle);
+    const lookY = Math.cos(player.angle);
     const info = {
         map: currentMap,
-        position: { x: Math.round(state.playerX), y: Math.round(state.playerY), z: Math.round(state.playerZ) },
-        floorHeight: state.floorHeight,
+        position: { x: Math.round(player.x), y: Math.round(player.y), z: Math.round(player.z) },
+        floorHeight: player.floorHeight,
         angle: Math.round(angleDeg) + '°',
         lookDir: { x: +lookX.toFixed(3), y: +lookY.toFixed(3) },
         sector: sector ? {
@@ -106,10 +111,10 @@ window.dump = function () {
             ceiling: sector.ceilingHeight,
             light: sector.lightLevel,
         } : null,
-        health: state.health,
-        armor: state.armor,
-        weapon: state.currentWeapon,
-        isDead: state.isDead,
+        health: player.health,
+        armor: player.armor,
+        weapon: player.currentWeapon,
+        isDead: player.isDead,
     };
     console.table ? console.table(info.position) : null;
     console.log(info);
@@ -118,8 +123,9 @@ window.dump = function () {
 
 /** Dump all walls, doors, things, and projectiles near the player */
 window.nearby = function (radius = 512) {
-    const px = state.playerX, py = state.playerY;
-    const eyeZ = state.floorHeight + EYE_HEIGHT;
+    const player = state.players[0];
+    const px = player.x, py = player.y;
+    const eyeZ = player.floorHeight + EYE_HEIGHT;
     const r = radius;
 
     // Walls

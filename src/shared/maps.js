@@ -52,8 +52,9 @@ export async function loadMap(name) {
     applyPlayerStart();
 
     // Death restarts with a full reset (health/ammo/weapons);
-    // level transitions keep the player's inventory intact.
-    if (isInitialLoad || state.isDead) {
+    // level transitions keep the player's inventory intact. Mode-switch
+    // from menu marks player 0 dead before reload to force the reset path.
+    if (isInitialLoad || state.players[0].isDead) {
         resetGameState();
     } else {
         transitionToLevel();
@@ -158,7 +159,7 @@ function addPlayerThings() {
             x: player.x,
             y: player.y,
             floorHeight: player.floorHeight,
-            // Convert the player's north-convention angle (state.playerAngle:
+            // Convert the player's north-convention angle (player.angle:
             // 0=north) to the thing facing convention (atan2 east-radians:
             // 0=east) for updateEnemyRotation's billboard math.
             facing: Math.PI / 2 + player.angle,

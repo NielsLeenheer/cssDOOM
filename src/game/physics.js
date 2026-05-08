@@ -4,12 +4,12 @@
  * Uses pure geometry functions from geometry.js and the spatial grid query API
  * from spatial-grid.js.
  *
- * Phase 4 multiplayer status: canMoveTo now takes optional fromX/fromY
- * parameters (defaulting to state.playerX/Y, i.e. player 0 via proxy) so
- * each player's collision query uses their own coordinates. rayHitPoint
- * still uses state.floorHeight for eyeZ — that's player 0 via proxy and is
- * correct for SP, and good enough for DM until rocket/hitscan ranges
- * diverge enough between players to matter; will be revisited if needed.
+ * Multiplayer status: every caller passes explicit position / floor / eye
+ * data — there are no implicit player-0 defaults. canMoveTo's fromX/fromY
+ * and currentFloorHeight come from the moving entity (player or enemy);
+ * rayHitPoint's eyeZ comes from the firing player's eye height or the
+ * projectile's z. Each player / projectile / enemy operates on its own
+ * coordinates regardless of state.players[0]'s position.
  */
 
 import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from './constants.js';
@@ -58,12 +58,12 @@ function crossesLinedef(fromX, fromY, newX, newY, _radius, wall) {
  * that position without colliding with solid walls, barrels, or lift shafts,
  * and without encountering an impassable step height change.
  *
- * `fromX, fromY` are the mover's current position. Used for the linedef
+ * `fromX, fromY` are the mover's current position — used for the linedef
  * crossing test (two-sided lines only block when the mover crosses, not
- * when moving parallel) and step-height comparison. Default to state's
- * player 0 via proxy for backwards compat with un-converted callers.
+ * when moving parallel) and step-height comparison. Callers pass their own
+ * coordinates (movement.js: player.x/y, ai.js: enemy.x/y).
  */
-export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight = state.floorHeight, maxDropHeight = Infinity, excludeThing = null, fromX = state.playerX, fromY = state.playerY) {
+export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight = 0, maxDropHeight = Infinity, excludeThing = null, fromX = 0, fromY = 0) {
     if (debug.noclip) return true;
 
     // Check collision against walls via spatial grid.
@@ -153,12 +153,16 @@ export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight
  * Casts a ray from the origin in the given direction and returns the
  * intersection point with the nearest solid wall, or null if no wall
  * is hit within maxDistance.
+ *
+ * `eyeZ` is the height at which the ray travels — used to test whether
+ * a wall's vertical span actually obstructs the ray. Player firing passes
+ * `player.floorHeight + EYE_HEIGHT`; projectile collision passes the
+ * projectile's z.
  */
-export function rayHitPoint(originX, originY, directionX, directionY, maxDistance) {
+export function rayHitPoint(originX, originY, directionX, directionY, maxDistance, eyeZ = 0) {
     let closestHitDistance = maxDistance;
     const endX = originX + directionX * maxDistance;
     const endY = originY + directionY * maxDistance;
-    const eyeZ = state.floorHeight + EYE_HEIGHT;
 
     forEachWallInAABB(
         Math.min(originX, endX), Math.min(originY, endY),

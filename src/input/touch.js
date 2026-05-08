@@ -247,15 +247,17 @@ function setupPointerHandlers() {
 // ============================================================================
 
 function cycleWeapon(direction) {
-    const owned = [...state.ownedWeapons].sort((a, b) => a - b);
-    const currentIndex = owned.indexOf(state.currentWeapon);
+    const player = state.players[0];
+    const owned = [...player.ownedWeapons].sort((a, b) => a - b);
+    const currentIndex = owned.indexOf(player.currentWeapon);
     const nextIndex = (currentIndex + direction + owned.length) % owned.length;
-    equipWeapon(state.players[0], owned[nextIndex]);
+    equipWeapon(player, owned[nextIndex]);
 }
 
 function handleDeadRestart() {
-    if (!state.isDead) return false;
-    if (performance.now() - state.deathTime > 4000) {
+    const player = state.players[0];
+    if (!player.isDead) return false;
+    if (performance.now() - player.deathTime > 4000) {
         loadMap(currentMap);
     }
     return true;

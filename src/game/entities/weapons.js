@@ -280,7 +280,7 @@ function checkWeaponHit(player) {
                 spawnPuff(player, target.x, target.y, getFloorHeightAt(target.x, target.y));
                 damageHitscanTarget(target, rollWeaponDamage(player, 'hitscan'), player);
             } else {
-                const wallHit = rayHitPoint(player.x, player.y, pelletDirX, pelletDirY, weapon.range);
+                const wallHit = rayHitPoint(player.x, player.y, pelletDirX, pelletDirY, weapon.range, player.floorHeight + EYE_HEIGHT);
                 if (wallHit) spawnPuff(player, wallHit.x, wallHit.y);
             }
         }
@@ -298,7 +298,7 @@ function checkWeaponHit(player) {
 
     // No target or target behind a wall — spawn wall puff
     if (weapon.hitscan) {
-        const wallHitPoint = rayHitPoint(player.x, player.y, forwardX, forwardY, weapon.range);
+        const wallHitPoint = rayHitPoint(player.x, player.y, forwardX, forwardY, weapon.range, player.floorHeight + EYE_HEIGHT);
         if (wallHitPoint) spawnPuff(player, wallHitPoint.x, wallHitPoint.y);
     }
 }

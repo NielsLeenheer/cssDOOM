@@ -3,12 +3,7 @@
  *
  * Shared world state (things, projectiles, doors, lifts) lives here directly.
  * Per-player state (position, health, ammo, weapons, keys, powerups) lives
- * on Player objects in `state.players`.
- *
- * During the multiplayer migration, `state.playerX`, `state.health`, etc. are
- * defined as getters/setters that forward to `state.players[0]` (see proxy
- * block at the end of this file). Once all call sites take an explicit
- * `player` parameter, those proxies will be removed.
+ * on Player objects in `state.players`. SP has length 1; DM has length 2.
  */
 
 import { Player } from './player/player.js';
@@ -32,8 +27,7 @@ export const state = {
 
     // ── Players ───────────────────────────────────────────────────────
     // Length 1 in single-player, 2 in deathmatch. Per-player fields like
-    // position, health, weapons live here. Legacy `state.playerX` etc.
-    // proxy to `players[0]` via the Object.defineProperty block below.
+    // position, health, weapons, score live on each Player.
     players: [new Player(0)],
 
     // ── Doors & lifts ─────────────────────────────────────────────────
@@ -45,8 +39,9 @@ export const state = {
 
     // ── Things (entities) ──────────────────────────────────────────────
     // Array of entity objects for in-world sprites (enemies, pickups,
-    // decorations). Each entry holds gameplay metadata (position, hp, AI).
-    // The array index serves as the thing ID for renderer communication.
+    // decorations) and the live player thing entries (kind:'player').
+    // Each entry's array index serves as the thing ID for renderer
+    // communication.
     things: [],
 
     // ── Projectiles ───────────────────────────────────────────────────
@@ -56,40 +51,6 @@ export const state = {
     projectiles: [],
     nextProjectileId: 0,
 };
-
-// ── Backwards-compat proxies (Phase 1 multiplayer migration) ─────────
-// Forward legacy `state.playerX`/`state.health`/etc. to `state.players[0]`.
-// To be removed once all call sites take an explicit `player` parameter.
-const PLAYER_FIELD_MAP = {
-    playerX: 'x',
-    playerY: 'y',
-    playerZ: 'z',
-    playerAngle: 'angle',
-    floorHeight: 'floorHeight',
-    health: 'health',
-    armor: 'armor',
-    armorType: 'armorType',
-    ammo: 'ammo',
-    maxAmmo: 'maxAmmo',
-    hasBackpack: 'hasBackpack',
-    isDead: 'isDead',
-    deathTime: 'deathTime',
-    currentWeapon: 'currentWeapon',
-    ownedWeapons: 'ownedWeapons',
-    isFiring: 'isFiring',
-    sectorDamageTimer: 'sectorDamageTimer',
-    collectedKeys: 'collectedKeys',
-    powerups: 'powerups',
-};
-
-for (const [stateName, playerField] of Object.entries(PLAYER_FIELD_MAP)) {
-    Object.defineProperty(state, stateName, {
-        get() { return state.players[0][playerField]; },
-        set(value) { state.players[0][playerField] = value; },
-        enumerable: true,
-        configurable: true,
-    });
-}
 
 // ── Debug flags ──────────────────────────────────────────────────────
 // Toggled from the debug menu at runtime.

@@ -58,7 +58,7 @@ function spectatorLoop() {
         if (spectator.keys.f) spectator.height += spectator.height * 0.02;
 
         dom.viewport.style.setProperty('--follow-height', spectator.height);
-        updatePlayerSprite(-state.playerAngle, true);
+        updatePlayerSprite(-state.players[0].angle, true);
     }
     requestAnimationFrame(spectatorLoop);
 }
@@ -84,7 +84,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
         sheetRow = 4;
         mirrorScale = 1;
     } else {
-        let relAngle = cameraAngle - state.playerAngle + Math.PI;
+        let relAngle = cameraAngle - state.players[0].angle + Math.PI;
         relAngle = ((relAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         const rotationIndex = (Math.floor((relAngle + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
 
@@ -184,7 +184,7 @@ window.spectate = function() {
         // Start interactive loop after transition completes
         setTimeout(() => {
             if (spectatorActive) {
-                updatePlayerSprite(-state.playerAngle, true);
+                updatePlayerSprite(-state.players[0].angle, true);
                 spectatorLoopRunning = true;
                 spectatorLoop();
             }
@@ -302,7 +302,7 @@ function switchSpectatorMode(newMode) {
     // transition doesn't spin back through accumulated rotations.
     const fullTurn = Math.PI * 2;
     spectator.angle = newMode === 'top'
-        ? -Math.round(state.playerAngle / fullTurn) * fullTurn
+        ? -Math.round(state.players[0].angle / fullTurn) * fullTurn
         : 0;
 
     updateSpectatorProperties();

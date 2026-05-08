@@ -428,8 +428,14 @@ export function updateCulling(player, viewportIndex = player.viewportIndex) {
             continue;
         }
 
-        const relX = t.x - playerX;
-        const relY = t.y - playerY;
+        // For things tied to live game entries (enemies, players), use the
+        // current position from state.things — t.x/t.y are spawn-time
+        // values and would let a fast-moving DM player drift outside their
+        // opponent's culling frustum even when standing in plain view.
+        const tx = gameEntry ? gameEntry.x : t.x;
+        const ty = gameEntry ? gameEntry.y : t.y;
+        const relX = tx - playerX;
+        const relY = ty - playerY;
         let hide = false;
 
         if (culling.distance) {
@@ -443,7 +449,7 @@ export function updateCulling(player, viewportIndex = player.viewportIndex) {
         }
 
         if (!hide && skyPlanes && skyPlanes.length > 0) {
-            if (behindSkyWall(t.x, t.y, 0, -1, playerX, playerY, skyPlanes, skyGroupOf)) {
+            if (behindSkyWall(tx, ty, 0, -1, playerX, playerY, skyPlanes, skyGroupOf)) {
                 hide = true; skyCulled++;
             }
         }

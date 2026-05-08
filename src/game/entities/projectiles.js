@@ -56,7 +56,7 @@ export function updateProjectiles() {
             const moveDist = Math.sqrt(moveX * moveX + moveY * moveY);
             const dirX = moveX / moveDist;
             const dirY = moveY / moveDist;
-            const hitPoint = rayHitPoint(projectile.x, projectile.y, dirX, dirY, moveDist);
+            const hitPoint = rayHitPoint(projectile.x, projectile.y, dirX, dirY, moveDist, projectile.z);
             // Pull the explosion 25 units back from the wall so it doesn't clip into the surface
             const impactX = hitPoint ? hitPoint.x - dirX * 25 : projectile.x;
             const impactY = hitPoint ? hitPoint.y - dirY * 25 : projectile.y;
