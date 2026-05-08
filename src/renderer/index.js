@@ -39,3 +39,6 @@ export { toggleSwitchState } from './scene/mechanics/switches.js';
 
 // Surfaces
 export { lowerTaggedFloor } from './scene/surfaces/floors.js';
+
+// Scene rebuild controls (used by the pane-mirror debug toggle and Phase 4 mode change)
+export { setMirrorMode, isMirrorMode, viewportsForEffect } from './scene/scene.js';

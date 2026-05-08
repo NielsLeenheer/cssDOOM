@@ -9,6 +9,7 @@ import { loadMap } from './src/shared/maps.js';
 import { updateCamera } from './src/renderer/scene/camera.js';
 import { startCullingLoop } from './src/renderer/scene/culling.js';
 import { updateHud } from './src/renderer/hud.js';
+import { sceneStates } from './src/renderer/dom.js';
 import { updateMenuSelection } from './src/ui/menu.js';
 import { hideInitialOverlay } from './src/ui/overlay.js';
 import { initKeyboardInput } from './src/input/keyboard.js';
@@ -29,6 +30,20 @@ window.debug = function() {
 };
 
 /**
+ * Render every pane that has a built scene tree. Pane index i uses
+ * state.players[i] when present; panes beyond the player count (mirror mode)
+ * fall back to player 0 — the same view rendered into a second viewport.
+ */
+function renderAllActivePanes() {
+    for (let i = 0; i < sceneStates.length; i++) {
+        if (sceneStates[i].wallElements.length === 0) continue;
+        const player = state.players[i] || state.players[0];
+        updateHud(player, i);
+        updateCamera(player, i);
+    }
+}
+
+/**
  * Game Loop
  */
 function gameLoop(timestamp) {
@@ -38,14 +53,17 @@ function gameLoop(timestamp) {
     }
 
     if (state.isDead) {
-        for (const player of state.players) updateCamera(player);
+        for (let i = 0; i < sceneStates.length; i++) {
+            if (sceneStates[i].wallElements.length === 0) continue;
+            const player = state.players[i] || state.players[0];
+            updateCamera(player, i);
+        }
         requestAnimationFrame(gameLoop);
         return;
     }
 
     updateGame(timestamp);
-    for (const player of state.players) updateHud(player);
-    for (const player of state.players) updateCamera(player);
+    renderAllActivePanes();
 
     if (import.meta.env.DEV || debugEnabled) updateDebugStats();
 
@@ -65,10 +83,9 @@ async function init() {
 
     await loadMap('E1M1');
     startCullingLoop();
-    
+
     updateMenuSelection();
-    for (const player of state.players) updateHud(player);
-    for (const player of state.players) updateCamera(player);
+    renderAllActivePanes();
 
     await new Promise(resolve => setTimeout(resolve, 600));
 

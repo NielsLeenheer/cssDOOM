@@ -2,7 +2,7 @@
  * Crusher rendering — scene construction and visual state updates.
  */
 
-import { dom, sceneState } from '../../dom.js';
+import { dom, sceneState, sceneStates } from '../../dom.js';
 import { setContainerLight } from '../surfaces/walls.js';
 
 /**
@@ -34,6 +34,8 @@ export function buildCrusher(crusher) {
 }
 
 export function setCrusherOffset(sectorIndex, offset) {
-    const container = sceneState.crusherContainers.get(sectorIndex);
-    if (container) container.style.setProperty('--crusher-offset', offset);
+    for (const sState of sceneStates) {
+        const container = sState.crusherContainers.get(sectorIndex);
+        if (container) container.style.setProperty('--crusher-offset', offset);
+    }
 }

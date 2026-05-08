@@ -19,9 +19,11 @@ import { WEAPONS } from '../game/constants.js';
 
 const AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
 
-// Previous values per player — only touch the DOM when something changes.
-// Map<player.index, prevObject>.
-const prevByPlayer = new Map();
+// Previous values per viewport — only touch the DOM when something changes.
+// Keyed by viewportIndex (the destination pane), not player.index, so mirror
+// mode (writing player 0's stats to two panes) tracks each pane's own
+// last-written values independently.
+const prevByViewport = new Map();
 
 function freshPrev() {
     return {
@@ -34,15 +36,14 @@ function freshPrev() {
 // Pre-built class name strings to avoid per-frame template literal allocation
 const WEAPON_CLASSES = { 2: 'has-weapon-2', 3: 'has-weapon-3', 4: 'has-weapon-4', 5: 'has-weapon-5', 6: 'has-weapon-6', 7: 'has-weapon-7' };
 
-export function updateHud(player) {
-    const paneIndex = player.viewportIndex;
-    const style = dom.statusElements[paneIndex].style;
-    const rendererEl = dom.renderers[paneIndex];
+export function updateHud(player, viewportIndex = player.viewportIndex) {
+    const style = dom.statusElements[viewportIndex].style;
+    const rendererEl = dom.renderers[viewportIndex];
 
-    let prev = prevByPlayer.get(player.index);
+    let prev = prevByViewport.get(viewportIndex);
     if (!prev) {
         prev = freshPrev();
-        prevByPlayer.set(player.index, prev);
+        prevByViewport.set(viewportIndex, prev);
     }
 
     const weapon = WEAPONS[player.currentWeapon];

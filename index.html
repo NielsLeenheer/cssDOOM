@@ -22,7 +22,7 @@
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="stylesheet" href="index.css">
 </head>
-<body>
+<body class="mode-singleplayer">
     <!-- Doom "fuzz" effect for Spectre — displaces pixels using animated noise -->
     <svg width="0" height="0" aria-hidden="true">
         <filter id="fuzz" x="-10%" y="-10%" width="120%" height="120%">
@@ -52,15 +52,32 @@
     <!-- Loading overlay -->
     <div id="loading-overlay" class="visible"></div>
 
-    <!-- Renderer — wraps viewport, HUD, and overlays. Per-pane: each pane has
-         its own .renderer/.viewport/.scene/.hud/.weapon subtree. SP has one. -->
-    <div class="renderer">
-        <!-- Scene viewport -->
-        <div class="viewport">
-            <div class="scene"></div>
+    <!-- Game container — split-screen wrapper.
+         Single pane visible in body.mode-singleplayer; both panes flex 50/50
+         in body.mode-deathmatch. Each pane owns its own .renderer subtree;
+         the HUD is cloned from the <template> below into each .renderer at
+         dom.js module load. -->
+    <div id="game">
+        <div class="pane" data-player="0">
+            <div class="renderer">
+                <div class="viewport">
+                    <div class="scene"></div>
+                </div>
+                <!-- HUD cloned from <template id="hud-template"> at boot -->
+            </div>
         </div>
+        <div class="pane" data-player="1">
+            <div class="renderer">
+                <div class="viewport">
+                    <div class="scene"></div>
+                </div>
+                <!-- HUD cloned from <template id="hud-template"> at boot -->
+            </div>
+        </div>
+    </div>
 
-        <!-- HUD — gameplay overlay elements -->
+    <!-- HUD template — cloned into each pane's .renderer at dom.js load. -->
+    <template id="hud-template">
         <div class="hud">
         <!-- Status bar -->
         <div class="status">
@@ -120,8 +137,8 @@
         <div class="damage-overlay"></div>
         <div class="pickup-overlay"></div>
         <div class="teleport-overlay"></div>
-    </div>
-    </div>
+        </div>
+    </template>
 
     <!-- Spectator UI -->
     <div id="spectator">

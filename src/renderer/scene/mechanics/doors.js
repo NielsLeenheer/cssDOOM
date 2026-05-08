@@ -2,7 +2,7 @@
  * Door rendering — scene construction and visual state updates.
  */
 
-import { dom, sceneState } from '../../dom.js';
+import { dom, sceneState, sceneStates } from '../../dom.js';
 import { getSectorLight } from '../sectors.js';
 import { createWallElement } from '../surfaces/walls.js';
 
@@ -59,6 +59,8 @@ export function buildDoor(door, trackWallData) {
 }
 
 export function setDoorState(sectorIndex, doorState) {
-    const container = sceneState.doorContainers.get(sectorIndex);
-    if (container) container.dataset.state = doorState;
+    for (const sState of sceneStates) {
+        const container = sState.doorContainers.get(sectorIndex);
+        if (container) container.dataset.state = doorState;
+    }
 }

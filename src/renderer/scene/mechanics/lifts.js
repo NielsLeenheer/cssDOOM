@@ -2,7 +2,7 @@
  * Lift rendering — scene construction and visual state updates.
  */
 
-import { dom, sceneState } from '../../dom.js';
+import { dom, sceneState, sceneStates } from '../../dom.js';
 import { createWallElement, setContainerLight } from '../surfaces/walls.js';
 
 /**
@@ -51,6 +51,8 @@ export function buildLift(lift) {
 }
 
 export function setLiftState(sectorIndex, liftState) {
-    const container = sceneState.liftContainers.get(sectorIndex);
-    if (container) container.dataset.state = liftState;
+    for (const sState of sceneStates) {
+        const container = sState.liftContainers.get(sectorIndex);
+        if (container) container.dataset.state = liftState;
+    }
 }

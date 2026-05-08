@@ -3,7 +3,7 @@
  */
 
 import { mapData } from '../../../shared/maps.js';
-import { sceneState } from '../../dom.js';
+import { sceneState, sceneStates } from '../../dom.js';
 import { playSound } from '../../../audio/audio.js';
 import { buildHorizontalSurface } from './horizontal.js';
 
@@ -54,12 +54,14 @@ export function lowerTaggedFloor(tag) {
             }
         }
 
-        // Animate the floor surface DOM elements down
-        for (let j = 0, seLen = sceneState.surfaceElements.length; j < seLen; j++) {
-            const el = sceneState.surfaceElements[j];
-            if (el._sectorIndex === sectorIndex && el._type === 'floor') {
-                el.style.transition = 'transform 2s ease-in-out';
-                el.style.setProperty('--floor-z', lowestFloor);
+        // Animate the floor surface DOM elements down — every pane's clone
+        for (const sState of sceneStates) {
+            for (let j = 0, seLen = sState.surfaceElements.length; j < seLen; j++) {
+                const el = sState.surfaceElements[j];
+                if (el._sectorIndex === sectorIndex && el._type === 'floor') {
+                    el.style.transition = 'transform 2s ease-in-out';
+                    el.style.setProperty('--floor-z', lowestFloor);
+                }
             }
         }
     }

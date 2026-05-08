@@ -305,7 +305,7 @@ export function debugSkyTrace(wallId) {
  * `hidden` attribute which maps to `display: none` and fully removes them
  * from compositor work.
  */
-export function updateCulling(player) {
+export function updateCulling(player, viewportIndex = player.viewportIndex) {
     const anyCulling = culling.frustum || culling.distance || culling.backface || culling.sky;
 
     let total = 0;
@@ -318,7 +318,7 @@ export function updateCulling(player) {
     const playerX = player.x;
     const playerY = player.y;
     const distSq = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
-    const sState = sceneStates[player.viewportIndex];
+    const sState = sceneStates[viewportIndex];
     const skyPlanes = culling.sky ? sState.skyWallPlanes : null;
     const skyGroupOf = sState.skyGroupOf;
 
@@ -326,7 +326,7 @@ export function updateCulling(player) {
     // so side-by-side panes each cull against their own slice of the screen.
     const sinAngle = Math.sin(player.angle);
     const cosAngle = Math.cos(player.angle);
-    const paneWidth = dom.viewports[player.viewportIndex].clientWidth || window.innerWidth;
+    const paneWidth = dom.viewports[viewportIndex].clientWidth || window.innerWidth;
     const halfFov = Math.atan2(paneWidth / 2, sState.perspectiveValue) + FRUSTUM_MARGIN;
 
     // Cull walls
@@ -467,7 +467,14 @@ function cullingLoop() {
     frameCount++;
     if (frameCount >= CULLING_INTERVAL) {
         frameCount = 0;
-        for (const player of state.players) updateCulling(player);
+        // Cull every pane that has a built scene tree. Pane index i uses
+        // state.players[i] when present; panes beyond the player count
+        // (mirror mode) fall back to player 0 — the same view rendered twice.
+        for (let i = 0; i < sceneStates.length; i++) {
+            if (sceneStates[i].wallElements.length === 0) continue;
+            const player = state.players[i] || state.players[0];
+            updateCulling(player, i);
+        }
     }
     requestAnimationFrame(cullingLoop);
 }

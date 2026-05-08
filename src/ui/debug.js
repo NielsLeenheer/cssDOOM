@@ -11,8 +11,32 @@ import { EYE_HEIGHT } from '../game/constants.js';
 import { THING_NAMES } from '../renderer/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
 import { updateCamera } from '../renderer/scene/camera.js';
+import { setMirrorMode } from '../renderer/scene/scene.js';
 import { mapData, currentMap, loadMap } from '../shared/maps.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
+
+/**
+ * Debug: enable a pane-1 mirror — clones pane 0's scene tree into pane 1 and
+ * shows both panes side by side, both rendering player 0's view. Used to
+ * visually verify the two-pane rendering before Phase 4 lights up an actual
+ * second player. Reload the map to apply (cleanest path); or call
+ * disablePane1Mirror() to undo.
+ */
+window.enablePane1Mirror = async function () {
+    setMirrorMode(true);
+    document.body.classList.remove('mode-singleplayer');
+    document.body.classList.add('mode-deathmatch');
+    await loadMap(currentMap);
+    console.log('Pane 1 mirror enabled. Reload or call disablePane1Mirror() to undo.');
+};
+
+window.disablePane1Mirror = async function () {
+    setMirrorMode(false);
+    document.body.classList.remove('mode-deathmatch');
+    document.body.classList.add('mode-singleplayer');
+    await loadMap(currentMap);
+    console.log('Pane 1 mirror disabled.');
+};
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 

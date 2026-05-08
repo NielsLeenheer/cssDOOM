@@ -43,8 +43,8 @@ import { dom } from '../dom.js';
  * pane's `.scene` reads these properties to compute the inverse camera
  * transform each frame.
  */
-export function updateCamera(player) {
-    const viewportStyle = dom.viewports[player.viewportIndex].style;
+export function updateCamera(player, viewportIndex = player.viewportIndex) {
+    const viewportStyle = dom.viewports[viewportIndex].style;
 
     // Horizontal position along the east-west axis
     viewportStyle.setProperty('--player-x', player.x);

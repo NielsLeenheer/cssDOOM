@@ -1,14 +1,62 @@
+/* ==========================================================================
+   Game container — split-screen wrapper around the panes
+   ==========================================================================
+   Both panes always exist in the DOM. body.mode-singleplayer hides pane 1
+   so SP fills the screen with pane 0; body.mode-deathmatch splits 50/50.
+*/
+
+#game {
+    position: fixed;
+    inset: 0;
+    display: flex;
+}
+
+.pane {
+    position: relative;
+    height: 100%;
+    overflow: hidden;
+    /* Container queries on inline-size let HUD/status size and wrap based on
+       this pane's width, not the full viewport. Necessary in DM/mirror mode
+       where each pane is half the screen — media queries would only react
+       to the full viewport width and would scale/wrap incorrectly. */
+    container-type: inline-size;
+    container-name: pane;
+}
+
+body.mode-deathmatch .pane {
+    flex: 1 1 50%;
+}
+
+body.mode-singleplayer .pane[data-player="0"] {
+    flex: 1;
+}
+
+body.mode-singleplayer .pane[data-player="1"] {
+    display: none;
+}
+
+/* The .renderer fills its pane; .viewport and .hud both inset:0 it. */
+.renderer {
+    position: absolute;
+    inset: 0;
+}
+
+/* ==========================================================================
+   Scene viewport — owns CSS perspective for the 3D scene transform
+   ========================================================================== */
 
 .viewport {
-    position: fixed;
+    position: absolute;
     inset: 0;
     overflow: hidden;
     perspective: var(--perspective);
     perspective-origin: 50% 50%;
-
 }
 
-/* Black overlay that fades out to reveal the scene */
+/* ==========================================================================
+   Loading overlay — global, fades out to reveal the scene
+   ========================================================================== */
+
 #loading-overlay {
     position: fixed;
     inset: 0;

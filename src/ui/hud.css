@@ -14,13 +14,13 @@
 .hud {
     --scale: 3;
 
-    position: fixed;
+    position: absolute;
     inset: 0;
     z-index: 1000;
     pointer-events: none;
 }
 
-@media (max-width: 960px) {
+@container pane (max-width: 960px) {
     .hud { --scale: 2; }
 }
 
@@ -41,8 +41,8 @@
     transition: transform 0.3s ease-in 0.8s;
 }
 
-/* 320*2 = 640px — allow wrapping */
-@media (max-width: 640px) {
+/* 320*2 = 640px — allow wrapping when the pane is narrower than that */
+@container pane (max-width: 640px) {
     .status {
         flex-wrap: wrap;
         background: rgba(80, 80, 80, 0.60);
