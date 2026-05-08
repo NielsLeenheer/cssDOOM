@@ -4,12 +4,12 @@
  * Uses pure geometry functions from geometry.js and the spatial grid query API
  * from spatial-grid.js.
  *
- * Phase 1 multiplayer status: this module still reads state.playerX/Y (in
- * crossesLinedef) and state.floorHeight (as defaults in canMoveTo and as the
- * eye-height in rayHitPoint). Those proxy through to state.players[0], which
- * is correct for SP and for player 0 in DM. Phase 4 will refactor canMoveTo
- * to take a from-position parameter and rayHitPoint to take an originZ, so
- * each player's physics queries use their own coordinates instead of player 0's.
+ * Phase 4 multiplayer status: canMoveTo now takes optional fromX/fromY
+ * parameters (defaulting to state.playerX/Y, i.e. player 0 via proxy) so
+ * each player's collision query uses their own coordinates. rayHitPoint
+ * still uses state.floorHeight for eyeZ — that's player 0 via proxy and is
+ * correct for SP, and good enough for DM until rocket/hitscan ranges
+ * diverge enough between players to matter; will be revisited if needed.
  */
 
 import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from './constants.js';
@@ -27,23 +27,23 @@ import { forEachWallInAABB, forEachSectorAt } from './spatial-grid.js';
  * crossing from one side of the wall's linedef to the other.  Two-sided
  * linedefs in DOOM only block movement *through* the line, not movement
  * parallel to it.  We test this by computing which side of the infinite
- * line both the current player position and the candidate position fall on.
- * If both centres are on the same side, the player is moving along (or away
- * from) the linedef and should not be blocked.
+ * line both the current and candidate positions fall on. If both are on
+ * the same side, the mover is moving along (or away from) the linedef and
+ * should not be blocked.
  *
  * Based on: linuxdoom-1.10/p_map.c — PIT_CheckLine only rejects moves that
  * cross from front to back (or vice-versa) of a two-sided linedef.
  */
-function crossesLinedef(newX, newY, _radius, wall) {
+function crossesLinedef(fromX, fromY, newX, newY, _radius, wall) {
     const dx = wall.end.x - wall.start.x;
     const dy = wall.end.y - wall.start.y;
 
     // Perpendicular (signed) distance of old and new centres from the line.
     // sign > 0  →  "front" side,  sign < 0  →  "back" side.
-    const oldSide = (state.playerX - wall.start.x) * dy - (state.playerY - wall.start.y) * dx;
-    const newSide = (newX          - wall.start.x) * dy - (newY          - wall.start.y) * dx;
+    const oldSide = (fromX - wall.start.x) * dy - (fromY - wall.start.y) * dx;
+    const newSide = (newX  - wall.start.x) * dy - (newY  - wall.start.y) * dx;
 
-    // If both centres are on the same side the player is not crossing.
+    // If both centres are on the same side the mover is not crossing.
     if ((oldSide > 0) === (newSide > 0)) return false;
 
     return true;
@@ -57,8 +57,13 @@ function crossesLinedef(newX, newY, _radius, wall) {
  * Tests whether a circle at (newX, newY) with the given radius can occupy
  * that position without colliding with solid walls, barrels, or lift shafts,
  * and without encountering an impassable step height change.
+ *
+ * `fromX, fromY` are the mover's current position. Used for the linedef
+ * crossing test (two-sided lines only block when the mover crosses, not
+ * when moving parallel) and step-height comparison. Default to state's
+ * player 0 via proxy for backwards compat with un-converted callers.
  */
-export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight = state.floorHeight, maxDropHeight = Infinity, excludeThing = null) {
+export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight = state.floorHeight, maxDropHeight = Infinity, excludeThing = null, fromX = state.playerX, fromY = state.playerY) {
     if (debug.noclip) return true;
 
     // Check collision against walls via spatial grid.
@@ -81,7 +86,7 @@ export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight
             // Two-sided walls only block when the player crosses the linedef,
             // not when moving parallel to it. This prevents lifts from trapping
             // players who ride into overlap with the upper wall geometry.
-            if (!crossesLinedef(newX, newY, radius, wall)) return;
+            if (!crossesLinedef(fromX, fromY, newX, newY, radius, wall)) return;
         } else if (wall.isSolid) {
             // Solid wall or two-sided linedef with ML_BLOCKING (windows, railings)
         } else {

@@ -3,7 +3,7 @@
  * floor height tracking, and the moving state flag for head-bob / weapon-bob.
  */
 
-import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED } from './constants.js';
+import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED, PLAYER_RADIUS } from './constants.js';
 import { canMoveTo, getFloorHeightAt } from './physics.js';
 import { playSound } from '../audio/audio.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
@@ -61,12 +61,18 @@ function updateLocation(player, deltaTime) {
      */
 
     if (desiredX !== player.x || desiredY !== player.y) {
-        if (canMoveTo(desiredX, desiredY)) {
+        // Pass this player's own current position and floor height — without
+        // them, canMoveTo defaults to state's proxy (player 0), which means
+        // player 1's step-up/cross checks would use player 0's coordinates.
+        const fromX = player.x;
+        const fromY = player.y;
+        const floor = player.floorHeight;
+        if (canMoveTo(desiredX, desiredY, PLAYER_RADIUS, floor, Infinity, null, fromX, fromY)) {
             player.x = desiredX;
             player.y = desiredY;
-        } else if (canMoveTo(desiredX, player.y)) {
+        } else if (canMoveTo(desiredX, player.y, PLAYER_RADIUS, floor, Infinity, null, fromX, fromY)) {
             player.x = desiredX;
-        } else if (canMoveTo(player.x, desiredY)) {
+        } else if (canMoveTo(player.x, desiredY, PLAYER_RADIUS, floor, Infinity, null, fromX, fromY)) {
             player.y = desiredY;
         }
     }
