@@ -19,6 +19,7 @@ import { damageEnemy } from './combat.js';
 import * as renderer from '../../renderer/index.js';
 import { inputs } from '../../input/index.js';
 import { propagateSound } from '../sound-propagation.js';
+import { isMatchLobby } from '../match.js';
 
 // ============================================================================
 // Weapon Loading & Equipping
@@ -29,6 +30,7 @@ import { propagateSound } from '../sound-propagation.js';
  * to switch visuals (the renderer decides whether to animate).
  */
 export function equipWeapon(player, slot) {
+    if (isMatchLobby()) return;
     const weapon = WEAPONS[slot];
     if (!weapon || !player.ownedWeapons.has(slot)) return;
 
@@ -73,6 +75,10 @@ const automaticFireIntervalsByPlayer = new Map();
  */
 export function fireWeapon(player) {
     if (player.isDead || player.isFiring || performance.now() < player.weaponSwitchUntil) return;
+    // Lobby gate: claimed players can't shoot until the match formally
+    // starts. Also covers the chaingun auto-fire loop (which calls
+    // fireWeapon recursively while fireHeld stays true).
+    if (isMatchLobby()) return;
 
     const weapon = WEAPONS[player.currentWeapon];
     if (!weapon) return;

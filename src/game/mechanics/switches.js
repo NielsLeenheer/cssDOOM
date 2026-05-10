@@ -30,8 +30,10 @@ import { activateLift } from './lifts.js';
 import { activateCrusher } from './crushers.js';
 import { loadMap, getNextMap, getSecretExitMap } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
+import { isMatchLobby } from '../match.js';
 
 export function tryUseSwitch(player) {
+    if (isMatchLobby()) return;
     // Cast a forward ray from the player's position along their facing direction.
     // The check-point is placed at half USE_RANGE ahead — the actual distance
     // threshold is USE_RANGE, so this samples the midpoint of the interaction zone.

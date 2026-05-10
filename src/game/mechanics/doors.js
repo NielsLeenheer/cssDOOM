@@ -25,6 +25,7 @@ import { mapData } from '../../shared/maps.js';
 import { getSectorAt } from '../physics.js';
 import { playSound } from '../../audio/audio.js';
 import * as renderer from '../../renderer/index.js';
+import { isMatchLobby } from '../match.js';
 
 const DOOR_PASSABLE_DELAY = 0.8; // seconds — slightly before fully open to allow ducking under
 
@@ -163,6 +164,7 @@ function closeDoor(sectorIndex) {
  * Based on: linuxdoom-1.10/p_map.c:PTR_UseTraverse()
  */
 export function tryOpenDoor(player) {
+    if (isMatchLobby()) return;
     if (!state.doorState.size) return;
 
     // Calculate a check point in front of the player (halfway to USE_RANGE)

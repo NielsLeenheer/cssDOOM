@@ -25,6 +25,7 @@ import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
 import { playSound } from '../../audio/audio.js';
 import * as renderer from '../../renderer/index.js';
+import { isMatchLobby } from '../match.js';
 
 const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation duration
 
@@ -222,6 +223,7 @@ export function checkWalkOverTriggers() {
  * Based on: linuxdoom-1.10/p_map.c:PTR_UseTraverse() → EV_DoPlat()
  */
 export function tryUseLift(player) {
+    if (isMatchLobby()) return;
     if (!liftEntries.length) return;
 
     const forwardX = -Math.sin(player.angle);

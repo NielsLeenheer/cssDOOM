@@ -10,6 +10,7 @@ import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
 import { inputs } from '../input/index.js';
 import { state } from './state.js';
+import { isMatchLobby } from './match.js';
 
 const wasMovingByPlayer = new Map();
 
@@ -18,6 +19,10 @@ export function updateMovement(player, deltaTime, timestamp) {
     // camera drops to floor via the .renderer.dead CSS rule. Other players
     // continue updating independently.
     if (player.isDead) return;
+    // DM lobby: claimed players can't run around the map before the
+    // match formally begins. Same applies in Network DM while waiting
+    // for the host to press start.
+    if (isMatchLobby()) return;
     updateLocation(player, deltaTime);
     updatePlayerFromLift(timestamp);
     updateHeight(player);
