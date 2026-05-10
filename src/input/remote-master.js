@@ -8,10 +8,12 @@
  * switch, respawn) as keys arrive.
  *
  * Why a parallel implementation rather than dispatching synthetic events
- * into keyboard.js: the existing handlers route by state.kbmTargetPlayer,
- * which is global. Forcing it to 1 just for remote events would race
- * against any local kbm interaction. A dedicated handler hardcoded to
- * player 1 is cleaner and stays tidy when keyboard.js evolves.
+ * into keyboard.js: keyboard.js routes by its active kbm virtual device,
+ * which is global to the local kbm pair. Forcing remote events to a
+ * different slot would race against any local kbm interaction. A
+ * dedicated handler hardcoded to player 1 is cleaner and stays tidy when
+ * keyboard.js evolves. Architecture cleanup #6 will collapse this back
+ * once the input layer separates collection from action dispatch.
  *
  * The master may have BOTH local input on player 0 (keyboard or gamepad)
  * AND remote input on player 1 simultaneously — they coexist via separate

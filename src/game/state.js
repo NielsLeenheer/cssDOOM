@@ -20,11 +20,6 @@ export const state = {
     // { fragLimit, timeLimit, startTime, ended, winner }.
     match: null,
 
-    // Runtime-mutable keyboard+mouse target slot (which player they drive).
-    // Default is player 0. The dev Tab handler toggles this between 0 and 1
-    // when `import.meta.env.DEV && state.mode === 'deathmatch' && no gamepads`.
-    kbmTargetPlayer: 0,
-
     // ── Players ───────────────────────────────────────────────────────
     // Length 1 in single-player, 2 in deathmatch. Per-player fields like
     // position, health, weapons, score live on each Player.

@@ -9,11 +9,11 @@
  * via `registerInputProvider(getPlayerIndex, getInput)`:
  *
  *   getPlayerIndex(): returns the player slot this provider currently
- *                     targets (0 or 1). Dynamic — keyboard/mouse share a
- *                     mutable `state.kbmTargetPlayer` so the dev Tab
- *                     handler can switch which player they drive. May
- *                     return `null` if the device is currently unbound
- *                     (Local DM lobby state, before press-to-claim).
+ *                     targets (0 or 1). Dynamic — looked up via
+ *                     `getDriverSlot(deviceId)` against the press-to-claim
+ *                     registry. May return `null` if the device is
+ *                     currently unbound (Local DM lobby state, before
+ *                     a slot has been claimed).
  *   getInput():       returns the current contribution as
  *                     { moveX, moveY, turn, turnDelta, run }.
  *
@@ -115,22 +115,6 @@ export function collectInputs() {
  */
 export function collectInput() {
     collectInputs();
-}
-
-/**
- * Clear the held / pending state on a single input slot. Called by the
- * dev Tab handler when switching keyboard target so a held W or pending
- * mouse delta on the previous target doesn't leak into the new one.
- */
-export function clearInputSlot(playerIndex) {
-    const slot = inputs[playerIndex];
-    if (!slot) return;
-    slot.moveX = 0;
-    slot.moveY = 0;
-    slot.turn = 0;
-    slot.turnDelta = 0;
-    slot.run = false;
-    slot.fireHeld = false;
 }
 
 // ============================================================================

@@ -5,9 +5,10 @@
  * fullscreen and grants pointer lock, allowing mouse movement to turn the
  * player. Left click fires the current weapon.
  *
- * Per-player: mouse drives the same target slot as keyboard
- * (`state.kbmTargetPlayer`) — keyboard and mouse are one logical input
- * combo (FPS-standard WASD + mouselook), so they switch together.
+ * Per-player: mouse follows the **active kbm device** (kbm-A or kbm-B) so
+ * keyboard and mouse drive the same player at all times. The Tab key in
+ * keyboard.js flips the active device; the mouse switches with it
+ * automatically because both modules read `getActiveKbm()` here.
  *
  * Ignores clicks on touch devices to prevent accidental firing from taps.
  */
@@ -19,7 +20,7 @@ import { spawnPlayer } from '../game/player/spawn.js';
 import { isMatchEnded, restartMatch } from '../game/match.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { pingActivity } from '../ui/attract.js';
-import { KBM_DEVICE } from './keyboard.js';
+import { getActiveKbm } from './keyboard.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
 
@@ -29,10 +30,10 @@ const isTouchDevice = matchMedia('(pointer: coarse)').matches;
 // Accumulated mouse turn delta (consumed each frame by the provider)
 let turnDelta = 0;
 
-/** Slot the mouse is currently driving, or null if unbound. Mouse shares
- *  the keyboard's KBM_DEVICE so they're claimed together. */
+/** Slot the mouse is currently driving, or null if unbound. Mouse follows
+ *  whichever virtual kbm device is currently active. */
 function kbmSlot() {
-    return getDriverSlot(KBM_DEVICE);
+    return getDriverSlot(getActiveKbm());
 }
 
 /** The player object the mouse is currently driving, or null if unbound. */
@@ -47,7 +48,8 @@ function kbmPlayer() {
  * Should be called once during application startup.
  */
 export function initMouseInput() {
-    // Mouse shares the keyboard's KBM_DEVICE — same press-to-claim binding.
+    // Mouse follows the active kbm device — same press-to-claim binding
+    // as the keyboard at any moment.
     registerInputProvider(() => kbmSlot(), getInput);
 
     // Fire weapon on left click (outside UI elements). In DM, fire on a
@@ -58,9 +60,10 @@ export function initMouseInput() {
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
         if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #ui-buttons')) return;
 
-        // Press-to-claim in DM lobby: unbound left-click claims a slot.
+        // Press-to-claim in DM lobby: unbound left-click claims a slot
+        // for the active kbm device.
         if (state.mode === 'deathmatch' && kbmSlot() == null) {
-            tryClaimSlot(KBM_DEVICE);
+            tryClaimSlot(getActiveKbm());
             return;
         }
 
