@@ -35,7 +35,7 @@ import { BroadcastConnection } from './src/renderer/broadcast-connection.js';
 import { tearDownPane, rebuildPane } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
 import { initRemoteInputForwarder } from './src/input/remote-secondary.js';
-import { setExternallyClaimedSlots } from './src/input/index.js';
+import { setExternallyClaimedSlots } from './src/input/claim-registry.js';
 import { initLobby } from './src/ui/lobby.js';
 
 const isSecondary = new URLSearchParams(location.search).has('join');

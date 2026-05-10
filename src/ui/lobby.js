@@ -9,9 +9,9 @@
  *   - Auto-starts the match when all expected slots are claimed.
  *
  * Listens to:
- *   - `onClaimChange` from input/index.js — fires when a device claims
- *     or releases a slot, or when external (remote) slot occupancy
- *     changes via setExternallyClaimedSlots.
+ *   - `onClaimChange` from input/claim-registry.js — fires when a device
+ *     claims or releases a slot, or when external (remote) slot
+ *     occupancy changes via setExternallyClaimedSlots.
  *   - `cssdoom:match-reset` — dispatched by maps.js / menu.js when a
  *     fresh match begins so we can re-enter lobby state.
  *
@@ -22,7 +22,8 @@
  */
 
 import { state } from '../game/state.js';
-import { onClaimChange, isSlotClaimedLocally, clearAllClaims } from '../input/index.js';
+import { clearAllClaims } from '../input/index.js';
+import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
 
 let externalSlotsRef = () => new Set();

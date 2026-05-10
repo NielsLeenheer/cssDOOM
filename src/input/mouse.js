@@ -13,7 +13,8 @@
  * Ignores clicks on touch devices to prevent accidental firing from taps.
  */
 
-import { inputs, registerInputProvider, getDriverSlot, tryClaimSlot } from './index.js';
+import { inputs, registerInputProvider } from './index.js';
+import { getDriverSlot, tryClaimSlot } from './claim-registry.js';
 import { state } from '../game/state.js';
 import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spawnPlayer } from '../game/player/spawn.js';

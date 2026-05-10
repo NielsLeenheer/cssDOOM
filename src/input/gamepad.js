@@ -32,7 +32,8 @@
  */
 
 import 'gamecontroller.js';
-import { inputs, registerInputProvider, getDriverSlot, tryClaimSlot, unclaim } from './index.js';
+import { inputs, registerInputProvider } from './index.js';
+import { getDriverSlot, tryClaimSlot, unclaim } from './claim-registry.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';

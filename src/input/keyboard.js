@@ -36,7 +36,8 @@
  * movement keys are cleared to prevent stuck-key issues on macOS.
  */
 
-import { inputs, registerInputProvider, getDriverSlot, tryClaimSlot, onClaimChange } from './index.js';
+import { inputs, registerInputProvider } from './index.js';
+import { getDriverSlot, tryClaimSlot, onClaimChange } from './claim-registry.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { WEAPONS } from '../game/constants.js';
