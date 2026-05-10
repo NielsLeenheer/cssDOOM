@@ -12,6 +12,7 @@ import { getSectorAt } from '../physics.js';
 import { awardFrag } from '../match.js';
 import * as renderer from '../../renderer/index.js';
 import { clearWeaponSlots } from '../../renderer/hud.js';
+import { clearMovingState } from '../movement.js';
 
 // ============================================================================
 // Player Damage
@@ -71,6 +72,10 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         player.health = 0;
         player.isDead = true;
         player.deathTime = performance.now();
+        // Stop the head-bob / weapon-bob — dying mid-stride otherwise
+        // leaves the moving state stuck on, since updateMovement early-
+        // exits while dead and never gets to toggle it off.
+        clearMovingState(player);
         // DM frag attribution. SP no-ops because state.match is null.
         awardFrag(player, attacker);
         // Mark this player's thing entry collected so AI ignores them,

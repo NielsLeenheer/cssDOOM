@@ -105,6 +105,20 @@ function updateLocation(player, deltaTime) {
     }
 }
 
+/**
+ * Clear the moving state for a player. Called from damage.js when a
+ * player dies — without this, dying mid-stride leaves wasMovingByPlayer
+ * stuck at `true`, and since updateMovement early-exits while dead,
+ * `setPlayerMoving(false)` never gets sent. The corpse / death camera
+ * keeps bobbing as if walking. Resets both the cached flag and the
+ * renderer's `.moving` class on the pane.
+ */
+export function clearMovingState(player) {
+    if (!wasMovingByPlayer.get(player.index)) return;
+    wasMovingByPlayer.set(player.index, false);
+    renderer.setPlayerMoving(player.viewportIndex, false);
+}
+
 function updateMovingState(player) {
     const input = inputs[player.index];
     const isMoving = input.moveX !== 0 || input.moveY !== 0;
