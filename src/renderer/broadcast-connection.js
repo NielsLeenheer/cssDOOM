@@ -39,13 +39,14 @@ export class BroadcastConnection {
      * @param {() => void} [options.onLeave]              master — secondary went away
      * @param {(payload: object) => void} [options.onAck]     secondary — master accepted us
      */
-    constructor({ role, snapshotProvider, onJoin, onLeave, onAck, onRemoteInput }) {
+    constructor({ role, snapshotProvider, onJoin, onLeave, onAck, onRemoteInput, onLobbyState }) {
         this.role = role;
         this.snapshotProvider = snapshotProvider;
         this.onJoin = onJoin;
         this.onLeave = onLeave;
         this.onAck = onAck;
         this.onRemoteInput = onRemoteInput;
+        this.onLobbyState = onLobbyState;
         this.channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
         this.peerAlive = false;
         this.lastPong = 0;
@@ -147,8 +148,21 @@ export class BroadcastConnection {
                 // Master is about to rebuild its scene. Reload so the next
                 // reconnect happens against the master's settled new state.
                 location.reload();
+            } else if (msg.type === MSG.LOBBY_STATE) {
+                this.onLobbyState?.(msg);
             }
         }
+    }
+
+    /**
+     * Master-only: broadcast a lobby-state envelope to all peers. Caller
+     * passes `{ inLobby, slotsClaimed }`; secondary mirrors it onto its
+     * own DOM. No-op when no peer is alive — saves a postMessage.
+     */
+    broadcastLobbyState(state) {
+        if (this.role !== 'master') return;
+        if (!this.peerAlive) return;
+        this._post({ type: MSG.LOBBY_STATE, ...state });
     }
 
     /**

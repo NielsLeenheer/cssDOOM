@@ -34,9 +34,10 @@ import { BroadcastClient } from './src/renderer/broadcast-client.js';
 import { BroadcastConnection } from './src/renderer/broadcast-connection.js';
 import { tearDownPane, rebuildPane } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
-import { initRemoteInputForwarder } from './src/input/remote-secondary.js';
-import { setExternallyClaimedSlots } from './src/input/claim-registry.js';
+import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
 import { initLobby } from './src/ui/lobby.js';
+import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
+import { isMatchLobby } from './src/game/match.js';
 
 const isSecondary = new URLSearchParams(location.search).has('join');
 // Master's renderable panes. Slot 0 is always the host's local view.
@@ -157,7 +158,12 @@ async function initMaster() {
     // Lobby controller — manages the press-to-claim UX, watches input
     // claims to drive the join-prompt overlay, and auto-starts the
     // match when all slots are claimed in Local DM.
-    initLobby({ getExternallyClaimedSlots: () => occupiedRemoteSlots });
+    //
+    // Local DM has no "externally claimed" slots: a connected secondary
+    // is display-only and doesn't claim slot 1 — master's local kbm-B /
+    // gamepad must do that explicitly. Network DM will swap in a getter
+    // returning remote-occupied slots.
+    initLobby({ getExternallyClaimedSlots: () => new Set() });
 
     // Restore the previously chosen mode (default singleplayer) before the
     // initial map load so the scene is built with the right pane count and
@@ -258,7 +264,9 @@ function setupMasterBroadcast() {
             }
             occupiedRemoteSlots.add(slot);
             currentSecondarySlot = slot;
-            setExternallyClaimedSlots(occupiedRemoteSlots);
+            // Don't mark slot as externally claimed: secondary is
+            // display-only, master's local kbm-B / gamepad must still be
+            // able to claim it. (Network DM will revisit.)
             const sink = new BroadcastSink(masterConnection.channel, slot);
             savedSecondaryTarget = orchestrator.replaceTarget(slot, sink);
             // Tear down master's local DOM for this slot — the secondary
@@ -270,6 +278,10 @@ function setupMasterBroadcast() {
             // showing it. CSS rule lives in viewport.css.
             document.body.classList.add('secondary-active');
             console.log('[broadcast] secondary joined at slot', slot, '- pane torn down');
+            // Send current lobby state right away so the freshly-
+            // connected secondary's pane shows the correct prompt
+            // immediately (instead of waiting for the next claim event).
+            broadcastLobbyState();
         },
         onLeave: () => {
             const slot = currentSecondarySlot;
@@ -279,7 +291,6 @@ function setupMasterBroadcast() {
             if (slot != null) {
                 orchestrator.replaceTarget(slot, savedSecondaryTarget ?? new DomRenderer(slot));
                 occupiedRemoteSlots.delete(slot);
-                setExternallyClaimedSlots(occupiedRemoteSlots);
             }
             savedSecondaryTarget = null;
             currentSecondarySlot = null;
@@ -296,6 +307,26 @@ function setupMasterBroadcast() {
             }, RECONNECT_GRACE_MS);
             console.log('[broadcast] secondary left slot', slot);
         },
+    });
+
+    // Mirror master's lobby state onto any connected secondary. Fires on
+    // every local claim add/remove (via claim-registry's notify) and on
+    // match-reset so the secondary's overlay tracks live.
+    onClaimChange(broadcastLobbyState);
+    window.addEventListener('cssdoom:match-reset', broadcastLobbyState);
+}
+
+/**
+ * Build current lobby state and send it to all connected sinks. No-op
+ * when no secondary is alive (the underlying broadcast is gated on
+ * `peerAlive`).
+ */
+function broadcastLobbyState() {
+    if (!masterConnection) return;
+    const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
+    masterConnection.broadcastLobbyState({
+        inLobby: isMatchLobby(),
+        slotsClaimed,
     });
 }
 
@@ -320,6 +351,7 @@ async function initSecondary() {
     let client = null;
     const conn = new BroadcastConnection({
         role: 'secondary',
+        onLobbyState: applyLobbyState,
         onAck: async (payload, isReconnect) => {
             console.log('[broadcast] master accepted, syncing', payload, isReconnect ? '(reconnect)' : '');
             if (isReconnect) {
@@ -349,6 +381,12 @@ async function initSecondary() {
             const visiblePane = document.querySelectorAll('.pane')[1];
             if (visiblePane) visiblePane.dataset.player = String(slotIndex);
 
+            // Tell the lobby mirror which slot we represent — it'll use
+            // this to pick our slot's bit out of incoming LOBBY_STATE
+            // broadcasts. Replays any LOBBY_STATE that arrived during
+            // onAck's await loadMap.
+            setSecondarySlot(slotIndex);
+
             client = new BroadcastClient(conn.channel, slotIndex, orchestrator.target(1), orchestrator);
             console.log('[broadcast] client wired up at slot', slotIndex);
         },
@@ -358,11 +396,11 @@ async function initSecondary() {
         },
     });
 
-    // Forward keyboard / mouse events on the secondary window over the
-    // channel — master applies them to player 1's input slot. Wired up
-    // before any handshake so input works the moment the user starts
-    // pressing keys, even if the renderer scene isn't ready yet.
-    initRemoteInputForwarder(conn.channel);
+    // Local DM: secondary is display-only. Input always comes from
+    // master's keyboard / gamepads; no forwarding needed. Network DM
+    // (future) will wire input forwarding via a different code path —
+    // `initRemoteInputForwarder` stays in `src/input/remote-secondary.js`
+    // as scaffolding for that.
 
     requestAnimationFrame(cullingLoop);
     hideInitialOverlay();

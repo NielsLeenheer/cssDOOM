@@ -44,6 +44,11 @@ export const MSG = {
     // so the next reconnect arrives after master's loadMap has settled
     // on a fresh state.
     LEVEL_CHANGE: 'level-change',
+    // Master → secondary: current lobby state. Secondary mirrors it onto
+    // its own DOM (body[data-match-lobby] + pane data-claim-state) so
+    // the existing CSS shows the same PRESS BUTTON TO JOIN / READY /
+    // waiting visuals as the local split-screen pane would.
+    LOBBY_STATE: 'lobby-state',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within
