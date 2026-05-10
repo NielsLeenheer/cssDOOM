@@ -19,14 +19,23 @@ export function updateMovement(player, deltaTime, timestamp) {
     // camera drops to floor via the .renderer.dead CSS rule. Other players
     // continue updating independently.
     if (player.isDead) return;
+
     // DM lobby: claimed players can't run around the map before the
-    // match formally begins. Same applies in Network DM while waiting
-    // for the host to press start.
-    if (isMatchLobby()) return;
-    updateLocation(player, deltaTime);
+    // match formally begins (same applies in Network DM while waiting
+    // for the host to press start). But height tracking and lift
+    // following must still run — spawn points on raised floors need
+    // `player.z` resolved from `floorHeight` so the camera isn't stuck
+    // below the platform during the lobby wait.
+    const inLobby = isMatchLobby();
+
+    if (!inLobby) {
+        updateLocation(player, deltaTime);
+    }
     updatePlayerFromLift(timestamp);
     updateHeight(player);
-    updateMovingState(player);
+    if (!inLobby) {
+        updateMovingState(player);
+    }
 }
 
 function updateLocation(player, deltaTime) {
