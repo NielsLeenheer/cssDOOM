@@ -35,14 +35,41 @@ import { clonePanes as clonePanesHelper, setMirrorMode as setMirrorModeHelper, i
 class Orchestrator {
     constructor() {
         // Default registration: one DomRenderer per pane in the current
-        // sceneStates layout (always 2 in current HTML). The eventual
-        // two-window mode will swap one of these for a BroadcastSink.
+        // sceneStates layout (always 2 in current HTML). Two-window mode
+        // swaps one of these for a BroadcastSink via replaceTarget().
         this.targets = [new DomRenderer(0), new DomRenderer(1)];
     }
 
     /** Returns the target for a given pane index, or null if out of range. */
     target(paneIndex) {
         return this.targets[paneIndex] ?? null;
+    }
+
+    /**
+     * Swap the target at a given pane index. Used to install a BroadcastSink
+     * when a secondary window connects, and to swap back to a DomRenderer
+     * when it disconnects. The replaced instance is returned in case the
+     * caller wants to keep it around (e.g. to restore on disconnect).
+     */
+    replaceTarget(paneIndex, target) {
+        const previous = this.targets[paneIndex];
+        this.targets[paneIndex] = target;
+        return previous;
+    }
+
+    /** All sink targets currently registered (used to fan out world commands). */
+    _sinks() {
+        const out = [];
+        for (const t of this.targets) {
+            if (t && typeof t.forwardWorld === 'function') out.push(t);
+        }
+        return out;
+    }
+
+    /** Forward a world command to all registered sinks (master local DOM is updated by _world). */
+    _broadcastWorld(method, args) {
+        const sinks = this._sinks();
+        for (const sink of sinks) sink.forwardWorld(method, args);
     }
 
     // ── Per-player commands (paneIndex first) ─────────────────────────────
@@ -99,40 +126,56 @@ class Orchestrator {
         this.targets[paneIndex]?.collectKey(...args);
     }
 
-    // ── World commands (one call, helpers fan out across panes) ───────────
+    // ── World commands (one local call, plus forward to any sinks) ───────
+    //
+    // Each call: (1) invoke the underlying helper which iterates every
+    // local pane internally — preserves existing behavior in single-window
+    // mode; (2) forward an envelope to any registered sinks so secondary
+    // windows can apply the same world change to their local DOM.
 
-    setEnemyState(...args) { sprites.setEnemyState(...args); }
-    resetEnemy(...args) { sprites.resetEnemy(...args); }
-    killEnemy(...args) { sprites.killEnemy(...args); }
-    updateEnemyRotation(...args) { sprites.updateEnemyRotation(...args); }
-    updateThingPosition(...args) { sprites.updateThingPosition(...args); }
-    reparentThingToSector(...args) { sprites.reparentThingToSector(...args); }
-    collectItem(...args) { sprites.collectItem(...args); }
-    uncollectItem(...args) { sprites.uncollectItem(...args); }
-    setThingMoving(...args) { sprites.setThingMoving(...args); }
-    createPuff(...args) { sprites.createPuff(...args); }
-    createExplosion(...args) { sprites.createExplosion(...args); }
-    createTeleportFog(...args) { sprites.createTeleportFog(...args); }
-    createProjectile(...args) { sprites.createProjectile(...args); }
-    removeProjectile(...args) { sprites.removeProjectile(...args); }
-    createPlayerSprite(...args) { sprites.createPlayerSprite(...args); }
-    createCorpse(...args) { sprites.createCorpse(...args); }
-    playPlayerAttack(...args) { sprites.playPlayerAttack(...args); }
+    setEnemyState(...args) { sprites.setEnemyState(...args); this._broadcastWorld('setEnemyState', args); }
+    resetEnemy(...args) { sprites.resetEnemy(...args); this._broadcastWorld('resetEnemy', args); }
+    killEnemy(...args) { sprites.killEnemy(...args); this._broadcastWorld('killEnemy', args); }
+    updateEnemyRotation(...args) { sprites.updateEnemyRotation(...args); this._broadcastWorld('updateEnemyRotation', args); }
+    updateThingPosition(...args) { sprites.updateThingPosition(...args); this._broadcastWorld('updateThingPosition', args); }
+    reparentThingToSector(...args) { sprites.reparentThingToSector(...args); this._broadcastWorld('reparentThingToSector', args); }
+    collectItem(...args) { sprites.collectItem(...args); this._broadcastWorld('collectItem', args); }
+    uncollectItem(...args) { sprites.uncollectItem(...args); this._broadcastWorld('uncollectItem', args); }
+    setThingMoving(...args) { sprites.setThingMoving(...args); this._broadcastWorld('setThingMoving', args); }
+    createPuff(...args) { sprites.createPuff(...args); this._broadcastWorld('createPuff', args); }
+    createExplosion(...args) { sprites.createExplosion(...args); this._broadcastWorld('createExplosion', args); }
+    createTeleportFog(...args) { sprites.createTeleportFog(...args); this._broadcastWorld('createTeleportFog', args); }
+    createProjectile(...args) { sprites.createProjectile(...args); this._broadcastWorld('createProjectile', args); }
+    removeProjectile(...args) { sprites.removeProjectile(...args); this._broadcastWorld('removeProjectile', args); }
+    createPlayerSprite(...args) { sprites.createPlayerSprite(...args); this._broadcastWorld('createPlayerSprite', args); }
+    createCorpse(...args) { sprites.createCorpse(...args); this._broadcastWorld('createCorpse', args); }
+    playPlayerAttack(...args) { sprites.playPlayerAttack(...args); this._broadcastWorld('playPlayerAttack', args); }
 
-    buildThing(...args) { buildThingHelper(...args); }
-    buildDoor(...args) { doors.buildDoor(...args); }
-    setDoorState(...args) { doors.setDoorState(...args); }
-    buildLift(...args) { lifts.buildLift(...args); }
-    setLiftState(...args) { lifts.setLiftState(...args); }
-    buildCrusher(...args) { crushers.buildCrusher(...args); }
-    setCrusherOffset(...args) { crushers.setCrusherOffset(...args); }
-    toggleSwitchState(...args) { toggleSwitchState(...args); }
-    lowerTaggedFloor(...args) { lowerTaggedFloor(...args); }
+    buildThing(...args) { buildThingHelper(...args); this._broadcastWorld('buildThing', args); }
+    buildDoor(...args) { doors.buildDoor(...args); this._broadcastWorld('buildDoor', args); }
+    setDoorState(...args) { doors.setDoorState(...args); this._broadcastWorld('setDoorState', args); }
+    buildLift(...args) { lifts.buildLift(...args); this._broadcastWorld('buildLift', args); }
+    setLiftState(...args) { lifts.setLiftState(...args); this._broadcastWorld('setLiftState', args); }
+    buildCrusher(...args) { crushers.buildCrusher(...args); this._broadcastWorld('buildCrusher', args); }
+    setCrusherOffset(...args) { crushers.setCrusherOffset(...args); this._broadcastWorld('setCrusherOffset', args); }
+    toggleSwitchState(...args) { toggleSwitchState(...args); this._broadcastWorld('toggleSwitchState', args); }
+    lowerTaggedFloor(...args) { lowerTaggedFloor(...args); this._broadcastWorld('lowerTaggedFloor', args); }
 
     clonePanes(paneCount) { clonePanesHelper(paneCount); }
     setMirrorMode(value) { setMirrorModeHelper(value); }
     isMirrorMode() { return isMirrorModeHelper(); }
     viewportsForEffect(playerIndex) { return viewportsForEffect(playerIndex); }
+
+    /**
+     * Attract-mode toggle. Sets body[data-attract] locally (CSS uses it to
+     * show the kiosk overlay and hide the HUD) and broadcasts to sinks so
+     * the secondary window mirrors the visual state.
+     */
+    setAttract(active) {
+        if (active) document.body.dataset.attract = 'true';
+        else delete document.body.dataset.attract;
+        this._broadcastWorld('setAttract', [active]);
+    }
 }
 
 export const orchestrator = new Orchestrator();

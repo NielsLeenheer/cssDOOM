@@ -2,15 +2,24 @@
  * Gamepad Input
  *
  * Gamepad/controller support using gamecontroller.js. Maps standard gamepad
- * controls to DOOM actions:
+ * controls to DOOM actions following modern FPS console conventions:
  *
  *   Left stick:        move forward/backward + strafe left/right
  *   Right stick:       turn left/right
- *   A / button0:       use (open doors, activate switches/lifts)
- *   Right trigger:     fire weapon
- *   Left/Right bumpers: cycle weapons
- *   Start:             toggle menu
- *   D-pad:             move (alternative to left stick)
+ *   A / Cross / b0:    use (open doors, activate switches/lifts)
+ *   Right trigger / b7: fire weapon
+ *   Left trigger / b6: run modifier (hold for sprint speed)
+ *   L1 / LB / b4:      previous weapon
+ *   R1 / RB / b5:      next weapon
+ *   D-pad up / b12:    next weapon (alternative to R1)
+ *   D-pad down / b13:  previous weapon (alternative to L1)
+ *   Start / Options / b9: toggle menu
+ *
+ * Triggers (L2 / R2) are read via the analog `value` property rather than
+ * the lib's `before/after('r2')` button events. Some controllers — notably
+ * Xbox on macOS — don't reliably flip `buttons[7].pressed` even when the
+ * trigger is fully pulled. Polling the value each cycle works on every
+ * controller we've tested.
  *
  * Per-player: each connected gamepad drives a player slot equal to its
  * `gamepad.index` (gamepad 0 → state.players[0], gamepad 1 → state.players[1]).
@@ -23,7 +32,7 @@
  */
 
 import 'gamecontroller.js';
-import { inputs, registerInputProvider } from './index.js';
+import { inputs, registerInputProvider, getDriverSlot, tryClaimSlot, unclaim } from './index.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
@@ -41,9 +50,17 @@ const SP_RESTART_COOLDOWN_MS = 4000;
 
 const STICK_DEADZONE = 0.15;
 const TURN_SENSITIVITY = 0.04;
+// Threshold past which an analog trigger counts as "pressed". Half-pull
+// fires the action; release returns it to false. Standard FPS feel.
+const TRIGGER_THRESHOLD = 0.5;
 
 /** Per-gamepad analog state, keyed by gamepad.index. */
 const padStates = new Map();
+
+/** Build the per-gamepad deviceId used by the press-to-claim registry. */
+function gamepadDeviceId(gamepadIndex) {
+    return `gamepad-${gamepadIndex}`;
+}
 
 /**
  * Initialise gamepad input. The gamecontroller.js library auto-detects
@@ -56,38 +73,92 @@ export function initGamepadInput() {
         setupGamepad(gamepad);
     });
 
-    window.gameControl.on('disconnect', gamepad => {
-        const padState = padStates.get(gamepad.index);
+    // gamecontroller.js passes the raw numeric gamepad slot here, not the
+    // wrapped gamepad object — different shape than the connect callback.
+    window.gameControl.on('disconnect', gamepadIndex => {
+        const padState = padStates.get(gamepadIndex);
         if (padState) {
             padState.moveX = 0;
             padState.moveY = 0;
             padState.turnDelta = 0;
+            padState.run = false;
+            // Reset button-transition tracking so a reconnect doesn't
+            // see "previously pressed" buttons as a state to unwind.
+            padState._prevButtons = [];
         }
-        const slot = inputs[gamepad.index];
-        if (slot) slot.fireHeld = false;
+        // Free this gamepad's claim so the slot becomes available again.
+        const deviceId = gamepadDeviceId(gamepadIndex);
+        const claimedSlot = getDriverSlot(deviceId);
+        if (claimedSlot != null) {
+            unclaim(deviceId);
+            const slotInputs = inputs[claimedSlot];
+            if (slotInputs) slotInputs.fireHeld = false;
+        }
     });
 
-    // Single global afterCycle handler that walks all known gamepads each
-    // polling tick and updates their padState from raw axes.
+    // Global afterCycle dispatcher. Walks every connected gamepad and
+    // handles axes + button transitions itself instead of relying on
+    // gamecontroller.js's per-button events — those proved unreliable on
+    // Xbox controllers via macOS's native driver (button.pressed didn't
+    // flip even when input was registering at the OS level).
     window.gameControl.on('afterCycle', () => {
+        const rawPads = navigator.getGamepads ? navigator.getGamepads() : [];
         for (const [index, padState] of padStates) {
-            const pad = window.gameControl.gamepads?.[index];
-            if (!pad) continue;
-            const axes0 = pad.axeValues[0];
-            if (axes0) {
-                const lx = parseFloat(axes0[0]) || 0;
-                const ly = parseFloat(axes0[1]) || 0;
+            const rawPad = rawPads[index];
+            if (!rawPad) continue;
+
+            // ── Sticks → padState (left = move, right = turn) ──
+            const axes = rawPad.axes ?? [];
+            if (axes.length >= 2) {
+                const lx = axes[0] || 0;
+                const ly = axes[1] || 0;
                 padState.moveX = Math.abs(lx) > STICK_DEADZONE ? lx : 0;
-                padState.moveY = Math.abs(ly) > STICK_DEADZONE ? -ly : 0; // invert Y
+                padState.moveY = Math.abs(ly) > STICK_DEADZONE ? -ly : 0; // invert Y for north=forward
             }
-            const axes1 = pad.axeValues[1];
-            if (axes1) {
-                const rx = parseFloat(axes1[0]) || 0;
+            if (axes.length >= 4) {
+                const rx = axes[2] || 0;
                 padState.turnDelta = Math.abs(rx) > STICK_DEADZONE ? -rx * TURN_SENSITIVITY : 0;
             }
-            // Any stick activity counts as engagement for the attract loop —
-            // button-press paths ping separately in their own handlers.
-            if (padState.moveX || padState.moveY || padState.turnDelta) pingActivity();
+            if (padState.moveX || padState.moveY || padState.turnDelta) padState._pingActivity();
+
+            // ── Button transitions ──
+            // Detect each button's press/release transition by comparing
+            // current state against the previous tick. Triggers (6, 7)
+            // use value-based detection so analog triggers register even
+            // if the browser doesn't flip the boolean pressed flag.
+            const handlers = padState._handlers;
+            const claimOrPass = padState._claimOrPass;
+            const prev = padState._prevButtons ??= [];
+            const buttons = rawPad.buttons ?? [];
+            for (let i = 0; i < buttons.length; i++) {
+                const button = buttons[i];
+                if (!button) continue;
+                const isTrigger = i === 6 || i === 7;
+                const isPressed = isTrigger
+                    ? (button.pressed || (button.value ?? 0) > TRIGGER_THRESHOLD)
+                    : button.pressed;
+                const wasPressed = prev[i] ?? false;
+
+                if (isPressed && !wasPressed) {
+                    padState._pingActivity();
+                    // Lobby claim is universal: any button press claims
+                    // when the gamepad is unbound in DM. Returns true if
+                    // it consumed the press.
+                    if (!claimOrPass()) {
+                        handlers[i]?.press?.();
+                    }
+                } else if (!isPressed && wasPressed) {
+                    handlers[i]?.release?.();
+                }
+                prev[i] = isPressed;
+            }
+
+            // ── Run modifier (L2 / button6) ──
+            // Continuous state (held = run, released = walk), separate
+            // from the button-transition handling above. Sets padState.run
+            // which collectInputs OR-merges into the slot's input.
+            const l2 = buttons[6];
+            padState.run = !!l2 && (l2.pressed || (l2.value ?? 0) > TRIGGER_THRESHOLD);
         }
     });
 }
@@ -102,79 +173,125 @@ export function isGamepadConnected() {
 // ============================================================================
 
 function setupGamepad(gamepad) {
-    const playerIndex = gamepad.index;
-    const padState = { moveX: 0, moveY: 0, turnDelta: 0 };
-    padStates.set(playerIndex, padState);
+    // gamecontroller.js's wrapped gamepad object exposes the slot number
+    // as `.id` (a number), not `.index`. The original gamepadPrototype is
+    // a plain object — there's no `.index` to read.
+    const gamepadIndex = gamepad.id;
+    const deviceId = gamepadDeviceId(gamepadIndex);
+    const padState = { moveX: 0, moveY: 0, turnDelta: 0, run: false };
+    padStates.set(gamepadIndex, padState);
 
-    // Per-gamepad provider — contributes to its own player slot.
-    registerInputProvider(() => playerIndex, () => padState);
+    // Per-gamepad provider — contributes to whichever slot the press-to-
+    // claim system has bound this gamepad to. SP auto-binds to slot 0,
+    // DM requires fire-press claim before contributing.
+    registerInputProvider(() => getDriverSlot(deviceId), () => padState);
 
     // Set deadzone threshold for analog sticks
     gamepad.set('axeThreshold', STICK_DEADZONE);
 
-    /** The player driven by this gamepad. May be undefined if SP and the
-     *  gamepad's slot is beyond state.players.length. */
-    const playerForPad = () => state.players[playerIndex];
+    /** The slot this gamepad currently drives, or null if unbound. */
+    const slotForPad = () => getDriverSlot(deviceId);
+    /** The player driven by this gamepad, or null if unbound. */
+    const playerForPad = () => {
+        const s = slotForPad();
+        return s != null ? state.players[s] : null;
+    };
+    /** True if this gamepad is unbound and should claim on next fire. */
+    const isLobbyClaimPending = () =>
+        state.mode === 'deathmatch' && slotForPad() == null;
 
-    // --- A / Cross (button0): Use ---
-    gamepad.before('button0', () => {
-        pingActivity();
-        const player = playerForPad();
-        if (!player) return;
-        if (isMatchEnded()) { restartMatch(); return; }
-        if (handleDeadRestart(player)) return;
-        if (isMenuOpen()) return;
-        tryOpenDoor(player);
-        tryUseSwitch(player);
-        tryUseLift(player);
-    });
+    /**
+     * Claim-or-pass: when this gamepad is unbound in a DM lobby, *any*
+     * button press counts as a claim attempt. Returns true if the press
+     * was consumed by the claim and the caller should skip its action.
+     */
+    function claimOrPass() {
+        if (!isLobbyClaimPending()) return false;
+        tryClaimSlot(deviceId);
+        return true;
+    }
+    padState._claimOrPass = claimOrPass;
+    padState._pingActivity = pingActivity;
 
-    // --- Right trigger (R2 / button7): Fire ---
-    gamepad.before('r2', () => {
-        pingActivity();
-        const player = playerForPad();
-        if (!player) return;
-        if (isMatchEnded()) { restartMatch(); return; }
-        if (handleDeadRestart(player)) return;
-        if (isMenuOpen()) return;
-        inputs[playerIndex].fireHeld = true;
-        fireWeapon(player);
-    });
-    gamepad.after('r2', () => {
-        const player = playerForPad();
-        inputs[playerIndex].fireHeld = false;
-        if (player) stopAutoFire(player);
-    });
+    // Per-button press/release handlers. Polled by the global afterCycle
+    // dispatcher below — bypassing gamecontroller.js's button events
+    // because they aren't reliable on every controller (some Xbox
+    // configurations on macOS don't flip buttons[N].pressed cleanly even
+    // when the input is registering at the OS level). Index → action.
+    const handlers = {};
 
-    // --- Left bumper (L1 / button4): Previous weapon ---
-    gamepad.before('l1', () => {
-        pingActivity();
-        if (isMenuOpen()) return;
-        cycleWeapon(playerIndex, -1);
-    });
+    // A / Cross (button0): Use
+    handlers[0] = {
+        press: () => {
+            const player = playerForPad();
+            if (!player) return;
+            if (isMatchEnded()) { restartMatch(); return; }
+            if (handleDeadRestart(player)) return;
+            if (isMenuOpen()) return;
+            tryOpenDoor(player);
+            tryUseSwitch(player);
+            tryUseLift(player);
+        },
+    };
+    // L1 / LB (button4): Previous weapon
+    handlers[4] = {
+        press: () => {
+            if (isMenuOpen()) return;
+            const slot = slotForPad();
+            if (slot != null) cycleWeapon(slot, -1);
+        },
+    };
+    // R1 / RB (button5): Next weapon
+    handlers[5] = {
+        press: () => {
+            if (isMenuOpen()) return;
+            const slot = slotForPad();
+            if (slot != null) cycleWeapon(slot, 1);
+        },
+    };
+    // R2 / RT (button7): Fire. Run-modifier is L2 (button6) — handled
+    // separately below via padState.run because it's a continuous state
+    // rather than a discrete press/release.
+    handlers[7] = {
+        press: () => {
+            const player = playerForPad();
+            if (!player) return;
+            if (isMatchEnded()) { restartMatch(); return; }
+            if (handleDeadRestart(player)) return;
+            if (isMenuOpen()) return;
+            const slot = slotForPad();
+            inputs[slot].fireHeld = true;
+            fireWeapon(player);
+        },
+        release: () => {
+            const slot = slotForPad();
+            const player = playerForPad();
+            if (slot != null) inputs[slot].fireHeld = false;
+            if (player) stopAutoFire(player);
+        },
+    };
+    // Start / Options (button9): Toggle menu
+    handlers[9] = {
+        press: () => toggleMenu(!isMenuOpen()),
+    };
+    // D-pad up (button12): Next weapon (mirrors R1)
+    handlers[12] = {
+        press: () => {
+            if (isMenuOpen()) return;
+            const slot = slotForPad();
+            if (slot != null) cycleWeapon(slot, 1);
+        },
+    };
+    // D-pad down (button13): Previous weapon (mirrors L1)
+    handlers[13] = {
+        press: () => {
+            if (isMenuOpen()) return;
+            const slot = slotForPad();
+            if (slot != null) cycleWeapon(slot, -1);
+        },
+    };
 
-    // --- Right bumper (R1 / button5): Next weapon ---
-    gamepad.before('r1', () => {
-        pingActivity();
-        if (isMenuOpen()) return;
-        cycleWeapon(playerIndex, 1);
-    });
-
-    // --- Start (button9): Toggle menu ---
-    gamepad.before('start', () => {
-        pingActivity();
-        toggleMenu(!isMenuOpen());
-    });
-
-    // --- D-pad: alternative movement ---
-    gamepad.on('up0',    () => { pingActivity(); padState.moveY = 1; });
-    gamepad.after('up0', () => { padState.moveY = 0; });
-    gamepad.on('down0',    () => { pingActivity(); padState.moveY = -1; });
-    gamepad.after('down0', () => { padState.moveY = 0; });
-    gamepad.on('left0',    () => { pingActivity(); padState.moveX = -1; });
-    gamepad.after('left0', () => { padState.moveX = 0; });
-    gamepad.on('right0',    () => { pingActivity(); padState.moveX = 1; });
-    gamepad.after('right0', () => { padState.moveX = 0; });
+    padState._handlers = handlers;
 }
 
 // ============================================================================

@@ -17,6 +17,7 @@ import { orchestrator } from './orchestrator.js';
 
 // ── Camera & HUD ──────────────────────────────────────────────────────────
 export const updateCamera = (player, paneIndex) => orchestrator.updateCamera(player, paneIndex);
+export const updateHud = (player, paneIndex) => orchestrator.updateHud(player, paneIndex);
 
 // ── Effects ───────────────────────────────────────────────────────────────
 export const triggerFlash = (paneIndex, type) => orchestrator.triggerFlash(paneIndex, type);
@@ -74,6 +75,7 @@ export const clonePanes = (paneCount) => orchestrator.clonePanes(paneCount);
 export const setMirrorMode = (value) => orchestrator.setMirrorMode(value);
 export const isMirrorMode = () => orchestrator.isMirrorMode();
 export const viewportsForEffect = (playerIndex) => orchestrator.viewportsForEffect(playerIndex);
+export const setAttract = (active) => orchestrator.setAttract(active);
 
 // Direct access for code that benefits from instance-shaped API
 export { orchestrator };

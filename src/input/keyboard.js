@@ -25,7 +25,7 @@
  * keyup events are suppressed while Meta is held on macOS.
  */
 
-import { inputs, registerInputProvider, clearInputSlot } from './index.js';
+import { inputs, registerInputProvider, clearInputSlot, getDriverSlot, tryClaimSlot } from './index.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { WEAPONS } from '../game/constants.js';
@@ -50,9 +50,21 @@ const keys = {
     strafeLeft: false, strafeRight: false, run: false, strafe: false,
 };
 
-/** The player object currently driven by keyboard input. */
+// deviceId for the keyboard+mouse combo. They share a slot — see the
+// commentary in mouse.js. The press-to-claim flow binds this device.
+export const KBM_DEVICE = 'kbm';
+
+/** The player object currently driven by keyboard input, or null if the
+ *  kbm device is unbound (Local DM lobby state). */
 function kbmPlayer() {
-    return state.players[state.kbmTargetPlayer];
+    const slot = getDriverSlot(KBM_DEVICE);
+    if (slot == null) return null;
+    return state.players[slot];
+}
+
+/** The slot index the keyboard is currently driving, or null if unbound. */
+function kbmSlot() {
+    return getDriverSlot(KBM_DEVICE);
 }
 
 /**
@@ -84,8 +96,12 @@ function switchKbmTarget() {
  * Should be called once during application startup.
  */
 export function initKeyboardInput() {
-    // Keyboard input is routed to whatever slot kbmTargetPlayer points at.
-    registerInputProvider(() => state.kbmTargetPlayer, getInput);
+    // Keyboard's slot is determined by the press-to-claim system. In SP,
+    // getDriverSlot auto-binds to slot 0; in DM, the slot is null until
+    // a fire-press claims one. The provider returning null causes
+    // collectInputs to skip its contribution, which is what we want
+    // pre-claim.
+    registerInputProvider(() => kbmSlot(), getInput);
     document.body.dataset.kbmTarget = String(state.kbmTargetPlayer);
 
     // Keyboard: key down
@@ -127,6 +143,16 @@ export function initKeyboardInput() {
         }
 
         const player = kbmPlayer();
+
+        // Press-to-claim: in DM lobby with kbm unbound, *any* key counts
+        // as a join — the user shouldn't have to figure out which key is
+        // "the right one." Escape, Tab, and the menu/match-end keys are
+        // already handled higher up so they don't reach this gate.
+        if (state.mode === 'deathmatch' && player == null) {
+            tryClaimSlot(KBM_DEVICE);
+            event.preventDefault();
+            return;
+        }
 
         // Dead handling differs by mode:
         //   SP: any key restarts the level after a 4-second cooldown.
@@ -170,7 +196,7 @@ export function initKeyboardInput() {
             case 'Space': tryOpenDoor(player); tryUseSwitch(player); tryUseLift(player); break;
             // Fire weapon: Alt or X
             case 'AltLeft': case 'AltRight': case 'KeyX':
-                inputs[state.kbmTargetPlayer].fireHeld = true;
+                inputs[kbmSlot()].fireHeld = true;
                 fireWeapon(player);
                 break;
             // Weapon selection: number keys 1-7
@@ -200,10 +226,12 @@ export function initKeyboardInput() {
             case 'KeyD': case 'Period': keys.strafeRight = false; break;
             case 'ShiftLeft': case 'ShiftRight': keys.run = false; break;
             case 'KeyZ': keys.strafe = false; break;
-            case 'AltLeft': case 'AltRight': case 'KeyX':
-                inputs[state.kbmTargetPlayer].fireHeld = false;
+            case 'AltLeft': case 'AltRight': case 'KeyX': {
+                const slot = kbmSlot();
+                if (slot != null) inputs[slot].fireHeld = false;
                 if (player) stopAutoFire(player);
                 break;
+            }
 
             // Meta key release: clear all movement to avoid stuck keys on macOS
             case 'MetaLeft': case 'MetaRight':

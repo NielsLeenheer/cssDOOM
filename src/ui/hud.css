@@ -477,6 +477,71 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
 
 
 /* ========================================================================
+   Lobby overlays (Local DM)
+   ======================================================================== */
+
+/* Shared layout for both join-prompt and join-ready overlays. Display is
+   driven below by data-claim-state on the parent .pane. */
+.join-prompt, .join-ready {
+    position: absolute;
+    inset: 0;
+    z-index: 1100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    font-family: 'PressStart2P', monospace;
+    font-size: 18px;
+    color: #ffd700;
+    text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
+    letter-spacing: 2px;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.join-prompt {
+    animation: join-prompt-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes join-prompt-pulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+}
+
+.join-ready {
+    color: #4caf50;
+}
+
+/* "prompting" — this pane's slot is the next one to claim. Show the
+   PRESS BUTTON TO JOIN overlay. Only one pane is in this state at a time
+   (sequential join, left → right). */
+body[data-mode="deathmatch"] .pane[data-claim-state="prompting"] .join-prompt {
+    display: flex;
+}
+
+/* "ready" — this pane's slot has been claimed but the match hasn't
+   formally started yet (still waiting on later panes). The bound player
+   can move around in warmup; the READY overlay sits on top so the user
+   knows the join took. */
+body[data-mode="deathmatch"] .pane[data-claim-state="ready"] .join-ready {
+    display: flex;
+}
+
+/* "waiting" — this pane is later in the sequence than the one currently
+   prompting. Dim it out so attention focuses on the prompting pane. */
+body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] {
+    filter: brightness(0.3);
+}
+
+/* Hide HUD numbers in any non-active lobby state — there's no player
+   stats to show until the match actually starts. */
+body[data-mode="deathmatch"] .pane[data-claim-state="prompting"] .hud .status,
+body[data-mode="deathmatch"] .pane[data-claim-state="ready"] .hud .status,
+body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
+    visibility: hidden;
+}
+
+
+/* ========================================================================
    Deathmatch win overlay (per-pane FRAGS counter lives in the HUD bar)
    ======================================================================== */
 

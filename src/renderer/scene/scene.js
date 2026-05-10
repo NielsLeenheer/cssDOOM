@@ -131,76 +131,141 @@ export function clonePanes(paneCount) {
  * `[data-orig-id="..."]` (see toggleSwitchState).
  */
 function cloneSceneToOtherPanes(paneCount) {
+    for (let pi = 1; pi < paneCount; pi++) {
+        cloneSceneToPane(pi);
+    }
+}
+
+/**
+ * Clone pane 0's current `.scene` DOM tree into the target pane,
+ * copying expando JS properties (`_midX`, `_wall`, `_sectorIndex`, etc.)
+ * onto the clones via a source→clone Map. After the clone walk, the
+ * target pane's sceneState arrays/Maps are populated by mapping pane 0's
+ * references through the cloneMap so culling, sprite rotation, and
+ * mechanics state-toggling all work per-pane out of the box.
+ *
+ * Element ids on cloned elements (DOOM wall ids like "ld489", sector
+ * ids like "s0", the spectator "#player" sprite) are demoted to
+ * data-orig-id so duplicate ids across panes don't violate the HTML
+ * uniqueness rule. Renderer functions that need to find these elements
+ * across all panes use `[data-orig-id="..."]` (see toggleSwitchState).
+ *
+ * Idempotent — `targetSceneEl.replaceChildren()` clears any prior tree
+ * before re-cloning. Safe to call repeatedly to rebuild a torn-down
+ * pane after a secondary disconnects.
+ */
+function cloneSceneToPane(pi) {
     const sourceSceneEl = dom.scenes[0];
     const sourceSceneState = sceneStates[0];
+    const targetSceneEl = dom.scenes[pi];
+    const targetSceneState = sceneStates[pi];
+    if (!targetSceneEl || !targetSceneState) return;
+    const cloneMap = new Map();
 
-    for (let pi = 1; pi < paneCount; pi++) {
-        const targetSceneEl = dom.scenes[pi];
-        const targetSceneState = sceneStates[pi];
-        const cloneMap = new Map();
-
-        function cloneRec(src) {
-            const tgt = src.cloneNode(false);
-            // Promote duplicate id to data-orig-id (cross-pane uniqueness rule).
-            if (tgt.id) {
-                tgt.dataset.origId = tgt.id;
-                tgt.removeAttribute('id');
-            }
-            // Copy underscore-prefixed expando properties used by culling/etc.
-            for (const key of Object.getOwnPropertyNames(src)) {
-                if (key.startsWith('_')) tgt[key] = src[key];
-            }
-            cloneMap.set(src, tgt);
-            for (const child of src.children) {
-                tgt.appendChild(cloneRec(child));
-            }
-            return tgt;
+    function cloneRec(src) {
+        const tgt = src.cloneNode(false);
+        // Promote duplicate id to data-orig-id (cross-pane uniqueness rule).
+        if (tgt.id) {
+            tgt.dataset.origId = tgt.id;
+            tgt.removeAttribute('id');
         }
-
-        targetSceneEl.replaceChildren();
-        for (const child of sourceSceneEl.children) {
-            targetSceneEl.appendChild(cloneRec(child));
+        // Copy underscore-prefixed expando properties used by culling/etc.
+        for (const key of Object.getOwnPropertyNames(src)) {
+            if (key.startsWith('_')) tgt[key] = src[key];
         }
-
-        // Populate per-pane arrays via the source→clone Map.
-        targetSceneState.wallElements = sourceSceneState.wallElements.map(el => cloneMap.get(el));
-        targetSceneState.surfaceElements = sourceSceneState.surfaceElements.map(el => cloneMap.get(el));
-        targetSceneState.sectorContainers = sourceSceneState.sectorContainers.map(el => cloneMap.get(el));
-        targetSceneState.thingContainers = sourceSceneState.thingContainers.map(tc => ({
-            ...tc,
-            element: cloneMap.get(tc.element),
-        }));
-
-        targetSceneState.thingDom.clear();
-        for (const [idx, { element, sprite }] of sourceSceneState.thingDom) {
-            targetSceneState.thingDom.set(idx, {
-                element: cloneMap.get(element),
-                sprite: sprite ? cloneMap.get(sprite) : null,
-            });
+        cloneMap.set(src, tgt);
+        for (const child of src.children) {
+            tgt.appendChild(cloneRec(child));
         }
-        targetSceneState.doorContainers.clear();
-        for (const [idx, container] of sourceSceneState.doorContainers) {
-            targetSceneState.doorContainers.set(idx, cloneMap.get(container));
-        }
-        targetSceneState.liftContainers.clear();
-        for (const [idx, container] of sourceSceneState.liftContainers) {
-            targetSceneState.liftContainers.set(idx, cloneMap.get(container));
-        }
-        targetSceneState.crusherContainers.clear();
-        for (const [idx, container] of sourceSceneState.crusherContainers) {
-            targetSceneState.crusherContainers.set(idx, cloneMap.get(container));
-        }
-        targetSceneState.projectileDom.clear();
-        for (const [idx, el] of sourceSceneState.projectileDom) {
-            targetSceneState.projectileDom.set(idx, cloneMap.get(el));
-        }
-
-        // Pure data — duplicate so each pane has its own independent copy.
-        targetSceneState.skyWallPlanes = [...sourceSceneState.skyWallPlanes];
-        targetSceneState.skySectors = new Set(sourceSceneState.skySectors);
-        targetSceneState.skyGroupOf = new Map(sourceSceneState.skyGroupOf);
-        targetSceneState.perspectiveValue = sourceSceneState.perspectiveValue;
+        return tgt;
     }
+
+    targetSceneEl.replaceChildren();
+    for (const child of sourceSceneEl.children) {
+        targetSceneEl.appendChild(cloneRec(child));
+    }
+
+    // Populate per-pane arrays via the source→clone Map.
+    targetSceneState.wallElements = sourceSceneState.wallElements.map(el => cloneMap.get(el));
+    targetSceneState.surfaceElements = sourceSceneState.surfaceElements.map(el => cloneMap.get(el));
+    targetSceneState.sectorContainers = sourceSceneState.sectorContainers.map(el => cloneMap.get(el));
+    targetSceneState.thingContainers = sourceSceneState.thingContainers.map(tc => ({
+        ...tc,
+        element: cloneMap.get(tc.element),
+    }));
+
+    targetSceneState.thingDom.clear();
+    for (const [idx, { element, sprite }] of sourceSceneState.thingDom) {
+        targetSceneState.thingDom.set(idx, {
+            element: cloneMap.get(element),
+            sprite: sprite ? cloneMap.get(sprite) : null,
+        });
+    }
+    targetSceneState.doorContainers.clear();
+    for (const [idx, container] of sourceSceneState.doorContainers) {
+        targetSceneState.doorContainers.set(idx, cloneMap.get(container));
+    }
+    targetSceneState.liftContainers.clear();
+    for (const [idx, container] of sourceSceneState.liftContainers) {
+        targetSceneState.liftContainers.set(idx, cloneMap.get(container));
+    }
+    targetSceneState.crusherContainers.clear();
+    for (const [idx, container] of sourceSceneState.crusherContainers) {
+        targetSceneState.crusherContainers.set(idx, cloneMap.get(container));
+    }
+    targetSceneState.projectileDom.clear();
+    for (const [idx, el] of sourceSceneState.projectileDom) {
+        targetSceneState.projectileDom.set(idx, cloneMap.get(el));
+    }
+
+    // Pure data — duplicate so each pane has its own independent copy.
+    targetSceneState.skyWallPlanes = [...sourceSceneState.skyWallPlanes];
+    targetSceneState.skySectors = new Set(sourceSceneState.skySectors);
+    targetSceneState.skyGroupOf = new Map(sourceSceneState.skyGroupOf);
+    targetSceneState.perspectiveValue = sourceSceneState.perspectiveValue;
+}
+
+/**
+ * Tear down a single pane's DOM and sceneState. Used when a secondary
+ * window connects and takes over rendering for that slot — clearing
+ * sceneStates[paneIndex] makes world commands (setEnemyState,
+ * updateThingPosition, etc.) and the culling loop both early-exit when
+ * they iterate that pane's empty arrays. Saves CPU/DOM work that would
+ * otherwise happen against an invisible subtree.
+ *
+ * The .scene element itself is preserved (only its children are
+ * replaced) — same for the .viewport, .hud, .status, and .weapon
+ * elements that live in the pane template. They become empty containers
+ * waiting for rebuildPane().
+ */
+export function tearDownPane(paneIndex) {
+    const sState = sceneStates[paneIndex];
+    if (!sState) return;
+    sState.wallElements = [];
+    sState.surfaceElements = [];
+    sState.sectorContainers = [];
+    sState.thingContainers = [];
+    sState.skyWallPlanes = [];
+    sState.skySectors = new Set();
+    sState.skyGroupOf = new Map();
+    sState.thingDom.clear();
+    sState.doorContainers.clear();
+    sState.liftContainers.clear();
+    sState.crusherContainers.clear();
+    sState.projectileDom.clear();
+    dom.scenes[paneIndex]?.replaceChildren();
+}
+
+/**
+ * Rebuild a single pane by cloning pane 0's current DOM tree into it.
+ * Counterpart to tearDownPane — used when a secondary disconnects and
+ * master needs the local pane back. The clone is from pane 0's *live*
+ * state, so accumulated runtime mutations (open doors, dead enemies,
+ * collected items) carry over correctly.
+ */
+export function rebuildPane(paneIndex) {
+    if (paneIndex === 0) return; // pane 0 is the source, never rebuilt from itself
+    cloneSceneToPane(paneIndex);
 }
 
 /**

@@ -25,6 +25,7 @@ import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
 import { resetMatch } from '../game/match.js';
 import { isMenuOpen } from './menu.js';
+import { setAttract } from '../renderer/index.js';
 
 const IDLE_MS = 60_000;
 const ROTATE_RAD_PER_MS = 0.0006; // ~36° per second
@@ -81,7 +82,7 @@ export function attractTick(timestamp) {
 
 async function enterAttract() {
     entering = true;
-    document.body.dataset.attract = 'true';
+    setAttract(true);
 
     // Treat attract as "match abandoned" — zero scores and restart the
     // timer so when the next pair of players walks up, they get a fully
@@ -114,7 +115,7 @@ async function enterAttract() {
 
 function exitAttract() {
     attractActive = false;
-    delete document.body.dataset.attract;
+    setAttract(false);
     lastActivityAt = performance.now();
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the

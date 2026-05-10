@@ -146,6 +146,15 @@
                 <!-- Deathmatch respawn prompt — shown by CSS when this pane's
                      player is dead, after a 2-second cooldown. -->
                 <div class="respawn-prompt">PRESS FIRE TO RESPAWN</div>
+
+                <!-- Local DM lobby overlays — JS sets data-claim-state on
+                     the parent .pane to one of: prompting | ready | waiting
+                     | active. CSS shows the matching overlay (or none for
+                     the active state). Only one prompt is visible at a
+                     time across all panes — sequential join, left first
+                     then right. -->
+                <div class="join-prompt">PRESS BUTTON TO JOIN</div>
+                <div class="join-ready">READY</div>
             </div>
 
             <!-- Per-pane copies of global text overlays. Hidden by default;
@@ -177,6 +186,7 @@
          In video-wall layout the cluster is anchored to the right edge of
          the left pane (50vw) so buttons land on a single monitor. -->
     <div id="ui-buttons">
+        <button id="detach-button" aria-label="Open Player 2 in new window"><img src="assets/icons/detach.svg" alt=""></button>
         <button id="fullscreen-button" aria-label="Fullscreen"><img src="assets/icons/fullscreen.svg" alt=""></button>
         <button id="help-button" aria-label="Help"><img src="assets/icons/help.svg" alt=""></button>
         <button id="spectator-button" aria-label="Spectator"><img src="assets/icons/binoculars.svg" alt=""></button>
@@ -278,6 +288,22 @@
             } else {
                 document.documentElement.requestFullscreen();
             }
+        });
+        // Track fullscreen via a body class so CSS can react. Used to hide
+        // the detach button (no point spawning an external window when the
+        // game is filling the screen anyway).
+        document.addEventListener('fullscreenchange', () => {
+            document.body.classList.toggle('fullscreen', !!document.fullscreenElement);
+        });
+        document.getElementById('detach-button').addEventListener('click', () => {
+            const url = new URL(location.href);
+            url.searchParams.set('join', '1');
+            // popup=true forces a chrome-stripped popup window (no tab
+            // strip, no address bar) — feels like a dedicated game display
+            // and stays out of the master window's tab bar. Named target
+            // means repeat clicks reuse the same window.
+            const features = `popup=true,width=${innerWidth},height=${innerHeight}`;
+            window.open(url.toString(), 'cssdoom-secondary', features);
         });
         document.getElementById('help-button').addEventListener('click', () => {
             document.getElementById('help-overlay').hidden = false;

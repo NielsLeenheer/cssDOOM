@@ -107,6 +107,14 @@ body.all-enemies-shadow .enemy .sprite {
     animation-duration: calc(var(--frames) * 200ms);
 }
 
+/* Faster walk cycle for player billboards. The shared .sprite rule uses
+   250ms/frame which reads as a slow shuffle on a four-frame player loop
+   (full cycle = 1s). Original DOOM is ~115ms/frame; 120ms here lands
+   close to that without going so fast it judders. */
+.sprite[data-type="player"]:not([data-state]) {
+    animation-duration: calc(var(--frames) * 120ms);
+}
+
 /* Hide each player's own sprite in their own pane — you don't want to see
    your own body floating in your own first-person view. */
 .pane[data-player="0"] .enemy.player[data-player-index="0"],

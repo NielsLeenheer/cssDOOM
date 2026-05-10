@@ -16,6 +16,12 @@ const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
 /**
  * Initializes (or resets) state.match and zeros every player's score.
  * Called when entering DM mode and on match restart.
+ *
+ * The match is created with `started: false` — the lobby state. While
+ * !started, scoring is suppressed and the match clock isn't ticking.
+ * Players can still move and fire, but it's all warmup. startMatch()
+ * formally starts scoring and the timer; in Local DM it fires auto when
+ * all slots are claimed, in Network DM it'll fire from a host button.
  */
 export function resetMatch({
     fragLimit = DEFAULT_FRAG_LIMIT,
@@ -24,7 +30,8 @@ export function resetMatch({
     state.match = {
         fragLimit,
         timeLimit,
-        startTime: performance.now(),
+        started: false,
+        startTime: 0,
         ended: false,
         winner: null,
     };
@@ -33,6 +40,26 @@ export function resetMatch({
     setWinOverlayText('');
     setTimerActive(false);
     lastTimerSeconds = -1;
+    // Notify the lobby UI so it can clear stale input claims and show
+    // the PRESS FIRE TO JOIN prompts again. Decoupling via event keeps
+    // match.js free of input/UI imports.
+    window.dispatchEvent(new CustomEvent('cssdoom:match-reset'));
+}
+
+/**
+ * Formally start the match — flip `started` to true, set the clock's
+ * startTime to now. Idempotent: already-started or no-match calls are
+ * a no-op.
+ */
+export function startMatch() {
+    if (!state.match || state.match.started || state.match.ended) return;
+    state.match.started = true;
+    state.match.startTime = performance.now();
+}
+
+/** True if a DM match is in the lobby state — exists but not yet started. */
+export function isMatchLobby() {
+    return state.match != null && !state.match.started && !state.match.ended;
 }
 
 /** Clears any DM match state — called when leaving DM mode. */
@@ -54,7 +81,7 @@ export function clearMatch() {
  * also a -1 since the killer === victim case is rejected.
  */
 export function awardFrag(victim, killer) {
-    if (!state.match || state.match.ended) return;
+    if (!state.match || !state.match.started || state.match.ended) return;
     if (killer instanceof Player && killer !== victim) {
         killer.score++;
     } else {
@@ -66,7 +93,7 @@ export function awardFrag(victim, killer) {
 /** Called once per frame from updateGame to enforce the time limit and
  *  drive the on-screen countdown in the last 60 s. */
 export function matchTick() {
-    if (!state.match || state.match.ended) return;
+    if (!state.match || !state.match.started || state.match.ended) return;
     const elapsed = performance.now() - state.match.startTime;
     if (elapsed >= state.match.timeLimit) {
         endMatch();

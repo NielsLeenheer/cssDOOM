@@ -107,3 +107,15 @@ kbd {
     #help-button, #fullscreen-button { display: none; }
 }
 
+/* Detach button — opens a secondary window that mirrors player 1's view.
+   Hidden unless we're in deathmatch on the master, not fullscreen, and
+   not already pointing a secondary at us. Also hidden on touch (no popup
+   windows there). */
+#detach-button { display: none; }
+body[data-mode="deathmatch"]:not(.fullscreen):not(.secondary-window):not(.secondary-active) #detach-button {
+    display: block;
+}
+@media (pointer: coarse) {
+    #detach-button { display: none !important; }
+}
+
