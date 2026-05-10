@@ -10,6 +10,7 @@ import { MAPS } from '../shared/maps.js';
 import { loadMap } from '../shared/maps.js';
 import { setMirrorMode } from '../renderer/scene/scene.js';
 import { resetMatch, clearMatch } from '../game/match.js';
+import { setDefaultSlot } from '../input/claim-registry.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 
@@ -82,9 +83,13 @@ export function applyMode(mode) {
     if (mode === 'deathmatch') {
         if (state.players.length < 2) state.players.push(new Player(1));
         resetMatch();
+        // DM requires explicit press-to-claim; no default slot.
+        setDefaultSlot(null);
     } else {
         state.players.length = 1;
         clearMatch();
+        // SP: every input device drives player 0 without a claim ceremony.
+        setDefaultSlot(0);
     }
 
     // The Phase 3 debug mirror is incompatible with real DM (it forces a

@@ -22,6 +22,22 @@ const claimListeners = new Set();
 
 let externallyClaimedSlots = new Set();
 
+// When set, devices without an explicit claim resolve to this slot. Used
+// by single-player mode (every device drives slot 0). Game-mode policy
+// lives in menu.js's applyMode — claim-registry just exposes the knob.
+let defaultSlot = null;
+
+/**
+ * Set the slot returned by `getDriverSlot` for any unclaimed device.
+ * Called from menu.applyMode: 0 for singleplayer (every device auto-binds
+ * to player 0), null for deathmatch (devices must claim explicitly).
+ */
+export function setDefaultSlot(slot) {
+    if (defaultSlot === slot) return;
+    defaultSlot = slot;
+    notifyClaimChange();
+}
+
 /**
  * Replace the set of slots known to be claimed by remote sinks. Called
  * by setupMasterBroadcast whenever a secondary joins or leaves so local
@@ -36,13 +52,12 @@ export function setExternallyClaimedSlots(slots) {
  * Returns the slot a device is currently driving. Providers call this
  * from their getPlayerIndex callback so routing follows claim state.
  *
- * - In SP, every device auto-binds to slot 0 (no claim ceremony).
- * - In DM, returns the device's claim if it has one, else `null` (the
- *   provider's contribution is then skipped by collectInputs).
+ * Resolution order: explicit claim → defaultSlot (if set) → null. The
+ * default-slot fallback is what makes singleplayer "every device drives
+ * player 0" without claim-registry knowing about modes.
  */
 export function getDriverSlot(deviceId) {
-    if (state.mode === 'singleplayer') return 0;
-    return claims.get(deviceId) ?? null;
+    return claims.get(deviceId) ?? defaultSlot;
 }
 
 /** Returns true if any local device has claimed the given slot. */

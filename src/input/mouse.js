@@ -8,28 +8,18 @@
  * Per-player: mouse follows the **active kbm device** (kbm-A or kbm-B) so
  * keyboard and mouse drive the same player at all times. The Tab key in
  * keyboard.js flips the active device; the mouse switches with it
- * automatically because both modules read `getActiveKbm()` here.
+ * automatically because both modules feed the same `kbmHandler` instance.
  *
  * Ignores clicks on touch devices to prevent accidental firing from taps.
  */
 
-import { inputs, registerInputProvider } from './index.js';
-import { getDriverSlot, tryClaimSlot } from './claim-registry.js';
 import { state } from '../game/state.js';
-import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
-import { spawnPlayer } from '../game/player/spawn.js';
-import { isMatchEnded, restartMatch } from '../game/match.js';
+import { tryClaimSlot, getDriverSlot } from './claim-registry.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { pingActivity } from '../ui/attract.js';
-import { getActiveKbm } from './keyboard.js';
+import { getActiveKbm, kbmHandler } from './keyboard.js';
 
-const DM_RESPAWN_COOLDOWN_MS = 2000;
-
-const MOUSE_SENSITIVITY = 0.003;
 const isTouchDevice = matchMedia('(pointer: coarse)').matches;
-
-// Accumulated mouse turn delta (consumed each frame by the provider)
-let turnDelta = 0;
 
 /** Slot the mouse is currently driving, or null if unbound. Mouse follows
  *  whichever virtual kbm device is currently active. */
@@ -37,25 +27,11 @@ function kbmSlot() {
     return getDriverSlot(getActiveKbm());
 }
 
-/** The player object the mouse is currently driving, or null if unbound. */
-function kbmPlayer() {
-    const slot = kbmSlot();
-    if (slot == null) return null;
-    return state.players[slot];
-}
-
 /**
  * Initializes mouse event listeners.
  * Should be called once during application startup.
  */
 export function initMouseInput() {
-    // Mouse follows the active kbm device — same press-to-claim binding
-    // as the keyboard at any moment.
-    registerInputProvider(() => kbmSlot(), getInput);
-
-    // Fire weapon on left click (outside UI elements). In DM, fire on a
-    // dead kbm-target player respawns them after the cooldown. Pre-claim
-    // in DM, the click claims the slot instead of firing.
     document.addEventListener('mousedown', event => {
         pingActivity();
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
@@ -68,28 +44,11 @@ export function initMouseInput() {
             return;
         }
 
-        if (isMatchEnded()) { restartMatch(); return; }
-
-        const player = kbmPlayer();
-        if (player?.isDead) {
-            if (state.mode === 'deathmatch'
-                && performance.now() - player.deathTime > DM_RESPAWN_COOLDOWN_MS) {
-                spawnPlayer(player);
-            }
-            return;
-        }
-        const slot = kbmSlot();
-        if (slot == null || !player) return;
-        inputs[slot].fireHeld = true;
-        fireWeapon(player);
+        kbmHandler.handleMouseDown(event.button);
     });
+
     document.addEventListener('mouseup', event => {
-        if (event.button === 0) {
-            const slot = kbmSlot();
-            if (slot != null) inputs[slot].fireHeld = false;
-            const player = kbmPlayer();
-            if (player) stopAutoFire(player);
-        }
+        kbmHandler.handleMouseUp(event.button);
     });
 
     // Request pointer lock when entering fullscreen
@@ -102,18 +61,8 @@ export function initMouseInput() {
     // Accumulate mouse movement as turn delta
     document.addEventListener('mousemove', event => {
         if (document.pointerLockElement) {
-            turnDelta -= event.movementX * MOUSE_SENSITIVITY;
+            kbmHandler.addMouseTurn(event.movementX);
             pingActivity();
         }
     });
-}
-
-// ============================================================================
-// Input Provider
-// ============================================================================
-
-function getInput() {
-    const td = turnDelta;
-    turnDelta = 0;
-    return { turnDelta: td };
 }
