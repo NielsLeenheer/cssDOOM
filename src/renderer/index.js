@@ -2,75 +2,94 @@
  * Renderer public API — game code's single entry point into rendering.
  *
  * The flat-namespace exports below mirror what was here before the
- * orchestrator refactor. Each is a thin re-export of an Orchestrator method,
- * so existing call sites (`import * as renderer from '../renderer/index.js'`)
- * keep working unchanged. New call sites can also import the orchestrator
- * directly via `import { orchestrator } from '../renderer/orchestrator.js'`.
+ * orchestrator refactor. Per-pane commands take `(paneIndex, ...args)`;
+ * world commands take `(...args)`. Two helpers (`updateCamera`,
+ * `updateHud`) accept the legacy `(player, paneIndex)` signature with
+ * paneIndex falling back to `player.viewportIndex` when omitted —
+ * preserved for callers like teleporters.js and debug.js.
  *
- * The orchestrator owns the routing — per-player commands route to a single
- * DomRenderer target by paneIndex; world commands call the underlying
- * helpers once. Future targets (BroadcastSink for two-window mode) are
- * registered against the orchestrator without changing this file.
+ * All re-exports are generated from the command registry
+ * ([commands.js](commands.js)). Adding a renderer command is one entry
+ * there; this file picks it up automatically.
  */
 
 import { orchestrator } from './orchestrator.js';
+import { COMMANDS } from './commands.js';
+
+const exported = {};
+
+for (const [name, { kind }] of Object.entries(COMMANDS)) {
+    if (kind === 'per-pane') {
+        exported[name] = (paneIndex, ...args) => orchestrator[name](paneIndex, ...args);
+    } else {
+        exported[name] = (...args) => orchestrator[name](...args);
+    }
+}
+
+// Legacy callers pass (player, paneIndex) — and some omit paneIndex,
+// relying on `player.viewportIndex`. Override the generated wrappers
+// for these two so the public signature stays as it was.
+exported.updateCamera = (player, paneIndex) =>
+    orchestrator.updateCamera(paneIndex ?? player.viewportIndex, player);
+exported.updateHud = (player, paneIndex) =>
+    orchestrator.updateHud(paneIndex ?? player.viewportIndex, player);
 
 // ── Camera & HUD ──────────────────────────────────────────────────────────
-export const updateCamera = (player, paneIndex) => orchestrator.updateCamera(player, paneIndex);
-export const updateHud = (player, paneIndex) => orchestrator.updateHud(player, paneIndex);
+export const updateCamera = exported.updateCamera;
+export const updateHud = exported.updateHud;
 
 // ── Effects ───────────────────────────────────────────────────────────────
-export const triggerFlash = (paneIndex, type) => orchestrator.triggerFlash(paneIndex, type);
-export const showPowerup = (paneIndex, name) => orchestrator.showPowerup(paneIndex, name);
-export const flickerPowerup = (paneIndex, name) => orchestrator.flickerPowerup(paneIndex, name);
-export const hidePowerup = (paneIndex, name) => orchestrator.hidePowerup(paneIndex, name);
+export const triggerFlash = exported.triggerFlash;
+export const showPowerup = exported.showPowerup;
+export const flickerPowerup = exported.flickerPowerup;
+export const hidePowerup = exported.hidePowerup;
 
 // ── Sprites & things (world commands) ─────────────────────────────────────
-export const setEnemyState = (...args) => orchestrator.setEnemyState(...args);
-export const resetEnemy = (...args) => orchestrator.resetEnemy(...args);
-export const killEnemy = (...args) => orchestrator.killEnemy(...args);
-export const updateEnemyRotation = (...args) => orchestrator.updateEnemyRotation(...args);
-export const updateThingPosition = (...args) => orchestrator.updateThingPosition(...args);
-export const reparentThingToSector = (...args) => orchestrator.reparentThingToSector(...args);
-export const collectItem = (...args) => orchestrator.collectItem(...args);
-export const uncollectItem = (...args) => orchestrator.uncollectItem(...args);
-export const setThingMoving = (...args) => orchestrator.setThingMoving(...args);
-export const createPuff = (...args) => orchestrator.createPuff(...args);
-export const createExplosion = (...args) => orchestrator.createExplosion(...args);
-export const createTeleportFog = (...args) => orchestrator.createTeleportFog(...args);
-export const createProjectile = (...args) => orchestrator.createProjectile(...args);
-export const removeProjectile = (...args) => orchestrator.removeProjectile(...args);
-export const createPlayerSprite = (...args) => orchestrator.createPlayerSprite(...args);
-export const createCorpse = (...args) => orchestrator.createCorpse(...args);
-export const playPlayerAttack = (...args) => orchestrator.playPlayerAttack(...args);
+export const setEnemyState = exported.setEnemyState;
+export const resetEnemy = exported.resetEnemy;
+export const killEnemy = exported.killEnemy;
+export const updateEnemyRotation = exported.updateEnemyRotation;
+export const updateThingPosition = exported.updateThingPosition;
+export const reparentThingToSector = exported.reparentThingToSector;
+export const collectItem = exported.collectItem;
+export const uncollectItem = exported.uncollectItem;
+export const setThingMoving = exported.setThingMoving;
+export const createPuff = exported.createPuff;
+export const createExplosion = exported.createExplosion;
+export const createTeleportFog = exported.createTeleportFog;
+export const createProjectile = exported.createProjectile;
+export const removeProjectile = exported.removeProjectile;
+export const createPlayerSprite = exported.createPlayerSprite;
+export const createCorpse = exported.createCorpse;
+export const playPlayerAttack = exported.playPlayerAttack;
 
 // ── Thing DOM construction ────────────────────────────────────────────────
-export const buildThing = (...args) => orchestrator.buildThing(...args);
+export const buildThing = exported.buildThing;
 
 // ── Player visuals ────────────────────────────────────────────────────────
-export const setPlayerDead = (paneIndex, ...args) => orchestrator.setPlayerDead(paneIndex, ...args);
-export const clearKeys = (paneIndex) => orchestrator.clearKeys(paneIndex);
-export const setPlayerMoving = (paneIndex, isMoving) => orchestrator.setPlayerMoving(paneIndex, isMoving);
-export const collectKey = (paneIndex, ...args) => orchestrator.collectKey(paneIndex, ...args);
+export const setPlayerDead = exported.setPlayerDead;
+export const clearKeys = exported.clearKeys;
+export const setPlayerMoving = exported.setPlayerMoving;
+export const collectKey = exported.collectKey;
 
 // ── Weapon visuals ────────────────────────────────────────────────────────
-export const switchWeapon = (paneIndex, weaponName, fireRate) => orchestrator.switchWeapon(paneIndex, weaponName, fireRate);
-export const startFiring = (paneIndex) => orchestrator.startFiring(paneIndex);
-export const stopFiring = (paneIndex) => orchestrator.stopFiring(paneIndex);
+export const switchWeapon = exported.switchWeapon;
+export const startFiring = exported.startFiring;
+export const stopFiring = exported.stopFiring;
 
 // ── Mechanics ─────────────────────────────────────────────────────────────
-export const buildDoor = (...args) => orchestrator.buildDoor(...args);
-export const setDoorState = (...args) => orchestrator.setDoorState(...args);
-export const buildLift = (...args) => orchestrator.buildLift(...args);
-export const setLiftState = (...args) => orchestrator.setLiftState(...args);
-export const buildCrusher = (...args) => orchestrator.buildCrusher(...args);
-export const setCrusherOffset = (...args) => orchestrator.setCrusherOffset(...args);
-export const toggleSwitchState = (...args) => orchestrator.toggleSwitchState(...args);
+export const buildDoor = exported.buildDoor;
+export const setDoorState = exported.setDoorState;
+export const buildLift = exported.buildLift;
+export const setLiftState = exported.setLiftState;
+export const buildCrusher = exported.buildCrusher;
+export const setCrusherOffset = exported.setCrusherOffset;
+export const toggleSwitchState = exported.toggleSwitchState;
 
 // ── Surfaces ──────────────────────────────────────────────────────────────
-export const lowerTaggedFloor = (...args) => orchestrator.lowerTaggedFloor(...args);
+export const lowerTaggedFloor = exported.lowerTaggedFloor;
 
-// ── Scene controls ────────────────────────────────────────────────────────
+// ── Scene controls (orchestrator-only) ────────────────────────────────────
 export const clonePanes = (paneCount) => orchestrator.clonePanes(paneCount);
 export const setMirrorMode = (value) => orchestrator.setMirrorMode(value);
 export const isMirrorMode = () => orchestrator.isMirrorMode();
