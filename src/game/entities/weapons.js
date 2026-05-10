@@ -30,7 +30,6 @@ import { isMatchLobby } from '../match.js';
  * to switch visuals (the renderer decides whether to animate).
  */
 export function equipWeapon(player, slot) {
-    if (isMatchLobby()) return;
     const weapon = WEAPONS[slot];
     if (!weapon || !player.ownedWeapons.has(slot)) return;
 
