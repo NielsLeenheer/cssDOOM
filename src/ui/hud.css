@@ -160,6 +160,20 @@
     background-position-x: 0;
 }
 
+/* In deathmatch, the face backdrop tints to the player's team color using
+   the matching DOOM STFB sprite. P0 keeps the default STFB0 (green). The
+   STBAR layer is repeated here to preserve the layered background-image
+   stack (face backdrop on top, status-bar slice beneath). */
+body[data-mode="deathmatch"] .pane[data-player="1"] .hud-section-face {
+    background-image: url('/assets/hud/STFB3.png'), url('/assets/hud/STBAR.png');
+}
+body[data-mode="deathmatch"] .pane[data-player="2"] .hud-section-face {
+    background-image: url('/assets/hud/STFB1.png'), url('/assets/hud/STBAR.png');
+}
+body[data-mode="deathmatch"] .pane[data-player="3"] .hud-section-face {
+    background-image: url('/assets/hud/STFB2.png'), url('/assets/hud/STBAR.png');
+}
+
 
 /* ========================================================================
    Keys
