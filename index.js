@@ -83,11 +83,17 @@ function renderAllActivePanes() {
  * renderer module) because it iterates game state — state.players for the
  * camera position, state.things for live thing positions, and the spectator
  * toggle for ceiling-skip behavior.
+ *
+ * During attract mode the camera rotates so slowly (~12°/sec) that we
+ * can afford to cull much less often. Drops culling work to ~10 Hz from
+ * the in-match 20 Hz, freeing up more idle headroom on the kiosk.
  */
+const CULLING_INTERVAL_ATTRACT = 6; // ~10 Hz at 60 Hz RAF
 let cullingFrameCount = 0;
 function cullingLoop() {
     cullingFrameCount++;
-    if (cullingFrameCount >= CULLING_INTERVAL) {
+    const interval = isAttractActive() ? CULLING_INTERVAL_ATTRACT : CULLING_INTERVAL;
+    if (cullingFrameCount >= interval) {
         cullingFrameCount = 0;
         for (let i = 0; i < sceneStates.length; i++) {
             if (sceneStates[i].wallElements.length === 0) continue;
