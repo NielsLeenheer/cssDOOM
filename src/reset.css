@@ -31,6 +31,18 @@
     font-display: swap;
 }
 
+/* STYSN — small yellow HUD digits (STYSNUM0..9). Tabular 4×6 cells,
+ * used for the per-ammo-type cur/max counts on the status bar.
+ * Rebuild with: generate/.venv/bin/python generate/build-stysn-color-font.py
+ */
+@font-face {
+    font-family: 'STYSN';
+    src: url('/assets/fonts/STYSN.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Alternative palettes for STCFN. The font ships with the WAD's red
  * shading baked into its 16-entry CPAL palette. CSS @font-palette-values
  * lets a stylesheet override any palette entry without rebuilding the

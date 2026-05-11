@@ -82,19 +82,22 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
         if (armorEl) armorEl.textContent = `${currentArmor}%`;
     }
 
-    // Per-type ammo counts and maximums
+    // Per-type ammo counts and maximums — rendered with the STYSN font
+    // via textContent on the per-row .ammo-cur / .ammo-max output elements.
     for (const type of AMMO_TYPES) {
         const cur = Math.round(player.ammo[type]);
         if (cur !== prev[type]) {
             prev[type] = cur;
-            style.setProperty(`--ammo-${type}`, cur);
+            const curEl = statusEl.querySelector(`.ammo-row[data-ammo="${type}"] .ammo-cur`);
+            if (curEl) curEl.textContent = String(cur);
         }
 
         const max = player.maxAmmo[type];
         const maxKey = `max${type[0].toUpperCase()}${type.slice(1)}`;
         if (max !== prev[maxKey]) {
             prev[maxKey] = max;
-            style.setProperty(`--max-${type}`, max);
+            const maxEl = statusEl.querySelector(`.ammo-row[data-ammo="${type}"] .ammo-max`);
+            if (maxEl) maxEl.textContent = String(max);
         }
     }
 

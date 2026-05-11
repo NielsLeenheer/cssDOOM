@@ -304,61 +304,24 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
 .ammo-cur { left: calc(28px * var(--scale)); }
 .ammo-max { left: calc(52px * var(--scale)); }
 
-/* Map container properties to --value per ammo digit element */
-[data-ammo="bullets"] .ammo-cur { --value: var(--ammo-bullets, 0); }
-[data-ammo="bullets"] .ammo-max { --value: var(--max-bullets, 200); }
-[data-ammo="shells"]  .ammo-cur { --value: var(--ammo-shells, 0); }
-[data-ammo="shells"]  .ammo-max { --value: var(--max-shells, 50); }
-[data-ammo="rockets"] .ammo-cur { --value: var(--ammo-rockets, 0); }
-[data-ammo="rockets"] .ammo-max { --value: var(--max-rockets, 50); }
-[data-ammo="cells"]   .ammo-cur { --value: var(--ammo-cells, 0); }
-[data-ammo="cells"]   .ammo-max { --value: var(--max-cells, 300); }
-
+/* Small yellow HUD digit — per-ammo-type cur / max counts. Renders via
+   the STYSN color font (build-stysn-color-font.py). 4-px-wide glyphs,
+   3-char-wide slot for values up to 999, right-aligned. */
 .small-number {
     --glyph: calc(4px * var(--scale));
-    --value: 0;
 
-    /* Extract individual digits */
-    --hundreds: round(down, var(--value) / 100, 1);
-    --tens: mod(round(down, var(--value) / 10, 1), 10);
-    --ones: mod(var(--value), 10);
-
-    /* Hide leading zeros */
-    --hide-leading-zero: calc(-9999px * (1 - min(1, var(--hundreds))));
-    --hide-middle-zero: calc(-9999px * (1 - min(1, round(down, var(--value) / 10, 1))));
-
-    /* Sprite offsets */
-    --digit-1: calc(var(--hundreds) * var(--glyph) * -1 + var(--hide-leading-zero));
-    --digit-2: calc(var(--tens) * var(--glyph) * -1 + var(--hide-middle-zero));
-    --digit-3: calc(var(--ones) * var(--glyph) * -1);
-
+    display: block;
     position: absolute;
-    box-sizing: content-box;
-    padding: 0 var(--glyph);
-    width: var(--glyph);
+    width: calc(var(--glyph) * 3);
     height: calc(6px * var(--scale));
-    background: url('/assets/hud/SMALL_DIGITS_SHEET.png') no-repeat;
-    background-size: calc(var(--glyph) * 10) calc(6px * var(--scale));
-    background-clip: content-box;
-    background-origin: content-box;
-    background-position-x: var(--digit-2);
-    image-rendering: pixelated;
-}
 
-.small-number::before,
-.small-number::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    width: var(--glyph);
-    height: calc(6px * var(--scale));
-    background: url('/assets/hud/SMALL_DIGITS_SHEET.png') no-repeat;
-    background-size: calc(var(--glyph) * 10) calc(6px * var(--scale));
-    image-rendering: pixelated;
+    font-family: 'STYSN', monospace;
+    font-size: calc(6px * var(--scale));
+    line-height: 1;
+    text-align: right;
+    color: #ffd700; /* non-COLR fallback (DOOM yellow) */
+    -webkit-font-smoothing: none;
 }
-
-.small-number::before { left: 0; background-position-x: var(--digit-1); }
-.small-number::after  { right: 0; background-position-x: var(--digit-3); }
 
 
 
