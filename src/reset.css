@@ -1,9 +1,101 @@
+/* STCFN — color TrueType font built from the DOOM shareware WAD's STCFN
+ * small font glyphs. Each glyph is composed of layered COLR/CPAL fills,
+ * one per distinct red shade in the source bitmap (16 colors total).
+ * Renders multi-color natively in COLR-supporting browsers (Chrome,
+ * Firefox, Safari, Edge); non-COLR fallback renders the silhouette in
+ * the CSS `color` value.
+ *
+ * Pixel-perfect at integer font-sizes that are multiples of 8 px.
+ * Rebuild with: generate/.venv/bin/python generate/build-stcfn-color-font.py
+ */
 @font-face {
-    font-family: 'PressStart2P';
-    src: url('/assets/fonts/PressStart2P-Regular.ttf') format('truetype');
+    font-family: 'STCFN';
+    src: url('/assets/fonts/STCFN.ttf') format('truetype');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
+}
+
+/* Alternative palettes for STCFN. The font ships with the WAD's red
+ * shading baked into its 16-entry CPAL palette. CSS @font-palette-values
+ * lets a stylesheet override any palette entry without rebuilding the
+ * font. Apply with `font-palette: --stcfn-white` etc. on the element.
+ *
+ * The palette is sorted by usage frequency (see
+ * generate/build-stcfn-color-font.py). Index 0 is the darkest /
+ * most-common shade (the letter outline); higher indices are brighter,
+ * less-common letter-body shades. When recoloring, preserve the
+ * intensity ladder so the per-glyph shading still reads.
+ *
+ * Source red values (R component) per palette index:
+ *   0  → 66    4  → 227   8  → 155  12 → 102
+ *   1  → 191   5  → 167   9  → 139  13 → 255
+ *   2  → 203   6  → 179  10 → 126  14 → 78
+ *   3  → 215   7  → 239  11 → 114  15 → 90
+ *
+ * Browser support (font-palette + @font-palette-values): Chrome 101+,
+ * Firefox 107+, Safari 15.4+. */
+
+/* Grayscale shading — each entry uses the source palette's R value as
+ * the grey level, preserving the dark-outline → bright-body ladder
+ * exactly as in the red original. */
+@font-palette-values --stcfn-white {
+    font-family: 'STCFN';
+    override-colors:
+        0 #424242,  1 #bfbfbf,  2 #cbcbcb,  3 #d7d7d7,
+        4 #e3e3e3,  5 #a7a7a7,  6 #b3b3b3,  7 #efefef,
+        8 #9b9b9b,  9 #8b8b8b, 10 #7e7e7e, 11 #727272,
+       12 #666666, 13 #ffffff, 14 #4e4e4e, 15 #5a5a5a;
+}
+
+/* ── Player colors ───────────────────────────────────────────────────
+ *
+ * Mirror DOOM's player-color translation tables (the same ones used by
+ * extract-graphics.js to generate PLAY-indigo.png / PLAY-brown.png /
+ * PLAY-red.png from the green PLAY sprites). Each palette preserves the
+ * source intensity ladder (`R` of each red entry maps to the equivalent
+ * brightness in the target hue).
+ *
+ * Player slot → color mapping in cssDOOM:
+ *   P0 (host primary)          → green   (--stcfn-green)
+ *   P1 (host second / remote)  → red     (default font palette — no override needed)
+ *   P2 (remote)                → indigo  (--stcfn-indigo)
+ *   P3 (remote)                → brown   (--stcfn-brown)
+ *
+ * Hex values are derived by hue-substitution; they're approximations of
+ * the DOOM PLAYPAL ramps, not pixel-exact transcripts. Tune the channel
+ * ratios if these don't read right against the existing sprite colors. */
+
+/* Green ramp — pure green at the source's red intensity. */
+@font-palette-values --stcfn-green {
+    font-family: 'STCFN';
+    override-colors:
+        0 #004200,  1 #00bf00,  2 #00cb00,  3 #00d700,
+        4 #00e300,  5 #00a700,  6 #00b300,  7 #00ef00,
+        8 #009b00,  9 #008b00, 10 #007e00, 11 #007200,
+       12 #006600, 13 #00ff00, 14 #004e00, 15 #005a00;
+}
+
+/* Indigo ramp — heavy blue with a violet tint at the bright end.
+ * Channel ratios: R = source × 0.35, G = source × 0.20, B = source × 0.85. */
+@font-palette-values --stcfn-indigo {
+    font-family: 'STCFN';
+    override-colors:
+        0 #170d38,  1 #4226a2,  2 #4729ad,  3 #4b2bb7,
+        4 #4f2dc1,  5 #3a218e,  6 #3e2498,  7 #5430cb,
+        8 #361f84,  9 #311c76, 10 #2c196b, 11 #281761,
+       12 #241457, 13 #5933d9, 14 #1b1042, 15 #20124d;
+}
+
+/* Brown / tan ramp — warm orange at the bright end, dark brown at the
+ * outline. Channel ratios: R = source, G = source × 0.6, B = source × 0.25. */
+@font-palette-values --stcfn-brown {
+    font-family: 'STCFN';
+    override-colors:
+        0 #422811,  1 #bf7330,  2 #cb7a33,  3 #d78136,
+        4 #e38839,  5 #a7642a,  6 #b36b2d,  7 #ef8f3c,
+        8 #9b5d27,  9 #8b5323, 10 #7e4c20, 11 #72441d,
+       12 #663d1a, 13 #ff9940, 14 #4e2f14, 15 #5a3617;
 }
 
 * {

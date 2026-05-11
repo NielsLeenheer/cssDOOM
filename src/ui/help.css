@@ -64,7 +64,7 @@
     padding: 24px 32px;
     max-width: 600px;
     width: 90%;
-    font-family: 'PressStart2P', monospace;
+    font-family: 'STCFN', monospace;
     color: #ccc;
 
     & table {
@@ -96,7 +96,7 @@ kbd {
         inset #333 -2px -2px 0 0;
     
     padding: 5px 10px;
-    font-family: 'PressStart2P', monospace;
+    font-family: 'STCFN', monospace;
     font-size: 12px;
     color: #fff;
     min-width: 20px;

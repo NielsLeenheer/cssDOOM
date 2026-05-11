@@ -97,6 +97,11 @@ export function updateLobbyUI() {
             claimState = 'waiting';
         }
         paneEl.dataset.claimState = claimState;
+
+        // Personalize the ready overlay text per player slot. Slot index
+        // is zero-based internally; player names are one-based for UX.
+        const readyEl = paneEl.querySelector('.join-ready');
+        if (readyEl) readyEl.textContent = `PLAYER ${slot + 1} READY`;
     }
 
     // Auto-start trigger for Local DM: when all slots in the player
@@ -104,18 +109,48 @@ export function updateLobbyUI() {
     if (inLobby) checkAutoStart();
 }
 
+// How long to keep showing the "PLAYER N READY" overlays after the last
+// player claims before formally starting the match. Gives the last
+// player a beat to see their READY appear in their color before the
+// world wakes up.
+const READY_FLASH_MS = 1000;
+let autoStartTimer = null;
+
+function allSlotsClaimedNow() {
+    const externalSlots = externalSlotsRef();
+    for (let i = 0; i < state.players.length; i++) {
+        if (!isSlotClaimedLocally(i) && !externalSlots.has(i)) return false;
+    }
+    return true;
+}
+
 /**
  * Auto-start the match if every player slot has a claim (local or
  * external). Local DM only — Network DM will use a manual host trigger
  * and skip this check (TODO: gate on mode when Network DM is added).
+ *
+ * The actual `startMatch()` call is deferred by READY_FLASH_MS so the
+ * last-to-claim player's "PLAYER N READY" overlay is visible briefly
+ * before the world unfreezes. If someone un-claims during the delay,
+ * the pending timer is cancelled.
  */
 function checkAutoStart() {
-    const externalSlots = externalSlotsRef();
-    for (let i = 0; i < state.players.length; i++) {
-        if (!isSlotClaimedLocally(i) && !externalSlots.has(i)) return;
+    if (!allSlotsClaimedNow()) {
+        if (autoStartTimer) {
+            clearTimeout(autoStartTimer);
+            autoStartTimer = null;
+        }
+        return;
     }
-    startMatch();
-    updateLobbyUI();
+    if (autoStartTimer) return;  // already pending
+    autoStartTimer = setTimeout(() => {
+        autoStartTimer = null;
+        // Re-verify state at fire time — someone may have un-claimed,
+        // or the match could have ended/reset while waiting.
+        if (!isMatchLobby() || !allSlotsClaimedNow()) return;
+        startMatch();
+        updateLobbyUI();
+    }, READY_FLASH_MS);
 }
 
 /**

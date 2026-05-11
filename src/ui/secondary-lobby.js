@@ -69,5 +69,11 @@ export function applyLobbyState(msg) {
     }
 
     const paneEl = document.querySelector(`.pane[data-player="${mySlot}"]`);
-    if (paneEl) paneEl.dataset.claimState = claimState;
+    if (paneEl) {
+        paneEl.dataset.claimState = claimState;
+        // Mirror master's "PLAYER N READY" overlay text. Player names
+        // are one-based in UX; slot indices are zero-based internally.
+        const readyEl = paneEl.querySelector('.join-ready');
+        if (readyEl) readyEl.textContent = `PLAYER ${mySlot + 1} READY`;
+    }
 }
