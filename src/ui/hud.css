@@ -72,79 +72,48 @@
    Large Digits (ammo, health, armor)
    ======================================================================== */
 
+/* Big HUD number — ammo, health, armor, frags. Renders via the STBIG
+   color font (built from the WAD's STTNUM/STTPRCNT/STTMINUS lumps;
+   see generate/build-stbig-color-font.py). All glyphs share a 14-px
+   advance for tabular alignment; text-align:right keeps shorter values
+   right-justified in their slot. */
 .hud-number {
     --glyph: calc(14px * var(--scale));
-    --value: 0;
-
-    /* Extract individual digits */
-    --hundreds: round(down, var(--value) / 100, 1);
-    --tens: mod(round(down, var(--value) / 10, 1), 10);
-    --ones: mod(var(--value), 10);
-
-    /* Hide leading zeros */
-    --hide-leading-zero: calc(-9999px * (1 - min(1, var(--hundreds))));
-    --hide-middle-zero: calc(-9999px * (1 - min(1, round(down, var(--value) / 10, 1))));
-
-    /* Sprite offsets */
-    --digit-1: calc(var(--hundreds) * var(--glyph) * -1 + var(--hide-leading-zero));
-    --digit-2: calc(var(--tens) * var(--glyph) * -1 + var(--hide-middle-zero));
-    --digit-3: calc(var(--ones) * var(--glyph) * -1);
 
     display: block;
     position: absolute;
-    box-sizing: content-box;
-    padding: 0 var(--glyph);
-    width: var(--glyph);
     height: calc(16px * var(--scale));
-    background: url('/assets/hud/DIGITS_SHEET.png') no-repeat;
-    background-size: calc(var(--glyph) * 12) calc(16px * var(--scale));
-    background-clip: content-box;
-    background-origin: content-box;
-    background-position-x: var(--digit-2);
-    image-rendering: pixelated;
+    /* Default width = 3 chars; sections that include the % suffix
+       override this below. */
+    width: calc(var(--glyph) * 3);
+
+    font-family: 'STBIG', monospace;
+    /* font-size = digit cell height. STBIG's unitsPerEm = 16 * 64, so
+       this renders 1 source pixel = `var(--scale)` screen pixels —
+       pixel-perfect at integer scales. */
+    font-size: calc(16px * var(--scale));
+    line-height: 1;
+    text-align: right;
+    color: #cb0000; /* non-COLR fallback */
+    -webkit-font-smoothing: none;
 }
 
-.hud-number::before,
-.hud-number::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    width: var(--glyph);
-    height: calc(16px * var(--scale));
-    background: url('/assets/hud/DIGITS_SHEET.png') no-repeat;
-    background-size: calc(var(--glyph) * 12) calc(16px * var(--scale));
-    image-rendering: pixelated;
+/* Health and armor display the percent sign — 4-char slot, same advance. */
+.hud-section-health .hud-number,
+.hud-section-armor .hud-number {
+    width: calc(var(--glyph) * 4);
 }
 
-.hud-number::before { left: 0; background-position-x: var(--digit-1); }
-.hud-number::after  { right: 0; background-position-x: var(--digit-3); }
-
-/* Percent sign wrapper for health/armor */
-.hud-pct {
-    position: absolute;
-    width: calc(14px * 3 * var(--scale));
+/* Per-section positioning */
+.hud-section-ammo .hud-number {
+    left: calc(2px * var(--scale));
+    top: calc(3px * var(--scale));
 }
-
-.hud-pct::after {
-    content: '';
-    position: absolute;
-    right: calc(-14px * var(--scale));
-    top: 0;
-    width: calc(14px * var(--scale));
-    height: calc(16px * var(--scale));
-    background: url('/assets/hud/DIGITS_SHEET.png') no-repeat;
-    background-size: calc(168px * var(--scale)) calc(16px * var(--scale));
-    background-position-x: calc(-10 * 14px * var(--scale));
-    image-rendering: pixelated;
+.hud-section-health .hud-number,
+.hud-section-armor .hud-number {
+    left: 0;
+    top: calc(3px * var(--scale));
 }
-
-/* Map container properties to --value per digit element */
-.hud-section-ammo   .hud-number { --value: var(--ammo, 0);   left: calc(2px * var(--scale)); top: calc(3px * var(--scale)); }
-.hud-section-health .hud-number { --value: var(--health, 0); }
-.hud-section-armor  .hud-number { --value: var(--armor, 0); }
-
-.hud-section-health .hud-pct { left: 0; top: calc(3px * var(--scale)); }
-.hud-section-armor  .hud-pct { left: 0; top: calc(3px * var(--scale)); }
 
 
 /* ========================================================================
@@ -265,27 +234,15 @@
 body[data-mode="deathmatch"] .hud-section-arms { display: none; }
 body[data-mode="deathmatch"] .hud-section-frags { display: block; }
 
-.frags-digit {
-    position: absolute;
-    width: calc(14px * var(--scale));
-    height: calc(16px * var(--scale));
-    top: calc(3px * var(--scale)); /* matches ammo/health/armor digits */
-    background-repeat: no-repeat;
-    background-size: 100% 100%;
-    image-rendering: pixelated;
-}
-
-/* Right-align the two-digit pair within the 37-wide section so single
-   digits sit in the ones column rather than the tens. */
-.frags-tens { left: calc(4px * var(--scale)); }
-.frags-ones { left: calc(19px * var(--scale)); }
-
-/* The minus sprite (STTMINUS) is 8×6, much smaller than digits (14×16).
-   When the tens slot holds a minus, scale it to its native size and
-   centre it in the slot box. */
-.frags-tens[data-glyph="minus"] {
-    background-size: calc(8px * var(--scale)) calc(6px * var(--scale));
-    background-position: center;
+/* DM frags counter — two-digit STBIG number with optional leading minus.
+   text-align:right inside a 2-char-wide slot keeps single digits in the
+   ones column. STTMINUS sits centered vertically in its cell (baked
+   into the font; see build-stbig-color-font.py). */
+.frags-display {
+    /* Overrides the default 3-char .hud-number width. */
+    width: calc(var(--glyph) * 2);
+    left: calc(4px * var(--scale));
+    top: calc(3px * var(--scale));
 }
 
 .slot {

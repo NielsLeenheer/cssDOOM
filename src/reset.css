@@ -16,6 +16,21 @@
     font-display: swap;
 }
 
+/* STBIG — color TrueType font built from the DOOM WAD's big HUD digit
+ * lumps (STTNUM0..9, STTPRCNT, STTMINUS). Same COLR/CPAL pipeline as
+ * STCFN. All glyphs share a 14-px advance for tabular HUD numbers; the
+ * minus sign is vertically centered inside the 16-px digit row.
+ * Renders pixel-perfect at integer font-sizes that are multiples of 16 px.
+ * Rebuild with: generate/.venv/bin/python generate/build-stbig-color-font.py
+ */
+@font-face {
+    font-family: 'STBIG';
+    src: url('/assets/fonts/STBIG.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Alternative palettes for STCFN. The font ships with the WAD's red
  * shading baked into its 16-entry CPAL palette. CSS @font-palette-values
  * lets a stylesheet override any palette entry without rebuilding the

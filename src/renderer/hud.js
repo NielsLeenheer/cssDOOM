@@ -1,11 +1,15 @@
 /**
- * Per-frame HUD updates via CSS custom properties on each pane's status bar.
+ * Per-frame HUD updates.
  *
- * All HUD values (health, armor, ammo, face row, per-type ammo counts and
- * maximums) are set as custom properties on the pane's status container. CSS
- * then inherits these down to the digit elements, which use calc() to derive
- * individual digit sprite offsets. This keeps all per-element rendering in
- * CSS — JavaScript only touches one DOM element per frame per player.
+ * Big HUD numbers (ammo, health, armor, frags) render via the STBIG color
+ * font — see `generate/build-stbig-color-font.py` and `@font-face` in
+ * reset.css. Update path is straightforward: stringify the value and
+ * write it to the .hud-number element's textContent. The font handles
+ * digit shapes, the dark-red outline, and the % / minus glyphs.
+ *
+ * Per-type ammo counts and maximums still use CSS custom properties on
+ * the pane's status container (separate sprite-based rendering for the
+ * small yellow STYSNUM digits — different font, not yet migrated).
  *
  * Per-player: each pane has its own status element in dom.statusElements[i]
  * and its own .renderer in dom.renderers[i]. updateHud(player) writes that
@@ -39,7 +43,8 @@ function freshPrev() {
 const WEAPON_CLASSES = { 2: 'has-weapon-2', 3: 'has-weapon-3', 4: 'has-weapon-4', 5: 'has-weapon-5', 6: 'has-weapon-6', 7: 'has-weapon-7' };
 
 export function updateHud(player, viewportIndex = player.viewportIndex) {
-    const style = dom.statusElements[viewportIndex].style;
+    const statusEl = dom.statusElements[viewportIndex];
+    const style = statusEl.style;
     const rendererEl = dom.renderers[viewportIndex];
 
     let prev = prevByViewport.get(viewportIndex);
@@ -55,12 +60,14 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
 
     if (currentAmmo !== prev.ammo) {
         prev.ammo = currentAmmo;
-        style.setProperty('--ammo', currentAmmo);
+        const ammoEl = statusEl.querySelector('.hud-section-ammo .hud-number');
+        if (ammoEl) ammoEl.textContent = String(currentAmmo);
     }
 
     if (currentHealth !== prev.health) {
         prev.health = currentHealth;
-        style.setProperty('--health', currentHealth);
+        const healthEl = statusEl.querySelector('.hud-section-health .hud-number');
+        if (healthEl) healthEl.textContent = `${currentHealth}%`;
 
         const faceRow = currentHealth >= 80 ? 0 : currentHealth >= 60 ? 1 : currentHealth >= 40 ? 2 : currentHealth >= 20 ? 3 : 4;
         if (faceRow !== prev.faceRow) {
@@ -71,7 +78,8 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
 
     if (currentArmor !== prev.armor) {
         prev.armor = currentArmor;
-        style.setProperty('--armor', currentArmor);
+        const armorEl = statusEl.querySelector('.hud-section-armor .hud-number');
+        if (armorEl) armorEl.textContent = `${currentArmor}%`;
     }
 
     // Per-type ammo counts and maximums
@@ -105,29 +113,13 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
 }
 
 function updateFragsDisplay(viewportIndex, score) {
+    // Display range clamped to -9..99 (the slot is 2 chars wide + an
+    // optional leading minus). Underlying player.score is uncapped.
     const display = Math.max(-9, Math.min(99, score));
-    const isNeg = display < 0;
-    const abs = Math.abs(display);
-    const tens = Math.floor(abs / 10);
-    const ones = abs % 10;
-
     const status = dom.statusElements[viewportIndex];
-    const tensEl = status.querySelector('.frags-tens');
-    const onesEl = status.querySelector('.frags-ones');
-    if (!tensEl || !onesEl) return;
-
-    if (isNeg) {
-        tensEl.dataset.glyph = 'minus';
-        tensEl.style.backgroundImage = `url('/assets/hud/STTMINUS.png')`;
-    } else if (tens > 0) {
-        tensEl.dataset.glyph = 'digit';
-        tensEl.style.backgroundImage = `url('/assets/hud/STTNUM${tens}.png')`;
-    } else {
-        // Single-digit positive — leave the tens slot blank.
-        tensEl.dataset.glyph = '';
-        tensEl.style.backgroundImage = '';
-    }
-    onesEl.style.backgroundImage = `url('/assets/hud/STTNUM${ones}.png')`;
+    const fragsEl = status.querySelector('.frags-display');
+    if (!fragsEl) return;
+    fragsEl.textContent = String(display);
 }
 
 export function clearWeaponSlots() {
