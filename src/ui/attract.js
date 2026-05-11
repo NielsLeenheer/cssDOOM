@@ -28,7 +28,11 @@ import { isMenuOpen } from './menu.js';
 import { setAttract } from '../renderer/index.js';
 
 const IDLE_MS = 60_000;
-const ROTATE_RAD_PER_MS = 0.0006; // ~36° per second
+const ROTATE_RAD_PER_MS = 0.0002; // ~12°/sec — full rotation every 30s.
+                                   // Slow enough to feel ambient, low enough
+                                   // that the kiosk's GPU compositor stays
+                                   // cool with the render throttling in
+                                   // gameLoop (see ATTRACT_RENDER_INTERVAL_MS).
 
 let lastActivityAt = performance.now();
 let attractActive = false;
