@@ -48,10 +48,21 @@ export function isAttractActive() {
  * Called by input modules whenever they observe a button press, axis nudge,
  * pointer motion, or any other live engagement. Resets the idle timer and
  * exits attract mode if it's currently showing.
+ *
+ * Returns `true` when the call ended an active attract session — discrete
+ * input handlers (keydown / mousedown / gamepad button-press) should treat
+ * that as "input consumed by waking up" and skip further processing so the
+ * wakeup press doesn't immediately claim a slot, fire a weapon, or open
+ * the menu. Continuous handlers (mousemove / gamepad sticks) can ignore
+ * the return value — they have no discrete action to suppress.
  */
 export function pingActivity() {
     lastActivityAt = performance.now();
-    if (attractActive) exitAttract();
+    if (attractActive) {
+        exitAttract();
+        return true;
+    }
+    return false;
 }
 
 /**

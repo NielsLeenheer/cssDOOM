@@ -33,7 +33,9 @@ function kbmSlot() {
  */
 export function initMouseInput() {
     document.addEventListener('mousedown', event => {
-        pingActivity();
+        // Wake from attract — first click only dismisses the overlay;
+        // claim/fire happen on subsequent presses.
+        if (pingActivity()) return;
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
         if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #ui-buttons')) return;
 

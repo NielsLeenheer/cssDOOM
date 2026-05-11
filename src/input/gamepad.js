@@ -155,7 +155,13 @@ function processGamepad(rawPad) {
         const wasPressed = prev[i] ?? false;
 
         if (isPressed && !wasPressed) {
-            pingActivity();
+            // Wake from attract on any press; if that's what just
+            // happened, skip claim + action so the wakeup press is a
+            // dedicated "enter lobby" press, not also a claim.
+            if (pingActivity()) {
+                prev[i] = isPressed;
+                continue;
+            }
             // Lobby claim is universal: any button press claims when the
             // gamepad is unbound in DM. Returns true if the press was
             // consumed by the claim attempt.

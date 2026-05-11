@@ -131,7 +131,13 @@ export function initKeyboardInput() {
     syncKbmTargetAttribute();
 
     document.addEventListener('keydown', event => {
-        pingActivity();
+        // Wake from attract on any keypress; if that's what just happened,
+        // consume the event so the wakeup press doesn't immediately claim
+        // a slot or toggle the menu.
+        if (pingActivity()) {
+            event.preventDefault();
+            return;
+        }
 
         // Escape — master-window menu toggle. Outside the kbm pipeline
         // because the menu lives on the master regardless of which slot

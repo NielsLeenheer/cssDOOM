@@ -33,7 +33,11 @@ export function initRemoteInputReceiver() {
 
 /** Called by BroadcastConnection when an INPUT envelope arrives. */
 export function applyRemoteInput(msg) {
-    pingActivity();
+    // Wake from attract on any discrete remote press; first wake-up press
+    // doesn't propagate to game actions. Continuous events (mousemove)
+    // still ping but never need to be suppressed (no discrete action).
+    const isDiscretePress = msg.kind === 'keydown' || msg.kind === 'mousedown';
+    if (pingActivity() && isDiscretePress) return;
     switch (msg.kind) {
         case 'keydown': remoteHandler.handleKeyDown(msg.code); break;
         case 'keyup': remoteHandler.handleKeyUp(msg.code); break;
