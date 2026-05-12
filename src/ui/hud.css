@@ -485,8 +485,9 @@ body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="
 }
 
 /* "waiting" — this pane is later in the sequence than the one currently
-   prompting. Dim it out so attention focuses on the prompting pane. */
-body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] {
+   prompting. Dim it out so attention focuses on the prompting pane.
+   Suppressed during attract for the same reason as the join overlays. */
+body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="waiting"] {
     filter: brightness(0.3);
 }
 
