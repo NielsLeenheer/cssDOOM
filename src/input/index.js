@@ -26,12 +26,13 @@
  * persists across frames so chaingun auto-fire can poll it.
  *
  * Press-to-claim (the deviceId → slot binding used in Local DM lobby)
- * lives in [claim-registry.js](claim-registry.js). This module wraps
- * `clearAllClaims` to additionally reset transient input-slot state on a
- * fresh match — that side effect needs `inputs` here.
+ * lives in [claim-registry.js](claim-registry.js). Bindings persist
+ * across matches in the kiosk loop — only an explicit unclaim (gamepad
+ * disconnect, future menu action) drops them, so the player on a given
+ * monitor keeps their controller→slot assignment across back-to-back
+ * games. The per-frame transient input reset on match-reset still lives
+ * here (`resetTransientInputs`) because it touches the `inputs` array.
  */
-
-import { clearAllClaims as registryClearAllClaims } from './claim-registry.js';
 
 const NUM_INPUT_SLOTS = 2;
 
@@ -97,12 +98,13 @@ export function collectInputs() {
 }
 
 /**
- * Drop every claim AND reset transient input state on every slot. Called
- * on match-reset so a held fire-button or pending mouse delta from the
- * previous match doesn't carry over into the next one's lobby.
+ * Reset transient input state on every slot. Called on match-reset so a
+ * held fire-button or pending mouse / stick delta from the previous
+ * match doesn't carry over into the next one's lobby. Claims themselves
+ * (the device→slot bindings) are intentionally preserved across
+ * match-reset — see the module docstring above.
  */
-export function clearAllClaims() {
-    registryClearAllClaims();
+export function resetTransientInputs() {
     for (const slot of inputs) {
         slot.moveX = 0;
         slot.moveY = 0;

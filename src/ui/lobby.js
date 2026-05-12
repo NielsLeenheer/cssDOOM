@@ -22,7 +22,7 @@
  */
 
 import { state } from '../game/state.js';
-import { clearAllClaims } from '../input/index.js';
+import { resetTransientInputs } from '../input/index.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
 import { PLAYER_COLOR_NAME } from './scoreboard.js';
@@ -38,11 +38,14 @@ export function initLobby({ getExternallyClaimedSlots }) {
     externalSlotsRef = getExternallyClaimedSlots;
     onClaimChange(updateLobbyUI);
     window.addEventListener('cssdoom:match-reset', () => {
-        // New match → drop all claims so each player has to press fire
-        // to join again, even if it's a back-to-back rematch with the
-        // same controllers. Matches the installation flow where new
-        // players might be standing at the kiosk.
-        clearAllClaims();
+        // New match: clear any transient held-input from the previous
+        // match (a fire key still down from the kill that ended it
+        // would otherwise blow through the lobby into the next match)
+        // but keep device→slot claims so a player on a given monitor
+        // keeps their controller→pane assignment across back-to-back
+        // games. The kiosk loop is players standing side-by-side — we
+        // do NOT want their assignments to shuffle between matches.
+        resetTransientInputs();
         updateLobbyUI();
     });
 }

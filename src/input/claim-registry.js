@@ -9,10 +9,10 @@
  * secondary window) so local claims don't double up on those.
  *
  * Pure registry: no knowledge of input slots, providers, or per-frame
- * input collection. Callers wanting the "drop all claims AND zero
- * transient input state" combo go through `clearAllClaims` in
- * [index.js](index.js), which wraps `clearAllClaims` here with the
- * input-slot reset.
+ * input collection. Claims are persistent — `unclaim` runs only on
+ * explicit release (gamepad disconnect, future menu action). The
+ * per-frame transient-input reset on match-reset lives separately in
+ * [index.js](index.js) as `resetTransientInputs`.
  */
 
 import { state } from '../game/state.js';
@@ -96,10 +96,11 @@ export function unclaim(deviceId) {
 }
 
 /**
- * Drop every claim. Called when a match ends or DM mode is entered, so
- * each player must re-press to join the next match. The "transient
- * input state" reset that used to ride along here lives in
- * [index.js](index.js)'s `clearAllClaims` wrapper.
+ * Drop every claim. Not called from the normal kiosk loop (claims persist
+ * across matches so players keep their controller→pane assignment).
+ * Exported for explicit "reset all bindings" actions — e.g. a future
+ * menu button, or a hard mode-switch — that genuinely want to start
+ * over with no remembered devices.
  */
 export function clearAllClaims() {
     if (claims.size === 0) return;
