@@ -10,6 +10,7 @@ import { state } from './state.js';
 import { Player } from './player/player.js';
 import { loadMap, currentMap } from '../shared/maps.js';
 import { showScoreboard, hideScoreboard } from '../ui/scoreboard.js';
+import { clearMovingState } from './movement.js';
 
 const DEFAULT_FRAG_LIMIT = 20;
 const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
@@ -182,6 +183,13 @@ export function endMatch() {
         }
     }
     state.match.winner = tied ? null : winner;
+
+    // After the match-ended early-return goes live in updateGame,
+    // movement.updateMovingState stops firing, so any player who was
+    // walking when the match ended would keep their .moving class
+    // (and the head-bob animation) all the way through scoreboard →
+    // attract. Clear it explicitly here.
+    for (const p of state.players) clearMovingState(p);
 
     const data = buildScoreboardData();
     document.body.dataset.matchEnded = 'true';

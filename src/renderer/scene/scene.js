@@ -88,10 +88,18 @@ export function teardownScene() {
  * Async because it preloads textures before returning.
  */
 export async function buildScene() {
-    const viewportWidth = window.innerWidth;
-    const perspectiveValue = viewportWidth / 2;
-    for (const s of sceneStates) s.perspectiveValue = perspectiveValue;
-    for (const v of dom.viewports) v.style.setProperty('--perspective', `${perspectiveValue}px`);
+    // Per-pane perspective drives FOV — perspective = half the pane's
+    // own rendered width gives a ~90° horizontal FOV per pane. Reading
+    // each viewport's clientWidth means split-screen, kiosk, mirror,
+    // and SP all "just work" without mode branching, and each pane
+    // gets the value matching its own slice of the screen.
+    for (let i = 0; i < dom.viewports.length; i++) {
+        const v = dom.viewports[i];
+        const paneWidth = v.clientWidth || window.innerWidth;
+        const perspectiveValue = paneWidth / 2;
+        sceneStates[i].perspectiveValue = perspectiveValue;
+        v.style.setProperty('--perspective', `${perspectiveValue}px`);
+    }
 
     // Build pane 0's scene from map data using the existing helpers (which
     // operate on the singletons dom.scene / sceneState — both alias pane 0).
