@@ -58,7 +58,7 @@ import {
 } from './renderer-state.js';
 
 // Camera reads many fields off the player; strip to a plain transform
-// before going over BroadcastChannel.
+// before going over the transport.
 const stripCameraTransform = (player) => [{
     x: player.x,
     y: player.y,

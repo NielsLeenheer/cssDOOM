@@ -36,7 +36,7 @@
  * import directly from there as a sibling.
  *
  * `setupMasterBroadcast` in `index.js` is just thin wiring on top: it
- * opens the BroadcastChannel and routes handshake events into the
+ * opens the Transport and routes handshake events into the
  * orchestrator's bind/unbind methods.
  *
  * The public command API mirrors what `src/renderer/index.js` exported

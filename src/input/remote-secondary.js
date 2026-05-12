@@ -1,9 +1,9 @@
 /**
  * Forward keyboard and mouse events from the secondary window over the
- * BroadcastChannel to the master. Master-side handler (remote-master.js)
+ * shared Transport to the master. Master-side handler (remote-master.js)
  * applies them as input from player 1, the player whose view the
- * secondary is rendering. This is a same-machine fixture today; a network
- * transport (WebSocket / WebRTC) could swap in for remote multiplayer
+ * secondary is rendering. This is a same-machine fixture today; a
+ * `WebRTCDataChannelTransport` could swap in for remote multiplayer
  * without changing either end.
  *
  * Raw events are forwarded — keydown/keyup/mousemove/mousedown/mouseup —
@@ -16,7 +16,7 @@
 import { MSG } from '../renderer/broadcast-protocol.js';
 
 export function initRemoteInputForwarder(channel) {
-    const post = (msg) => channel.postMessage({ type: MSG.INPUT, ...msg });
+    const post = (msg) => channel.send({ type: MSG.INPUT, ...msg });
 
     document.addEventListener('keydown', (e) => {
         // Skip OS auto-repeat — master tracks discrete down/up transitions

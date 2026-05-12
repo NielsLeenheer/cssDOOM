@@ -1,6 +1,6 @@
 /**
  * BroadcastSink — a render target that forwards commands over a
- * BroadcastChannel instead of painting DOM.
+ * `Transport` instead of painting DOM.
  *
  * Per-pane methods are generated from the command registry
  * ([commands.js](commands.js)) at module load. Each method serializes
@@ -17,6 +17,10 @@
  * applies the world command locally (helpers iterate every pane); the
  * sink still forwards because the secondary window has its own DOM tree
  * and needs its own copy of the update.
+ *
+ * The "Broadcast" in the class name is historical — the sink talks to
+ * any Transport. Swapping a `WebRTCDataChannelTransport` in is a one-line
+ * change at construction time.
  */
 
 import { MSG } from './broadcast-protocol.js';
@@ -24,8 +28,10 @@ import { PER_PANE_COMMANDS } from './commands.js';
 
 export class BroadcastSink {
     /**
-     * @param {BroadcastChannel} channel  shared channel
-     * @param {number} paneIndex          master-side pane this sink represents
+     * @param {{send: (msg: object) => void}} channel  Transport instance
+     *        shared with the corresponding Connection on the receiving
+     *        side. Only `send` is used here — sinks never receive.
+     * @param {number} paneIndex   master-side pane this sink represents.
      */
     constructor(channel, paneIndex) {
         this.channel = channel;
@@ -34,7 +40,7 @@ export class BroadcastSink {
 
     /** Post a per-pane command envelope. */
     _post(method, args) {
-        this.channel.postMessage({
+        this.channel.send({
             type: MSG.CMD_PANE,
             target: this.paneIndex,
             method,
@@ -44,7 +50,7 @@ export class BroadcastSink {
 
     /** Post a world-command envelope (called from the orchestrator). */
     forwardWorld(method, args) {
-        this.channel.postMessage({
+        this.channel.send({
             type: MSG.CMD_WORLD,
             method,
             args,

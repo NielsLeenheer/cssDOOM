@@ -1,9 +1,10 @@
 /**
- * BroadcastChannel connection lifecycle for master ↔ secondary windows.
+ * Connection lifecycle for master ↔ remote (today: secondary window via
+ * BroadcastChannel; tomorrow: network peer via WebRTC).
  *
- * Master and secondary share a `BroadcastChannel` and a small set of
- * envelope conventions (`./broadcast-protocol.js`'s `MSG` enum), but
- * their lifecycles are completely different:
+ * Master and remote share a `Transport` (see [transport.js](transport.js))
+ * and a small set of envelope conventions (`./broadcast-protocol.js`'s
+ * `MSG` enum), but their lifecycles are completely different:
  *
  *   - Master accepts LOOKING, replies with ACK, then keeps the link
  *     alive with PING. Tracks one peer at a time. Pauses LOOKING
@@ -16,26 +17,32 @@
  *
  * To keep each role's logic readable we use two classes
  * (`MasterConnection`, `SecondaryConnection`) sharing the tiny
- * `BroadcastConnectionBase` for channel + post + unload + close. The
+ * `BroadcastConnectionBase` for transport + post + unload + close. The
  * per-pane and world renderer commands flow through `BroadcastSink` /
- * `BroadcastClient`, which share the same channel via the
+ * `BroadcastClient`, which share the same Transport via the
  * `.channel` accessor here.
  */
 
+import { BroadcastChannelTransport } from './transport.js';
 import {
     BROADCAST_CHANNEL_NAME, MSG, PING_INTERVAL_MS, PING_TIMEOUT_MS,
 } from './broadcast-protocol.js';
 
 /**
- * Shared infrastructure: opens the channel, wires up the message and
- * unload listeners, and provides a safe `_post`. Subclasses override
- * `_handle(msg)` to dispatch role-specific behavior.
+ * Shared infrastructure: opens the transport, subscribes to incoming
+ * envelopes, registers the unload announcement, and provides a safe
+ * `_post`. Subclasses override `_handle(msg)` to dispatch role-specific
+ * behavior.
+ *
+ * `this.channel` holds the Transport (not a raw BroadcastChannel — the
+ * name is preserved because sinks and clients still treat it as "the
+ * wire" regardless of which transport backs it).
  */
 class BroadcastConnectionBase {
     constructor() {
-        this.channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
+        this.channel = new BroadcastChannelTransport(BROADCAST_CHANNEL_NAME);
         this.peerAlive = false;
-        this.channel.addEventListener('message', (event) => this._handle(event.data));
+        this.channel.onMessage((msg) => this._handle(msg));
 
         // Both sides announce departure on unload so the peer can react
         // immediately instead of waiting on the watchdog.
@@ -46,9 +53,9 @@ class BroadcastConnectionBase {
 
     _post(envelope) {
         try {
-            this.channel.postMessage(envelope);
+            this.channel.send(envelope);
         } catch (err) {
-            console.warn('BroadcastConnection: post failed', err);
+            console.warn('BroadcastConnection: send failed', err);
         }
     }
 

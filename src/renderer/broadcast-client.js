@@ -1,7 +1,7 @@
 /**
  * BroadcastClient — the receiving end in the secondary window.
  *
- * Listens on the BroadcastChannel and dispatches incoming envelopes to a
+ * Subscribes to a Transport and dispatches incoming envelopes to a
  * local DomRenderer (per-pane commands) and the local Orchestrator (world
  * commands).
  *
@@ -15,6 +15,9 @@
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, snapshot replay, heartbeat, disconnect) is
  * layered on top of this in a separate module.
+ *
+ * The "Broadcast" in the class name is historical — the client talks to
+ * any Transport.
  */
 
 import { MSG } from './broadcast-protocol.js';
@@ -22,8 +25,9 @@ import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './commands.js';
 
 export class BroadcastClient {
     /**
-     * @param {BroadcastChannel} channel
-     * @param {number} slotIndex   master-side slot this secondary represents
+     * @param {{onMessage: (cb: (msg: object) => void) => () => void}} channel
+     *        Transport instance shared with the master-side connection.
+     * @param {number} slotIndex    master-side slot this secondary represents
      * @param {object} domRenderer  the secondary's local DomRenderer
      * @param {object} orchestrator the secondary's local Orchestrator (for world commands)
      */
@@ -32,7 +36,7 @@ export class BroadcastClient {
         this.slotIndex = slotIndex;
         this.domRenderer = domRenderer;
         this.orchestrator = orchestrator;
-        this.channel.addEventListener('message', (event) => this._handle(event.data));
+        this._unsubscribe = this.channel.onMessage((msg) => this._handle(msg));
     }
 
     _handle(msg) {
