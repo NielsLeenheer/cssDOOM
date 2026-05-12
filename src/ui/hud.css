@@ -701,61 +701,31 @@ body[data-attract="true"] #ui-buttons {
 
 
 /* ========================================================================
-   Video-wall layout (≥ 24/9 aspect ratio)
+   Kiosk vs single-screen overlay positioning
 
-   At CSS Day the kiosk may run on two side-by-side monitors with a bezel
-   down the middle. Anything centred on the viewport would land on the
-   bezel. In this layout we re-anchor each pane's overlay to its own pane
-   instead of the viewport — `position: absolute` against the pane (which
-   is `position: relative`) confines the overlay to one monitor.
+   The kiosk runs on a 3840×2160 capture but only the top half is two
+   physical 1080p monitors side-by-side (see viewport.css `body.kiosk
+   #game`). Each pane has its own monitor, so per-pane overlays must
+   anchor per-pane — `position: absolute` against the pane (which is
+   position: relative) confines them to one monitor.
 
-   The threshold (24/9 ≈ 2.67) is wider than common ultrawide ratios
-   (21/9 = 2.33) so dev windows don't accidentally trip it.
-
-   All styling (font, size, colors, background) is inherited from the
-   base rules above — this block only changes the positioning.
+   Outside of kiosk mode, both panes are visible in the same window and
+   would otherwise render their fullscreen position:fixed overlays
+   stacked identically. Hide pane 1's copy so only pane 0's renders.
+   Carved out for master+secondary and secondary-window since they
+   already hide one pane via viewport.css.
    ======================================================================== */
 
-/* Non-video-wall split-screen DM: both panes are visible and both their
-   overlays would render fullscreen via position:fixed, stacking identical
-   content. Hide pane 1's copy so only pane 0's renders. Carved out of
-   master+secondary (.secondary-active) and the secondary window itself
-   (.secondary-window) — both already have the right pane hidden via
-   viewport.css, so suppressing pane 1's overlay there would hide the
-   only visible overlay.
-
-   Specificity is high enough (six classes/attrs) to beat the state-
-   driven `display: flex/block` rules above (two classes/attrs each). */
-@media (max-aspect-ratio: 24/9) {
-    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
-    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-win,
-    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
-        display: none;
-    }
-}
-
-@media (min-aspect-ratio: 24/9) {
-    .pane-attract,
-    .pane-win {
-        position: absolute;
-    }
-
-    .pane-timer {
-        position: absolute;
-        /* top / left / transform stay as the base rule sets them — but
-           they now resolve against the pane, not the viewport, which is
-           what we want. */
-    }
-}
-
-/* Kiosk runs on a 16/9 input (3840×2160) so it doesn't match the
-   min-aspect-ratio: 24/9 branch above — but each pane still lives on
-   its own physical monitor, so overlays must anchor per-pane the same
-   way the wide branch does. */
 body.kiosk .pane-attract,
 body.kiosk .pane-win,
 body.kiosk .pane-timer {
     position: absolute;
+}
+
+body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
+body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-win,
+body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
+    display: none;
 }
 
 

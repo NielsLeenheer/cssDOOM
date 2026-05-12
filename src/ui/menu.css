@@ -241,20 +241,14 @@ body.secondary-window #menu-button:hover { filter: none; }
 
 
 /* ========================================================================
-   Video-wall layout (≥ 24/9 aspect ratio)
-
-   Background still spans both displays; menu contents are pulled into the
-   left half so they sit on a single monitor instead of straddling the
-   bezel.
+   Kiosk layout — confine the menu to the top-left monitor (1920×1080
+   inside the 3840×2160 capture). The whole overlay (backdrop + content)
+   shrinks to that quadrant so the other monitor and the bottom half of
+   the capture stay clear. See viewport.css `body.kiosk #game` for the
+   matching constraint on the game area itself.
    ======================================================================== */
 
-@media (min-aspect-ratio: 24/9) {
-    #menu-overlay {
-        justify-content: flex-start;
-    }
-    #menu-content {
-        width: 50vw;
-        justify-content: center;
-        padding-left: 20px;
-    }
+body.kiosk #menu-overlay {
+    right: 50vw;
+    bottom: 50vh;
 }

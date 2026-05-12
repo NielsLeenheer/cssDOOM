@@ -143,3 +143,14 @@ body[data-mode="deathmatch"][data-kbm-target="1"] .pane[data-player="1"] .render
         }
     }
 }
+
+/* Kiosk: the black splash backdrop spans both monitors (full top half
+   of the 3840×2160 capture) so neither screen is dark + uncovered
+   during load, but the M_DOOM logo itself is offset so it lands
+   centered on the top-left 1920×1080 monitor instead of straddling the
+   bezel. The bottom half of the capture is clamped away — it's not on
+   the physical wall. */
+body.kiosk #loading-overlay {
+    bottom: 50vh;
+    background-position-x: calc(25vw - 82px * 4 / 2);
+}
