@@ -392,9 +392,10 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
     font-family: 'STCFN', monospace;
     /* Matches lobby + attract sizing — 32 px is a multiple of 8 so
        STCFN's bitmap glyphs render pixel-perfect. Padding keeps wrapped
-       text from kissing the pane edge. */
-    font-size: 32px;
-    padding: 32px;
+       text from kissing the pane edge. Scales with --screen-scale so
+       4K outputs read at the same physical size as 1080p. */
+    font-size: calc(32px * var(--screen-scale, 1));
+    padding: calc(32px * var(--screen-scale, 1));
     text-align: center;
     color: #ffd700;
     text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
@@ -430,12 +431,13 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
     pointer-events: none;
     font-family: 'STCFN', monospace;
     /* Multiple of 8 px so the bitmap-derived STCFN renders pixel-perfect.
-       At 32 px each source pixel is 4 screen pixels. */
-    font-size: 32px;
+       At 32 px each source pixel is 4 screen pixels. Scales with
+       --screen-scale to keep visual size consistent on HD vs 4K. */
+    font-size: calc(32px * var(--screen-scale, 1));
     /* Padding keeps wrapped lines off the pane / window edges. Matches
        the respawn + attract overlays so all three read at the same
        inset. */
-    padding: 32px;
+    padding: calc(32px * var(--screen-scale, 1));
     /* STCFN is a COLR/CPAL color font — the per-glyph red shades and
        dark outline are baked in via the embedded palette. `color:` is
        used as the fallback when the COLR path isn't taken (older browsers
@@ -543,16 +545,16 @@ body[data-match-ended="true"] .pane-win {
 .scoreboard-subtitle {
     /* WIF = the DOOM intermission "FINISHED" sprite. Scale by integer
        multiples to keep the pixel art crisp at kiosk size. */
-    height: calc(16px * 2);
+    height: calc(16px * 2 * var(--screen-scale, 1));
     image-rendering: pixelated;
-    margin-bottom: 16px;
+    margin-bottom: calc(16px * var(--screen-scale, 1));
 }
 
 .scoreboard-banner {
-    font-size: 18px;
+    font-size: calc(18px * var(--screen-scale, 1));
     color: #ffd700;
     font-palette: --stcfn-white;
-    margin-bottom: 32px;
+    margin-bottom: calc(32px * var(--screen-scale, 1));
 }
 
 /* Grid: [killer-swatch col] [N victim cols] [total col]. The first row
@@ -560,9 +562,12 @@ body[data-match-ended="true"] .pane-win {
    sits in the top-right cell. */
 .scoreboard-grid {
     display: grid;
-    grid-template-columns: 56px repeat(var(--player-count, 2), 64px) auto;
-    grid-auto-rows: 56px;
-    gap: 6px;
+    grid-template-columns:
+        calc(56px * var(--screen-scale, 1))
+        repeat(var(--player-count, 2), calc(64px * var(--screen-scale, 1)))
+        auto;
+    grid-auto-rows: calc(56px * var(--screen-scale, 1));
+    gap: calc(6px * var(--screen-scale, 1));
     align-items: center;
     justify-items: center;
 }
@@ -571,12 +576,12 @@ body[data-match-ended="true"] .pane-win {
    needed (the gap + grid track sizing leaves it as whitespace). */
 
 .scoreboard-total-label {
-    padding-left: 12px;
+    padding-left: calc(12px * var(--screen-scale, 1));
 }
 
 .scoreboard-total-label img {
     /* WIMSTT = DOOM intermission "TOTAL" sprite. */
-    height: calc(7px * 3);
+    height: calc(7px * 3 * var(--screen-scale, 1));
     image-rendering: pixelated;
     display: block;
 }
@@ -585,8 +590,8 @@ body[data-match-ended="true"] .pane-win {
     image-rendering: pixelated;
     background: no-repeat center / cover;
     border: 1px solid rgba(0, 0, 0, 0.4);
-    width: 48px;
-    height: 48px;
+    width: calc(48px * var(--screen-scale, 1));
+    height: calc(48px * var(--screen-scale, 1));
 }
 
 /* Player color swatches — mirror the HUD face background tints. */
@@ -597,16 +602,16 @@ body[data-match-ended="true"] .pane-win {
 
 .scoreboard-cell {
     font-family: 'WINUM', monospace;
-    font-size: 24px;       /* WINUM is pixel-perfect at multiples of 12 px */
+    font-size: calc(24px * var(--screen-scale, 1));   /* WINUM is pixel-perfect at multiples of 12 px */
     text-align: center;
-    min-width: 48px;
+    min-width: calc(48px * var(--screen-scale, 1));
     text-shadow: none;
 }
 
 .scoreboard-total {
     color: #ffd700;
     font-palette: --stcfn-white;
-    padding-left: 12px;
+    padding-left: calc(12px * var(--screen-scale, 1));
 }
 
 
@@ -622,12 +627,12 @@ body[data-match-ended="true"] .pane-win {
 .pane-timer {
     display: none;
     position: fixed;
-    top: calc(12px + env(safe-area-inset-top, 0px));
+    top: calc(12px * var(--screen-scale, 1) + env(safe-area-inset-top, 0px));
     left: 50%;
     transform: translateX(-50%);
     z-index: 1100;
     font-family: 'STCFN', monospace;
-    font-size: 28px;
+    font-size: calc(28px * var(--screen-scale, 1));
     color: #dc0000;
     text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
     pointer-events: none;
@@ -655,12 +660,12 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 48px;
+    gap: calc(48px * var(--screen-scale, 1));
     font-family: 'STCFN', monospace;
     /* Matches lobby + respawn — 32 px is a multiple of STCFN's 8 px
        source cell. Padding keeps the wrap inset from the screen edges. */
-    font-size: 32px;
-    padding: 32px;
+    font-size: calc(32px * var(--screen-scale, 1));
+    padding: calc(32px * var(--screen-scale, 1));
     color: #ffd700;
     text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
     background: rgba(0, 0, 0, 0.45);
@@ -670,8 +675,8 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
 
 .pane-attract-logo {
     /* M_DOOM is 82×40 px — render pixelated and scale by integer
-       multiples to keep the bitmap crisp. 4× → 328×160. */
-    width: calc(82px * 4);
+       multiples to keep the bitmap crisp. 4× source → 328×160 at scale 1×. */
+    width: calc(82px * 4 * var(--screen-scale, 1));
     image-rendering: pixelated;
     user-select: none;
 }

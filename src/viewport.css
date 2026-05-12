@@ -12,6 +12,34 @@
     display: flex;
 }
 
+
+/* ==========================================================================
+   Screen-relative UI scale (--screen-scale)
+
+   Pane overlays (attract, lobby prompts, scoreboard, respawn, countdown)
+   read this so the same physical-screen footprint holds across HD and 4K
+   outputs. Snaps to integer multiples — bitmap-derived COLR fonts
+   (STCFN, STBIG, WINUM) stay pixel-perfect.
+
+   Reference: pane width ≈ 960 px = scale 1× (HD kiosk pane / dev). Each
+   doubling of pane width bumps the scale. In kiosk mode each pane is
+   half the window (the capture is split between two monitors), so the
+   thresholds shift up by 2×.
+
+   The HUD bar has its own `--scale` driven by container queries on
+   `.renderer` (pane width-based) and is intentionally untouched here.
+   ========================================================================== */
+
+:root { --screen-scale: 1; }
+
+@media (min-width: 1440px) { :root { --screen-scale: 2; } }
+@media (min-width: 2880px) { :root { --screen-scale: 4; } }
+
+/* Kiosk: pane = window / 2, so the breakpoints are doubled. */
+body.kiosk { --screen-scale: 1; }
+@media (min-width: 2880px) { body.kiosk { --screen-scale: 2; } }
+@media (min-width: 5760px) { body.kiosk { --screen-scale: 4; } }
+
 .pane {
     position: relative;
     height: 100%;
@@ -122,7 +150,9 @@ body[data-mode="deathmatch"][data-kbm-target="1"] .pane[data-player="1"] .render
     position: fixed;
     inset: 0;
     background: black url('/assets/menu/M_DOOM.png') no-repeat center;
-    background-size: calc(82px * 4) calc(40px * 4);
+    background-size:
+        calc(82px * 4 * var(--screen-scale, 1))
+        calc(40px * 4 * var(--screen-scale, 1));
     image-rendering: pixelated;
     z-index: 10000;
     pointer-events: none;
@@ -152,5 +182,5 @@ body[data-mode="deathmatch"][data-kbm-target="1"] .pane[data-player="1"] .render
    the physical wall. */
 body.kiosk #loading-overlay {
     bottom: 50vh;
-    background-position-x: calc(25vw - 82px * 4 / 2);
+    background-position-x: calc(25vw - 82px * 4 * var(--screen-scale, 1) / 2);
 }
