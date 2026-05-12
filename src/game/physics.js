@@ -125,13 +125,25 @@ export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight
         }
     }
 
-    // Check collision against lift shaft edges when the lift platform is above the player
+    // Check collision against lift shaft edges when the lift platform is
+    // above the player. The edge.insideSign annotation (precomputed in
+    // lifts.js initLifts) tells us which side of the edge is the lift's
+    // interior; we only block when the new position sits on that side,
+    // so a player who's *outside* the footprint but brushing the edge
+    // (e.g., just after stepping off a raised lift) isn't trapped.
     for (const [, liftEntry] of state.liftState) {
         const edges = liftEntry.collisionEdges;
         if (!edges) continue;
         if (currentFloorHeight >= liftEntry.currentHeight - MAX_STEP_HEIGHT) continue;
         for (let i = 0, edgeCount = edges.length; i < edgeCount; i++) {
             const edge = edges[i];
+            if (edge.insideSign !== 0) {
+                const dx = edge.end.x - edge.start.x;
+                const dy = edge.end.y - edge.start.y;
+                const side = (newX - edge.start.x) * dy - (newY - edge.start.y) * dx;
+                const sideSign = side > 0 ? 1 : (side < 0 ? -1 : 0);
+                if (sideSign !== edge.insideSign) continue;
+            }
             if (circleLineCollision(newX, newY, radius, edge.start.x, edge.start.y, edge.end.x, edge.end.y)) {
                 return false;
             }

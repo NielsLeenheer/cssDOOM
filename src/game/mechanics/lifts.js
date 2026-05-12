@@ -32,6 +32,23 @@ const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation dur
 // Cached flat array of { sectorIndex, entry } for zero-alloc iteration in the hot path
 let liftEntries = [];
 
+/**
+ * Approximate centroid of a sector's outer polygon — average of its
+ * vertices. Used to determine which side of a collision edge is
+ * "inside" the lift footprint (vs outside). Good enough for the convex
+ * / mildly-concave lift platforms typical in DOOM E1 maps; for a
+ * pathologically concave shape it might miss, but those don't occur on
+ * lifts in practice.
+ */
+function computeSectorCentroid(sectorIndex) {
+    const poly = mapData.sectorPolygons?.[sectorIndex];
+    if (!poly?.boundaries?.[0]) return null;
+    const pts = poly.boundaries[0];
+    let cx = 0, cy = 0;
+    for (const p of pts) { cx += p.x; cy += p.y; }
+    return { x: cx / pts.length, y: cy / pts.length };
+}
+
 export function initLifts() {
     state.liftState = new Map();
     if (!mapData.lifts) return;
@@ -43,12 +60,31 @@ export function initLifts() {
         // Build the visual representation via the renderer
         renderer.buildLift(lift);
 
+        // Annotate each collision edge with the "inside sign" — which side
+        // of the edge is inside the lift's footprint. Used by canMoveTo
+        // so the edge only blocks moves that would enter the footprint,
+        // not moves that just brush the edge from the outside. Without
+        // this, a player stepping off a raised lift would be trapped
+        // within PLAYER_RADIUS of the edge: blocked forward by the
+        // circle/edge overlap, blocked backward by the step-up height.
+        const centroid = computeSectorCentroid(lift.sectorIndex);
+        const annotatedEdges = (lift.collisionEdges || []).map(e => {
+            const dx = e.end.x - e.start.x;
+            const dy = e.end.y - e.start.y;
+            let insideSign = 0;
+            if (centroid) {
+                const s = (centroid.x - e.start.x) * dy - (centroid.y - e.start.y) * dx;
+                insideSign = s > 0 ? 1 : (s < 0 ? -1 : 0);
+            }
+            return { ...e, insideSign };
+        });
+
         state.liftState.set(lift.sectorIndex, {
             sectorIndex: lift.sectorIndex,
             tag: lift.tag,
             upperHeight: lift.upperHeight,
             lowerHeight: lift.lowerHeight,
-            collisionEdges: lift.collisionEdges || [],
+            collisionEdges: annotatedEdges,
             currentHeight: lift.upperHeight,
             targetHeight: lift.upperHeight,
             moving: false,
