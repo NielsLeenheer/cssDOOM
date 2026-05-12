@@ -130,7 +130,6 @@ body.secondary-window #menu-button:hover { filter: none; }
     font-size: 12px;
     color: #666; /* non-COLR fallback */
     text-transform: uppercase;
-    letter-spacing: 2px;
     margin-bottom: 12px;
 }
 
@@ -214,7 +213,6 @@ body.secondary-window #menu-button:hover { filter: none; }
         font-size: 16px;
         color: #dc0000; /* DOOM red — matches the level-selector digit sprite */
         text-transform: uppercase;
-        letter-spacing: 1px;
         padding: 4px 0;
     }
 }

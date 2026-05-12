@@ -398,7 +398,6 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
     text-align: center;
     color: #ffd700;
     text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
-    letter-spacing: 2px;
     opacity: 0;
 }
 
@@ -443,7 +442,6 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
        or no-color-font fallback fonts). text-shadow would draw a second
        silhouette underneath the colored glyph, so leave it off. */
     color: #cb0000;
-    letter-spacing: 2px;
     text-align: center;
     background: rgba(0, 0, 0, 0.45);
 }
@@ -552,7 +550,6 @@ body[data-match-ended="true"] .pane-win {
 
 .scoreboard-banner {
     font-size: 18px;
-    letter-spacing: 4px;
     color: #ffd700;
     font-palette: --stcfn-white;
     margin-bottom: 32px;
@@ -633,7 +630,6 @@ body[data-match-ended="true"] .pane-win {
     font-size: 28px;
     color: #dc0000;
     text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
-    letter-spacing: 4px;
     pointer-events: none;
 }
 
@@ -667,7 +663,6 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
     background: rgba(0, 0, 0, 0.45);
     pointer-events: none;
-    letter-spacing: 6px;
     text-align: center;
     animation: attract-pulse 1.6s ease-in-out infinite;
 }
