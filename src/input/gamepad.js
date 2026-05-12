@@ -51,7 +51,11 @@ const DM_RESPAWN_COOLDOWN_MS = 2000;
 const SP_RESTART_COOLDOWN_MS = 4000;
 
 const STICK_DEADZONE = 0.15;
-const TURN_SENSITIVITY = 0.04;
+// Right-stick deflection is mapped to the same `turn` rate channel the
+// keyboard uses, so movement.js applies it via `turn * TURN_SPEED * dt`
+// and turning stays framerate-independent. At full stick this scale
+// yields TURN_SPEED * GAMEPAD_TURN_SCALE rad/s — tune by feel.
+const GAMEPAD_TURN_SCALE = 0.65;
 // Threshold past which an analog trigger counts as "pressed". Half-pull
 // fires the action; release returns it to false. Standard FPS feel.
 const TRIGGER_THRESHOLD = 0.5;
@@ -132,9 +136,9 @@ function processGamepad(rawPad) {
     }
     if (axes.length >= 4) {
         const rx = axes[2] || 0;
-        padState.turnDelta = Math.abs(rx) > STICK_DEADZONE ? -rx * TURN_SENSITIVITY : 0;
+        padState.turn = Math.abs(rx) > STICK_DEADZONE ? -rx * GAMEPAD_TURN_SCALE : 0;
     }
-    if (padState.moveX || padState.moveY || padState.turnDelta) pingActivity();
+    if (padState.moveX || padState.moveY || padState.turn) pingActivity();
 
     // ── Button transitions ──
     // Detect each button's press/release transition by comparing current
@@ -198,7 +202,7 @@ function setupGamepad(gamepad) {
     const gamepadIndex = gamepad.index;
     const deviceId = gamepadDeviceId(gamepadIndex);
     const padState = {
-        moveX: 0, moveY: 0, turnDelta: 0, run: false,
+        moveX: 0, moveY: 0, turn: 0, run: false,
         _wasConnected: false,
     };
     padStates.set(gamepadIndex, padState);
@@ -320,7 +324,7 @@ function handleDisconnect(gamepadIndex) {
     if (padState) {
         padState.moveX = 0;
         padState.moveY = 0;
-        padState.turnDelta = 0;
+        padState.turn = 0;
         padState.run = false;
         padState._prevButtons = [];
         padState._wasConnected = false;
