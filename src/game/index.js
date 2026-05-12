@@ -14,6 +14,7 @@ import { checkWalkOverTriggers } from './mechanics/lifts.js';
 import { checkTeleporters } from './mechanics/teleporters.js';
 import { updateCrushers } from './mechanics/crushers.js';
 import { matchTick } from './match.js';
+import { GAME_STATE, getGameState } from './game-state.js';
 
 let previousTimestamp = 0;
 
@@ -24,7 +25,7 @@ export function updateGame(timestamp) {
     // Tick the DM match clock and check the time-limit end condition.
     // No-op in SP (state.match is null).
     matchTick();
-    if (state.match?.ended) {
+    if (getGameState() === GAME_STATE.ENDED) {
         // Match ended — freeze all gameplay logic. The win overlay covers
         // the screen; input handlers route fire-press to restartMatch().
         return;

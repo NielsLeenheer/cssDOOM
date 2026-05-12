@@ -92,11 +92,9 @@ export function initLobby({ getExternallyClaimedSlots }) {
  */
 export function updateLobbyUI() {
     const inLobby = isMatchLobby();
-    if (inLobby) {
-        document.body.dataset.matchLobby = 'true';
-    } else {
-        delete document.body.dataset.matchLobby;
-    }
+    // The body[data-match-lobby] attribute is mirrored by game-state's
+    // transitionTo — we don't write it here. updateLobbyUI fires on
+    // every claim change, after match transitions are already settled.
 
     const externalSlots = externalSlotsRef();
     const isClaimed = (slot) => isSlotClaimedLocally(slot) || externalSlots.has(slot);
@@ -180,8 +178,9 @@ function checkAutoStart() {
 /**
  * Enter lobby state — called when DM mode is entered or the previous
  * match ended and we're cycling back to a new one. The match clock,
- * scoring, and frag-tracking are all gated by `state.match.started`,
- * which resetMatch() leaves false. This function just refreshes the UI.
+ * scoring, and frag-tracking are all gated by the game-state machine
+ * (`getGameState() === ACTIVE`), which resetMatch() leaves at LOBBY.
+ * This function just refreshes the lobby UI.
  */
 export function enterLobby() {
     if (state.mode !== 'deathmatch') return;

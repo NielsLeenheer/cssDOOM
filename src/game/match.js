@@ -2,8 +2,13 @@
  * Deathmatch match state — frag scoring, frag-limit / timer end conditions,
  * win overlay, and restart.
  *
- * SP doesn't touch any of this; state.match stays null. DM mode entry
+ * SP doesn't touch any of this; `state.match` stays null. DM mode entry
  * (menu.js's switchMode) calls resetMatch() to initialize.
+ *
+ * Lifecycle is driven by the unified `game-state` machine:
+ *   resetMatch()  → LOBBY  (warmup, scoring suppressed)
+ *   startMatch()  → ACTIVE (clock running, frags counted)
+ *   endMatch()    → ENDED  (scoreboard up, awaiting restart input)
  */
 
 import { state } from './state.js';
@@ -11,6 +16,7 @@ import { Player } from './player/player.js';
 import { loadMap, currentMap } from '../shared/maps.js';
 import { showScoreboard, hideScoreboard } from '../ui/scoreboard.js';
 import { clearMovingState } from './movement.js';
+import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
 
 const DEFAULT_FRAG_LIMIT = 20;
 const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
@@ -24,13 +30,9 @@ export function setMatchEndBroadcaster(fn) { broadcastMatchEnd = fn; }
 
 /**
  * Initializes (or resets) state.match and zeros every player's score.
- * Called when entering DM mode and on match restart.
- *
- * The match is created with `started: false` — the lobby state. While
- * !started, scoring is suppressed and the match clock isn't ticking.
- * Players can still move and fire, but it's all warmup. startMatch()
- * formally starts scoring and the timer; in Local DM it fires auto when
- * all slots are claimed, in Network DM it'll fire from a host button.
+ * Called when entering DM mode and on match restart. Transitions to
+ * LOBBY — players may walk around in warmup but scoring + the clock
+ * don't start until startMatch() is called.
  */
 export function resetMatch({
     fragLimit = DEFAULT_FRAG_LIMIT,
@@ -40,9 +42,7 @@ export function resetMatch({
     state.match = {
         fragLimit,
         timeLimit,
-        started: false,
         startTime: 0,
-        ended: false,
         winner: null,
         // kills[killer][victim] — PvP kills increment kills[k][v]; suicide
         // / environmental death increments kills[v][v]. Drives the
@@ -51,10 +51,10 @@ export function resetMatch({
         kills: Array.from({ length: n }, () => new Array(n).fill(0)),
     };
     for (const p of state.players) p.score = 0;
-    document.body.removeAttribute('data-match-ended');
     hideScoreboard();
     setTimerActive(false);
     lastTimerSeconds = -1;
+    transitionTo(GAME_STATE.LOBBY);
     // Notify the lobby UI so it can clear stale input claims and show
     // the PRESS FIRE TO JOIN prompts again. Decoupling via event keeps
     // match.js free of input/UI imports.
@@ -62,28 +62,28 @@ export function resetMatch({
 }
 
 /**
- * Formally start the match — flip `started` to true, set the clock's
- * startTime to now. Idempotent: already-started or no-match calls are
- * a no-op.
+ * Formally start the match — transition to ACTIVE and stamp the clock.
+ * Idempotent: only fires if we're currently in LOBBY.
  */
 export function startMatch() {
-    if (!state.match || state.match.started || state.match.ended) return;
-    state.match.started = true;
+    if (getGameState() !== GAME_STATE.LOBBY) return;
+    if (!state.match) return;
     state.match.startTime = performance.now();
+    transitionTo(GAME_STATE.ACTIVE);
 }
 
 /** True if a DM match is in the lobby state — exists but not yet started. */
 export function isMatchLobby() {
-    return state.match != null && !state.match.started && !state.match.ended;
+    return getGameState() === GAME_STATE.LOBBY;
 }
 
 /** Clears any DM match state — called when leaving DM mode. */
 export function clearMatch() {
     state.match = null;
-    document.body.removeAttribute('data-match-ended');
     hideScoreboard();
     setTimerActive(false);
     lastTimerSeconds = -1;
+    transitionTo(GAME_STATE.ACTIVE);
 }
 
 /**
@@ -96,7 +96,8 @@ export function clearMatch() {
  * also a -1 since the killer === victim case is rejected.
  */
 export function awardFrag(victim, killer) {
-    if (!state.match || !state.match.started || state.match.ended) return;
+    if (getGameState() !== GAME_STATE.ACTIVE) return;
+    if (!state.match) return;
     if (killer instanceof Player && killer !== victim) {
         killer.score++;
         state.match.kills[killer.index][victim.index]++;
@@ -110,7 +111,7 @@ export function awardFrag(victim, killer) {
 /** Called once per frame from updateGame to enforce the time limit and
  *  drive the on-screen countdown in the last 60 s. */
 export function matchTick() {
-    if (!state.match || !state.match.started || state.match.ended) return;
+    if (getGameState() !== GAME_STATE.ACTIVE || !state.match) return;
     const elapsed = performance.now() - state.match.startTime;
     if (elapsed >= state.match.timeLimit) {
         endMatch();
@@ -152,7 +153,7 @@ function setTimerActive(active) {
 }
 
 function checkFragLimit() {
-    if (state.match.ended) return;
+    if (getGameState() === GAME_STATE.ENDED) return;
     for (const p of state.players) {
         if (p.score >= state.match.fragLimit) {
             endMatch();
@@ -166,8 +167,8 @@ function checkFragLimit() {
  * can force the scoreboard without waiting for frag-limit / timer.
  */
 export function endMatch() {
-    if (!state.match || state.match.ended) return;
-    state.match.ended = true;
+    if (getGameState() === GAME_STATE.ENDED) return;
+    if (!state.match) return;
 
     // Highest score wins; tie when two players are level.
     let winner = null;
@@ -184,15 +185,14 @@ export function endMatch() {
     }
     state.match.winner = tied ? null : winner;
 
-    // After the match-ended early-return goes live in updateGame,
-    // movement.updateMovingState stops firing, so any player who was
-    // walking when the match ended would keep their .moving class
-    // (and the head-bob animation) all the way through scoreboard →
-    // attract. Clear it explicitly here.
+    // After ENDED, updateGame's per-player movement update stops firing.
+    // Any player who was walking when the match ended would keep their
+    // .moving class (and head-bob animation) all the way through
+    // scoreboard → attract. Clear it explicitly here.
     for (const p of state.players) clearMovingState(p);
 
     const data = buildScoreboardData();
-    document.body.dataset.matchEnded = 'true';
+    transitionTo(GAME_STATE.ENDED);
     showScoreboard(data);
     broadcastMatchEnd?.(data);
 }
@@ -212,7 +212,7 @@ function buildScoreboardData() {
 
 /** True when DM is active and the match has ended. */
 export function isMatchEnded() {
-    return state.match?.ended === true;
+    return getGameState() === GAME_STATE.ENDED;
 }
 
 /** Resets and reloads the current map for a fresh DM match. */
@@ -220,4 +220,3 @@ export function restartMatch() {
     resetMatch();
     loadMap(currentMap);
 }
-

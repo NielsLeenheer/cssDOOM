@@ -30,9 +30,10 @@ import { state } from '../game/state.js';
 import { loadMap } from '../shared/maps.js';
 import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
-import { resetMatch, isMatchEnded, endMatch } from '../game/match.js';
+import { resetMatch, endMatch } from '../game/match.js';
 import { isMenuOpen } from './menu.js';
 import { setAttract } from '../renderer/index.js';
+import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
 
 // Idle thresholds.
 //   GAME_IDLE_MS — in-progress match → end the match so the scoreboard
@@ -49,18 +50,17 @@ const ROTATE_RAD_PER_MS = 0.0002; // ~12°/sec — full rotation every 30s.
                                    // gameLoop (see ATTRACT_RENDER_INTERVAL_MS).
 
 let lastActivityAt = performance.now();
-let attractActive = false;
 let entering = false;
 let rotateStartTime = 0;
 const baseAngles = []; // baseAngle per player at the moment of attract entry
-// Tracks the previous tick's match-ended state so we can detect the
-// transition to a fresh scoreboard and reset the idle clock — without
-// this, a 60s in-match idle would immediately trip the 30s scoreboard
-// timeout the moment endMatch fires.
-let wasMatchEnded = false;
+// Tracks the previous tick's game state so we can detect the LOBBY/ACTIVE
+// → ENDED transition and reset the idle clock — without this, a 60s
+// in-match idle would immediately trip the 30s scoreboard timeout the
+// moment endMatch fires.
+let wasEnded = false;
 
 export function isAttractActive() {
-    return attractActive;
+    return getGameState() === GAME_STATE.ATTRACT;
 }
 
 /**
@@ -77,7 +77,7 @@ export function isAttractActive() {
  */
 export function pingActivity() {
     lastActivityAt = performance.now();
-    if (attractActive) {
+    if (getGameState() === GAME_STATE.ATTRACT) {
         exitAttract();
         return true;
     }
@@ -101,20 +101,22 @@ export function attractTick(timestamp) {
         return;
     }
 
+    const gs = getGameState();
+
     // Detect the in-game → scoreboard transition (either an organic
     // match-end via frag limit / timer / debug button, or our own
     // GAME_IDLE_MS-triggered endMatch below) and restart the idle clock
     // so the scoreboard gets its full SCORE_IDLE_MS window.
-    const ended = isMatchEnded();
-    if (ended && !wasMatchEnded) lastActivityAt = timestamp;
-    wasMatchEnded = ended;
+    const ended = gs === GAME_STATE.ENDED;
+    if (ended && !wasEnded) lastActivityAt = timestamp;
+    wasEnded = ended;
 
-    if (!attractActive) {
+    if (gs !== GAME_STATE.ATTRACT) {
         const idle = timestamp - lastActivityAt;
         if (ended) {
             // Scoreboard up → attract after the shorter idle window.
             if (idle > SCORE_IDLE_MS) enterAttract();
-        } else if (state.match && state.match.started) {
+        } else if (gs === GAME_STATE.ACTIVE) {
             // Mid-match idle → end the match so the scoreboard appears
             // before attract takes over. Next tick picks up the
             // ended-state transition above.
@@ -162,14 +164,19 @@ export async function enterAttract() {
     baseAngles.length = 0;
     for (const p of state.players) baseAngles.push(p.angle);
     rotateStartTime = performance.now();
-    attractActive = true;
     entering = false;
+    transitionTo(GAME_STATE.ATTRACT);
 }
 
 function exitAttract() {
-    attractActive = false;
     setAttract(false);
     lastActivityAt = performance.now();
+    // After attract, loadMap put us in a fresh post-resetMatch world.
+    // resetMatch already transitioned us to LOBBY; we just need to
+    // un-set the ATTRACT state. transitionTo(LOBBY) is a no-op if we're
+    // somehow not in ATTRACT (e.g., direct dismissIntermission called
+    // pingActivity).
+    transitionTo(GAME_STATE.LOBBY);
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the
     // very next updateGame frame would see elapsed > timeLimit and call

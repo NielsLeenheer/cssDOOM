@@ -16,6 +16,7 @@
 
 import { captureSpStats } from '../game/sp-stats.js';
 import { currentMap } from '../shared/maps.js';
+import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
 
 const LABEL_BASE = '/assets/intermission';
 const COUNT_UP_MS = 1200;     // per-row duration
@@ -48,7 +49,7 @@ export function showIntermission(nextMap, advanceCallback) {
     for (const container of document.querySelectorAll('.pane-intermission')) {
         container.replaceChildren(buildIntermissionNode());
     }
-    document.body.dataset.intermission = 'true';
+    transitionTo(GAME_STATE.INTERMISSION);
 
     // Brief grace period — the same fire press that triggered the exit
     // (in attract-like flows) shouldn't immediately advance the screen.
@@ -59,7 +60,9 @@ export function showIntermission(nextMap, advanceCallback) {
 }
 
 export function hideIntermission() {
-    delete document.body.dataset.intermission;
+    if (getGameState() === GAME_STATE.INTERMISSION) {
+        transitionTo(GAME_STATE.ACTIVE);
+    }
     pendingNextMap = null;
     onAdvance = null;
     dismissable = false;
@@ -74,7 +77,7 @@ export function hideIntermission() {
 /** True if the intermission is currently shown (input handlers route
  *  fire to advance instead of fireWeapon). */
 export function isIntermissionActive() {
-    return document.body.dataset.intermission === 'true';
+    return getGameState() === GAME_STATE.INTERMISSION;
 }
 
 /**
