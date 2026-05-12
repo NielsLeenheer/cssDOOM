@@ -36,6 +36,18 @@ body[data-mode="singleplayer"] .pane[data-player="1"] {
     display: none;
 }
 
+/* Kiosk mode (?kiosk URL param) — installation runs on a video-wall
+   controller that takes a single 3840×2160 input in 2x2 quadrant mode,
+   but only the top two quadrants are physical 1080p monitors. Constrain
+   the game to the top half so each pane lands 1:1 on one monitor; the
+   bottom half stays empty (body background) and is discarded by the
+   wall. Uses viewport units so the exact resolution can change without
+   touching CSS. */
+body.kiosk #game {
+    inset: 0 0 auto 0;
+    height: 50vh;
+}
+
 /* Secondary window mode (?join URL param) — the secondary represents one
    remote slot the master assigned to it. Visually only one pane is shown
    regardless of which slot the master picked. Position-based selector

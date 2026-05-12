@@ -41,6 +41,8 @@ import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
 import { isMatchLobby, setMatchEndBroadcaster } from './src/game/match.js';
 
 const isSecondary = new URLSearchParams(location.search).has('join');
+const isKiosk = new URLSearchParams(location.search).has('kiosk');
+if (isKiosk) document.body.classList.add('kiosk');
 // Master's renderable panes. Slot 0 is always the host's local view.
 // Slots 1, 2, 3 can be filled by either a Local-on-master player (rendered
 // to master's pane 1) or a Remote (BroadcastSink → secondary). Allocation
@@ -190,7 +192,10 @@ async function initMaster() {
     // Restore the previously chosen mode (default singleplayer) before the
     // initial map load so the scene is built with the right pane count and
     // DM gets player 2 + match state from the first frame.
-    applyMode(loadSavedMode());
+    // Kiosk forces deathmatch and bypasses the saved-mode restore so the
+    // installation always boots into 2P split-screen regardless of what the
+    // last interactive session left in localStorage.
+    applyMode(isKiosk ? 'deathmatch' : loadSavedMode());
 
     await loadMap('E1M1');
     requestAnimationFrame(cullingLoop);

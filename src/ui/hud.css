@@ -718,9 +718,9 @@ body[data-attract="true"] #ui-buttons {
    Specificity is high enough (six classes/attrs) to beat the state-
    driven `display: flex/block` rules above (two classes/attrs each). */
 @media (max-aspect-ratio: 24/9) {
-    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window) .pane[data-player="1"] .pane-attract,
-    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window) .pane[data-player="1"] .pane-win,
-    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window) .pane[data-player="1"] .pane-timer {
+    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
+    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-win,
+    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
         display: none;
     }
 }
@@ -737,6 +737,16 @@ body[data-attract="true"] #ui-buttons {
            they now resolve against the pane, not the viewport, which is
            what we want. */
     }
+}
+
+/* Kiosk runs on a 16/9 input (3840×2160) so it doesn't match the
+   min-aspect-ratio: 24/9 branch above — but each pane still lives on
+   its own physical monitor, so overlays must anchor per-pane the same
+   way the wide branch does. */
+body.kiosk .pane-attract,
+body.kiosk .pane-win,
+body.kiosk .pane-timer {
+    position: absolute;
 }
 
 
