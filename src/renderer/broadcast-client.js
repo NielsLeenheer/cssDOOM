@@ -5,11 +5,11 @@
  * local DomRenderer (per-pane commands) and the local Orchestrator (world
  * commands).
  *
- * Game-state mirroring (keeping `state.players[i].x/y/angle` and
- * `state.things[i].x/y/collected` in sync with the master so the
- * secondary's culling loop sees current values) is handled by
- * [state-mirror.js](../game/state-mirror.js) — this class just calls
- * into it before forwarding to the renderer.
+ * Renderer-state mirroring (keeping `rendererState.cameras[i]` and
+ * `rendererState.things[i]` in sync with the master so the local culling
+ * loop sees current values) is handled inline below by calling the apply*
+ * functions from [renderer-state.js](renderer-state.js) before forwarding
+ * the command to the renderer.
  *
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, snapshot replay, heartbeat, disconnect) is
@@ -17,7 +17,11 @@
  */
 
 import { MSG } from './broadcast-protocol.js';
-import { applyPaneCommand, applyWorldCommand } from '../game/state-mirror.js';
+import {
+    applyCameraUpdate,
+    applyThingPositionUpdate,
+    applyThingCollected,
+} from './renderer-state.js';
 
 export class BroadcastClient {
     /**
@@ -57,7 +61,9 @@ export class BroadcastClient {
     }
 
     _dispatchPaneCommand({ target, method, args }) {
-        applyPaneCommand(method, args, target);
+        if (method === 'updateCamera') {
+            applyCameraUpdate(target, args[0]);
+        }
 
         const fn = this.domRenderer[method];
         if (typeof fn === 'function') {
@@ -68,7 +74,22 @@ export class BroadcastClient {
     }
 
     _dispatchWorldCommand({ method, args }) {
-        applyWorldCommand(method, args);
+        switch (method) {
+            case 'updateThingPosition': {
+                const [thingIndex, x, y, floorHeight] = args;
+                applyThingPositionUpdate(thingIndex, x, y, floorHeight);
+                break;
+            }
+            case 'collectItem':
+            case 'killEnemy':
+                applyThingCollected(args[0], true);
+                break;
+            case 'uncollectItem':
+                applyThingCollected(args[0], false);
+                break;
+            default:
+                break;
+        }
 
         const fn = this.orchestrator[method];
         if (typeof fn === 'function') {

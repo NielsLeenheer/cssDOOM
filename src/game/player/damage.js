@@ -212,7 +212,9 @@ function clearSceneState() {
         }
         player.powerups = {};
     }
-    state.things = [];
+    // Clear in place so the rendererState alias (master:
+    // rendererState.things === state.things) stays valid across map loads.
+    state.things.length = 0;
     for (let index = 0; index < state.projectiles.length; index++) renderer.removeProjectile(state.projectiles[index].id);
     state.projectiles = [];
     state.nextProjectileId = 0;

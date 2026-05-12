@@ -41,6 +41,11 @@ import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
 import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
 import { isMatchLobby, setMatchEndBroadcaster } from './src/game/match.js';
 import { setGameStateBroadcaster, applyRemoteGameState, getGameState } from './src/game/game-state.js';
+import {
+    rendererState,
+    bindRendererStateToMaster,
+    initSecondaryRendererState,
+} from './src/renderer/renderer-state.js';
 
 const isSecondary = new URLSearchParams(location.search).has('join');
 const isKiosk = new URLSearchParams(location.search).has('kiosk');
@@ -85,9 +90,13 @@ function renderAllActivePanes() {
 /**
  * Culling loop. Runs every CULLING_INTERVAL frames per pane, hiding
  * off-screen elements. Lives at the orchestration layer (not inside the
- * renderer module) because it iterates game state — state.players for the
- * camera position, state.things for live thing positions, and the spectator
- * toggle for ceiling-skip behavior.
+ * renderer module) because it iterates the renderer-side world view —
+ * rendererState.cameras for camera position, rendererState.things for live
+ * thing positions, and the spectator toggle for ceiling-skip behavior.
+ *
+ * Same code runs on master and secondary: on master rendererState aliases
+ * the live game state, on secondary it's populated by inbound broadcast
+ * envelopes. Culling can't tell the difference.
  *
  * During attract mode the camera rotates so slowly (~12°/sec) that we
  * can afford to cull much less often. Drops culling work to ~10 Hz from
@@ -102,8 +111,9 @@ function cullingLoop() {
         cullingFrameCount = 0;
         for (let i = 0; i < sceneStates.length; i++) {
             if (sceneStates[i].wallElements.length === 0) continue;
-            const player = state.players[i] || state.players[0];
-            updateCulling(player, state.things, spectatorActive, i);
+            const camera = rendererState.cameras[i] || rendererState.cameras[0];
+            if (!camera) continue;
+            updateCulling(camera, rendererState.things, spectatorActive, i);
         }
     }
     requestAnimationFrame(cullingLoop);
@@ -171,6 +181,10 @@ function gameLoop(timestamp) {
  */
 async function initMaster() {
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
+    // Alias the renderer-state arrays directly onto the live game state so
+    // master-side reads (culling, sprite billboard rotation) see the
+    // authoritative simulation values with no copy step.
+    bindRendererStateToMaster(state);
     // Wire action handlers BEFORE input modules emit anything. Inputs
     // produce events on the bus; handlers in src/actions/* subscribe to
     // them and dispatch into game functions.
@@ -404,6 +418,11 @@ function broadcastLobbyState() {
  */
 async function initSecondary() {
     document.body.classList.add('secondary-window');
+
+    // Stand up the renderer-state arrays sized for the secondary's two-pane
+    // DOM. The BroadcastClient's apply* calls populate them as updates flow
+    // in from master; until then they sit at spawn-default zeros.
+    initSecondaryRendererState(sceneStates.length);
 
     const overlay = ensureDisconnectedOverlay();
 
