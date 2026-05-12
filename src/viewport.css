@@ -76,6 +76,20 @@ body.kiosk #game {
     height: 50vh;
 }
 
+/* Kiosk SP — the kiosk has two physical monitors; we don't want the SP
+   view to span both with a giant 32:9 image. Instead, render SP on the
+   left monitor and mirror pane 0's scene onto the right pane (the
+   mirror state is set by menu.applyMode → setMirrorMode based on
+   body.kiosk + singleplayer). Override SP's default "hide pane 1" so
+   both panes split the top-half capture 50/50, matching DM layout. */
+body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] {
+    display: block;
+}
+body.kiosk[data-mode="singleplayer"] .pane[data-player="0"],
+body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] {
+    flex: 1 1 50%;
+}
+
 /* Secondary window mode (?join URL param) — the secondary represents one
    remote slot the master assigned to it. Visually only one pane is shown
    regardless of which slot the master picked. Position-based selector

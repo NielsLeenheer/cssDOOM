@@ -92,9 +92,14 @@ export function applyMode(mode) {
         setDefaultSlot(0);
     }
 
-    // The Phase 3 debug mirror is incompatible with real DM (it forces a
-    // mirror of player 0 into pane 1; DM wants player 1's own view there).
-    setMirrorMode(false);
+    // Mirror pane 0 → pane 1 in kiosk SP so the right monitor isn't
+    // dark. The mirror flag drives both the renderer's per-effect
+    // viewport fanout AND the paneCount used at scene build time
+    // (maps.js). DM never wants the mirror — pane 1 holds its own
+    // player there. Outside kiosk, SP just hides pane 1 via CSS, so
+    // mirroring would build an invisible second scene for nothing.
+    const isKiosk = document.body.classList.contains('kiosk');
+    setMirrorMode(isKiosk && mode === 'singleplayer');
 }
 
 /**

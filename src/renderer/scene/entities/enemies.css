@@ -122,6 +122,15 @@ body.all-enemies-shadow .enemy .sprite {
     display: none;
 }
 
+/* Kiosk SP mirror — pane 1 renders player 0's view onto the right
+   monitor, so player 0's billboard (sprite) must also stay hidden
+   there. The default rule above only hides each pane's "own" sprite
+   by matching data-player-index === data-player; in mirror SP we
+   want player-0's sprite hidden in pane 1 too. */
+body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] .enemy.player[data-player-index="0"] {
+    display: none;
+}
+
 /* When a player dies, their LIVE sprite is hidden — a separate `.corpse`
    decoration is spawned at the death point by damage.js's createCorpse so
    the body persists at the original location even after the live player
