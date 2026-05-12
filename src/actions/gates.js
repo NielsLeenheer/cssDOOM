@@ -26,7 +26,7 @@ import { isMenuOpen } from '../ui/menu.js';
 import { isMatchEnded, restartMatch } from '../game/match.js';
 import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
 import { spawnPlayer } from '../game/player/spawn.js';
-import { tryClaimSlot } from '../input/claim-registry.js';
+import { orchestrator } from '../renderer/orchestrator.js';
 import { currentMap, loadMap } from '../shared/maps.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';
@@ -78,7 +78,7 @@ export function initGates() {
         if (state.mode !== 'deathmatch') return;    // SP uses default-slot fallback
         if (event.deviceId == null) return;
         if (isMatchEnded()) return;                  // match-end gate handles its own
-        const claimed = tryClaimSlot(event.deviceId);
+        const claimed = orchestrator.tryClaimSlot(event.deviceId);
         // Whether or not the claim succeeded (slot full → null), consume
         // so the wake-up press doesn't fire weapons or open doors.
         return true;

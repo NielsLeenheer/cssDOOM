@@ -29,13 +29,10 @@ import { spectatorActive } from './src/ui/spectator.js';
 import './src/ui/spectator.js';
 
 import { orchestrator } from './src/renderer/orchestrator.js';
-import { DomRenderer } from './src/renderer/dom-renderer.js';
-import { BroadcastSink } from './src/renderer/broadcast-sink.js';
 import { BroadcastClient } from './src/renderer/broadcast-client.js';
 import { MasterConnection, SecondaryConnection } from './src/renderer/broadcast-connection.js';
-import { tearDownPane, rebuildPane, updatePerspective } from './src/renderer/scene/scene.js';
+import { updatePerspective } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
-import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
 import { initLobby, getCarriedOverClaims } from './src/ui/lobby.js';
 import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
 import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
@@ -50,11 +47,6 @@ import {
 const isSecondary = new URLSearchParams(location.search).has('join');
 const isKiosk = new URLSearchParams(location.search).has('kiosk');
 if (isKiosk) document.body.classList.add('kiosk');
-// Master's renderable panes. Slot 0 is always the host's local view.
-// Slots 1, 2, 3 can be filled by either a Local-on-master player (rendered
-// to master's pane 1) or a Remote (BroadcastSink → secondary). Allocation
-// is dynamic — see setupMasterBroadcast.
-const MAX_SLOTS = 4;
 
 let debugEnabled = false;
 
@@ -241,30 +233,11 @@ async function initMaster() {
 
 /**
  * Set up the master-side broadcast connection. Listens for a secondary
- * window's LOOKING announcement, swaps target[1] for a BroadcastSink so
- * subsequent renderer commands stream to the secondary, and watches a
- * heartbeat to detect disconnection.
+ * window's LOOKING announcement and routes join / leave events into the
+ * orchestrator, which owns the slot lifecycle (target swap, pane
+ * teardown, visibility). This function is now mostly wiring.
  */
 let masterConnection = null;
-let savedSecondaryTarget = null;
-// When a secondary disconnects, defer the visual "show pane 1 again" toggle
-// for this many ms. Lets a quickly-reloading secondary reconnect without
-// the user seeing master's pane 1 flash visible. The target-swap (sink →
-// DomRenderer) still happens immediately so the local DOM stays current.
-const RECONNECT_GRACE_MS = 500;
-let secondaryActiveGraceTimer = null;
-// Slots currently occupied by a remote sink. Master picks the next free
-// one when a secondary joins. With one secondary at most (today's Local
-// DM use case), this practically always returns 1; the dynamic structure
-// is here so multi-remote (Network DM) can extend it without surgery.
-const occupiedRemoteSlots = new Set();
-let currentSecondarySlot = null; // for the single-secondary case
-function allocateRemoteSlot() {
-    for (let i = 1; i < MAX_SLOTS; i++) {
-        if (!occupiedRemoteSlots.has(i)) return i;
-    }
-    return null;
-}
 function setupMasterBroadcast() {
     // Track the level we're transitioning to. `currentMap` from maps.js
     // doesn't get updated until partway through loadMap (after the fetch),
@@ -278,97 +251,43 @@ function setupMasterBroadcast() {
         pendingLevel = e.detail?.level ?? null;
         masterConnection?.signalLevelChange();
     });
-    // After loadMap settles, clear the pending level and resume accepting
-    // secondary handshakes. Without this, a secondary that hits LOOKING
-    // mid-loadMap would receive an ACK pointing at a half-built scene.
     window.addEventListener('cssdoom:level-loaded', () => {
         pendingLevel = null;
         masterConnection?.resumeAfterLevelLoad();
     });
 
     masterConnection = new MasterConnection({
-        snapshotProvider: () => {
-            // Allocate (or re-use) a slot for the joiner. If a secondary is
-            // already alive (this LOOKING is a duplicate retry from the
-            // same peer), give it back the slot it already has rather than
-            // allocating a new one.
-            const slotIndex = currentSecondarySlot ?? allocateRemoteSlot();
-            return {
-                mode: state.mode,
-                level: pendingLevel ?? currentMap,
-                gameState: getGameState(),
-                slotIndex,
-            };
-        },
+        snapshotProvider: () => ({
+            mode: state.mode,
+            level: pendingLevel ?? currentMap,
+            gameState: getGameState(),
+            slotIndex: orchestrator.nextOrCurrentRemoteSlot(),
+        }),
         onRemoteInput: applyRemoteInput,
         onJoin: (payload) => {
-            // A reconnecting secondary cancels any pending "show pane 1
-            // again" timer so the user doesn't see a flash during reload.
-            if (secondaryActiveGraceTimer) {
-                clearTimeout(secondaryActiveGraceTimer);
-                secondaryActiveGraceTimer = null;
-            }
             const slot = payload.slotIndex;
             if (slot == null) {
                 console.warn('[broadcast] secondary join refused — no free slots');
                 return;
             }
-            occupiedRemoteSlots.add(slot);
-            currentSecondarySlot = slot;
             // Don't mark slot as externally claimed: secondary is
             // display-only, master's local kbm-B / gamepad must still be
             // able to claim it. (Network DM will revisit.)
-            const sink = new BroadcastSink(masterConnection.channel, slot);
-            savedSecondaryTarget = orchestrator.replaceTarget(slot, sink);
-            // Tear down master's local DOM for this slot — the secondary
-            // is rendering it now. World commands and the culling loop
-            // both early-exit on the now-empty sceneStates[slot] arrays,
-            // so master skips the wasted work on an invisible subtree.
-            tearDownPane(slot);
-            // Hide master's local copy of the pane — the secondary is now
-            // showing it. CSS rule lives in viewport.css.
-            document.body.classList.add('secondary-active');
-            // Pane[0] just grew from 50% → 100% width; refresh its
-            // perspective so the FOV matches the new size.
-            updatePerspective();
-            console.log('[broadcast] secondary joined at slot', slot, '- pane torn down');
+            orchestrator.bindRemoteSlot(slot, masterConnection.channel);
             // Send current lobby state right away so the freshly-
             // connected secondary's pane shows the correct prompt
             // immediately (instead of waiting for the next claim event).
             broadcastLobbyState();
         },
         onLeave: () => {
-            const slot = currentSecondarySlot;
-            // Restore the DomRenderer immediately so master's per-frame
-            // commands keep the pane's DOM in sync. Visual unhide is
-            // deferred so a reloading secondary doesn't flash the pane.
-            if (slot != null) {
-                orchestrator.replaceTarget(slot, savedSecondaryTarget ?? new DomRenderer(slot));
-                occupiedRemoteSlots.delete(slot);
-            }
-            savedSecondaryTarget = null;
-            currentSecondarySlot = null;
-            if (secondaryActiveGraceTimer) clearTimeout(secondaryActiveGraceTimer);
-            secondaryActiveGraceTimer = setTimeout(() => {
-                secondaryActiveGraceTimer = null;
-                // Rebuild the pane DOM from pane 0's current state before
-                // unhiding it — without this, the user would see a brief
-                // flash of an empty .scene before the next gameLoop frame
-                // would have a chance to repopulate it (and frankly,
-                // there's no path that would repopulate without this).
-                if (slot != null) rebuildPane(slot);
-                document.body.classList.remove('secondary-active');
-                // Both panes are back at 50% — refresh perspectives.
-                updatePerspective();
-            }, RECONNECT_GRACE_MS);
-            console.log('[broadcast] secondary left slot', slot);
+            orchestrator.unbindRemoteSlot();
         },
     });
 
     // Mirror master's lobby state onto any connected secondary. Fires on
-    // every local claim add/remove (via claim-registry's notify) and on
-    // match-reset so the secondary's overlay tracks live.
-    onClaimChange(broadcastLobbyState);
+    // every local claim add/remove (via the orchestrator's claim notify)
+    // and on match-reset so the secondary's overlay tracks live.
+    orchestrator.onClaimChange(broadcastLobbyState);
     window.addEventListener('cssdoom:match-reset', broadcastLobbyState);
 
     // Mirror match-end scoreboard onto any connected secondary. match.js
@@ -393,7 +312,7 @@ function setupMasterBroadcast() {
  */
 function broadcastLobbyState() {
     if (!masterConnection) return;
-    const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
+    const slotsClaimed = state.players.map((_, i) => orchestrator.isSlotClaimedLocally(i));
     const carried = getCarriedOverClaims();
     const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
     masterConnection.broadcastLobbyState({

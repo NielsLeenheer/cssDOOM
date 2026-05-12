@@ -11,7 +11,7 @@
  * kbm-input-handler instances + separate input slots.
  */
 
-import { registerInputProvider } from './index.js';
+import { registerInputProvider } from '../renderer/orchestrator.js';
 import { pingActivity } from '../ui/attract.js';
 import { createKbmInputHandler } from './kbm-input-handler.js';
 

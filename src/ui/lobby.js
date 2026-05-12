@@ -9,7 +9,7 @@
  *   - Auto-starts the match when all expected slots are claimed.
  *
  * Listens to:
- *   - `onClaimChange` from input/claim-registry.js — fires when a device
+ *   - `orchestrator.onClaimChange` — fires when a device
  *     claims or releases a slot, or when external (remote) slot
  *     occupancy changes via setExternallyClaimedSlots.
  *   - `cssdoom:match-reset` — dispatched by maps.js / menu.js when a
@@ -22,8 +22,7 @@
  */
 
 import { state } from '../game/state.js';
-import { resetTransientInputs } from '../input/index.js';
-import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
+import { orchestrator } from '../renderer/orchestrator.js';
 import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
 
 let externalSlotsRef = () => new Set();
@@ -50,7 +49,7 @@ export function getCarriedOverClaims() {
  */
 export function initLobby({ getExternallyClaimedSlots }) {
     externalSlotsRef = getExternallyClaimedSlots;
-    onClaimChange(updateLobbyUI);
+    orchestrator.onClaimChange(updateLobbyUI);
     window.addEventListener('cssdoom:match-reset', () => {
         // New match: clear any transient held-input from the previous
         // match (a fire key still down from the kill that ended it
@@ -59,14 +58,14 @@ export function initLobby({ getExternallyClaimedSlots }) {
         // keeps their controller→pane assignment across back-to-back
         // games. The kiosk loop is players standing side-by-side — we
         // do NOT want their assignments to shuffle between matches.
-        resetTransientInputs();
+        orchestrator.resetTransientInputs();
         // Snapshot already-claimed slots so they're treated as carried
         // over (no READY flash) in the new lobby session. Any claim
         // added AFTER this point is "fresh" and will flash READY.
         carriedOverClaims = new Set();
         const ext = externalSlotsRef();
         for (let i = 0; i < state.players.length; i++) {
-            if (isSlotClaimedLocally(i) || ext.has(i)) carriedOverClaims.add(i);
+            if (orchestrator.isSlotClaimedLocally(i) || ext.has(i)) carriedOverClaims.add(i);
         }
         updateLobbyUI();
     });
@@ -97,7 +96,7 @@ export function updateLobbyUI() {
     // every claim change, after match transitions are already settled.
 
     const externalSlots = externalSlotsRef();
-    const isClaimed = (slot) => isSlotClaimedLocally(slot) || externalSlots.has(slot);
+    const isClaimed = (slot) => orchestrator.isSlotClaimedLocally(slot) || externalSlots.has(slot);
 
     // Find the lowest unclaimed slot — that's the one currently prompting.
     // Slots below it are 'ready' (claimed); slots above are 'waiting'.
@@ -141,7 +140,7 @@ let autoStartTimer = null;
 function allSlotsClaimedNow() {
     const externalSlots = externalSlotsRef();
     for (let i = 0; i < state.players.length; i++) {
-        if (!isSlotClaimedLocally(i) && !externalSlots.has(i)) return false;
+        if (!orchestrator.isSlotClaimedLocally(i) && !externalSlots.has(i)) return false;
     }
     return true;
 }

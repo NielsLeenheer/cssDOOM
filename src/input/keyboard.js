@@ -40,8 +40,8 @@
  * hookup.
  */
 
-import { inputs, registerInputProvider } from './index.js';
-import { getDriverSlot, tryClaimSlot, onClaimChange, applySavedClaim } from './claim-registry.js';
+import { inputs, registerInputProvider } from '../renderer/orchestrator.js';
+import { orchestrator } from '../renderer/orchestrator.js';
 import { isMenuOpen } from '../ui/menu.js';
 import { pingActivity } from '../ui/attract.js';
 import { createKbmInputHandler } from './kbm-input-handler.js';
@@ -64,7 +64,7 @@ export function getActiveKbm() {
 
 /** Slot the active kbm device drives, or null if unbound. */
 function activeSlot() {
-    return getDriverSlot(activeKbm);
+    return orchestrator.getDriverSlot(activeKbm);
 }
 
 // Shared kbm input handler — one instance drives both keyboard and
@@ -101,10 +101,10 @@ function handleTab() {
     if (activeSlot() == null) return;
 
     const other = activeKbm === KBM_A ? KBM_B : KBM_A;
-    const otherSlot = getDriverSlot(other);
+    const otherSlot = orchestrator.getDriverSlot(other);
 
     if (otherSlot == null) {
-        const claimed = tryClaimSlot(other);
+        const claimed = orchestrator.tryClaimSlot(other);
         if (claimed == null) return;  // No free slot available.
     }
 
@@ -119,12 +119,12 @@ function handleTab() {
 
 export function initKeyboardInput() {
     registerInputProvider(() => activeSlot(), kbmHandler.getInput);
-    onClaimChange(syncKbmTargetAttribute);
+    orchestrator.onClaimChange(syncKbmTargetAttribute);
     // Resume any KBM bindings from the previous page load in this tab
     // (sessionStorage). Keyboard is always "connected" so we can do
     // this synchronously at init.
-    applySavedClaim(KBM_A);
-    applySavedClaim(KBM_B);
+    orchestrator.applySavedClaim(KBM_A);
+    orchestrator.applySavedClaim(KBM_B);
     syncKbmTargetAttribute();
 
     document.addEventListener('keydown', event => {

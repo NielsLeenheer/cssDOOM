@@ -11,7 +11,7 @@
  *   { kind: <ACTION>, slot: number|null, deviceId: string, …extra }
  *
  *   `slot` is the player slot the source device currently drives
- *   (resolved via claim-registry at emit time). Unbound devices in a DM
+ *   (resolved via orchestrator.getDriverSlot at emit time). Unbound devices in a DM
  *   lobby emit slot=null so the claim handler can promote a fresh
  *   button-press into a slot claim.
  *

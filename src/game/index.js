@@ -4,7 +4,7 @@
 
 import { MAX_FRAME_DELTA_TIME } from './constants.js';
 import { state } from './state.js';
-import { collectInputs } from '../input/index.js';
+import { orchestrator } from '../renderer/orchestrator.js';
 import { updateMovement } from './movement.js';
 import { checkSectorDamage } from './player/damage.js';
 import { checkPickups, updatePowerups, checkItemRespawns } from './player/pickups.js';
@@ -33,7 +33,7 @@ export function updateGame(timestamp) {
 
     // Single per-frame input collection — populates inputs[i] for every
     // active player slot from all registered providers.
-    collectInputs();
+    orchestrator.collectInputs();
 
     // Per-player updates (movement, sector damage, pickups, powerups).
     // World updates (enemies, projectiles, doors, teleporters, crushers)

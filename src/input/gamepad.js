@@ -33,8 +33,8 @@
  * slots independently.
  */
 
-import { inputs, registerInputProvider } from './index.js';
-import { getDriverSlot, unclaim, applySavedClaim } from './claim-registry.js';
+import { inputs, registerInputProvider } from '../renderer/orchestrator.js';
+import { orchestrator } from '../renderer/orchestrator.js';
 import { pingActivity } from '../ui/attract.js';
 import { emit } from './event-bus.js';
 import * as A from './actions.js';
@@ -316,17 +316,17 @@ function setupGamepad(gamepad) {
     // Per-gamepad provider — contributes to whichever slot the press-to-
     // claim system has bound this gamepad to. SP auto-binds to slot 0,
     // DM requires fire-press claim before contributing.
-    registerInputProvider(() => getDriverSlot(deviceId), () => padState);
+    registerInputProvider(() => orchestrator.getDriverSlot(deviceId), () => padState);
 
     // Resume any saved binding from this tab's sessionStorage so reloads
     // keep the same controller on the same pane. Gamepad indices are
     // typically stable across same-tab reloads when the hardware doesn't
     // change; if not, the saved entry silently drops to null and the
     // player can re-claim by pressing fire.
-    applySavedClaim(deviceId);
+    orchestrator.applySavedClaim(deviceId);
 
     /** The slot this gamepad currently drives, or null if unbound. */
-    const slotForPad = () => getDriverSlot(deviceId);
+    const slotForPad = () => orchestrator.getDriverSlot(deviceId);
 
     // Per-button press/release handlers, dispatched by `processGamepad`.
     // Each handler just emits the logical action on the bus — gates +
@@ -386,9 +386,9 @@ function handleDisconnect(gamepadIndex) {
         padState._wasConnected = false;
     }
     const deviceId = gamepadDeviceId(gamepadIndex);
-    const claimedSlot = getDriverSlot(deviceId);
+    const claimedSlot = orchestrator.getDriverSlot(deviceId);
     if (claimedSlot != null) {
-        unclaim(deviceId);
+        orchestrator.unclaim(deviceId);
         const slotInputs = inputs[claimedSlot];
         if (slotInputs) slotInputs.fireHeld = false;
     }
