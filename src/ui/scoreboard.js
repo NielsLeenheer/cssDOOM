@@ -91,10 +91,12 @@ function buildGrid({ scores, kills }) {
     grid.className = 'scoreboard-grid';
     grid.style.setProperty('--player-count', String(n));
 
-    // Header row: empty corner, victim swatches, TOTAL label.
+    // Header row: empty corner, victim swatches, TOTAL label. The
+    // `scoreboard-swatch-victim` class lets CSS overlay the bloody face
+    // on the swatch matching the local pane's player.
     appendCell(grid, 'scoreboard-corner');
     for (let v = 0; v < n; v++) {
-        appendCell(grid, `scoreboard-swatch player-${v}`);
+        appendCell(grid, `scoreboard-swatch scoreboard-swatch-victim player-${v}`);
     }
     const totalLabel = document.createElement('div');
     totalLabel.className = 'scoreboard-total-label';
@@ -104,9 +106,10 @@ function buildGrid({ scores, kills }) {
     totalLabel.appendChild(totalImg);
     grid.appendChild(totalLabel);
 
-    // Per-killer rows.
+    // Per-killer rows. `scoreboard-swatch-killer` lets CSS overlay the
+    // healthy face on the swatch matching the local pane's player.
     for (let k = 0; k < n; k++) {
-        appendCell(grid, `scoreboard-swatch player-${k}`);
+        appendCell(grid, `scoreboard-swatch scoreboard-swatch-killer player-${k}`);
         for (let v = 0; v < n; v++) {
             appendCell(grid, 'scoreboard-cell', pad(kills[k][v], CELL_WIDTH));
         }

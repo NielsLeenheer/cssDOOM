@@ -592,6 +592,35 @@ body[data-match-ended="true"] .pane-win {
 .scoreboard-swatch.player-2 { background-image: url('/assets/hud/STFB1.png'); }
 .scoreboard-swatch.player-3 { background-image: url('/assets/hud/STFB2.png'); }
 
+/* Per-pane player marker — overlay a face sprite on the swatch
+   matching THIS pane's player so each monitor highlights its own
+   player's row and column. STFDEAD0 (dead) for the victim (top) row,
+   STFST00 (healthy front-facing) for the killer (left) column.
+   Other panes' / other players' swatches stay plain colored squares. */
+.scoreboard-swatch-victim::after,
+.scoreboard-swatch-killer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: no-repeat center / contain;
+    image-rendering: pixelated;
+}
+.scoreboard-swatch {
+    position: relative;
+}
+.pane[data-player="0"] .scoreboard-swatch-victim.player-0::after,
+.pane[data-player="1"] .scoreboard-swatch-victim.player-1::after,
+.pane[data-player="2"] .scoreboard-swatch-victim.player-2::after,
+.pane[data-player="3"] .scoreboard-swatch-victim.player-3::after {
+    background-image: url('/assets/hud/STFDEAD0.png');
+}
+.pane[data-player="0"] .scoreboard-swatch-killer.player-0::after,
+.pane[data-player="1"] .scoreboard-swatch-killer.player-1::after,
+.pane[data-player="2"] .scoreboard-swatch-killer.player-2::after,
+.pane[data-player="3"] .scoreboard-swatch-killer.player-3::after {
+    background-image: url('/assets/hud/STFST00.png');
+}
+
 .scoreboard-cell {
     font-family: 'WINUM', monospace;
     font-size: calc(24px * var(--screen-scale, 1));   /* WINUM is pixel-perfect at multiples of 12 px */
