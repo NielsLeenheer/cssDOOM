@@ -14,18 +14,22 @@ import { setDefaultSlot } from '../input/claim-registry.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 
-// Build level buttons with HUD digit sprites
+// Build level buttons using the WILV0N intermission level-name sprites
+// (HANGAR, NUCLEAR PLANT, …) — the same white sprites the SP intermission
+// screen shows above FINISHED, so the menu and intermission stay
+// visually consistent.
 for (const name of MAPS) {
     const btn = document.createElement('button');
     btn.className = 'menu-level';
     btn.dataset.map = name;
 
-    // Level number is the last character (e.g. "1" from "E1M1")
+    // E1M{N} → WILV0{N-1}.
     const levelNum = parseInt(name.slice(-1));
-    const digit = document.createElement('span');
-    digit.className = 'level-digit';
-    digit.style.setProperty('--level', levelNum);
-    btn.appendChild(digit);
+    const label = document.createElement('img');
+    label.className = 'level-name';
+    label.src = `/assets/intermission/WILV0${levelNum - 1}.png`;
+    label.alt = name;
+    btn.appendChild(label);
 
     btn.addEventListener('click', () => {
         loadMap(name);

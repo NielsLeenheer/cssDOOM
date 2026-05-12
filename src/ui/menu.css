@@ -144,6 +144,7 @@ body.secondary-window #menu-button:hover { filter: none; }
 .menu-level-list {
     display: flex;
     flex-direction: column;
+    align-items: center;
     gap: 2px;
 }
 
@@ -162,12 +163,10 @@ body.secondary-window #menu-button:hover { filter: none; }
     &.active { opacity: 1; }
 }
 
-.menu-level .level-digit {
-    width: calc(14px * 1.5);
-    height: calc(16px * 1.5);
-    background: url('/assets/hud/DIGITS_SHEET.png') no-repeat;
-    background-size: calc(168px * 1.5) calc(16px * 1.5);
-    background-position-x: calc(var(--level, 0) * -14px * 1.5);
+.menu-level .level-name {
+    /* WILV sprites are 12 px tall — native size keeps each menu row
+       compact. Pixelated rendering preserves the sharp edges. */
+    height: 12px;
     image-rendering: pixelated;
 }
 
@@ -233,6 +232,17 @@ body.secondary-window #menu-button:hover { filter: none; }
 .menu-level::before,
 .menu-skill::before,
 .menu-mode::before {
+    content: '';
+    width: 20px;
+    height: 19px;
+    flex-shrink: 0;
+}
+
+/* Mirror the skull-cursor box on the right so the label between them
+   is centered, with or without the active skull showing. */
+.menu-level::after,
+.menu-skill::after,
+.menu-mode::after {
     content: '';
     width: 20px;
     height: 19px;
