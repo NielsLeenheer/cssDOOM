@@ -17,6 +17,7 @@ import { isSectorAlerted } from '../sound-propagation.js';
 import { damagePlayer } from '../player/damage.js';
 import { playSound } from '../../audio/audio.js';
 import { setEnemyState, respawnEnemy } from './enemies.js';
+import { isMatchLobby } from '../match.js';
 import { enemyHitscanAttack, enemyHitscanAttackEnemy, checkMissileRange, damageEnemy } from './combat.js';
 import { spawnProjectile } from './projectiles.js';
 
@@ -510,6 +511,10 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
 export function updateAllEnemies(deltaTime) {
     // Skip AI when every player is dead.
     if (state.players.every(p => p.isDead)) return;
+    // Skip AI during the DM lobby warmup — players can walk around to
+    // pick a spot, but enemies shouldn't ambush them before the match
+    // formally starts. No-op in SP / once the match begins.
+    if (isMatchLobby()) return;
     const currentTime = performance.now();
     const allThings = state.things;
     const maxRenderDistSq = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
