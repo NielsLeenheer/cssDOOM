@@ -33,6 +33,13 @@ export const GAME_STATE = Object.freeze({
 let current = GAME_STATE.ACTIVE;
 const listeners = new Set();
 
+// Optional master-side broadcaster — set by index.js when the
+// MasterConnection is up so every transition mirrors to the secondary.
+// Null on the secondary (or on master before init); receivers should
+// guard with `?.`.
+let broadcastGameState = null;
+export function setGameStateBroadcaster(fn) { broadcastGameState = fn; }
+
 // Mirror the initial state to the body at module load so CSS / debug
 // inspection see a sane starting attribute before any transition fires.
 if (typeof document !== 'undefined' && document.body) {
@@ -58,6 +65,24 @@ export function getGameState() {
  * the freshly-set attribute.
  */
 export function transitionTo(next) {
+    applyTransition(next);
+    // Mirror to any connected secondary. The hook is a no-op on the
+    // secondary side (no broadcaster registered) and on master when no
+    // peer is alive (MasterConnection gates on peerAlive).
+    broadcastGameState?.(next);
+}
+
+/**
+ * Apply a remote game-state transition without re-broadcasting.
+ * Called by the secondary when a GAME_STATE envelope arrives from
+ * master. We intentionally bypass the broadcaster hook so we don't
+ * echo the transition back into the channel.
+ */
+export function applyRemoteGameState(next) {
+    applyTransition(next);
+}
+
+function applyTransition(next) {
     if (next === current) return;
     const prev = current;
     current = next;

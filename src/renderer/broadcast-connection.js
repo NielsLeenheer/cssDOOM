@@ -155,6 +155,15 @@ export class MasterConnection extends BroadcastConnectionBase {
         this._post({ type: MSG.MATCH_END, ...payload });
     }
 
+    /**
+     * Broadcast a game-state transition. The secondary mirrors via
+     * `applyRemoteGameState` so its CSS body attributes track ours.
+     */
+    broadcastGameState(state) {
+        if (!this.peerAlive) return;
+        this._post({ type: MSG.GAME_STATE, state });
+    }
+
     _startHeartbeat() {
         if (this._pingTimer) return;
         this._pingTimer = setInterval(() => {
@@ -202,14 +211,16 @@ export class MasterConnection extends BroadcastConnectionBase {
  * @param {() => void} [options.onLeave]      Master went silent.
  * @param {(msg: object) => void} [options.onLobbyState]  LOBBY_STATE envelope arrived.
  * @param {(msg: object) => void} [options.onMatchEnd]    MATCH_END envelope arrived.
+ * @param {(msg: object) => void} [options.onGameState]   GAME_STATE envelope arrived.
  */
 export class SecondaryConnection extends BroadcastConnectionBase {
-    constructor({ onAck, onLeave, onLobbyState, onMatchEnd } = {}) {
+    constructor({ onAck, onLeave, onLobbyState, onMatchEnd, onGameState } = {}) {
         super();
         this.onAck = onAck;
         this.onLeave = onLeave;
         this.onLobbyState = onLobbyState;
         this.onMatchEnd = onMatchEnd;
+        this.onGameState = onGameState;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -246,6 +257,8 @@ export class SecondaryConnection extends BroadcastConnectionBase {
             this.onLobbyState?.(msg);
         } else if (msg.type === MSG.MATCH_END) {
             this.onMatchEnd?.(msg);
+        } else if (msg.type === MSG.GAME_STATE) {
+            this.onGameState?.(msg);
         }
     }
 

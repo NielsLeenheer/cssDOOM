@@ -32,7 +32,6 @@ import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
 import { resetMatch, endMatch } from '../game/match.js';
 import { isMenuOpen } from './menu.js';
-import { setAttract } from '../renderer/index.js';
 import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
 
 // Idle thresholds.
@@ -137,7 +136,6 @@ export function attractTick(timestamp) {
 
 export async function enterAttract() {
     entering = true;
-    setAttract(true);
 
     // Treat attract as "match abandoned" — zero scores and restart the
     // timer so when the next pair of players walks up, they get a fully
@@ -169,13 +167,13 @@ export async function enterAttract() {
 }
 
 function exitAttract() {
-    setAttract(false);
     lastActivityAt = performance.now();
     // After attract, loadMap put us in a fresh post-resetMatch world.
     // resetMatch already transitioned us to LOBBY; we just need to
     // un-set the ATTRACT state. transitionTo(LOBBY) is a no-op if we're
     // somehow not in ATTRACT (e.g., direct dismissIntermission called
-    // pingActivity).
+    // pingActivity). The body's data-attract attribute is cleared by
+    // game-state's mirror; the secondary mirrors via GAME_STATE.
     transitionTo(GAME_STATE.LOBBY);
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the

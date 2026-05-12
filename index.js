@@ -40,6 +40,7 @@ import { initLobby, getCarriedOverClaims } from './src/ui/lobby.js';
 import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
 import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
 import { isMatchLobby, setMatchEndBroadcaster } from './src/game/match.js';
+import { setGameStateBroadcaster, applyRemoteGameState, getGameState } from './src/game/game-state.js';
 
 const isSecondary = new URLSearchParams(location.search).has('join');
 const isKiosk = new URLSearchParams(location.search).has('kiosk');
@@ -281,7 +282,7 @@ function setupMasterBroadcast() {
             return {
                 mode: state.mode,
                 level: pendingLevel ?? currentMap,
-                attract: isAttractActive(),
+                gameState: getGameState(),
                 slotIndex,
             };
         },
@@ -362,6 +363,13 @@ function setupMasterBroadcast() {
     setMatchEndBroadcaster((payload) => {
         masterConnection?.broadcastMatchEnd(payload);
     });
+
+    // Mirror every game-state transition onto the secondary. game-state.js
+    // calls this on each transitionTo. The connection gates on
+    // peerAlive — no broadcast when nobody's listening.
+    setGameStateBroadcaster((state) => {
+        masterConnection?.broadcastGameState(state);
+    });
 }
 
 /**
@@ -402,18 +410,26 @@ async function initSecondary() {
     let client = null;
     const conn = new SecondaryConnection({
         onLobbyState: (msg) => {
+            // Per-pane claim-state mirror only — body[data-match-lobby]
+            // is now driven by the GAME_STATE handler below.
             applyLobbyState(msg);
-            // Re-entering the lobby = match no longer ended on this peer.
-            // Master clears its data-match-ended attribute in resetMatch;
-            // mirror that here so the scoreboard hides on a restart.
-            if (msg.inLobby && document.body.dataset.matchEnded) {
-                delete document.body.dataset.matchEnded;
-                hideScoreboard();
-            }
         },
         onMatchEnd: (msg) => {
-            document.body.dataset.matchEnded = 'true';
+            // body[data-match-ended] is driven by GAME_STATE; this
+            // handler just paints the scoreboard DOM from the payload.
             showScoreboard(msg);
+        },
+        onGameState: ({ state }) => {
+            // Mirror master's game-state machine. body[data-game-state]
+            // and the legacy per-state attributes both get set by
+            // applyRemoteGameState — covers what setAttract /
+            // data-match-ended / data-intermission / data-match-lobby
+            // used to do via separate paths. We also clear the
+            // scoreboard when leaving ENDED so a rematch doesn't keep
+            // the old DOM behind the dim overlay.
+            const wasEnded = document.body.dataset.matchEnded === 'true';
+            applyRemoteGameState(state);
+            if (wasEnded && state !== 'ended') hideScoreboard();
         },
         onAck: async (payload, isReconnect) => {
             console.log('[broadcast] master accepted, syncing', payload, isReconnect ? '(reconnect)' : '');
@@ -429,10 +445,11 @@ async function initSecondary() {
             if (payload.level) {
                 await loadMap(payload.level);
             }
-            // Mirror master's attract state immediately — without this the
-            // secondary HUD would show through during a kiosk-idle period
-            // until the master's next attract toggle.
-            if (payload.attract) document.body.dataset.attract = 'true';
+            // Mirror master's current game-state immediately — without
+            // this the secondary's body attributes would lag until the
+            // master's next transition. Applies via applyRemoteGameState
+            // (no echo back to the channel).
+            if (payload.gameState) applyRemoteGameState(payload.gameState);
 
             // Master assigns us a slot; default to 1 if it's missing
             // (e.g., older master that doesn't include slotIndex). The

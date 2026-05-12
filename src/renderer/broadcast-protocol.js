@@ -54,6 +54,13 @@ export const MSG = {
     // the same scoreboard. resetMatch / restartMatch implicitly clear
     // by re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
     MATCH_END: 'match-end',
+    // Master → secondary: game-state transition. Secondary mirrors
+    // master's game-state machine so its CSS gates (data-attract /
+    // data-match-ended / data-intermission / data-match-lobby + the
+    // unified data-game-state) stay in sync without the separate
+    // attract/match-end/lobby paths each having to write their own
+    // attribute.
+    GAME_STATE: 'game-state',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

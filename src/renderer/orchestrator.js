@@ -76,16 +76,6 @@ class Orchestrator {
     isMirrorMode() { return isMirrorModeHelper(); }
     viewportsForEffect(playerIndex) { return viewportsForEffectHelper(playerIndex); }
 
-    /**
-     * Attract-mode toggle. Sets body[data-attract] locally (CSS uses it
-     * to show the kiosk overlay and hide the HUD) and broadcasts to
-     * sinks so the secondary window mirrors the visual state.
-     */
-    setAttract(active) {
-        if (active) document.body.dataset.attract = 'true';
-        else delete document.body.dataset.attract;
-        this._broadcastWorld('setAttract', [active]);
-    }
 }
 
 // Per-pane commands: route to one target by paneIndex. Target's method

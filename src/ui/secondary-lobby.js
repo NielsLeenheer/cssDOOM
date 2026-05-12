@@ -48,11 +48,9 @@ export function applyLobbyState(msg) {
         return;
     }
 
-    if (msg.inLobby) {
-        document.body.dataset.matchLobby = 'true';
-    } else {
-        delete document.body.dataset.matchLobby;
-    }
+    // body[data-match-lobby] is now mirrored by the GAME_STATE envelope
+    // (see index.js initSecondary's onGameState handler). This module
+    // only updates the per-pane data-claim-state attribute.
 
     // Same algorithm as lobby.js's updateLobbyUI: lowest unclaimed slot
     // is the one currently 'prompting'; freshly-claimed slots get
