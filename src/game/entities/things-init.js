@@ -48,7 +48,13 @@ export function initThings() {
                 y: thing.y,
                 type: thing.type,
                 collected: false,
-                hp: THING_HEALTH[thing.type] || 0
+                hp: THING_HEALTH[thing.type] || 0,
+                // Remembered so lifts.js can push a fresh floorHeight into
+                // dead things sitting on a moving platform — live enemies
+                // get this every AI tick via getFloorHeightAt, but corpses
+                // stop ticking and would otherwise hang in mid-air.
+                sectorIndex,
+                floorHeight,
             };
 
             // Solid decorations: store collision radius for canMoveTo() checks.

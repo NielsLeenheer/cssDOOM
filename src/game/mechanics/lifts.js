@@ -190,6 +190,21 @@ export function updatePlayerFromLift(timestamp) {
             liftState.currentHeight = liftState.targetHeight;
             liftState.moving = false;
         }
+
+        // Sync things standing on the lift sector to the new height. Live
+        // enemies get this for free via their AI tick (which calls
+        // getFloorHeightAt → currentHeight), but corpses stop ticking
+        // after death and would otherwise hang in mid-air as the
+        // platform descends or rises. Players are handled separately
+        // by movement.updateHeight().
+        const sectorIndex = liftEntries[index].sectorIndex;
+        const things = state.things;
+        for (let i = 0, n = things.length; i < n; i++) {
+            const thing = things[i];
+            if (thing.sectorIndex !== sectorIndex) continue;
+            thing.floorHeight = liftState.currentHeight;
+            renderer.updateThingPosition(i, thing.x, thing.y, liftState.currentHeight);
+        }
     }
 }
 
