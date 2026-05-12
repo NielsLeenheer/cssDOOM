@@ -80,6 +80,24 @@ export function teardownScene() {
 }
 
 /**
+ * Recompute each pane's `--perspective` from its current rendered
+ * width. Perspective = half the pane's width gives a ~90° horizontal
+ * FOV; reading `clientWidth` per pane means split-screen, kiosk,
+ * mirror, single-pane SP, and master+secondary all just work without
+ * mode branching. Call after any layout change that resizes the panes
+ * — secondary join/leave, kiosk toggle, window resize.
+ */
+export function updatePerspective() {
+    for (let i = 0; i < dom.viewports.length; i++) {
+        const v = dom.viewports[i];
+        const paneWidth = v.clientWidth || window.innerWidth;
+        const perspectiveValue = paneWidth / 2;
+        sceneStates[i].perspectiveValue = perspectiveValue;
+        v.style.setProperty('--perspective', `${perspectiveValue}px`);
+    }
+}
+
+/**
  * Builds the static renderer DOM for pane 0: sector containers, walls,
  * floors, ceilings, and the player billboard. Things, doors, lifts, and
  * crushers are NOT built here — the caller invokes those as renderer
@@ -88,18 +106,7 @@ export function teardownScene() {
  * Async because it preloads textures before returning.
  */
 export async function buildScene() {
-    // Per-pane perspective drives FOV — perspective = half the pane's
-    // own rendered width gives a ~90° horizontal FOV per pane. Reading
-    // each viewport's clientWidth means split-screen, kiosk, mirror,
-    // and SP all "just work" without mode branching, and each pane
-    // gets the value matching its own slice of the screen.
-    for (let i = 0; i < dom.viewports.length; i++) {
-        const v = dom.viewports[i];
-        const paneWidth = v.clientWidth || window.innerWidth;
-        const perspectiveValue = paneWidth / 2;
-        sceneStates[i].perspectiveValue = perspectiveValue;
-        v.style.setProperty('--perspective', `${perspectiveValue}px`);
-    }
+    updatePerspective();
 
     // Build pane 0's scene from map data using the existing helpers (which
     // operate on the singletons dom.scene / sceneState — both alias pane 0).

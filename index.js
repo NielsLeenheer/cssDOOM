@@ -32,7 +32,7 @@ import { DomRenderer } from './src/renderer/dom-renderer.js';
 import { BroadcastSink } from './src/renderer/broadcast-sink.js';
 import { BroadcastClient } from './src/renderer/broadcast-client.js';
 import { MasterConnection, SecondaryConnection } from './src/renderer/broadcast-connection.js';
-import { tearDownPane, rebuildPane } from './src/renderer/scene/scene.js';
+import { tearDownPane, rebuildPane, updatePerspective } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
 import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
 import { initLobby, getCarriedOverClaims } from './src/ui/lobby.js';
@@ -209,6 +209,11 @@ async function initMaster() {
 
     setupMasterBroadcast();
 
+    // Resize: pane widths change → recompute perspective so FOV tracks
+    // the new layout. Covers dev-window resizing and the kiosk's
+    // single→split transitions as players join / drop.
+    window.addEventListener('resize', updatePerspective);
+
     /* Start game loop */
     requestAnimationFrame(gameLoop);
     window.focus();
@@ -303,6 +308,9 @@ function setupMasterBroadcast() {
             // Hide master's local copy of the pane — the secondary is now
             // showing it. CSS rule lives in viewport.css.
             document.body.classList.add('secondary-active');
+            // Pane[0] just grew from 50% → 100% width; refresh its
+            // perspective so the FOV matches the new size.
+            updatePerspective();
             console.log('[broadcast] secondary joined at slot', slot, '- pane torn down');
             // Send current lobby state right away so the freshly-
             // connected secondary's pane shows the correct prompt
@@ -330,6 +338,8 @@ function setupMasterBroadcast() {
                 // there's no path that would repopulate without this).
                 if (slot != null) rebuildPane(slot);
                 document.body.classList.remove('secondary-active');
+                // Both panes are back at 50% — refresh perspectives.
+                updatePerspective();
             }, RECONNECT_GRACE_MS);
             console.log('[broadcast] secondary left slot', slot);
         },
@@ -451,6 +461,7 @@ async function initSecondary() {
     // as scaffolding for that.
 
     requestAnimationFrame(cullingLoop);
+    window.addEventListener('resize', updatePerspective);
     hideInitialOverlay();
 }
 
