@@ -13,14 +13,47 @@
  * explicit release (gamepad disconnect, future menu action). The
  * per-frame transient-input reset on match-reset lives separately in
  * [index.js](index.js) as `resetTransientInputs`.
+ *
+ * Bindings are mirrored to `sessionStorage` so a tab reload keeps every
+ * controller on the same monitor. Cleared on tab close — a new browser
+ * session may enumerate gamepad indices differently, so we ask players
+ * to press-to-claim again. The input/keyboard/gamepad modules call
+ * `applySavedClaim` at startup to restore the mapping.
  */
 
 import { state } from '../game/state.js';
+
+const STORAGE_KEY = 'cssdoom:claims';
 
 const claims = new Map();
 const claimListeners = new Set();
 
 let externallyClaimedSlots = new Set();
+
+// Saved bindings read from sessionStorage at module load. Each entry is
+// consumed by the first `applySavedClaim(deviceId)` call that matches
+// (so a device only restores once per session).
+const savedClaims = loadSavedClaims();
+
+function loadSavedClaims() {
+    try {
+        const raw = sessionStorage.getItem(STORAGE_KEY);
+        if (!raw) return new Map();
+        const entries = JSON.parse(raw);
+        if (!Array.isArray(entries)) return new Map();
+        return new Map(entries);
+    } catch {
+        return new Map();
+    }
+}
+
+function persistClaims() {
+    try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify([...claims]));
+    } catch {
+        /* sessionStorage may be unavailable (private mode etc.) — non-fatal */
+    }
+}
 
 // When set, devices without an explicit claim resolve to this slot. Used
 // by single-player mode (every device drives slot 0). Game-mode policy
@@ -118,5 +151,36 @@ export function onClaimChange(callback) {
 }
 
 function notifyClaimChange() {
+    persistClaims();
     for (const cb of claimListeners) cb();
+}
+
+/**
+ * Try to apply a saved binding for the given deviceId.
+ *
+ * Restores the slot from sessionStorage if the device had one before
+ * the page reload AND that slot is still free + within the current
+ * player-roster size. Returns the claimed slot or null. Idempotent
+ * within a session: after the first successful restore the saved entry
+ * is consumed.
+ *
+ * Called from each input module at startup (keyboard.js for KBM_A/B,
+ * gamepad.js on connect / at init for already-connected pads) so the
+ * same controllers land on the same panes after a tab reload.
+ */
+export function applySavedClaim(deviceId) {
+    if (!savedClaims.has(deviceId)) return null;
+    const slot = savedClaims.get(deviceId);
+    savedClaims.delete(deviceId);
+    // Slot must look sane (non-negative, capped at the orchestrator's
+    // MAX_SLOTS = 4) but we deliberately don't gate on
+    // state.players.length: input init runs before applyMode expands
+    // the roster for DM, so checking length here would reject every
+    // saved slot-1 claim on boot. SP just ignores claims for slot ≥ 1
+    // via setDefaultSlot(0) — no harm leaving the entry in the map.
+    if (slot == null || slot < 0 || slot >= 4) return null;
+    if (isSlotClaimedLocally(slot) || externallyClaimedSlots.has(slot)) return null;
+    claims.set(deviceId, slot);
+    notifyClaimChange();
+    return slot;
 }

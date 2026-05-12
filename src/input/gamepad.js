@@ -34,7 +34,7 @@
  */
 
 import { inputs, registerInputProvider } from './index.js';
-import { getDriverSlot, tryClaimSlot, unclaim } from './claim-registry.js';
+import { getDriverSlot, tryClaimSlot, unclaim, applySavedClaim } from './claim-registry.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
@@ -105,6 +105,17 @@ export function initGamepadInput() {
     window.addEventListener('gamepaddisconnected', (e) => {
         handleDisconnect(e.gamepad.index);
     });
+
+    // Walk pads that are already enumerated at init — on a same-tab
+    // reload the browser remembers them, so `gamepadconnected` may not
+    // fire. Setting them up here means saved claims (sessionStorage)
+    // are restored synchronously before the lobby's match-reset
+    // snapshot runs, so the restored slots are treated as carried-over
+    // and don't flash READY.
+    const initial = navigator.getGamepads ? navigator.getGamepads() : [];
+    for (const pad of initial) {
+        if (pad && !padStates.has(pad.index)) setupGamepad(pad);
+    }
 
     setInterval(pollGamepads, POLL_INTERVAL_MS);
 
@@ -321,6 +332,13 @@ function setupGamepad(gamepad) {
     // claim system has bound this gamepad to. SP auto-binds to slot 0,
     // DM requires fire-press claim before contributing.
     registerInputProvider(() => getDriverSlot(deviceId), () => padState);
+
+    // Resume any saved binding from this tab's sessionStorage so reloads
+    // keep the same controller on the same pane. Gamepad indices are
+    // typically stable across same-tab reloads when the hardware doesn't
+    // change; if not, the saved entry silently drops to null and the
+    // player can re-claim by pressing fire.
+    applySavedClaim(deviceId);
 
     /** The slot this gamepad currently drives, or null if unbound. */
     const slotForPad = () => getDriverSlot(deviceId);

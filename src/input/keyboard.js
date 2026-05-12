@@ -39,7 +39,7 @@
  */
 
 import { inputs, registerInputProvider } from './index.js';
-import { getDriverSlot, tryClaimSlot, onClaimChange } from './claim-registry.js';
+import { getDriverSlot, tryClaimSlot, onClaimChange, applySavedClaim } from './claim-registry.js';
 import { state } from '../game/state.js';
 import { isMenuOpen, toggleMenu } from '../ui/menu.js';
 import { pingActivity } from '../ui/attract.js';
@@ -128,6 +128,11 @@ function handleTab() {
 export function initKeyboardInput() {
     registerInputProvider(() => activeSlot(), kbmHandler.getInput);
     onClaimChange(syncKbmTargetAttribute);
+    // Resume any KBM bindings from the previous page load in this tab
+    // (sessionStorage). Keyboard is always "connected" so we can do
+    // this synchronously at init.
+    applySavedClaim(KBM_A);
+    applySavedClaim(KBM_B);
     syncKbmTargetAttribute();
 
     document.addEventListener('keydown', event => {
