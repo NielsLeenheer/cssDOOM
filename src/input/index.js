@@ -48,12 +48,6 @@ function makeSlot() {
 export const inputs = Array.from({ length: NUM_INPUT_SLOTS }, makeSlot);
 
 /**
- * Migration alias — `input` points at slot 0. Will be removed once every
- * caller reads `inputs[player.index]` directly.
- */
-export const input = inputs[0];
-
-/**
  * Register an input provider.
  *
  * @param {() => number|null} getPlayerIndex  Returns the target slot index
@@ -100,15 +94,6 @@ export function collectInputs() {
         slot.moveY = Math.max(-1, Math.min(1, slot.moveY));
         slot.turn = Math.max(-1, Math.min(1, slot.turn));
     }
-}
-
-/**
- * Backwards-compat alias for collectInputs(). Was the only entry point in
- * the single-player era; many callers still use this name. It's now a thin
- * wrapper over collectInputs and can be removed once all callers update.
- */
-export function collectInput() {
-    collectInputs();
 }
 
 /**

@@ -19,10 +19,6 @@ let previousTimestamp = 0;
 
 export function updateGame(timestamp) {
     const deltaTime = Math.min((timestamp - previousTimestamp) / 1000, MAX_FRAME_DELTA_TIME);
-    if (updateGame._logCount === undefined) updateGame._logCount = 0;
-    if (updateGame._logCount++ < 300 && updateGame._logCount % 60 === 0) {
-        console.log('[game] deltaTime:', deltaTime.toFixed(4), 'ts:', timestamp.toFixed(1), 'prev:', previousTimestamp.toFixed(1));
-    }
     previousTimestamp = timestamp;
 
     // Tick the DM match clock and check the time-limit end condition.
