@@ -710,6 +710,24 @@ body[data-attract="true"] #ui-buttons {
    base rules above — this block only changes the positioning.
    ======================================================================== */
 
+/* Non-video-wall split-screen DM: both panes are visible and both their
+   overlays would render fullscreen via position:fixed, stacking identical
+   content. Hide pane 1's copy so only pane 0's renders. Carved out of
+   master+secondary (.secondary-active) and the secondary window itself
+   (.secondary-window) — both already have the right pane hidden via
+   viewport.css, so suppressing pane 1's overlay there would hide the
+   only visible overlay.
+
+   Specificity is high enough (six classes/attrs) to beat the state-
+   driven `display: flex/block` rules above (two classes/attrs each). */
+@media (max-aspect-ratio: 24/9) {
+    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window) .pane[data-player="1"] .pane-attract,
+    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window) .pane[data-player="1"] .pane-win,
+    body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window) .pane[data-player="1"] .pane-timer {
+        display: none;
+    }
+}
+
 @media (min-aspect-ratio: 24/9) {
     .pane-attract,
     .pane-win {
