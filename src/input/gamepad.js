@@ -59,6 +59,19 @@ const GAMEPAD_TURN_SCALE = 0.65;
 // Threshold past which an analog trigger counts as "pressed". Half-pull
 // fires the action; release returns it to false. Standard FPS feel.
 const TRIGGER_THRESHOLD = 0.5;
+// Press detection for non-trigger buttons falls back to `value` when the
+// `pressed` boolean stays false despite an active button — seen on
+// Firefox + PS5 DualSense face buttons. Face buttons are digital, so
+// `value` is effectively 0 or 1; 0.5 catches the active state cleanly.
+const BUTTON_PRESS_THRESHOLD = 0.5;
+// PS5 DualSense in Firefox (mapping="") reports the D-pad on axis 6 as
+// an 8-way hat instead of buttons 12–15. Values: up=-1.0, down=0.143,
+// left=0.714, right=-0.429, neutral=1.286. Step between directions is
+// 2/7 because 8 directions span the [-1, 1] range plus one neutral
+// slot. Confirmed by `_gamepadLogChanges` capture from both new pads.
+const HAT_AXIS = 6;
+const HAT_NEUTRAL_THRESHOLD = 1.14;
+const HAT_DIRECTION_STEP = 2 / 7;
 
 /** Per-gamepad analog state, keyed by gamepad.index. */
 const padStates = new Map();
@@ -71,9 +84,17 @@ function gamepadDeviceId(gamepadIndex) {
 /**
  * Initialise gamepad input. Native `gamepadconnected` fires when a pad
  * is plugged in (or first interacted with on a page-load-already-plugged
- * gamepad). The RAF poll loop is the source of truth — it both reads
- * per-frame state and detects pads that the connect event missed.
+ * gamepad). The poll loop is the source of truth — it both reads pad
+ * state and detects pads that the connect event missed.
+ *
+ * Polling runs on `setInterval` rather than `requestAnimationFrame` so
+ * sampling stays at a fixed ~125Hz independent of paint throttling.
+ * RAF was getting throttled to ~22Hz in attract mode (heavy DOM mutation
+ * pushing browser frame budget over 16ms), which let quick button taps
+ * fall between samples. A fixed-cadence timer is immune to that.
  */
+const POLL_INTERVAL_MS = 8;
+
 export function initGamepadInput() {
     window.addEventListener('gamepadconnected', (e) => {
         if (!padStates.has(e.gamepad.index)) {
@@ -84,7 +105,64 @@ export function initGamepadInput() {
         handleDisconnect(e.gamepad.index);
     });
 
-    requestAnimationFrame(pollGamepads);
+    setInterval(pollGamepads, POLL_INTERVAL_MS);
+
+    // TEMPORARY DIAGNOSTIC. Call `_gamepadDebug()` from the console to
+    // dump every connected pad's id, mapping, axes, and buttons.
+    window._gamepadDebug = () => {
+        const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+        for (const pad of pads) {
+            if (!pad) continue;
+            console.log({
+                index: pad.index,
+                id: pad.id,
+                mapping: pad.mapping,
+                connected: pad.connected,
+                axes: Array.from(pad.axes).map((v, i) => ({ [i]: Number(v.toFixed(3)) })),
+                buttons: Array.from(pad.buttons).map((b, i) => ({
+                    [i]: { pressed: b.pressed, value: Number((b.value ?? 0).toFixed(2)) },
+                })),
+            });
+        }
+    };
+
+    // Toggle a change-logger that prints whenever any axis or button on
+    // any pad changes from its previous polled value. Use to discover
+    // where unusual inputs (e.g. PS5 D-pad in non-standard mapping) are
+    // reported: enable, press each direction once, disable, read log.
+    window._gamepadLogChanges = (enable) => {
+        _logChangesEnabled = !!enable;
+        _logChangesPrev.clear();
+        console.log(`[gamepad] change logger ${_logChangesEnabled ? 'ON' : 'OFF'}`);
+    };
+}
+
+let _logChangesEnabled = false;
+const _logChangesPrev = new Map();
+const AXIS_CHANGE_THRESHOLD = 0.1;
+
+function logChangesIfEnabled(rawPad) {
+    if (!_logChangesEnabled) return;
+    const key = rawPad.index;
+    const prev = _logChangesPrev.get(key) ?? { axes: [], buttons: [] };
+    const next = {
+        axes: Array.from(rawPad.axes),
+        buttons: Array.from(rawPad.buttons).map(b => ({ pressed: b.pressed, value: b.value ?? 0 })),
+    };
+    for (let i = 0; i < next.axes.length; i++) {
+        const before = prev.axes[i] ?? 0;
+        if (Math.abs(next.axes[i] - before) > AXIS_CHANGE_THRESHOLD) {
+            console.log(`[pad ${key}] axis[${i}] ${before.toFixed(3)} → ${next.axes[i].toFixed(3)}`);
+        }
+    }
+    for (let i = 0; i < next.buttons.length; i++) {
+        const before = prev.buttons[i] ?? { pressed: false, value: 0 };
+        const after = next.buttons[i];
+        if (before.pressed !== after.pressed || Math.abs(before.value - after.value) > 0.1) {
+            console.log(`[pad ${key}] button[${i}] pressed=${before.pressed}→${after.pressed} value=${before.value.toFixed(2)}→${after.value.toFixed(2)}`);
+        }
+    }
+    _logChangesPrev.set(key, next);
 }
 
 /**
@@ -95,7 +173,20 @@ export function initGamepadInput() {
  *   - Updates each pad's analog state and dispatches button transitions.
  *   - Detects pads that disappeared without firing `gamepaddisconnected`.
  */
+// TEMPORARY DIAGNOSTIC: log when the gap between consecutive polls grows
+// beyond ~3× the expected interval (now setInterval-based at 8ms). With
+// the timer-driven poll we expect ~8–16ms gaps; sustained gaps near 44ms
+// would mean the timer itself is being throttled, not just RAF.
+let _lastPollTimestamp = 0;
+const POLL_GAP_LOG_THRESHOLD_MS = 25;
+
 function pollGamepads() {
+    const now = performance.now();
+    if (_lastPollTimestamp && now - _lastPollTimestamp > POLL_GAP_LOG_THRESHOLD_MS) {
+        console.warn(`[gamepad] poll gap ${Math.round(now - _lastPollTimestamp)}ms (attract=${document.body.dataset.attract === 'true'})`);
+    }
+    _lastPollTimestamp = now;
+
     const rawPads = navigator.getGamepads ? navigator.getGamepads() : [];
 
     for (let i = 0; i < rawPads.length; i++) {
@@ -114,6 +205,7 @@ function pollGamepads() {
             setupGamepad(rawPad);
         }
 
+        logChangesIfEnabled(rawPad);
         processGamepad(rawPad);
     }
 
@@ -140,11 +232,29 @@ function processGamepad(rawPad) {
     }
     if (padState.moveX || padState.moveY || padState.turn) pingActivity();
 
+    // ── D-pad hat fallback ──
+    // PS5 DualSense in Firefox: the D-pad is on axis 9 (8-way hat),
+    // not buttons 12–15. Decode the hat into synthetic press flags so
+    // the unified button loop below can edge-detect them just like any
+    // other button. Standard-mapping controllers still drive buttons
+    // 12–15 directly; the OR below makes both sources work.
+    const hat = axes[HAT_AXIS];
+    let hatUp = false, hatDown = false, hatLeft = false, hatRight = false;
+    if (typeof hat === 'number' && hat <= HAT_NEUTRAL_THRESHOLD) {
+        const idx = Math.round((hat + 1) / HAT_DIRECTION_STEP);
+        // 0 = N, 1 = NE, 2 = E, 3 = SE, 4 = S, 5 = SW, 6 = W, 7 = NW
+        hatUp    = idx === 0 || idx === 1 || idx === 7;
+        hatRight = idx === 1 || idx === 2 || idx === 3;
+        hatDown  = idx === 3 || idx === 4 || idx === 5;
+        hatLeft  = idx === 5 || idx === 6 || idx === 7;
+    }
+
     // ── Button transitions ──
     // Detect each button's press/release transition by comparing current
-    // state against the previous tick. Triggers (6, 7) use value-based
-    // detection so analog triggers register even if the browser doesn't
-    // flip the boolean pressed flag (Xbox-on-macOS issue).
+    // state against the previous tick. All buttons use both `pressed`
+    // and `value` — some Firefox + controller combos (Xbox on macOS,
+    // PS5 DualSense face buttons) leave `pressed` false while `value`
+    // goes to 1.0.
     const handlers = padState._handlers;
     const claimOrPass = padState._claimOrPass;
     const prev = padState._prevButtons ??= [];
@@ -152,10 +262,9 @@ function processGamepad(rawPad) {
     for (let i = 0; i < buttons.length; i++) {
         const button = buttons[i];
         if (!button) continue;
-        const isTrigger = i === 6 || i === 7;
-        const isPressed = isTrigger
-            ? (button.pressed || (button.value ?? 0) > TRIGGER_THRESHOLD)
-            : button.pressed;
+        const threshold = (i === 6 || i === 7) ? TRIGGER_THRESHOLD : BUTTON_PRESS_THRESHOLD;
+        const hatFlag = i === 12 ? hatUp : i === 13 ? hatDown : i === 14 ? hatLeft : i === 15 ? hatRight : false;
+        const isPressed = button.pressed || (button.value ?? 0) > threshold || hatFlag;
         const wasPressed = prev[i] ?? false;
 
         if (isPressed && !wasPressed) {
