@@ -502,18 +502,15 @@ body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
 
 /* ========================================================================
    Deathmatch end-of-match scoreboard (per-pane FRAGS counter lives in
-   the HUD bar). The .dm-win-overlay shell is empty until match.js
-   populates it via scoreboard.js; the .scoreboard subtree is the actual
-   grid.
+   the HUD bar). The `.pane-win` shell is empty until match.js populates
+   it via scoreboard.js; the `.scoreboard` subtree is the actual grid.
 
-   .pane-win lives inside .pane. Default position is fixed → covers the
-   whole viewport so it reads as a fullscreen overlay even in split-
-   screen. The video-wall media query below flips it to absolute so each
-   pane gets its own copy bound to its monitor (bezel-safe).
-
-   In non-video-wall split-screen, both panes render their overlay
-   fullscreen and stack identically — visually one overlay; the duplicate
-   render is a minor waste we accept for the simpler layout story.
+   `.pane-win` lives inside `.pane`. Default position is fixed → covers
+   the whole viewport so it reads as a fullscreen overlay in single-
+   screen layouts. The video-wall media query below flips it to absolute
+   so each pane gets its own copy bound to its monitor (bezel-safe). In
+   non-video-wall split-screen, the rule a bit further down hides pane
+   1's copy so only pane 0's overlay renders fullscreen.
    ======================================================================== */
 
 .pane-win {

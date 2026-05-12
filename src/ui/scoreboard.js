@@ -1,13 +1,13 @@
 /**
  * Post-match scoreboard.
  *
- * Built into every `.dm-win-overlay` element in the document — one per
- * pane (via the pane template). In normal / split-screen layouts each
- * pane's overlay is `position: fixed; inset: 0` and covers the viewport
- * (both panes' overlays stack identically — visually one overlay). In
- * video-wall mode (≥24/9 aspect ratio) the overlays flip to
- * `position: absolute` so each monitor gets its own copy instead of one
- * straddling the bezel. The same renderer paints every container.
+ * Built into every `.pane-win` element in the document — one per
+ * pane (via the pane template). In normal / split-screen layouts pane
+ * 0's `.pane-win` is `position: fixed; inset: 0` and covers the
+ * viewport; pane 1's copy is hidden by the non-video-wall CSS rule.
+ * In video-wall mode (≥24/9 aspect ratio) both copies become
+ * `position: absolute` so each monitor gets its own bezel-safe overlay.
+ * The same renderer paints every container.
  *
  * Visibility is driven by `body[data-match-ended="true"]` (set in
  * match.js); this module only owns the DOM structure inside the
@@ -24,7 +24,10 @@
  *     [K₁ swat]  [ k(1,0)  ] [ k(1,1)  ] ...  [  score₁  ]
  *     ...
  *
- * Diagonal cells (suicides) are dimmed via `.scoreboard-diagonal`.
+ * Diagonal cells `k(i,i)` are suicides — they display the count like any
+ * other cell. They subtract from the row's TOTAL (matching original
+ * DOOM scoring), so a player who suicides more than they frag ends up
+ * with a negative total — that's intentional, not a bug.
  */
 
 const CELL_WIDTH = 2;
@@ -40,7 +43,7 @@ const TOTAL_WIDTH = 2;
 export const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 
 /**
- * Render the scoreboard into every `.dm-win-overlay` element in the DOM.
+ * Render the scoreboard into every `.pane-win` element in the DOM.
  * @param {{
  *   mapName: string,
  *   scores: number[],
@@ -49,14 +52,14 @@ export const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
  * }} data
  */
 export function showScoreboard(data) {
-    for (const container of document.querySelectorAll('.dm-win-overlay')) {
+    for (const container of document.querySelectorAll('.pane-win')) {
         container.replaceChildren(buildScoreboardNode(data));
     }
 }
 
 /** Clear the scoreboard out of every overlay. */
 export function hideScoreboard() {
-    for (const container of document.querySelectorAll('.dm-win-overlay')) {
+    for (const container of document.querySelectorAll('.pane-win')) {
         container.replaceChildren();
     }
 }

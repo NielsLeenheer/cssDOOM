@@ -121,7 +121,7 @@ export function matchTick() {
 
 let lastTimerSeconds = -1;
 
-/** Updates the m:ss display on every .dm-timer element when in the last
+/** Updates the m:ss display on every .pane-timer element when in the last
  *  60 s of a match; toggles body[data-timer-active] which the CSS uses
  *  to fade the readout in/out. */
 function updateCountdown(remainingMs) {
@@ -137,7 +137,7 @@ function updateCountdown(remainingMs) {
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
     const text = `${m}:${s.toString().padStart(2, '0')}`;
-    for (const el of document.querySelectorAll('.dm-timer')) el.textContent = text;
+    for (const el of document.querySelectorAll('.pane-timer')) el.textContent = text;
 }
 
 function setTimerActive(active) {
