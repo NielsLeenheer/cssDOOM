@@ -23,6 +23,7 @@ import {
 import { state } from '../state.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { playSound } from '../../audio/audio.js';
+import { recordPickup } from '../sp-stats.js';
 import * as renderer from '../../renderer/index.js';
 
 /** Item respawn delay in deathmatch — collected pickups reappear after this. */
@@ -51,6 +52,7 @@ export function checkPickups(player) {
                 thing.collected = true;
                 renderer.collectItem(index);
                 triggerPickupFlash(player);
+                recordPickup(thing);
                 continue;
             }
 
@@ -90,6 +92,7 @@ export function checkPickups(player) {
                 thing.collected = true;
                 renderer.collectItem(index);
                 triggerPickupFlash(player);
+                recordPickup(thing);
                 continue;
             }
 
@@ -127,6 +130,11 @@ export function checkPickups(player) {
                 renderer.collectItem(index);
                 triggerPickupFlash(player);
             }
+
+            // Stats credit for any path that ended up marking the thing
+            // collected this tick (key, effect, weapon, backpack, generic
+            // pickup). recordPickup itself filters to MF_COUNTITEM types.
+            if (thing.collected) recordPickup(thing);
         }
     }
 }

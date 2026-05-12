@@ -25,6 +25,7 @@ import { initDoors } from '../game/mechanics/doors.js';
 import { initLifts } from '../game/mechanics/lifts.js';
 import { initCrushers } from '../game/mechanics/crushers.js';
 import { initThings } from '../game/entities/things-init.js';
+import { initSpStats } from '../game/sp-stats.js';
 import { updateCulling } from '../renderer/scene/culling.js';
 import * as renderer from '../renderer/index.js';
 
@@ -101,6 +102,8 @@ export async function loadMap(name) {
     buildSpatialGrid();
     addPlayerThings();
     buildSectorAdjacency();
+    // Reset SP stats and start the per-level timer. No-op in DM.
+    initSpStats();
 
     // Initial render pass — primes camera transforms and runs culling once
     // synchronously so the browser doesn't have to composite the entire

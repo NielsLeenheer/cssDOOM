@@ -45,6 +45,7 @@ import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { isMatchEnded, restartMatch } from '../game/match.js';
+import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
 import { loadMap } from '../shared/maps.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
@@ -352,6 +353,7 @@ function setupGamepad(gamepad) {
         press: () => {
             const player = playerForPad();
             if (!player) return;
+            if (isIntermissionActive()) { dismissIntermission(); return; }
             if (isMatchEnded()) { restartMatch(); return; }
             if (handleDeadRestart(player)) return;
             if (isMenuOpen()) return;
@@ -383,6 +385,7 @@ function setupGamepad(gamepad) {
         press: () => {
             const player = playerForPad();
             if (!player) return;
+            if (isIntermissionActive()) { dismissIntermission(); return; }
             if (isMatchEnded()) { restartMatch(); return; }
             if (handleDeadRestart(player)) return;
             if (isMenuOpen()) return;

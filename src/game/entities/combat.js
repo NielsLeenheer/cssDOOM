@@ -16,6 +16,7 @@ import { damagePlayer } from '../player/damage.js';
 import { hasPowerup } from '../player/pickups.js';
 import { playSound } from '../../audio/audio.js';
 import { setEnemyState } from './enemies.js';
+import { recordKill } from '../sp-stats.js';
 import * as renderer from '../../renderer/index.js';
 
 // ============================================================================
@@ -228,6 +229,7 @@ export function damageEnemy(target, damage, source) {
         // Target killed
         target.collected = true;
         renderer.killEnemy(thingIndex, target.type);
+        recordKill(target);
 
         if (target.type === 2035) {
             playSound('DSBAREXP');

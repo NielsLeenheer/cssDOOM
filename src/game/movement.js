@@ -11,6 +11,7 @@ import * as renderer from '../renderer/index.js';
 import { inputs } from '../input/index.js';
 import { state } from './state.js';
 import { isMatchLobby } from './match.js';
+import { recordSectorEnter } from './sp-stats.js';
 
 const wasMovingByPlayer = new Map();
 
@@ -114,7 +115,12 @@ function updateLocation(player, deltaTime) {
 
         renderer.updateThingPosition(player.thingIndex, player.x, player.y, player.floorHeight);
         const sector = getSectorAt(player.x, player.y);
-        if (sector) renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
+        if (sector) {
+            renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
+            // SP stats: credit the player for entering a SECRET sector
+            // (no-op in DM / repeat enters / non-secret sectors).
+            recordSectorEnter(sector.sectorIndex);
+        }
         renderer.updateEnemyRotation(player.thingIndex, player.thingRef, state.players);
     }
 }

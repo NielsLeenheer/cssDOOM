@@ -608,6 +608,94 @@ body[data-match-ended="true"] .pane-win {
 
 
 /* ========================================================================
+   Single-player intermission — KILLS / ITEMS / SECRET / TIME on the
+   WIMAP0 backdrop, shown between levels. Same `.pane-intermission`
+   container pattern as the DM scoreboard's `.pane-win`. Visibility
+   driven by body[data-intermission="true"] (set in intermission.js).
+   ======================================================================== */
+
+.pane-intermission {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    align-items: center;
+    justify-content: center;
+    background: url('/assets/intermission/WIMAP0.png') center / cover no-repeat;
+    image-rendering: pixelated;
+    pointer-events: none;
+}
+
+body[data-intermission="true"] .pane-intermission {
+    display: flex;
+}
+
+.intermission {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(64px * var(--screen-scale, 1));
+    font-family: 'STCFN', monospace;
+    color: #cb0000;
+}
+
+.intermission-header {
+    /* Level name (white WILV sprite) stacked tightly above FINISHED
+       (red WIF sprite). The outer .intermission gap (~64px) sits below
+       this header — between the header and the stats grid. */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: calc(12px * var(--screen-scale, 1));
+}
+
+.intermission-level,
+.intermission-finished {
+    /* WILV0N (white level name) / WIF (red FINISHED) — both 12 px tall
+       source. 2× scale per --screen-scale step. */
+    height: calc(12px * 2 * var(--screen-scale, 1));
+    image-rendering: pixelated;
+}
+
+.intermission-rows {
+    display: grid;
+    /* Value column is a fixed track sized for the widest reading
+       ("100%" / "10:00"). Without this, the cell auto-sizes during
+       the count-up animation and the column visibly grows from
+       "0%"-width to "100%"-width as it ticks. */
+    grid-template-columns: auto calc(120px * var(--screen-scale, 1));
+    column-gap: calc(160px * var(--screen-scale, 1));
+    row-gap: calc(24px * var(--screen-scale, 1));
+    align-items: center;
+}
+
+.intermission-row {
+    display: contents;
+}
+
+/* Extra breathing room above the TIME row — DOOM groups the three
+   percentage stats together and visually separates the time below. */
+.intermission-row-time > * {
+    margin-top: calc(24px * var(--screen-scale, 1));
+}
+
+.intermission-label {
+    /* Source labels are 12 px tall. Scale 2× per --screen-scale step. */
+    height: calc(12px * 2 * var(--screen-scale, 1));
+    image-rendering: pixelated;
+    justify-self: start;
+}
+
+.intermission-value {
+    font-family: 'WINUM', monospace;
+    font-size: calc(24px * var(--screen-scale, 1));
+    justify-self: end;
+    min-width: calc(72px * var(--screen-scale, 1));
+    text-align: right;
+}
+
+
+/* ========================================================================
    Deathmatch countdown timer (last 60 s)
    Shown when body[data-timer-active="true"]. Top-centre m:ss readout in
    DOOM red; fades in / out via the body attribute and pulses for the
@@ -715,12 +803,14 @@ body[data-attract="true"] #ui-buttons {
 
 body.kiosk .pane-attract,
 body.kiosk .pane-win,
+body.kiosk .pane-intermission,
 body.kiosk .pane-timer {
     position: absolute;
 }
 
 body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
 body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-win,
+body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
 body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
     display: none;
 }

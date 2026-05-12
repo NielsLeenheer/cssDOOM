@@ -12,10 +12,11 @@ import { THING_NAMES } from '../renderer/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
 import { updateCamera } from '../renderer/scene/camera.js';
 import { setMirrorMode } from '../renderer/scene/scene.js';
-import { mapData, currentMap, loadMap } from '../shared/maps.js';
+import { mapData, currentMap, loadMap, getNextMap } from '../shared/maps.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { endMatch } from '../game/match.js';
 import { enterAttract } from './attract.js';
+import { showIntermission } from './intermission.js';
 
 /**
  * Debug: enable a pane-1 mirror — clones pane 0's scene tree into pane 1 and
@@ -420,6 +421,17 @@ export function initDebugMenu() {
     attractBtn.style.cssText = buttonStyle;
     attractBtn.addEventListener('click', () => enterAttract());
     details.appendChild(attractBtn);
+
+    // SP intermission button — shows the level-finish stats screen so we
+    // can inspect it without having to find an exit.
+    const intermissionBtn = document.createElement('button');
+    intermissionBtn.type = 'button';
+    intermissionBtn.textContent = 'Show intermission';
+    intermissionBtn.style.cssText = buttonStyle;
+    intermissionBtn.addEventListener('click', () => {
+        showIntermission(getNextMap(), (next) => { if (next) loadMap(next); });
+    });
+    details.appendChild(intermissionBtn);
 
     document.body.appendChild(details);
 }

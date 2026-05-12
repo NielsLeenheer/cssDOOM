@@ -35,6 +35,7 @@ import { tryUseLift } from '../game/mechanics/lifts.js';
 import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { isMatchEnded, restartMatch } from '../game/match.js';
+import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
 import { isMenuOpen } from '../ui/menu.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
@@ -99,6 +100,13 @@ export function createKbmInputHandler({ getSlot, inputs }) {
      */
     function applyGates(player, code) {
         if (isMenuOpen()) return true;
+
+        if (isIntermissionActive()) {
+            if (code === 'AltLeft' || code === 'AltRight' || code === 'KeyX' || code === 'Space') {
+                dismissIntermission();
+            }
+            return true;
+        }
 
         if (isMatchEnded()) {
             if (code === 'AltLeft' || code === 'AltRight' || code === 'KeyX' || code === 'Space') {
@@ -189,6 +197,7 @@ export function createKbmInputHandler({ getSlot, inputs }) {
         if (button !== 0) return false;
         const player = currentPlayer();
 
+        if (isIntermissionActive()) { dismissIntermission(); return true; }
         if (isMatchEnded()) { restartMatch(); return true; }
 
         if (player?.isDead) {

@@ -31,6 +31,7 @@ import { activateCrusher } from './crushers.js';
 import { loadMap, getNextMap, getSecretExitMap } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
+import { showIntermission } from '../../ui/intermission.js';
 
 export function tryUseSwitch(player) {
     if (isMatchLobby()) return;
@@ -75,12 +76,22 @@ export function tryUseSwitch(player) {
             const linedef = mapData.linedefs[wall.linedefIndex];
             if (linedef) {
                 if (linedef.specialType === EXIT_SPECIAL || linedef.specialType === SECRET_EXIT_SPECIAL) {
-                    // Exit switches: load the next map, or the secret exit map
-                    // if the linedef has the secret exit special type.
+                    // Exit switches: in SP, show the intermission screen
+                    // (KILLS / ITEMS / SECRET / TIME) and let the player
+                    // press fire to advance to the next map. In DM there
+                    // are no exit switches in normal play, but if one
+                    // somehow triggers, skip the intermission and just
+                    // load.
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();
-                    if (nextMap) setTimeout(() => loadMap(nextMap), 1000);
+                    if (state.mode === 'singleplayer') {
+                        showIntermission(nextMap, (next) => {
+                            if (next) loadMap(next);
+                        });
+                    } else if (nextMap) {
+                        setTimeout(() => loadMap(nextMap), 1000);
+                    }
                 } else if (linedef.sectorTag > 0) {
                     // Sector-tagged switches: find all doors and lifts whose
                     // sector tag matches and activate them.
