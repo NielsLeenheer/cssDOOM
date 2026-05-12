@@ -15,13 +15,13 @@
 .pane {
     position: relative;
     height: 100%;
-    overflow: hidden;
-    /* Container queries on inline-size let HUD/status size and wrap based on
-       this pane's width, not the full viewport. Necessary in DM/mirror mode
-       where each pane is half the screen — media queries would only react
-       to the full viewport width and would scale/wrap incorrectly. */
-    container-type: inline-size;
-    container-name: pane;
+    /* No overflow:hidden here — .viewport already clips the 3D scene
+       transform, and we deliberately let .pane not be a containing block
+       for fixed-positioned descendants so per-pane overlays
+       (.pane-attract / .pane-win / .pane-timer) can position:fixed
+       themselves to fullscreen-stretch outside the pane in non-video-wall
+       layouts. See .renderer below for where the container-query context
+       moved to. */
 }
 
 body[data-mode="deathmatch"] .pane {
@@ -75,10 +75,19 @@ body[data-mode="deathmatch"][data-kbm-target="1"] .pane[data-player="1"] .render
     outline-offset: -2px;
 }
 
-/* The .renderer fills its pane; .viewport and .hud both inset:0 it. */
+/* The .renderer fills its pane; .viewport and .hud both inset:0 it.
+   The container-query context for this pane's HUD lives here (moved
+   from .pane) so .pane stays free of CSS-contain side effects — without
+   that, container-type would make .pane a containing block for fixed-
+   position descendants and our pane-local overlays couldn't escape it
+   to stretch fullscreen in non-video-wall layouts. The container's
+   inline-size matches .pane's (we're inset:0) so the @container pane
+   rules in hud.css resolve identically. */
 .renderer {
     position: absolute;
     inset: 0;
+    container-type: inline-size;
+    container-name: pane;
 }
 
 /* ==========================================================================

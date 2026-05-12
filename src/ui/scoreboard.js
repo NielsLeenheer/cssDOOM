@@ -1,11 +1,13 @@
 /**
  * Post-match scoreboard.
  *
- * Built into the existing `.dm-win-overlay` containers — one global
- * `#dm-win-overlay` for normal/split-screen layouts, plus per-pane
- * `.pane-win` copies that take over in video-wall mode (≥24/9 aspect
- * ratio) so each monitor gets its own copy instead of one straddling
- * the bezel. The same renderer paints every container.
+ * Built into every `.dm-win-overlay` element in the document — one per
+ * pane (via the pane template). In normal / split-screen layouts each
+ * pane's overlay is `position: fixed; inset: 0` and covers the viewport
+ * (both panes' overlays stack identically — visually one overlay). In
+ * video-wall mode (≥24/9 aspect ratio) the overlays flip to
+ * `position: absolute` so each monitor gets its own copy instead of one
+ * straddling the bezel. The same renderer paints every container.
  *
  * Visibility is driven by `body[data-match-ended="true"]` (set in
  * match.js); this module only owns the DOM structure inside the

@@ -505,9 +505,18 @@ body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
    the HUD bar). The .dm-win-overlay shell is empty until match.js
    populates it via scoreboard.js; the .scoreboard subtree is the actual
    grid.
+
+   .pane-win lives inside .pane. Default position is fixed → covers the
+   whole viewport so it reads as a fullscreen overlay even in split-
+   screen. The video-wall media query below flips it to absolute so each
+   pane gets its own copy bound to its monitor (bezel-safe).
+
+   In non-video-wall split-screen, both panes render their overlay
+   fullscreen and stack identically — visually one overlay; the duplicate
+   render is a minor waste we accept for the simpler layout story.
    ======================================================================== */
 
-#dm-win-overlay {
+.pane-win {
     display: none;
     position: fixed;
     inset: 0;
@@ -522,7 +531,7 @@ body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
     pointer-events: none;
 }
 
-body[data-match-ended="true"] #dm-win-overlay {
+body[data-match-ended="true"] .pane-win {
     display: flex;
 }
 
@@ -611,12 +620,18 @@ body[data-match-ended="true"] #dm-win-overlay {
    Deathmatch countdown timer (last 60 s)
    Shown when body[data-timer-active="true"]. Top-centre m:ss readout in
    DOOM red; fades in / out via the body attribute and pulses for the
-   final 10 s. The .dm-timer class is shared with per-pane copies so the
-   videowall layout can duplicate it on each display.
+   final 10 s. Lives per-pane inside .pane; default position is fixed
+   (viewport-centred) so split-screen still reads as one timer. Video-
+   wall flips to absolute so each monitor gets its own.
    ======================================================================== */
 
-.dm-timer {
+.pane-timer {
     display: none;
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 1100;
     font-family: 'STCFN', monospace;
     font-size: 28px;
     color: #dc0000;
@@ -625,15 +640,7 @@ body[data-match-ended="true"] #dm-win-overlay {
     pointer-events: none;
 }
 
-#dm-timer {
-    position: fixed;
-    top: calc(12px + env(safe-area-inset-top, 0px));
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 1100;
-}
-
-body[data-mode="deathmatch"][data-timer-active="true"] #dm-timer {
+body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     display: block;
 }
 
@@ -642,10 +649,12 @@ body[data-mode="deathmatch"][data-timer-active="true"] #dm-timer {
    Attract Loop
    Shown when body[data-attract="true"] — kiosk idle prompt. Camera is
    slow-rotated by attract.js; this overlay sits on top with a dimmed
-   background and a pulsing "PRESS START" prompt.
+   background and a pulsing "PRESS START" prompt. Lives per-pane inside
+   .pane; default position is fixed (full window) for split-screen.
+   Video-wall flips to absolute so each monitor gets its own copy.
    ======================================================================== */
 
-#attract-overlay {
+.pane-attract {
     display: none;
     position: fixed;
     inset: 0;
@@ -671,7 +680,7 @@ body[data-mode="deathmatch"][data-timer-active="true"] #dm-timer {
     50%      { opacity: 1; }
 }
 
-body[data-attract="true"] #attract-overlay {
+body[data-attract="true"] .pane-attract {
     display: flex;
 }
 
@@ -688,81 +697,30 @@ body[data-attract="true"] #ui-buttons {
 /* ========================================================================
    Video-wall layout (≥ 24/9 aspect ratio)
 
-   At CSS Day the kiosk may run on two side-by-side monitors driven by a
-   video-wall controller, so the browser window spans both screens with a
-   bezel down the middle. Anything centred horizontally (PRESS START, the
-   match-end overlay, the scoreboard) would land on the bezel and become
-   unreadable. In this layout we treat each pane as its own "monitor":
-   hide the global centred copies and reveal the per-pane copies
-   (template-rendered inside each .renderer) so each display gets its own
-   centred text.
+   At CSS Day the kiosk may run on two side-by-side monitors with a bezel
+   down the middle. Anything centred on the viewport would land on the
+   bezel. In this layout we re-anchor each pane's overlay to its own pane
+   instead of the viewport — `position: absolute` against the pane (which
+   is `position: relative`) confines the overlay to one monitor.
 
    The threshold (24/9 ≈ 2.67) is wider than common ultrawide ratios
    (21/9 = 2.33) so dev windows don't accidentally trip it.
 
-   Pane copies are display:none by default; the media query flips them on
-   and hides the globals.
+   All styling (font, size, colors, background) is inherited from the
+   base rules above — this block only changes the positioning.
    ======================================================================== */
 
-.pane-attract,
-.pane-win,
-.pane-timer {
-    display: none;
-}
-
 @media (min-aspect-ratio: 24/9) {
-    /* Hide the screen-spanning globals — bezel would split them. */
-    #attract-overlay,
-    #dm-win-overlay,
-    #dm-timer {
-        display: none !important;
+    .pane-attract,
+    .pane-win {
+        position: absolute;
     }
 
-    /* Show pane-local copies. .renderer is already position:absolute (in
-       viewport.css) so it establishes a positioning context for the
-       absolute children below — no extra anchor rule needed. */
-
-    body[data-attract="true"] .pane-attract {
-        display: flex;
+    .pane-timer {
         position: absolute;
-        inset: 0;
-        z-index: 1300;
-        align-items: center;
-        justify-content: center;
-        font-family: 'STCFN', monospace;
-        font-size: 32px;
-        padding: 32px;
-        color: #ffd700;
-        text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
-        background: rgba(0, 0, 0, 0.45);
-        pointer-events: none;
-        letter-spacing: 6px;
-        text-align: center;
-        animation: attract-pulse 1.6s ease-in-out infinite;
-    }
-
-    body[data-match-ended="true"] .pane-win {
-        display: flex;
-        position: absolute;
-        inset: 0;
-        z-index: 1200;
-        align-items: center;
-        justify-content: center;
-        /* Same WIMAP0 backdrop as the global overlay. Each pane in video-
-           wall mode gets its own copy so the image isn't stretched across
-           the bezel. */
-        background: url('/assets/intermission/WIMAP0.png') center / cover no-repeat;
-        image-rendering: pixelated;
-        pointer-events: none;
-    }
-
-    body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
-        display: block;
-        position: absolute;
-        top: calc(12px + env(safe-area-inset-top, 0px));
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 1100;
+        /* top / left / transform stay as the base rule sets them — but
+           they now resolve against the pane, not the viewport, which is
+           what we want. */
     }
 }
 

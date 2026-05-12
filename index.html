@@ -152,29 +152,18 @@
                 <div class="join-ready">READY</div>
             </div>
 
-            <!-- Per-pane copies of global text overlays. Hidden by default;
-                 shown only in video-wall layout (≥24/9 aspect ratio) where
-                 the bezel between two displays splits the screen and
-                 centred text would land on it. Sit outside .hud so the
-                 attract-mode HUD-hide rule doesn't suppress them. -->
+            <!-- Per-pane overlays. Live inside .pane so the pane's
+                 data-player + data-claim-state cascade decides what
+                 shows where. CSS positions them position:fixed (full
+                 viewport) by default — .pane is no longer a containing
+                 block for fixed descendants (we moved container-type to
+                 .renderer). In video-wall layout the position flips to
+                 absolute so each pane's overlay is bound to its half. -->
             <div class="pane-attract attract-overlay">PRESS A BUTTON TO START</div>
             <div class="pane-win dm-win-overlay"></div>
             <div class="pane-timer dm-timer"></div>
         </div>
     </template>
-
-    <!-- DM match-end overlay — shown when body[data-match-ended="true"]. -->
-    <div id="dm-win-overlay" class="dm-win-overlay"></div>
-
-    <!-- DM countdown timer — shown only in the last 60 s of a match
-         (body[data-timer-active="true"]). The .dm-timer class is shared
-         with per-pane copies in the pane template so videowall layout
-         can duplicate the readout on each display. -->
-    <div id="dm-timer" class="dm-timer"></div>
-
-    <!-- Attract-mode overlay — shown when body[data-attract="true"] after
-         the kiosk idle timer fires. Any input press dismisses it. -->
-    <div id="attract-overlay" class="attract-overlay">PRESS A BUTTON TO START</div>
 
     <!-- Top-right UI button cluster — flex container so each button takes
          the next slot and a hidden one collapses out (no manual offsets).
