@@ -25,6 +25,18 @@
  *                 calls impl locally (existing helpers iterate panes
  *                 internally) and forwards the call to every sink so
  *                 secondary windows mirror the same world change.
+ *
+ * Optional `mirror` callback — runs on the receive side (BroadcastClient)
+ * before dispatching to the local DomRenderer/Orchestrator. Keeps the
+ * secondary's `rendererState` (camera positions, thing positions,
+ * collected flags) in sync with the master so the secondary's culling
+ * loop reads fresh values. Signature mirrors the wire-format args:
+ *
+ *   per-pane: mirror(paneIndex, ...serializedArgs)
+ *   world:    mirror(...serializedArgs)
+ *
+ * Commands without renderer-state side-effects (most of them) omit
+ * `mirror` entirely.
  */
 
 import * as sprites from './scene/entities/sprites.js';
@@ -39,6 +51,11 @@ import * as weapons from './weapons.js';
 import { updateHud } from './hud.js';
 import { updateCamera } from './scene/camera.js';
 import * as playerVisuals from './scene/entities/player.js';
+import {
+    applyCameraUpdate,
+    applyThingPositionUpdate,
+    applyThingCollected,
+} from './renderer-state.js';
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over BroadcastChannel.
@@ -66,7 +83,12 @@ const stripHudData = (player) => [{
 
 export const COMMANDS = {
     // ── Per-pane: camera & HUD ────────────────────────────────────────────
-    updateCamera: { kind: 'per-pane', impl: (pane, player) => updateCamera(player, pane), serialize: stripCameraTransform },
+    updateCamera: {
+        kind: 'per-pane',
+        impl: (pane, player) => updateCamera(player, pane),
+        serialize: stripCameraTransform,
+        mirror: (pane, transform) => applyCameraUpdate(pane, transform),
+    },
     updateHud: { kind: 'per-pane', impl: (pane, player) => updateHud(player, pane), serialize: stripHudData },
 
     // ── Per-pane: effects ─────────────────────────────────────────────────
@@ -89,12 +111,29 @@ export const COMMANDS = {
     // ── World: enemies / things / projectiles / effects ───────────────────
     setEnemyState: { kind: 'world', impl: sprites.setEnemyState },
     resetEnemy: { kind: 'world', impl: sprites.resetEnemy },
-    killEnemy: { kind: 'world', impl: sprites.killEnemy },
+    killEnemy: {
+        kind: 'world',
+        impl: sprites.killEnemy,
+        mirror: (thingIndex) => applyThingCollected(thingIndex, true),
+    },
     updateEnemyRotation: { kind: 'world', impl: sprites.updateEnemyRotation },
-    updateThingPosition: { kind: 'world', impl: sprites.updateThingPosition },
+    updateThingPosition: {
+        kind: 'world',
+        impl: sprites.updateThingPosition,
+        mirror: (thingIndex, x, y, floorHeight) =>
+            applyThingPositionUpdate(thingIndex, x, y, floorHeight),
+    },
     reparentThingToSector: { kind: 'world', impl: sprites.reparentThingToSector },
-    collectItem: { kind: 'world', impl: sprites.collectItem },
-    uncollectItem: { kind: 'world', impl: sprites.uncollectItem },
+    collectItem: {
+        kind: 'world',
+        impl: sprites.collectItem,
+        mirror: (thingIndex) => applyThingCollected(thingIndex, true),
+    },
+    uncollectItem: {
+        kind: 'world',
+        impl: sprites.uncollectItem,
+        mirror: (thingIndex) => applyThingCollected(thingIndex, false),
+    },
     setThingMoving: { kind: 'world', impl: sprites.setThingMoving },
     createPuff: { kind: 'world', impl: sprites.createPuff },
     createExplosion: { kind: 'world', impl: sprites.createExplosion },

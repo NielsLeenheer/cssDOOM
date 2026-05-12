@@ -7,9 +7,10 @@
  *
  * Renderer-state mirroring (keeping `rendererState.cameras[i]` and
  * `rendererState.things[i]` in sync with the master so the local culling
- * loop sees current values) is handled inline below by calling the apply*
- * functions from [renderer-state.js](renderer-state.js) before forwarding
- * the command to the renderer.
+ * loop sees current values) is driven by the command registry: each
+ * affected entry in [commands.js](commands.js) declares an optional
+ * `mirror` callback that runs here before the renderer dispatch. Adding
+ * a new mirrored command is one entry in COMMANDS — no edits here.
  *
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, snapshot replay, heartbeat, disconnect) is
@@ -17,11 +18,7 @@
  */
 
 import { MSG } from './broadcast-protocol.js';
-import {
-    applyCameraUpdate,
-    applyThingPositionUpdate,
-    applyThingCollected,
-} from './renderer-state.js';
+import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './commands.js';
 
 export class BroadcastClient {
     /**
@@ -61,9 +58,8 @@ export class BroadcastClient {
     }
 
     _dispatchPaneCommand({ target, method, args }) {
-        if (method === 'updateCamera') {
-            applyCameraUpdate(target, args[0]);
-        }
+        const cmd = PER_PANE_COMMANDS[method];
+        cmd?.mirror?.(target, ...args);
 
         const fn = this.domRenderer[method];
         if (typeof fn === 'function') {
@@ -74,22 +70,8 @@ export class BroadcastClient {
     }
 
     _dispatchWorldCommand({ method, args }) {
-        switch (method) {
-            case 'updateThingPosition': {
-                const [thingIndex, x, y, floorHeight] = args;
-                applyThingPositionUpdate(thingIndex, x, y, floorHeight);
-                break;
-            }
-            case 'collectItem':
-            case 'killEnemy':
-                applyThingCollected(args[0], true);
-                break;
-            case 'uncollectItem':
-                applyThingCollected(args[0], false);
-                break;
-            default:
-                break;
-        }
+        const cmd = WORLD_COMMANDS[method];
+        cmd?.mirror?.(...args);
 
         const fn = this.orchestrator[method];
         if (typeof fn === 'function') {
