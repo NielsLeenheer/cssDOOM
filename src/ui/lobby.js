@@ -25,6 +25,7 @@ import { state } from '../game/state.js';
 import { clearAllClaims } from '../input/index.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
+import { PLAYER_COLOR_NAME } from './scoreboard.js';
 
 let externalSlotsRef = () => new Set();
 
@@ -98,10 +99,11 @@ export function updateLobbyUI() {
         }
         paneEl.dataset.claimState = claimState;
 
-        // Personalize the ready overlay text per player slot. Slot index
-        // is zero-based internally; player names are one-based for UX.
+        // Personalize the ready overlay text per player slot. UX refers
+        // to players by color name to match the per-pane visual identity
+        // (face backdrop, READY palette, billboard tint).
         const readyEl = paneEl.querySelector('.join-ready');
-        if (readyEl) readyEl.textContent = `PLAYER ${slot + 1} READY`;
+        if (readyEl) readyEl.textContent = `${PLAYER_COLOR_NAME[slot] ?? `PLAYER ${slot + 1}`} READY`;
     }
 
     // Auto-start trigger for Local DM: when all slots in the player

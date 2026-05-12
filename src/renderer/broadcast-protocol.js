@@ -49,6 +49,11 @@ export const MSG = {
     // the existing CSS shows the same PRESS BUTTON TO JOIN / READY /
     // waiting visuals as the local split-screen pane would.
     LOBBY_STATE: 'lobby-state',
+    // Master → secondary: match has ended. Carries the kill matrix,
+    // per-player scores, map name, and winner so the secondary renders
+    // the same scoreboard. resetMatch / restartMatch implicitly clear
+    // by re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
+    MATCH_END: 'match-end',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

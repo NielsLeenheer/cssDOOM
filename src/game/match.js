@@ -9,9 +9,17 @@
 import { state } from './state.js';
 import { Player } from './player/player.js';
 import { loadMap, currentMap } from '../shared/maps.js';
+import { showScoreboard, hideScoreboard } from '../ui/scoreboard.js';
 
 const DEFAULT_FRAG_LIMIT = 20;
 const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
+
+// Master-side hook for broadcasting the kill matrix + scores to the
+// secondary window on endMatch. Set by index.js once the BroadcastConnection
+// is up; null in secondary or before init. Decoupling via a setter keeps
+// match.js free of broadcast / connection imports.
+let broadcastMatchEnd = null;
+export function setMatchEndBroadcaster(fn) { broadcastMatchEnd = fn; }
 
 /**
  * Initializes (or resets) state.match and zeros every player's score.
@@ -27,6 +35,7 @@ export function resetMatch({
     fragLimit = DEFAULT_FRAG_LIMIT,
     timeLimit = DEFAULT_TIME_LIMIT_MS,
 } = {}) {
+    const n = state.players.length;
     state.match = {
         fragLimit,
         timeLimit,
@@ -34,10 +43,15 @@ export function resetMatch({
         startTime: 0,
         ended: false,
         winner: null,
+        // kills[killer][victim] — PvP kills increment kills[k][v]; suicide
+        // / environmental death increments kills[v][v]. Drives the
+        // post-match scoreboard. Per-player .score stays the canonical
+        // total (+1 PvP, -1 suicide); the matrix is purely for display.
+        kills: Array.from({ length: n }, () => new Array(n).fill(0)),
     };
     for (const p of state.players) p.score = 0;
     document.body.removeAttribute('data-match-ended');
-    setWinOverlayText('');
+    hideScoreboard();
     setTimerActive(false);
     lastTimerSeconds = -1;
     // Notify the lobby UI so it can clear stale input claims and show
@@ -66,7 +80,7 @@ export function isMatchLobby() {
 export function clearMatch() {
     state.match = null;
     document.body.removeAttribute('data-match-ended');
-    setWinOverlayText('');
+    hideScoreboard();
     setTimerActive(false);
     lastTimerSeconds = -1;
 }
@@ -84,8 +98,10 @@ export function awardFrag(victim, killer) {
     if (!state.match || !state.match.started || state.match.ended) return;
     if (killer instanceof Player && killer !== victim) {
         killer.score++;
+        state.match.kills[killer.index][victim.index]++;
     } else {
         victim.score--;
+        state.match.kills[victim.index][victim.index]++;
     }
     checkFragLimit();
 }
@@ -144,7 +160,12 @@ function checkFragLimit() {
     }
 }
 
-function endMatch() {
+/**
+ * End the match early. Exported so the debug menu (and future host UI)
+ * can force the scoreboard without waiting for frag-limit / timer.
+ */
+export function endMatch() {
+    if (!state.match || state.match.ended) return;
     state.match.ended = true;
 
     // Highest score wins; tie when two players are level.
@@ -162,20 +183,23 @@ function endMatch() {
     }
     state.match.winner = tied ? null : winner;
 
+    const data = buildScoreboardData();
     document.body.dataset.matchEnded = 'true';
-    setWinOverlayText(tied || !winner ? 'TIE' : `PLAYER ${winner.index + 1} WINS`);
+    showScoreboard(data);
+    broadcastMatchEnd?.(data);
 }
 
 /**
- * Writes the same text into every win-overlay element. The global
- * #dm-win-overlay covers the full screen for normal layouts; pane-local
- * .pane-win copies (in the pane template) take over in video-wall layouts
- * so the message lands inside each display rather than on the bezel.
+ * Snapshot of the post-match scoreboard. Shipped verbatim to the secondary
+ * via MSG.MATCH_END so it can render the same grid without needing the
+ * authoritative state.match.
  */
-function setWinOverlayText(text) {
-    for (const el of document.querySelectorAll('.dm-win-overlay')) {
-        el.textContent = text;
-    }
+function buildScoreboardData() {
+    return {
+        scores: state.players.map(p => p.score),
+        kills: state.match.kills.map(row => row.slice()),
+        winnerIndex: state.match.winner ? state.match.winner.index : -1,
+    };
 }
 
 /** True when DM is active and the match has ended. */

@@ -390,7 +390,12 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
     justify-content: center;
     pointer-events: none;
     font-family: 'STCFN', monospace;
-    font-size: 16px;
+    /* Matches lobby + attract sizing — 32 px is a multiple of 8 so
+       STCFN's bitmap glyphs render pixel-perfect. Padding keeps wrapped
+       text from kissing the pane edge. */
+    font-size: 32px;
+    padding: 32px;
+    text-align: center;
     color: #ffd700;
     text-shadow: 0 0 8px rgba(0, 0, 0, 0.9);
     letter-spacing: 2px;
@@ -428,6 +433,10 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
     /* Multiple of 8 px so the bitmap-derived STCFN renders pixel-perfect.
        At 32 px each source pixel is 4 screen pixels. */
     font-size: 32px;
+    /* Padding keeps wrapped lines off the pane / window edges. Matches
+       the respawn + attract overlays so all three read at the same
+       inset. */
+    padding: 32px;
     /* STCFN is a COLR/CPAL color font — the per-glyph red shades and
        dark outline are baked in via the embedded palette. `color:` is
        used as the fallback when the COLR path isn't taken (older browsers
@@ -459,8 +468,11 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
 
 /* "prompting" — this pane's slot is the next one to claim. Show the
    PRESS BUTTON TO JOIN overlay. Only one pane is in this state at a time
-   (sequential join, left → right). */
-body[data-mode="deathmatch"] .pane[data-claim-state="prompting"] .join-prompt {
+   (sequential join, left → right). Suppressed during attract: attract
+   calls resetMatch() (so the next walk-up starts on a fresh roster),
+   which re-enters lobby state and re-paints data-claim-state — without
+   the :not gate the prompts would render on top of the attract loop. */
+body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="prompting"] .join-prompt {
     display: flex;
 }
 
@@ -468,7 +480,7 @@ body[data-mode="deathmatch"] .pane[data-claim-state="prompting"] .join-prompt {
    formally started yet (still waiting on later panes). The bound player
    can move around in warmup; the READY overlay sits on top so the user
    knows the join took. */
-body[data-mode="deathmatch"] .pane[data-claim-state="ready"] .join-ready {
+body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="ready"] .join-ready {
     display: flex;
 }
 
@@ -488,7 +500,10 @@ body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
 
 
 /* ========================================================================
-   Deathmatch win overlay (per-pane FRAGS counter lives in the HUD bar)
+   Deathmatch end-of-match scoreboard (per-pane FRAGS counter lives in
+   the HUD bar). The .dm-win-overlay shell is empty until match.js
+   populates it via scoreboard.js; the .scoreboard subtree is the actual
+   grid.
    ======================================================================== */
 
 #dm-win-overlay {
@@ -498,17 +513,96 @@ body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
     z-index: 1200;
     align-items: center;
     justify-content: center;
-    font-family: 'STCFN', monospace;
-    font-size: 32px;
-    color: #ffd700;
-    text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
-    background: rgba(0, 0, 0, 0.7);
+    /* WIMAP0 = DOOM's intermission backdrop (the Phobos surface map).
+       Pixelated rendering keeps the 320x200 source crisp at any kiosk
+       display size. */
+    background: url('/assets/intermission/WIMAP0.png') center / cover no-repeat;
+    image-rendering: pixelated;
     pointer-events: none;
-    letter-spacing: 4px;
 }
 
 body[data-match-ended="true"] #dm-win-overlay {
     display: flex;
+}
+
+.scoreboard {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-family: 'STCFN', monospace;
+    color: #cb0000;       /* fallback for non-COLR renderers */
+    text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
+}
+
+.scoreboard-subtitle {
+    /* WIF = the DOOM intermission "FINISHED" sprite. Scale by integer
+       multiples to keep the pixel art crisp at kiosk size. */
+    height: calc(16px * 2);
+    image-rendering: pixelated;
+    margin-bottom: 16px;
+}
+
+.scoreboard-banner {
+    font-size: 18px;
+    letter-spacing: 4px;
+    color: #ffd700;
+    font-palette: --stcfn-white;
+    margin-bottom: 32px;
+}
+
+/* Grid: [killer-swatch col] [N victim cols] [total col]. The first row
+   is the victim-swatch header (with an empty corner). The TOTAL label
+   sits in the top-right cell. */
+.scoreboard-grid {
+    display: grid;
+    grid-template-columns: 56px repeat(var(--player-count, 2), 64px) auto;
+    grid-auto-rows: 56px;
+    gap: 6px;
+    align-items: center;
+    justify-items: center;
+}
+
+/* .scoreboard-corner — empty spacer in the top-left grid cell; no styling
+   needed (the gap + grid track sizing leaves it as whitespace). */
+
+.scoreboard-total-label {
+    padding-left: 12px;
+}
+
+.scoreboard-total-label img {
+    /* WIMSTT = DOOM intermission "TOTAL" sprite. */
+    height: calc(7px * 3);
+    image-rendering: pixelated;
+    display: block;
+}
+
+.scoreboard-swatch {
+    image-rendering: pixelated;
+    background: no-repeat center / cover;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    width: 48px;
+    height: 48px;
+}
+
+/* Player color swatches — mirror the HUD face background tints. */
+.scoreboard-swatch.player-0 { background-image: url('/assets/hud/STFB0.png'); }
+.scoreboard-swatch.player-1 { background-image: url('/assets/hud/STFB3.png'); }
+.scoreboard-swatch.player-2 { background-image: url('/assets/hud/STFB1.png'); }
+.scoreboard-swatch.player-3 { background-image: url('/assets/hud/STFB2.png'); }
+
+.scoreboard-cell {
+    font-family: 'WINUM', monospace;
+    font-size: 24px;       /* WINUM is pixel-perfect at multiples of 12 px */
+    text-align: center;
+    min-width: 48px;
+    text-shadow: none;
+}
+
+.scoreboard-total {
+    color: #ffd700;
+    font-palette: --stcfn-white;
+    padding-left: 12px;
 }
 
 
@@ -558,7 +652,10 @@ body[data-mode="deathmatch"][data-timer-active="true"] #dm-timer {
     align-items: center;
     justify-content: center;
     font-family: 'STCFN', monospace;
-    font-size: 36px;
+    /* Matches lobby + respawn — 32 px is a multiple of STCFN's 8 px
+       source cell. Padding keeps the wrap inset from the screen edges. */
+    font-size: 32px;
+    padding: 32px;
     color: #ffd700;
     text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
     background: rgba(0, 0, 0, 0.45);
@@ -632,7 +729,8 @@ body[data-attract="true"] #ui-buttons {
         align-items: center;
         justify-content: center;
         font-family: 'STCFN', monospace;
-        font-size: 36px;
+        font-size: 32px;
+        padding: 32px;
         color: #ffd700;
         text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
         background: rgba(0, 0, 0, 0.45);
@@ -649,13 +747,12 @@ body[data-attract="true"] #ui-buttons {
         z-index: 1200;
         align-items: center;
         justify-content: center;
-        font-family: 'STCFN', monospace;
-        font-size: 32px;
-        color: #ffd700;
-        text-shadow: 0 0 16px rgba(0, 0, 0, 0.95);
-        background: rgba(0, 0, 0, 0.7);
+        /* Same WIMAP0 backdrop as the global overlay. Each pane in video-
+           wall mode gets its own copy so the image isn't stretched across
+           the bezel. */
+        background: url('/assets/intermission/WIMAP0.png') center / cover no-repeat;
+        image-rendering: pixelated;
         pointer-events: none;
-        letter-spacing: 4px;
     }
 
     body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {

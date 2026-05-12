@@ -43,6 +43,20 @@
     font-display: swap;
 }
 
+/* WINUM — intermission/scoreboard digits (WINUM0..9, WIMINUS, WIPCNT).
+ * Bigger and chunkier than STBIG; 11×12 source cells (advance 12 px),
+ * used on the post-match scoreboard. Pixel-perfect at integer font-sizes
+ * that are multiples of 12 px.
+ * Rebuild with: generate/.venv/bin/python generate/build-winum-color-font.py
+ */
+@font-face {
+    font-family: 'WINUM';
+    src: url('/assets/fonts/WINUM.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
 /* Alternative palettes for STCFN. The font ships with the WAD's red
  * shading baked into its 16-entry CPAL palette. CSS @font-palette-values
  * lets a stylesheet override any palette entry without rebuilding the

@@ -20,6 +20,8 @@
  * an `await loadMap` and `LOBBY_STATE` may arrive in the meantime.
  */
 
+import { PLAYER_COLOR_NAME } from './scoreboard.js';
+
 let mySlot = null;
 let pendingLobbyState = null;
 
@@ -71,9 +73,9 @@ export function applyLobbyState(msg) {
     const paneEl = document.querySelector(`.pane[data-player="${mySlot}"]`);
     if (paneEl) {
         paneEl.dataset.claimState = claimState;
-        // Mirror master's "PLAYER N READY" overlay text. Player names
-        // are one-based in UX; slot indices are zero-based internally.
+        // Mirror master's "<COLOR> READY" overlay text. PLAYER_COLOR_NAME
+        // maps slot index → display name so master + secondary agree.
         const readyEl = paneEl.querySelector('.join-ready');
-        if (readyEl) readyEl.textContent = `PLAYER ${mySlot + 1} READY`;
+        if (readyEl) readyEl.textContent = `${PLAYER_COLOR_NAME[mySlot] ?? `PLAYER ${mySlot + 1}`} READY`;
     }
 }

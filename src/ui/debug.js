@@ -14,6 +14,7 @@ import { updateCamera } from '../renderer/scene/camera.js';
 import { setMirrorMode } from '../renderer/scene/scene.js';
 import { mapData, currentMap, loadMap } from '../shared/maps.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
+import { endMatch } from '../game/match.js';
 
 /**
  * Debug: enable a pane-1 mirror — clones pane 0's scene tree into pane 1 and
@@ -393,6 +394,20 @@ export function initDebugMenu() {
         label.appendChild(document.createTextNode(` ${toggle.label}`));
         details.appendChild(label);
     }
+
+    // Separator
+    const hr4 = document.createElement('hr');
+    hr4.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
+    details.appendChild(hr4);
+
+    // End-match button — forces the post-match scoreboard up without
+    // having to actually hit the frag limit or wait out the timer.
+    const endBtn = document.createElement('button');
+    endBtn.type = 'button';
+    endBtn.textContent = 'End match';
+    endBtn.style.cssText = 'display:block;margin:4px 0;padding:4px 8px;font:inherit;background:#222;color:#ddd;border:1px solid #444;cursor:pointer';
+    endBtn.addEventListener('click', () => endMatch());
+    details.appendChild(endBtn);
 
     document.body.appendChild(details);
 }

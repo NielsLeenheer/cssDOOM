@@ -1,19 +1,26 @@
 /**
  * Attract loop — kiosk idle behavior.
  *
- * Deathmatch-only feature: after `IDLE_MS` with no player input, reloads
- * E1M1 (resetting both players to fresh DM starts), shows a "PRESS START"
- * overlay, and slowly rotates each player's camera in place. Any input
- * dismisses attract and play resumes from the rotated position.
+ * Deathmatch-only. Idle behavior has three stages:
+ *
+ *   1. Lobby idle (30s)      → enter attract (reload E1M1, slow rotate).
+ *                              Short window: an empty lobby with nobody
+ *                              pressing buttons should fall back to the
+ *                              attract loop quickly.
+ *   2. In-match idle (60s)   → end the current match early. Players or
+ *                              kiosk visitors get to see the post-match
+ *                              scoreboard instead of jumping straight to
+ *                              attract from mid-game.
+ *   3. Scoreboard idle (30s) → enter attract. Shorter window because the
+ *                              match is already over and there's nothing
+ *                              left to engage with on the scoreboard.
+ *
+ * Any input pings `pingActivity()` from the input modules (keyboard,
+ * mouse, gamepad, remote), which resets the idle clock and exits attract
+ * if it's showing.
  *
  * In single-player there is no attract — SP is for dev/testing, the
  * installation kiosk runs DM exclusively.
- *
- * Activity is signalled by the input modules calling `pingActivity()`
- * directly (keyboard keydown, mouse / pointer events, gamepad afterCycle
- * + button hooks). That covers buttons that don't move sticks or trigger
- * fire — e.g. pressing "use" or a weapon-cycle button still counts as
- * engaged.
  *
  * Idle is paused while the menu is open or a load is in flight, so the
  * timer doesn't fire on a user mid-decision or mid-transition.
@@ -23,11 +30,18 @@ import { state } from '../game/state.js';
 import { loadMap } from '../shared/maps.js';
 import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
-import { resetMatch } from '../game/match.js';
+import { resetMatch, isMatchEnded, endMatch } from '../game/match.js';
 import { isMenuOpen } from './menu.js';
 import { setAttract } from '../renderer/index.js';
 
-const IDLE_MS = 60_000;
+// Idle thresholds.
+//   GAME_IDLE_MS — in-progress match → end the match so the scoreboard
+//                  appears before attract takes over.
+//   LOBBY_IDLE_MS / SCORE_IDLE_MS — lobby / scoreboard → enter attract.
+//     Both are short because nothing engaging is happening on screen.
+const GAME_IDLE_MS = 60_000;
+const LOBBY_IDLE_MS = 30_000;
+const SCORE_IDLE_MS = 30_000;
 const ROTATE_RAD_PER_MS = 0.0002; // ~12°/sec — full rotation every 30s.
                                    // Slow enough to feel ambient, low enough
                                    // that the kiosk's GPU compositor stays
@@ -39,6 +53,11 @@ let attractActive = false;
 let entering = false;
 let rotateStartTime = 0;
 const baseAngles = []; // baseAngle per player at the moment of attract entry
+// Tracks the previous tick's match-ended state so we can detect the
+// transition to a fresh scoreboard and reset the idle clock — without
+// this, a 60s in-match idle would immediately trip the 30s scoreboard
+// timeout the moment endMatch fires.
+let wasMatchEnded = false;
 
 export function isAttractActive() {
     return attractActive;
@@ -82,16 +101,35 @@ export function attractTick(timestamp) {
         return;
     }
 
-    if (!attractActive && timestamp - lastActivityAt > IDLE_MS) {
-        enterAttract();
+    // Detect the in-game → scoreboard transition (either an organic
+    // match-end via frag limit / timer / debug button, or our own
+    // GAME_IDLE_MS-triggered endMatch below) and restart the idle clock
+    // so the scoreboard gets its full SCORE_IDLE_MS window.
+    const ended = isMatchEnded();
+    if (ended && !wasMatchEnded) lastActivityAt = timestamp;
+    wasMatchEnded = ended;
+
+    if (!attractActive) {
+        const idle = timestamp - lastActivityAt;
+        if (ended) {
+            // Scoreboard up → attract after the shorter idle window.
+            if (idle > SCORE_IDLE_MS) enterAttract();
+        } else if (state.match && state.match.started) {
+            // Mid-match idle → end the match so the scoreboard appears
+            // before attract takes over. Next tick picks up the
+            // ended-state transition above.
+            if (idle > GAME_IDLE_MS) endMatch();
+        } else {
+            // Lobby (or no match yet) → attract restart.
+            if (idle > LOBBY_IDLE_MS) enterAttract();
+        }
         return;
     }
 
-    if (attractActive) {
-        const elapsed = ROTATE_RAD_PER_MS * (timestamp - rotateStartTime);
-        for (let i = 0; i < state.players.length; i++) {
-            state.players[i].angle = (baseAngles[i] ?? 0) + elapsed;
-        }
+    // Attract active — drive the slow camera rotation.
+    const elapsed = ROTATE_RAD_PER_MS * (timestamp - rotateStartTime);
+    for (let i = 0; i < state.players.length; i++) {
+        state.players[i].angle = (baseAngles[i] ?? 0) + elapsed;
     }
 }
 

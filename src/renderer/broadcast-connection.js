@@ -39,7 +39,7 @@ export class BroadcastConnection {
      * @param {() => void} [options.onLeave]              master — secondary went away
      * @param {(payload: object) => void} [options.onAck]     secondary — master accepted us
      */
-    constructor({ role, snapshotProvider, onJoin, onLeave, onAck, onRemoteInput, onLobbyState }) {
+    constructor({ role, snapshotProvider, onJoin, onLeave, onAck, onRemoteInput, onLobbyState, onMatchEnd }) {
         this.role = role;
         this.snapshotProvider = snapshotProvider;
         this.onJoin = onJoin;
@@ -47,6 +47,7 @@ export class BroadcastConnection {
         this.onAck = onAck;
         this.onRemoteInput = onRemoteInput;
         this.onLobbyState = onLobbyState;
+        this.onMatchEnd = onMatchEnd;
         this.channel = new BroadcastChannel(BROADCAST_CHANNEL_NAME);
         this.peerAlive = false;
         this.lastPong = 0;
@@ -150,6 +151,8 @@ export class BroadcastConnection {
                 location.reload();
             } else if (msg.type === MSG.LOBBY_STATE) {
                 this.onLobbyState?.(msg);
+            } else if (msg.type === MSG.MATCH_END) {
+                this.onMatchEnd?.(msg);
             }
         }
     }
@@ -163,6 +166,17 @@ export class BroadcastConnection {
         if (this.role !== 'master') return;
         if (!this.peerAlive) return;
         this._post({ type: MSG.LOBBY_STATE, ...state });
+    }
+
+    /**
+     * Master-only: broadcast the end-of-match scoreboard to all peers.
+     * Payload mirrors what scoreboard.js's renderer expects, so the
+     * secondary just hands it straight through.
+     */
+    broadcastMatchEnd(payload) {
+        if (this.role !== 'master') return;
+        if (!this.peerAlive) return;
+        this._post({ type: MSG.MATCH_END, ...payload });
     }
 
     /**

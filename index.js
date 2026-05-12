@@ -37,7 +37,8 @@ import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-ma
 import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
 import { initLobby } from './src/ui/lobby.js';
 import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
-import { isMatchLobby } from './src/game/match.js';
+import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
+import { isMatchLobby, setMatchEndBroadcaster } from './src/game/match.js';
 
 const isSecondary = new URLSearchParams(location.search).has('join');
 // Master's renderable panes. Slot 0 is always the host's local view.
@@ -335,6 +336,13 @@ function setupMasterBroadcast() {
     // match-reset so the secondary's overlay tracks live.
     onClaimChange(broadcastLobbyState);
     window.addEventListener('cssdoom:match-reset', broadcastLobbyState);
+
+    // Mirror match-end scoreboard onto any connected secondary. match.js
+    // calls this from endMatch(); we just hand the payload to the
+    // connection, which gates on peerAlive.
+    setMatchEndBroadcaster((payload) => {
+        masterConnection?.broadcastMatchEnd(payload);
+    });
 }
 
 /**
@@ -372,7 +380,20 @@ async function initSecondary() {
     let client = null;
     const conn = new BroadcastConnection({
         role: 'secondary',
-        onLobbyState: applyLobbyState,
+        onLobbyState: (msg) => {
+            applyLobbyState(msg);
+            // Re-entering the lobby = match no longer ended on this peer.
+            // Master clears its data-match-ended attribute in resetMatch;
+            // mirror that here so the scoreboard hides on a restart.
+            if (msg.inLobby && document.body.dataset.matchEnded) {
+                delete document.body.dataset.matchEnded;
+                hideScoreboard();
+            }
+        },
+        onMatchEnd: (msg) => {
+            document.body.dataset.matchEnded = 'true';
+            showScoreboard(msg);
+        },
         onAck: async (payload, isReconnect) => {
             console.log('[broadcast] master accepted, syncing', payload, isReconnect ? '(reconnect)' : '');
             if (isReconnect) {
