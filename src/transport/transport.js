@@ -10,12 +10,12 @@
  *   onMessage(cb)     — subscribe; returns an unsubscribe function.
  *   close()           — tear down the underlying wire.
  *
- * The renderer-side classes that touch the wire — `BroadcastConnection*`,
- * `BroadcastSink`, `BroadcastClient`, and the (scaffolding) input
- * forwarder in `src/input/remote-secondary.js` — talk only to this
- * interface. Swapping the transport (e.g. for Network DM) is a one-line
- * change at construction time; nothing downstream knows which wire it's
- * on.
+ * The classes that touch the wire — `MasterConnection` /
+ * `SecondaryConnection` (peer-connection.js), `RenderSink`,
+ * `RenderClient`, and the (scaffolding) input forwarder in
+ * `src/input/remote-secondary.js` — talk only to this interface.
+ * Swapping the transport (e.g. for Network DM) is a one-line change at
+ * construction time; nothing downstream knows which wire it's on.
  *
  * One Transport instance corresponds to one wire. In Local DM that's one
  * BroadcastChannel shared between the master window's connection + sink

@@ -9,18 +9,18 @@
  * One slot is one player position: index 0 is the host's local view;
  * indices 1..MAX_SLOTS-1 are filled by local players sitting at master
  * (rendered into master's pane N) or by remote secondaries (a
- * BroadcastSink streams renderer commands across the channel). The
+ * RenderSink streams renderer commands across the channel). The
  * orchestrator owns three concerns that all key off slot index:
  *
  *   1. Render-target dispatch — per-pane commands route to one target by
  *      paneIndex; world commands invoke the local impl once and fan out
- *      to every BroadcastSink so secondary windows mirror the change.
+ *      to every RenderSink so secondary windows mirror the change.
  *      Command names are generated from
  *      [renderer/commands.js](renderer/commands.js).
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
  *      `unbindRemoteSlot`. A joining secondary triggers bind: target
- *      swaps for a BroadcastSink, the master-side pane DOM is torn down,
+ *      swaps for a RenderSink, the master-side pane DOM is torn down,
  *      `body.secondary-active` hides the empty pane, perspective is
  *      refreshed. Unbind is the reverse with a grace-period deferred
  *      unhide so a quickly-reloading secondary doesn't flash.
@@ -46,7 +46,7 @@
  */
 
 import { DomRenderer } from './renderer/dom-renderer.js';
-import { BroadcastSink } from './renderer/broadcast-sink.js';
+import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import {
     clonePanes as clonePanesHelper,
@@ -60,7 +60,7 @@ import {
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
-// (rendered to master's pane N) or a Remote (BroadcastSink → secondary).
+// (rendered to master's pane N) or a Remote (RenderSink → secondary).
 const MAX_SLOTS = 4;
 
 // Deferred-unhide window. When a secondary disconnects, the target swap
@@ -104,7 +104,7 @@ class Orchestrator {
     constructor() {
         // Default registration: one DomRenderer per pane in the current
         // sceneStates layout (always 2 in current HTML). bindRemoteSlot
-        // swaps one of these for a BroadcastSink when a secondary joins.
+        // swaps one of these for a RenderSink when a secondary joins.
         this.targets = [new DomRenderer(0), new DomRenderer(1)];
 
         // Remote-slot bookkeeping. `occupiedRemoteSlots` is the set of
@@ -182,7 +182,7 @@ class Orchestrator {
 
     /**
      * Bind a connected secondary to the given slot. Installs a
-     * BroadcastSink in place of the DomRenderer, tears down master's
+     * RenderSink in place of the DomRenderer, tears down master's
      * local DOM for that pane (since the secondary now renders it),
      * hides the pane via `body.secondary-active`, and refreshes
      * perspectives because the remaining pane just grew from 50% → 100%
@@ -205,7 +205,7 @@ class Orchestrator {
         this._occupiedRemoteSlots.add(slot);
         this._currentSecondarySlot = slot;
 
-        const sink = new BroadcastSink(channel, slot);
+        const sink = new RenderSink(channel, slot);
         this._savedRemoteTarget = this.replaceTarget(slot, sink);
 
         // Master skips the wasted work on an invisible subtree — world
@@ -307,7 +307,7 @@ class Orchestrator {
 }
 
 // Per-pane commands: route to one target by paneIndex. Target's method
-// (DomRenderer or BroadcastSink) is responsible for everything past the
+// (DomRenderer or RenderSink) is responsible for everything past the
 // paneIndex argument.
 for (const name of Object.keys(PER_PANE_COMMANDS)) {
     Orchestrator.prototype[name] = function (paneIndex, ...args) {

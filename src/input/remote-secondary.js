@@ -13,7 +13,7 @@
  * would carry.
  */
 
-import { MSG } from '../renderer/broadcast-protocol.js';
+import { MSG } from '../transport/protocol.js';
 
 export function initRemoteInputForwarder(channel) {
     const post = (msg) => channel.send({ type: MSG.INPUT, ...msg });

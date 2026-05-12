@@ -3,7 +3,7 @@
  * BroadcastChannel; tomorrow: network peer via WebRTC).
  *
  * Master and remote share a `Transport` (see [transport.js](transport.js))
- * and a small set of envelope conventions (`./broadcast-protocol.js`'s
+ * and a small set of envelope conventions ([protocol.js](protocol.js)'s
  * `MSG` enum), but their lifecycles are completely different:
  *
  *   - Master accepts LOOKING, replies with ACK, then keeps the link
@@ -17,16 +17,16 @@
  *
  * To keep each role's logic readable we use two classes
  * (`MasterConnection`, `SecondaryConnection`) sharing the tiny
- * `BroadcastConnectionBase` for transport + post + unload + close. The
- * per-pane and world renderer commands flow through `BroadcastSink` /
- * `BroadcastClient`, which share the same Transport via the
- * `.channel` accessor here.
+ * `PeerConnectionBase` for transport + post + unload + close. The
+ * per-pane and world renderer commands flow through `RenderSink` /
+ * `RenderClient`, which share the same Transport via the `.channel`
+ * accessor here.
  */
 
 import { BroadcastChannelTransport } from './transport.js';
 import {
     BROADCAST_CHANNEL_NAME, MSG, PING_INTERVAL_MS, PING_TIMEOUT_MS,
-} from './broadcast-protocol.js';
+} from './protocol.js';
 
 /**
  * Shared infrastructure: opens the transport, subscribes to incoming
@@ -34,11 +34,11 @@ import {
  * `_post`. Subclasses override `_handle(msg)` to dispatch role-specific
  * behavior.
  *
- * `this.channel` holds the Transport (not a raw BroadcastChannel — the
- * name is preserved because sinks and clients still treat it as "the
- * wire" regardless of which transport backs it).
+ * `this.channel` holds the Transport (the name is preserved because
+ * sinks and clients still treat it as "the wire" regardless of which
+ * transport implementation backs it).
  */
-class BroadcastConnectionBase {
+class PeerConnectionBase {
     constructor() {
         this.channel = new BroadcastChannelTransport(BROADCAST_CHANNEL_NAME);
         this.peerAlive = false;
@@ -55,7 +55,7 @@ class BroadcastConnectionBase {
         try {
             this.channel.send(envelope);
         } catch (err) {
-            console.warn('BroadcastConnection: send failed', err);
+            console.warn('PeerConnection: send failed', err);
         }
     }
 
@@ -76,7 +76,7 @@ class BroadcastConnectionBase {
  * Master-side connection. Replies to a secondary's LOOKING with ACK,
  * pings on a heartbeat, and reports the secondary's lifecycle via the
  * `onJoin` / `onLeave` callbacks so the application can swap render
- * targets between a local DomRenderer and a BroadcastSink.
+ * targets between a local DomRenderer and a RenderSink.
  *
  * @param {object} options
  * @param {() => object} options.snapshotProvider Returns ACK payload (mode/level/slot).
@@ -84,7 +84,7 @@ class BroadcastConnectionBase {
  * @param {() => void}                [options.onLeave]   Fires when the secondary goes silent.
  * @param {(msg: object) => void}     [options.onRemoteInput] Forwarded INPUT envelopes.
  */
-export class MasterConnection extends BroadcastConnectionBase {
+export class MasterConnection extends PeerConnectionBase {
     constructor({ snapshotProvider, onJoin, onLeave, onRemoteInput } = {}) {
         super();
         this.snapshotProvider = snapshotProvider;
@@ -220,7 +220,7 @@ export class MasterConnection extends BroadcastConnectionBase {
  * @param {(msg: object) => void} [options.onMatchEnd]    MATCH_END envelope arrived.
  * @param {(msg: object) => void} [options.onGameState]   GAME_STATE envelope arrived.
  */
-export class SecondaryConnection extends BroadcastConnectionBase {
+export class SecondaryConnection extends PeerConnectionBase {
     constructor({ onAck, onLeave, onLobbyState, onMatchEnd, onGameState } = {}) {
         super();
         this.onAck = onAck;

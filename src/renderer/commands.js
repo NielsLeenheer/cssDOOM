@@ -7,7 +7,7 @@
  *                       to a target by paneIndex; world methods invoke the
  *                       local impl + broadcast to all sinks).
  *   - DomRenderer    — per-pane methods baked against `this.paneIndex`.
- *   - BroadcastSink  — per-pane methods serialize args and post envelopes.
+ *   - RenderSink     — per-pane methods serialize args and post envelopes.
  *   - renderer/index — flat-namespace re-exports for backward compat.
  *
  * Adding a new command becomes one entry in COMMANDS. Forgetting to wire
@@ -17,7 +17,7 @@
  * Two kinds:
  *
  *   `per-pane`  — addressed to one pane. impl signature is
- *                 (paneIndex, ...args). For BroadcastSink, an optional
+ *                 (paneIndex, ...args). For RenderSink, an optional
  *                 `serialize(...args)` strips non-cloneable refs (player
  *                 objects, etc.) before postMessage; defaults to identity.
  *
@@ -26,7 +26,7 @@
  *                 internally) and forwards the call to every sink so
  *                 secondary windows mirror the same world change.
  *
- * Optional `mirror` callback — runs on the receive side (BroadcastClient)
+ * Optional `mirror` callback — runs on the receive side (RenderClient)
  * before dispatching to the local DomRenderer/Orchestrator. Keeps the
  * secondary's `rendererState` (camera positions, thing positions,
  * collected flags) in sync with the master so the secondary's culling

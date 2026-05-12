@@ -1,15 +1,15 @@
 /**
- * BroadcastSink — a render target that forwards commands over a
- * `Transport` instead of painting DOM.
+ * RenderSink — a render target that forwards commands over a `Transport`
+ * instead of painting DOM.
  *
  * Per-pane methods are generated from the command registry
- * ([commands.js](commands.js)) at module load. Each method serializes
- * its args (via the registry's optional `serialize`, used to strip
- * non-cloneable refs like player objects) and posts a `cmd-pane`
- * envelope. The receiving side (`BroadcastClient`) deserializes and
- * dispatches to its local DomRenderer.
+ * ([../renderer/commands.js](../renderer/commands.js)) at module load.
+ * Each method serializes its args (via the registry's optional
+ * `serialize`, used to strip non-cloneable refs like player objects)
+ * and posts a `cmd-pane` envelope. The receiving side (`RenderClient`)
+ * deserializes and dispatches to its local DomRenderer.
  *
- * From the orchestrator's perspective, BroadcastSink and DomRenderer are
+ * From the orchestrator's perspective, RenderSink and DomRenderer are
  * interchangeable for per-pane commands: same method names, same arity.
  *
  * World commands are forwarded separately via `forwardWorld(method, args)`
@@ -17,16 +17,12 @@
  * applies the world command locally (helpers iterate every pane); the
  * sink still forwards because the secondary window has its own DOM tree
  * and needs its own copy of the update.
- *
- * The "Broadcast" in the class name is historical — the sink talks to
- * any Transport. Swapping a `WebRTCDataChannelTransport` in is a one-line
- * change at construction time.
  */
 
-import { MSG } from './broadcast-protocol.js';
-import { PER_PANE_COMMANDS } from './commands.js';
+import { MSG } from './protocol.js';
+import { PER_PANE_COMMANDS } from '../renderer/commands.js';
 
-export class BroadcastSink {
+export class RenderSink {
     /**
      * @param {{send: (msg: object) => void}} channel  Transport instance
      *        shared with the corresponding Connection on the receiving
@@ -59,7 +55,7 @@ export class BroadcastSink {
 }
 
 for (const [name, { serialize }] of Object.entries(PER_PANE_COMMANDS)) {
-    BroadcastSink.prototype[name] = function (...args) {
+    RenderSink.prototype[name] = function (...args) {
         const wireArgs = serialize ? serialize(...args) : args;
         this._post(name, wireArgs);
     };

@@ -5,7 +5,7 @@
  *   - Master (default): full game loop, input, audio. Listens on the
  *     broadcast channel for secondary windows wanting to join.
  *   - Secondary (`?join` URL param): renderer-only mirror of the master.
- *     Skips game loop and input, runs a BroadcastClient that applies
+ *     Skips game loop and input, runs a RenderClient that applies
  *     incoming renderer commands to a local DomRenderer + Orchestrator.
  */
 
@@ -30,8 +30,8 @@ import './src/ui/spectator.js';
 
 import { orchestrator } from './src/orchestrator.js';
 import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
-import { BroadcastClient } from './src/renderer/broadcast-client.js';
-import { MasterConnection, SecondaryConnection } from './src/renderer/broadcast-connection.js';
+import { RenderClient } from './src/transport/render-client.js';
+import { MasterConnection, SecondaryConnection } from './src/transport/peer-connection.js';
 import { updatePerspective } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
 import { initLobby, getCarriedOverClaims } from './src/ui/lobby.js';
@@ -66,7 +66,7 @@ window.debug = function() {
  * No `wallElements.length === 0` early-exit here even though some panes
  * may be empty (SP's pane 1, or DM's pane 1 after secondary teardown):
  * updateCamera / updateHud are routed through the orchestrator, and the
- * orchestrator's per-pane target may be a BroadcastSink that needs to
+ * orchestrator's per-pane target may be a RenderSink that needs to
  * forward to a secondary regardless of local DOM state. Skipping here
  * would starve the sink. Writing CSS variables on a hidden / empty pane
  * is harmless.
@@ -326,7 +326,7 @@ function broadcastLobbyState() {
 /**
  * Secondary initialization — renderer-only mode. Open a BroadcastConnection
  * in the secondary role; on ACK, sync mode/level locally so the renderer
- * has the same scene as the master, and start a BroadcastClient to apply
+ * has the same scene as the master, and start a RenderClient to apply
  * incoming renderer commands.
  *
  * Disconnect handling: when master goes silent (closed, reloaded, crashed),
@@ -340,7 +340,7 @@ async function initSecondary() {
     document.body.classList.add('secondary-window');
 
     // Stand up the renderer-state arrays sized for the secondary's two-pane
-    // DOM. The BroadcastClient's apply* calls populate them as updates flow
+    // DOM. The RenderClient's apply* calls populate them as updates flow
     // in from master; until then they sit at spawn-default zeros.
     initSecondaryRendererState(sceneStates.length);
 
@@ -406,7 +406,7 @@ async function initSecondary() {
             // onAck's await loadMap.
             setSecondarySlot(slotIndex);
 
-            client = new BroadcastClient(conn.channel, slotIndex, orchestrator.target(1), orchestrator);
+            client = new RenderClient(conn.channel, slotIndex, orchestrator.target(1), orchestrator);
             console.log('[broadcast] client wired up at slot', slotIndex);
         },
         onLeave: () => {

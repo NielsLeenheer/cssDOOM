@@ -18,7 +18,7 @@
  * lives at module scope in dom.js. A follow-on cleanup migrates that
  * state into the instance itself; for now this facade is enough to give
  * the orchestrator a swappable target abstraction (DomRenderer ↔
- * BroadcastSink) without rewriting twenty renderer files.
+ * RenderSink) without rewriting twenty renderer files.
  */
 
 import { PER_PANE_COMMANDS } from './commands.js';

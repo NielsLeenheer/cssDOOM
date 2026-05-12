@@ -1,29 +1,28 @@
 /**
- * BroadcastClient — the receiving end in the secondary window.
+ * RenderClient — the receiving end in a secondary window (or, in future,
+ * a network remote).
  *
  * Subscribes to a Transport and dispatches incoming envelopes to a
- * local DomRenderer (per-pane commands) and the local Orchestrator (world
- * commands).
+ * local DomRenderer (per-pane commands) and the local Orchestrator
+ * (world commands).
  *
  * Renderer-state mirroring (keeping `rendererState.cameras[i]` and
  * `rendererState.things[i]` in sync with the master so the local culling
  * loop sees current values) is driven by the command registry: each
- * affected entry in [commands.js](commands.js) declares an optional
- * `mirror` callback that runs here before the renderer dispatch. Adding
- * a new mirrored command is one entry in COMMANDS — no edits here.
+ * affected entry in [../renderer/commands.js](../renderer/commands.js)
+ * declares an optional `mirror` callback that runs here before the
+ * renderer dispatch. Adding a new mirrored command is one entry in
+ * COMMANDS — no edits here.
  *
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, snapshot replay, heartbeat, disconnect) is
- * layered on top of this in a separate module.
- *
- * The "Broadcast" in the class name is historical — the client talks to
- * any Transport.
+ * layered on top of this in [peer-connection.js](peer-connection.js).
  */
 
-import { MSG } from './broadcast-protocol.js';
-import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './commands.js';
+import { MSG } from './protocol.js';
+import { PER_PANE_COMMANDS, WORLD_COMMANDS } from '../renderer/commands.js';
 
-export class BroadcastClient {
+export class RenderClient {
     /**
      * @param {{onMessage: (cb: (msg: object) => void) => () => void}} channel
      *        Transport instance shared with the master-side connection.
@@ -69,7 +68,7 @@ export class BroadcastClient {
         if (typeof fn === 'function') {
             fn.apply(this.domRenderer, args);
         } else {
-            console.warn(`BroadcastClient: unknown pane method '${method}'`);
+            console.warn(`RenderClient: unknown pane method '${method}'`);
         }
     }
 
@@ -81,7 +80,7 @@ export class BroadcastClient {
         if (typeof fn === 'function') {
             fn.apply(this.orchestrator, args);
         } else {
-            console.warn(`BroadcastClient: unknown world method '${method}'`);
+            console.warn(`RenderClient: unknown world method '${method}'`);
         }
     }
 }
