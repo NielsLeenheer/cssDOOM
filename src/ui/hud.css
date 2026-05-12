@@ -652,8 +652,10 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     position: fixed;
     inset: 0;
     z-index: 1300;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 48px;
     font-family: 'STCFN', monospace;
     /* Matches lobby + respawn — 32 px is a multiple of STCFN's 8 px
        source cell. Padding keeps the wrap inset from the screen edges. */
@@ -664,6 +666,18 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     background: rgba(0, 0, 0, 0.45);
     pointer-events: none;
     text-align: center;
+}
+
+.pane-attract-logo {
+    /* M_DOOM is 82×40 px — render pixelated and scale by integer
+       multiples to keep the bitmap crisp. 4× → 328×160. */
+    width: calc(82px * 4);
+    image-rendering: pixelated;
+    user-select: none;
+}
+
+/* Only the prompt text pulses; logo stays at full opacity. */
+.pane-attract span {
     animation: attract-pulse 1.6s ease-in-out infinite;
 }
 

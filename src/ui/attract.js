@@ -133,7 +133,7 @@ export function attractTick(timestamp) {
     }
 }
 
-async function enterAttract() {
+export async function enterAttract() {
     entering = true;
     setAttract(true);
 
