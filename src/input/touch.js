@@ -12,7 +12,7 @@
  * to the unified input system.
  */
 
-import { input } from './index.js';
+import { inputs } from './index.js';
 import { state } from '../game/state.js';
 import { currentMap } from '../shared/maps.js';
 import { isMenuOpen } from '../ui/menu.js';
@@ -195,7 +195,7 @@ function setupPointerHandlers() {
         e.stopPropagation();
         fireOverlay.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, { type: 'fire' });
-        input.fireHeld = true;
+        inputs[0].fireHeld = true;
         fireWeapon(state.players[0]);
     });
 
@@ -204,7 +204,7 @@ function setupPointerHandlers() {
         if (!ptr || ptr.type !== 'fire') return;
 
         activePointers.delete(e.pointerId);
-        input.fireHeld = false;
+        inputs[0].fireHeld = false;
         stopAutoFire(state.players[0]);
     };
     fireOverlay.addEventListener('pointerup', releaseFire);
