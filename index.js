@@ -22,6 +22,7 @@ import { initKeyboardInput } from './src/input/keyboard.js';
 import { initMouseInput } from './src/input/mouse.js';
 import { initTouchInput } from './src/input/touch.js';
 import { initGamepadInput } from './src/input/gamepad.js';
+import { initActions } from './src/actions/index.js';
 import { initDebugMenu, updateDebugStats } from './src/ui/debug.js';
 import { attractTick, isAttractActive } from './src/ui/attract.js';
 import { spectatorActive } from './src/ui/spectator.js';
@@ -169,6 +170,10 @@ function gameLoop(timestamp) {
  */
 async function initMaster() {
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
+    // Wire action handlers BEFORE input modules emit anything. Inputs
+    // produce events on the bus; handlers in src/actions/* subscribe to
+    // them and dispatch into game functions.
+    initActions();
     initKeyboardInput();
     initMouseInput();
     initTouchInput();

@@ -8,20 +8,17 @@
  * Uses pointer events with touch-action: none for consistent multi-touch
  * handling. Only activates on touch-capable devices.
  *
- * Registers an input provider that supplies moveX, moveY, and turnDelta
- * to the unified input system.
+ * Discrete actions emit on the input event bus (`fire-down`, `fire-up`,
+ * `use`, `weapon-next`). The per-frame analog input provider returns
+ * the joystick + look-zone state for `inputs[0]`.
  */
 
-import { inputs } from './index.js';
-import { state } from '../game/state.js';
-import { currentMap } from '../shared/maps.js';
-import { isMenuOpen } from '../ui/menu.js';
-import { tryOpenDoor } from '../game/mechanics/doors.js';
-import { tryUseSwitch } from '../game/mechanics/switches.js';
-import { tryUseLift } from '../game/mechanics/lifts.js';
-import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
-import { loadMap } from '../shared/maps.js';
 import { registerInputProvider } from './index.js';
+import { emit } from './event-bus.js';
+import * as A from './actions.js';
+
+const TOUCH_DEVICE_ID = 'touch';
+const TOUCH_SLOT = 0;  // touch is single-player only
 
 const JOYSTICK_MAX_RADIUS = 50;
 const JOYSTICK_DEADZONE = 0.15;
@@ -47,7 +44,7 @@ export function initTouchInput() {
     if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) return;
 
     // Touch is single-player only — always targets slot 0.
-    registerInputProvider(() => 0, getInput);
+    registerInputProvider(() => TOUCH_SLOT, getInput);
     createTouchUI();
     setupPointerHandlers();
 }
@@ -108,13 +105,9 @@ function createTouchUI() {
 function setupPointerHandlers() {
     // --- Joystick ---
     joystickZone.addEventListener('pointerdown', e => {
-        if (isMenuOpen()) return;
-        if (handleDeadRestart()) return;
-
         e.preventDefault();
         joystickZone.setPointerCapture(e.pointerId);
         joystickKnob.style.transform = 'translate(0, 0)';
-
         activePointers.set(e.pointerId, { type: 'joystick' });
     });
 
@@ -158,9 +151,6 @@ function setupPointerHandlers() {
 
     // --- Look (drag-to-turn) ---
     lookZone.addEventListener('pointerdown', e => {
-        if (isMenuOpen()) return;
-        if (handleDeadRestart()) return;
-
         e.preventDefault();
         lookZone.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, {
@@ -188,37 +178,26 @@ function setupPointerHandlers() {
 
     // --- Fire overlay (invisible button covering the weapon area) ---
     fireOverlay.addEventListener('pointerdown', e => {
-        if (isMenuOpen()) return;
-        if (handleDeadRestart()) return;
-
         e.preventDefault();
         e.stopPropagation();
         fireOverlay.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, { type: 'fire' });
-        inputs[0].fireHeld = true;
-        fireWeapon(state.players[0]);
+        emit({ kind: A.FIRE_DOWN, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
     });
 
     const releaseFire = e => {
         const ptr = activePointers.get(e.pointerId);
         if (!ptr || ptr.type !== 'fire') return;
-
         activePointers.delete(e.pointerId);
-        inputs[0].fireHeld = false;
-        stopAutoFire(state.players[0]);
+        emit({ kind: A.FIRE_UP, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
     };
     fireOverlay.addEventListener('pointerup', releaseFire);
     fireOverlay.addEventListener('pointercancel', releaseFire);
 
     // --- Use button ---
     useButton.addEventListener('pointerdown', e => {
-        if (isMenuOpen()) return;
-        if (handleDeadRestart()) return;
-
         e.preventDefault();
-        tryOpenDoor(state.players[0]);
-        tryUseSwitch(state.players[0]);
-        tryUseLift(state.players[0]);
+        emit({ kind: A.USE, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
     });
 
     // --- Weapon cycling by tapping the ARMS panel ---
@@ -228,7 +207,7 @@ function setupPointerHandlers() {
         armsPanel.addEventListener('pointerdown', e => {
             e.preventDefault();
             e.stopPropagation();
-            cycleWeapon(1);
+            emit({ kind: A.WEAPON_NEXT, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
         });
     }
 
@@ -240,25 +219,4 @@ function setupPointerHandlers() {
         joystickKnob.style.transform = 'translate(0, 0)';
         activePointers.clear();
     });
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function cycleWeapon(direction) {
-    const player = state.players[0];
-    const owned = [...player.ownedWeapons].sort((a, b) => a - b);
-    const currentIndex = owned.indexOf(player.currentWeapon);
-    const nextIndex = (currentIndex + direction + owned.length) % owned.length;
-    equipWeapon(player, owned[nextIndex]);
-}
-
-function handleDeadRestart() {
-    const player = state.players[0];
-    if (!player.isDead) return false;
-    if (performance.now() - player.deathTime > 4000) {
-        loadMap(currentMap);
-    }
-    return true;
 }

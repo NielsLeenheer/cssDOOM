@@ -11,15 +11,16 @@
  * kbm-input-handler instances + separate input slots.
  */
 
-import { inputs, registerInputProvider } from './index.js';
+import { registerInputProvider } from './index.js';
 import { pingActivity } from '../ui/attract.js';
 import { createKbmInputHandler } from './kbm-input-handler.js';
 
 const SECONDARY_PLAYER = 1;
+const REMOTE_DEVICE_ID = 'remote-1';
 
 const remoteHandler = createKbmInputHandler({
     getSlot: () => SECONDARY_PLAYER,
-    inputs,
+    getDeviceId: () => REMOTE_DEVICE_ID,
 });
 
 /**

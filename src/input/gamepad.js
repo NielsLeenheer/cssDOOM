@@ -34,22 +34,10 @@
  */
 
 import { inputs, registerInputProvider } from './index.js';
-import { getDriverSlot, tryClaimSlot, unclaim, applySavedClaim } from './claim-registry.js';
-import { state } from '../game/state.js';
-import { currentMap } from '../shared/maps.js';
-import { isMenuOpen, toggleMenu } from '../ui/menu.js';
+import { getDriverSlot, unclaim, applySavedClaim } from './claim-registry.js';
 import { pingActivity } from '../ui/attract.js';
-import { tryOpenDoor } from '../game/mechanics/doors.js';
-import { tryUseSwitch } from '../game/mechanics/switches.js';
-import { tryUseLift } from '../game/mechanics/lifts.js';
-import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
-import { spawnPlayer } from '../game/player/spawn.js';
-import { isMatchEnded, restartMatch } from '../game/match.js';
-import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
-import { loadMap } from '../shared/maps.js';
-
-const DM_RESPAWN_COOLDOWN_MS = 2000;
-const SP_RESTART_COOLDOWN_MS = 4000;
+import { emit } from './event-bus.js';
+import * as A from './actions.js';
 
 const STICK_DEADZONE = 0.15;
 // Right-stick deflection is mapped to the same `turn` rate channel the
@@ -268,7 +256,6 @@ function processGamepad(rawPad) {
     // PS5 DualSense face buttons) leave `pressed` false while `value`
     // goes to 1.0.
     const handlers = padState._handlers;
-    const claimOrPass = padState._claimOrPass;
     const prev = padState._prevButtons ??= [];
     const buttons = rawPad.buttons ?? [];
     for (let i = 0; i < buttons.length; i++) {
@@ -281,18 +268,16 @@ function processGamepad(rawPad) {
 
         if (isPressed && !wasPressed) {
             // Wake from attract on any press; if that's what just
-            // happened, skip claim + action so the wakeup press is a
-            // dedicated "enter lobby" press, not also a claim.
+            // happened, skip the emit so the wakeup press is a
+            // dedicated "enter lobby" press, not also a fire/use/etc.
             if (pingActivity()) {
                 prev[i] = isPressed;
                 continue;
             }
-            // Lobby claim is universal: any button press claims when the
-            // gamepad is unbound in DM. Returns true if the press was
-            // consumed by the claim attempt.
-            if (!claimOrPass()) {
-                handlers[i]?.press?.();
-            }
+            // Each handler emits its logical action on the bus.
+            // Press-to-claim / dead-respawn / match-end / intermission
+            // gates in src/actions/gates.js consume as needed.
+            handlers[i]?.press?.();
         } else if (!isPressed && wasPressed) {
             handlers[i]?.release?.();
         }
@@ -342,101 +327,42 @@ function setupGamepad(gamepad) {
 
     /** The slot this gamepad currently drives, or null if unbound. */
     const slotForPad = () => getDriverSlot(deviceId);
-    /** The player driven by this gamepad, or null if unbound. */
-    const playerForPad = () => {
-        const s = slotForPad();
-        return s != null ? state.players[s] : null;
-    };
-    /** True if this gamepad is unbound and should claim on next press. */
-    const isLobbyClaimPending = () =>
-        state.mode === 'deathmatch' && slotForPad() == null;
-
-    /**
-     * Claim-or-pass: when this gamepad is unbound in a DM lobby, *any*
-     * button press counts as a claim attempt. Returns true if the press
-     * was consumed by the claim and the caller should skip its action.
-     */
-    function claimOrPass() {
-        if (!isLobbyClaimPending()) return false;
-        tryClaimSlot(deviceId);
-        return true;
-    }
-    padState._claimOrPass = claimOrPass;
 
     // Per-button press/release handlers, dispatched by `processGamepad`.
+    // Each handler just emits the logical action on the bus — gates +
+    // action handlers in src/actions/ do the dispatch.
     const handlers = {};
 
     // A / Cross (button0): Use
     handlers[0] = {
-        press: () => {
-            const player = playerForPad();
-            if (!player) return;
-            if (isIntermissionActive()) { dismissIntermission(); return; }
-            if (isMatchEnded()) { restartMatch(); return; }
-            if (handleDeadRestart(player)) return;
-            if (isMenuOpen()) return;
-            tryOpenDoor(player);
-            tryUseSwitch(player);
-            tryUseLift(player);
-        },
+        press: () => emit({ kind: A.USE, slot: slotForPad(), deviceId }),
     };
     // L1 / LB (button4): Previous weapon
     handlers[4] = {
-        press: () => {
-            if (isMenuOpen()) return;
-            const slot = slotForPad();
-            if (slot != null) cycleWeapon(slot, -1);
-        },
+        press: () => emit({ kind: A.WEAPON_PREV, slot: slotForPad(), deviceId }),
     };
     // R1 / RB (button5): Next weapon
     handlers[5] = {
-        press: () => {
-            if (isMenuOpen()) return;
-            const slot = slotForPad();
-            if (slot != null) cycleWeapon(slot, 1);
-        },
+        press: () => emit({ kind: A.WEAPON_NEXT, slot: slotForPad(), deviceId }),
     };
     // R2 / RT (button7): Fire. Run-modifier is L2 (button6) — handled
     // separately via padState.run because it's a continuous state rather
     // than a discrete press/release.
     handlers[7] = {
-        press: () => {
-            const player = playerForPad();
-            if (!player) return;
-            if (isIntermissionActive()) { dismissIntermission(); return; }
-            if (isMatchEnded()) { restartMatch(); return; }
-            if (handleDeadRestart(player)) return;
-            if (isMenuOpen()) return;
-            const slot = slotForPad();
-            inputs[slot].fireHeld = true;
-            fireWeapon(player);
-        },
-        release: () => {
-            const slot = slotForPad();
-            const player = playerForPad();
-            if (slot != null) inputs[slot].fireHeld = false;
-            if (player) stopAutoFire(player);
-        },
+        press: () => emit({ kind: A.FIRE_DOWN, slot: slotForPad(), deviceId }),
+        release: () => emit({ kind: A.FIRE_UP, slot: slotForPad(), deviceId }),
     };
     // Start / Options (button9): Toggle menu
     handlers[9] = {
-        press: () => toggleMenu(!isMenuOpen()),
+        press: () => emit({ kind: A.MENU_TOGGLE, slot: slotForPad(), deviceId }),
     };
     // D-pad up (button12): Next weapon (mirrors R1)
     handlers[12] = {
-        press: () => {
-            if (isMenuOpen()) return;
-            const slot = slotForPad();
-            if (slot != null) cycleWeapon(slot, 1);
-        },
+        press: () => emit({ kind: A.WEAPON_NEXT, slot: slotForPad(), deviceId }),
     };
     // D-pad down (button13): Previous weapon (mirrors L1)
     handlers[13] = {
-        press: () => {
-            if (isMenuOpen()) return;
-            const slot = slotForPad();
-            if (slot != null) cycleWeapon(slot, -1);
-        },
+        press: () => emit({ kind: A.WEAPON_PREV, slot: slotForPad(), deviceId }),
     };
 
     padState._handlers = handlers;
@@ -468,30 +394,3 @@ function handleDisconnect(gamepadIndex) {
     }
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
-
-function cycleWeapon(playerIndex, direction) {
-    const player = state.players[playerIndex];
-    if (!player) return;
-    const owned = [...player.ownedWeapons].sort((a, b) => a - b);
-    const currentIndex = owned.indexOf(player.currentWeapon);
-    const nextIndex = (currentIndex + direction + owned.length) % owned.length;
-    equipWeapon(player, owned[nextIndex]);
-}
-
-function handleDeadRestart(player) {
-    if (!player.isDead) return false;
-    const cooldown = state.mode === 'deathmatch'
-        ? DM_RESPAWN_COOLDOWN_MS
-        : SP_RESTART_COOLDOWN_MS;
-    if (performance.now() - player.deathTime > cooldown) {
-        if (state.mode === 'deathmatch') {
-            spawnPlayer(player);
-        } else {
-            loadMap(currentMap);
-        }
-    }
-    return true;
-}

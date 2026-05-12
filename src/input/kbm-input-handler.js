@@ -1,15 +1,14 @@
 /**
- * Keyboard + mouse input handler factory.
+ * Keyboard + mouse input pipeline.
  *
  * The heart of [keyboard.js](keyboard.js), [mouse.js](mouse.js), and
  * [remote-master.js](remote-master.js) — they all need the same
- * key→action mapping (movement keys → analog input, fire/use/weapon
- * select, isMatchEnded restart, dead-respawn cooldown), differing only
- * in *which slot* the input drives.
+ * key→action mapping and analog movement, differing only in *which
+ * slot* the input drives.
  *
- * Each call returns a fresh handler instance with its own `keys` shadow
- * state and accumulated mouseTurnDelta. Three instances exist at
- * runtime:
+ * Each call returns a fresh handler instance with its own `keys`
+ * shadow state and accumulated mouseTurnDelta. Three instances exist
+ * at runtime:
  *
  *   - Local kbm — slot resolved from the active virtual kbm device
  *     (keyboard.js owns this; mouse.js shares the same instance).
@@ -17,29 +16,17 @@
  *     events (remote-master.js).
  *   - (future, multi-remote) one per remote.
  *
- * The factory does NOT handle:
- *   - Escape / menu toggle (master-window concern)
- *   - Tab debug swap (kbm-specific affordance, dev-only)
- *   - press-to-claim on first key/click (caller decides whether/when)
- *   - event.repeat suppression (no concept for forwarded remote events)
- *
- * Those wrappers stay in keyboard.js / mouse.js / remote-master.js.
+ * The handler emits logical action events on the input event bus
+ * (`emit(...)` from `event-bus.js`) — no direct game-function imports
+ * here. Subscribers in `src/actions/*` route the events into
+ * fire/use/weapon-select. Per-frame analog movement still flows
+ * through the `inputs[]` aggregation via the `getInput()` callback the
+ * factory returns.
  */
 
-import { state } from '../game/state.js';
-import { currentMap, loadMap } from '../shared/maps.js';
 import { WEAPONS } from '../game/constants.js';
-import { tryOpenDoor } from '../game/mechanics/doors.js';
-import { tryUseSwitch } from '../game/mechanics/switches.js';
-import { tryUseLift } from '../game/mechanics/lifts.js';
-import { fireWeapon, equipWeapon, stopAutoFire } from '../game/entities/weapons.js';
-import { spawnPlayer } from '../game/player/spawn.js';
-import { isMatchEnded, restartMatch } from '../game/match.js';
-import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
-import { isMenuOpen } from '../ui/menu.js';
-
-const DM_RESPAWN_COOLDOWN_MS = 2000;
-const SP_RESTART_COOLDOWN_MS = 4000;
+import { emit } from './event-bus.js';
+import * as A from './actions.js';
 
 // Same value as the local mouse module used previously, kept in sync so
 // remote and local mouse-look feel identical when both are in play.
@@ -48,14 +35,15 @@ export const MOUSE_SENSITIVITY = 0.003;
 /**
  * Create a kbm input pipeline bound to one slot.
  *
- * @param {() => number|null} getSlot   Returns the slot the handler currently
- *                                       drives, or null if unbound.
- * @param {Array} inputs                 The shared `inputs[]` array — used
- *                                       to set/clear `fireHeld`.
+ * @param {() => number|null} getSlot      Current slot for this handler.
+ * @param {() => string} getDeviceId       The device id reported on each
+ *                                          emit. A function (not a constant)
+ *                                          because the active virtual kbm
+ *                                          can flip at runtime via Tab.
  *
  * @returns {{
- *   getInput: () => object,         // For registerInputProvider
- *   handleKeyDown: (code: string) => boolean,   // Returns true if handled
+ *   getInput: () => object,
+ *   handleKeyDown: (code: string) => boolean,
  *   handleKeyUp: (code: string) => void,
  *   handleMouseDown: (button: number) => boolean,
  *   handleMouseUp: (button: number) => void,
@@ -64,17 +52,12 @@ export const MOUSE_SENSITIVITY = 0.003;
  *   clearFireHeld: () => void,
  * }}
  */
-export function createKbmInputHandler({ getSlot, inputs }) {
+export function createKbmInputHandler({ getSlot, getDeviceId }) {
     const keys = {
         up: false, down: false, left: false, right: false,
         strafeLeft: false, strafeRight: false, run: false, strafe: false,
     };
     let mouseTurnDelta = 0;
-
-    function currentPlayer() {
-        const slot = getSlot();
-        return slot != null ? state.players[slot] : null;
-    }
 
     function getInput() {
         let moveX = 0, moveY = 0, turn = 0;
@@ -94,81 +77,34 @@ export function createKbmInputHandler({ getSlot, inputs }) {
         return { moveX, moveY, turn, turnDelta, run: keys.run };
     }
 
-    /**
-     * Pre-action gates — match-end restart, dead-respawn cooldown.
-     * Returns true if the gate consumed the input (caller should stop).
-     */
-    function applyGates(player, code) {
-        if (isMenuOpen()) return true;
-
-        if (isIntermissionActive()) {
-            if (code === 'AltLeft' || code === 'AltRight' || code === 'KeyX' || code === 'Space') {
-                dismissIntermission();
-            }
-            return true;
-        }
-
-        if (isMatchEnded()) {
-            if (code === 'AltLeft' || code === 'AltRight' || code === 'KeyX' || code === 'Space') {
-                restartMatch();
-            }
-            return true;
-        }
-
-        if (player?.isDead) {
-            const cooldown = state.mode === 'deathmatch'
-                ? DM_RESPAWN_COOLDOWN_MS
-                : SP_RESTART_COOLDOWN_MS;
-            if (performance.now() - player.deathTime > cooldown) {
-                if (state.mode === 'deathmatch') {
-                    spawnPlayer(player);
-                } else {
-                    loadMap(currentMap);
-                }
-            }
-            return true;
-        }
-
-        return false;
-    }
-
     function handleKeyDown(code) {
-        const player = currentPlayer();
-        if (applyGates(player, code)) return false;
-
+        const slot = getSlot();
         switch (code) {
-            case 'ArrowUp': case 'KeyW': keys.up = true; break;
-            case 'ArrowDown': case 'KeyS': keys.down = true; break;
-            case 'ArrowLeft': keys.left = true; break;
-            case 'ArrowRight': keys.right = true; break;
-            case 'KeyA': case 'Comma': keys.strafeLeft = true; break;
-            case 'KeyD': case 'Period': keys.strafeRight = true; break;
-            case 'ShiftLeft': case 'ShiftRight': keys.run = true; break;
-            case 'KeyZ': keys.strafe = true; break;
+            case 'ArrowUp': case 'KeyW': keys.up = true; return true;
+            case 'ArrowDown': case 'KeyS': keys.down = true; return true;
+            case 'ArrowLeft': keys.left = true; return true;
+            case 'ArrowRight': keys.right = true; return true;
+            case 'KeyA': case 'Comma': keys.strafeLeft = true; return true;
+            case 'KeyD': case 'Period': keys.strafeRight = true; return true;
+            case 'ShiftLeft': case 'ShiftRight': keys.run = true; return true;
+            case 'KeyZ': keys.strafe = true; return true;
             case 'Space':
-                tryOpenDoor(player);
-                tryUseSwitch(player);
-                tryUseLift(player);
-                break;
-            case 'AltLeft': case 'AltRight': case 'KeyX': {
-                const slot = getSlot();
-                if (slot != null) inputs[slot].fireHeld = true;
-                fireWeapon(player);
-                break;
-            }
+                emit({ kind: A.USE, slot, deviceId: getDeviceId() });
+                return true;
+            case 'AltLeft': case 'AltRight': case 'KeyX':
+                emit({ kind: A.FIRE_DOWN, slot, deviceId: getDeviceId() });
+                return true;
             case 'Digit1': case 'Digit2': case 'Digit3':
             case 'Digit4': case 'Digit5': case 'Digit6': case 'Digit7': {
                 const ws = parseInt(code[5]);
-                if (WEAPONS[ws]) equipWeapon(player, ws);
-                break;
+                if (WEAPONS[ws]) emit({ kind: A.WEAPON_SELECT, slot, deviceId: getDeviceId(), weapon: ws });
+                return true;
             }
             default: return false;
         }
-        return true;
     }
 
     function handleKeyUp(code) {
-        const player = currentPlayer();
         switch (code) {
             case 'ArrowUp': case 'KeyW': keys.up = false; break;
             case 'ArrowDown': case 'KeyS': keys.down = false; break;
@@ -178,12 +114,9 @@ export function createKbmInputHandler({ getSlot, inputs }) {
             case 'KeyD': case 'Period': keys.strafeRight = false; break;
             case 'ShiftLeft': case 'ShiftRight': keys.run = false; break;
             case 'KeyZ': keys.strafe = false; break;
-            case 'AltLeft': case 'AltRight': case 'KeyX': {
-                const slot = getSlot();
-                if (slot != null) inputs[slot].fireHeld = false;
-                if (player) stopAutoFire(player);
+            case 'AltLeft': case 'AltRight': case 'KeyX':
+                emit({ kind: A.FIRE_UP, slot: getSlot(), deviceId: getDeviceId() });
                 break;
-            }
             // Meta release: clear movement to avoid stuck keys on macOS,
             // where keyup is suppressed while Meta is held.
             case 'MetaLeft': case 'MetaRight':
@@ -195,32 +128,13 @@ export function createKbmInputHandler({ getSlot, inputs }) {
 
     function handleMouseDown(button) {
         if (button !== 0) return false;
-        const player = currentPlayer();
-
-        if (isIntermissionActive()) { dismissIntermission(); return true; }
-        if (isMatchEnded()) { restartMatch(); return true; }
-
-        if (player?.isDead) {
-            if (state.mode === 'deathmatch'
-                && performance.now() - player.deathTime > DM_RESPAWN_COOLDOWN_MS) {
-                spawnPlayer(player);
-            }
-            return true;
-        }
-
-        const slot = getSlot();
-        if (slot == null || !player) return false;
-        inputs[slot].fireHeld = true;
-        fireWeapon(player);
+        emit({ kind: A.FIRE_DOWN, slot: getSlot(), deviceId: getDeviceId() });
         return true;
     }
 
     function handleMouseUp(button) {
         if (button !== 0) return;
-        const slot = getSlot();
-        if (slot != null) inputs[slot].fireHeld = false;
-        const player = currentPlayer();
-        if (player) stopAutoFire(player);
+        emit({ kind: A.FIRE_UP, slot: getSlot(), deviceId: getDeviceId() });
     }
 
     function addMouseTurn(dx) {
@@ -234,7 +148,7 @@ export function createKbmInputHandler({ getSlot, inputs }) {
 
     function clearFireHeld() {
         const slot = getSlot();
-        if (slot != null && inputs[slot]) inputs[slot].fireHeld = false;
+        if (slot != null) emit({ kind: A.FIRE_UP, slot, deviceId: getDeviceId() });
     }
 
     return {

@@ -13,19 +13,11 @@
  * Ignores clicks on touch devices to prevent accidental firing from taps.
  */
 
-import { state } from '../game/state.js';
-import { tryClaimSlot, getDriverSlot } from './claim-registry.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { pingActivity } from '../ui/attract.js';
-import { getActiveKbm, kbmHandler } from './keyboard.js';
+import { kbmHandler } from './keyboard.js';
 
 const isTouchDevice = matchMedia('(pointer: coarse)').matches;
-
-/** Slot the mouse is currently driving, or null if unbound. Mouse follows
- *  whichever virtual kbm device is currently active. */
-function kbmSlot() {
-    return getDriverSlot(getActiveKbm());
-}
 
 /**
  * Initializes mouse event listeners.
@@ -34,17 +26,10 @@ function kbmSlot() {
 export function initMouseInput() {
     document.addEventListener('mousedown', event => {
         // Wake from attract — first click only dismisses the overlay;
-        // claim/fire happen on subsequent presses.
+        // claim/fire happen on subsequent presses (handled by gates).
         if (pingActivity()) return;
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
         if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #ui-buttons')) return;
-
-        // Press-to-claim in DM lobby: unbound left-click claims a slot
-        // for the active kbm device.
-        if (state.mode === 'deathmatch' && kbmSlot() == null) {
-            tryClaimSlot(getActiveKbm());
-            return;
-        }
 
         kbmHandler.handleMouseDown(event.button);
     });

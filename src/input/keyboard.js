@@ -1,5 +1,6 @@
 /**
- * Keyboard Input
+ * Keyboard input — emits logical action events on the bus and
+ * accumulates movement keys for the per-frame `inputs[]` aggregate.
  *
  * Key bindings (matches original DOOM + WASD):
  *   Movement:    W / ArrowUp    = forward
@@ -21,30 +22,31 @@
  * via the press-to-claim registry, but only one is "active" at a time —
  * the active one is the slot that key/mouse events route to right now.
  *
- *   - First non-Tab key press claims the **active** kbm device for the
- *     next free slot (default active is kbm-A → typically slot 0).
- *   - Tab claims the **other** kbm device for the next free slot, then
- *     flips active to it (debug affordance: one keyboard drives two
- *     players sequentially).
+ *   - First action-press (fire/use/weapon) by an unbound kbm in a DM
+ *     lobby claims the next free slot (handled by the claim gate in
+ *     `src/actions/gates.js`).
+ *   - Tab (dev only) claims the *other* kbm device for the next free
+ *     slot and flips active to it.
  *   - Once both are claimed, Tab toggles which one is active.
  *
  * `body[data-kbm-target=N]` tracks the active kbm's current slot so CSS
  * can outline the pane the keyboard is driving.
  *
- * The actual key→action mapping (movement, fire, weapon select, dead
- * respawn, etc.) lives in [kbm-input-handler.js](kbm-input-handler.js)
- * and is shared with mouse.js + remote-master.js. This file owns the
- * keyboard-only wrappers: Escape, Tab, press-to-claim on first key,
- * event.repeat suppression, blur reset, and the input-provider hookup.
+ * The actual key→action emit lives in
+ * [kbm-input-handler.js](kbm-input-handler.js) and is shared with
+ * `mouse.js` + `remote-master.js`. This file owns: Escape menu toggle,
+ * Tab dev swap, isMenuOpen gating of movement keys, event.repeat
+ * suppression, blur reset, attract wake-up, and the input-provider
+ * hookup.
  */
 
 import { inputs, registerInputProvider } from './index.js';
 import { getDriverSlot, tryClaimSlot, onClaimChange, applySavedClaim } from './claim-registry.js';
-import { state } from '../game/state.js';
-import { isMenuOpen, toggleMenu } from '../ui/menu.js';
+import { isMenuOpen } from '../ui/menu.js';
 import { pingActivity } from '../ui/attract.js';
-import { isMatchEnded } from '../game/match.js';
 import { createKbmInputHandler } from './kbm-input-handler.js';
+import { emit } from './event-bus.js';
+import * as A from './actions.js';
 
 // Two virtual deviceIds for the same physical keyboard+mouse, so each can
 // claim a slot independently via the press-to-claim registry.
@@ -67,10 +69,13 @@ function activeSlot() {
 
 // Shared kbm input handler — one instance drives both keyboard and
 // mouse events for the locally-active virtual device. Mouse imports
-// `kbmHandler` to feed mousedown/up/move into the same pipeline.
+// `kbmHandler` to feed mousedown/up/move into the same pipeline. The
+// getDeviceId callback returns whichever virtual kbm is currently
+// active, so Tab's swap is reflected in the bus events without
+// recreating the handler.
 export const kbmHandler = createKbmInputHandler({
     getSlot: activeSlot,
-    inputs,
+    getDeviceId: () => activeKbm,
 });
 
 /**
@@ -88,17 +93,8 @@ function syncKbmTargetAttribute() {
 
 /**
  * Tab pressed — debug affordance for driving two players from one
- * keyboard. Gated to the dev server so installation play (kiosk build)
- * can't accidentally land in a half-claimed state from an idle keypress.
- * Three cases:
- *   1. Active kbm not yet claimed → ignore (need a regular keypress
- *      first to claim, then Tab grabs the second slot).
- *   2. Other kbm not yet claimed → try to claim it for the next free
- *      slot. On success, flip active to the newly-claimed device.
- *   3. Both claimed → toggle active between the two.
- *
- * In every "did something" case we drop held keys + the previous slot's
- * fireHeld so a held W or Alt doesn't follow the swap.
+ * keyboard. Gated to the dev server so installation play can't
+ * accidentally land in a half-claimed state from an idle keypress.
  */
 function handleTab() {
     if (!import.meta.env.DEV) return;
@@ -121,10 +117,6 @@ function handleTab() {
     syncKbmTargetAttribute();
 }
 
-/**
- * Initializes keyboard event listeners.
- * Should be called once during application startup.
- */
 export function initKeyboardInput() {
     registerInputProvider(() => activeSlot(), kbmHandler.getInput);
     onClaimChange(syncKbmTargetAttribute);
@@ -144,32 +136,24 @@ export function initKeyboardInput() {
             return;
         }
 
-        // Escape — master-window menu toggle. Outside the kbm pipeline
-        // because the menu lives on the master regardless of which slot
-        // the active kbm is driving.
+        // Escape — master-window menu toggle. Routed via the bus so the
+        // menu action lives in src/actions/menu.js.
         if (event.code === 'Escape') {
-            toggleMenu(!isMenuOpen());
+            emit({ kind: A.MENU_TOGGLE, slot: null, deviceId: activeKbm });
             event.preventDefault();
             return;
         }
 
+        // Menu open — block all other keys so movement / fire / etc.
+        // don't leak through. Bus gate handles action events, but
+        // movement keys update the shadow state directly so we skip
+        // here too.
         if (isMenuOpen()) return;
 
-        // Tab — debug-only kbm-target swap. preventDefault unconditionally
-        // so Tab never cycles page focus, regardless of build mode.
+        // Tab — debug-only kbm-target swap.
         if (event.code === 'Tab') {
             event.preventDefault();
             handleTab();
-            return;
-        }
-
-        // Press-to-claim: in DM lobby with the active kbm unbound, *any*
-        // key counts as a join. Skip while a match has ended so a fire
-        // key triggers the restart inside kbmHandler instead of being
-        // consumed by the claim flow.
-        if (state.mode === 'deathmatch' && activeSlot() == null && !isMatchEnded()) {
-            tryClaimSlot(activeKbm);
-            event.preventDefault();
             return;
         }
 
