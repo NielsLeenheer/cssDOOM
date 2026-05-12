@@ -8,7 +8,7 @@ import { canMoveTo, getFloorHeightAt, getSectorAt } from './physics.js';
 import { playSound } from '../audio/audio.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
-import { inputs } from '../renderer/orchestrator.js';
+import { inputs } from '../orchestrator.js';
 import { state } from './state.js';
 import { isMatchLobby } from './match.js';
 import { recordSectorEnter } from './sp-stats.js';

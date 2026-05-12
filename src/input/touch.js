@@ -13,7 +13,7 @@
  * the joystick + look-zone state for `inputs[0]`.
  */
 
-import { registerInputProvider } from '../renderer/orchestrator.js';
+import { registerInputProvider } from '../orchestrator.js';
 import { emit } from './event-bus.js';
 import * as A from './actions.js';
 

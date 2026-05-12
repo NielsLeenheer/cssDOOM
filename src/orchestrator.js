@@ -1,16 +1,22 @@
 /**
  * Orchestrator — the I/O hub for everything slot-scoped.
  *
+ * Lives at the top of `src/` (not under `renderer/`) because it owns
+ * concerns from both sides: render targets AND per-frame input
+ * collection. Input modules and game code both reach into it through a
+ * neutral path.
+ *
  * One slot is one player position: index 0 is the host's local view;
  * indices 1..MAX_SLOTS-1 are filled by local players sitting at master
  * (rendered into master's pane N) or by remote secondaries (a
  * BroadcastSink streams renderer commands across the channel). The
- * orchestrator owns four concerns that all key off slot index:
+ * orchestrator owns three concerns that all key off slot index:
  *
  *   1. Render-target dispatch — per-pane commands route to one target by
  *      paneIndex; world commands invoke the local impl once and fan out
  *      to every BroadcastSink so secondary windows mirror the change.
- *      Command names are generated from [commands.js](commands.js).
+ *      Command names are generated from
+ *      [renderer/commands.js](renderer/commands.js).
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
  *      `unbindRemoteSlot`. A joining secondary triggers bind: target
@@ -19,17 +25,15 @@
  *      refreshed. Unbind is the reverse with a grace-period deferred
  *      unhide so a quickly-reloading secondary doesn't flash.
  *
- *   3. Press-to-claim registry — `tryClaimSlot`, `unclaim`,
- *      `getDriverSlot`, `setDefaultSlot`, `applySavedClaim`,
- *      `onClaimChange`. Maps device IDs to slots. Persists across tab
- *      reloads via sessionStorage so the same controller lands on the
- *      same monitor.
- *
- *   4. Per-frame input collection — `collectInputs` zeros + sums every
+ *   3. Per-frame input collection — `collectInputs` zeros + sums every
  *      provider's contribution into the per-slot `inputs[]` array, which
  *      game code (movement, weapons, fire) reads directly via the
  *      module-level `inputs` export. `registerInputProvider` is the
  *      hook input modules call at init time.
+ *
+ * Press-to-claim (device → slot binding) lives in its own module at
+ * [input/claim-registry.js](input/claim-registry.js) — input modules
+ * import directly from there as a sibling.
  *
  * `setupMasterBroadcast` in `index.js` is just thin wiring on top: it
  * opens the BroadcastChannel and routes handshake events into the
@@ -41,9 +45,9 @@
  * is unchanged.
  */
 
-import { DomRenderer } from './dom-renderer.js';
-import { BroadcastSink } from './broadcast-sink.js';
-import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './commands.js';
+import { DomRenderer } from './renderer/dom-renderer.js';
+import { BroadcastSink } from './renderer/broadcast-sink.js';
+import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import {
     clonePanes as clonePanesHelper,
     setMirrorMode as setMirrorModeHelper,
@@ -52,25 +56,7 @@ import {
     tearDownPane,
     rebuildPane,
     updatePerspective,
-} from './scene/scene.js';
-import { state } from '../game/state.js';
-
-// sessionStorage key for the device → slot claim map. Persists across tab
-// reloads but is cleared on tab close — a fresh browser session can
-// enumerate gamepads differently, so players re-claim from scratch.
-const CLAIM_STORAGE_KEY = 'cssdoom:claims';
-
-function loadSavedClaims() {
-    try {
-        const raw = sessionStorage.getItem(CLAIM_STORAGE_KEY);
-        if (!raw) return new Map();
-        const entries = JSON.parse(raw);
-        if (!Array.isArray(entries)) return new Map();
-        return new Map(entries);
-    } catch {
-        return new Map();
-    }
-}
+} from './renderer/scene/scene.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -130,17 +116,6 @@ class Orchestrator {
         this._currentSecondarySlot = null;
         this._savedRemoteTarget = null;
         this._unbindGraceTimer = null;
-
-        // Press-to-claim registry. `_claims` maps `deviceId → slot` for
-        // every device that has claimed a slot in Local DM. `_defaultSlot`
-        // is the fallback for unclaimed devices (0 in SP so every input
-        // drives player 0; null in DM so claiming is required).
-        // `_savedClaims` is the persisted-from-sessionStorage map that
-        // `applySavedClaim` consumes once per device per session.
-        this._claims = new Map();
-        this._defaultSlot = null;
-        this._claimListeners = new Set();
-        this._savedClaims = loadSavedClaims();
     }
 
     /** Returns the target for a given pane index, or null if out of range. */
@@ -270,116 +245,6 @@ class Orchestrator {
         }, RECONNECT_GRACE_MS);
 
         console.log('[orchestrator] secondary unbound from slot', slot);
-    }
-
-    // ── Press-to-claim registry ──────────────────────────────────────────
-
-    /**
-     * Set the slot returned by `getDriverSlot` for any unclaimed device.
-     * Called from menu.applyMode: 0 for singleplayer (every device
-     * auto-binds to player 0), null for deathmatch (devices must claim
-     * explicitly).
-     */
-    setDefaultSlot(slot) {
-        if (this._defaultSlot === slot) return;
-        this._defaultSlot = slot;
-        this._notifyClaimChange();
-    }
-
-    /**
-     * Returns the slot a device is currently driving. Providers call this
-     * from their getPlayerIndex callback so routing follows claim state.
-     *
-     * Resolution order: explicit claim → defaultSlot (if set) → null. The
-     * default-slot fallback is what makes singleplayer "every device drives
-     * player 0" without input modules knowing about modes.
-     */
-    getDriverSlot(deviceId) {
-        return this._claims.get(deviceId) ?? this._defaultSlot;
-    }
-
-    /** Returns true if any local device has claimed the given slot. */
-    isSlotClaimedLocally(slotIndex) {
-        for (const claimed of this._claims.values()) {
-            if (claimed === slotIndex) return true;
-        }
-        return false;
-    }
-
-    /**
-     * Try to claim a slot for the given deviceId. Idempotent: if the
-     * device already has a claim, returns its existing slot. Otherwise
-     * picks the lowest unclaimed slot in [0, state.players.length).
-     * Returns the claimed slot, or null if no slot is free.
-     */
-    tryClaimSlot(deviceId) {
-        const existing = this._claims.get(deviceId);
-        if (existing != null) return existing;
-        for (let i = 0; i < state.players.length; i++) {
-            if (this.isSlotClaimedLocally(i)) continue;
-            this._claims.set(deviceId, i);
-            this._notifyClaimChange();
-            return i;
-        }
-        return null;
-    }
-
-    /** Release a device's claim (e.g. on gamepad disconnect). */
-    unclaim(deviceId) {
-        if (!this._claims.has(deviceId)) return;
-        this._claims.delete(deviceId);
-        this._notifyClaimChange();
-    }
-
-    /**
-     * Subscribe to claim-state changes. Fires on add, remove, and
-     * default-slot updates. Returns an unsubscribe function.
-     */
-    onClaimChange(callback) {
-        this._claimListeners.add(callback);
-        return () => this._claimListeners.delete(callback);
-    }
-
-    /**
-     * Try to apply a saved binding for the given deviceId.
-     *
-     * Restores the slot from sessionStorage if the device had one before
-     * the page reload AND that slot is still free. Returns the claimed
-     * slot or null. Idempotent within a session: after the first
-     * successful restore the saved entry is consumed.
-     *
-     * Called from each input module at startup (keyboard.js for KBM_A/B,
-     * gamepad.js on connect / at init for already-connected pads) so the
-     * same controllers land on the same panes after a tab reload.
-     */
-    applySavedClaim(deviceId) {
-        if (!this._savedClaims.has(deviceId)) return null;
-        const slot = this._savedClaims.get(deviceId);
-        this._savedClaims.delete(deviceId);
-        // Slot must look sane (non-negative, capped at MAX_SLOTS) but we
-        // deliberately don't gate on state.players.length: input init
-        // runs before applyMode expands the roster for DM, so checking
-        // length here would reject every saved slot-1 claim on boot. SP
-        // just ignores claims for slot ≥ 1 via setDefaultSlot(0) — no
-        // harm leaving the entry in the map.
-        if (slot == null || slot < 0 || slot >= MAX_SLOTS) return null;
-        if (this.isSlotClaimedLocally(slot)) return null;
-        this._claims.set(deviceId, slot);
-        this._notifyClaimChange();
-        return slot;
-    }
-
-    _persistClaims() {
-        try {
-            sessionStorage.setItem(CLAIM_STORAGE_KEY, JSON.stringify([...this._claims]));
-        } catch {
-            /* sessionStorage may be unavailable (private mode etc.) — non-fatal */
-        }
-    }
-
-    _notifyClaimChange() {
-        this._persistClaims();
-        for (const cb of this._claimListeners) cb();
     }
 
     // ── Per-frame input collection ───────────────────────────────────────

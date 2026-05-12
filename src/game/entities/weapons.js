@@ -17,7 +17,7 @@ import { playSound } from '../../audio/audio.js';
 import { setEnemyState } from './enemies.js';
 import { damageEnemy } from './combat.js';
 import * as renderer from '../../renderer/index.js';
-import { inputs } from '../../renderer/orchestrator.js';
+import { inputs } from '../../orchestrator.js';
 import { propagateSound } from '../sound-propagation.js';
 import { isMatchLobby } from '../match.js';
 

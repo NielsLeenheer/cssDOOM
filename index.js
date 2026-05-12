@@ -28,7 +28,8 @@ import { attractTick, isAttractActive } from './src/ui/attract.js';
 import { spectatorActive } from './src/ui/spectator.js';
 import './src/ui/spectator.js';
 
-import { orchestrator } from './src/renderer/orchestrator.js';
+import { orchestrator } from './src/orchestrator.js';
+import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
 import { BroadcastClient } from './src/renderer/broadcast-client.js';
 import { MasterConnection, SecondaryConnection } from './src/renderer/broadcast-connection.js';
 import { updatePerspective } from './src/renderer/scene/scene.js';
@@ -287,7 +288,7 @@ function setupMasterBroadcast() {
     // Mirror master's lobby state onto any connected secondary. Fires on
     // every local claim add/remove (via the orchestrator's claim notify)
     // and on match-reset so the secondary's overlay tracks live.
-    orchestrator.onClaimChange(broadcastLobbyState);
+    onClaimChange(broadcastLobbyState);
     window.addEventListener('cssdoom:match-reset', broadcastLobbyState);
 
     // Mirror match-end scoreboard onto any connected secondary. match.js
@@ -312,7 +313,7 @@ function setupMasterBroadcast() {
  */
 function broadcastLobbyState() {
     if (!masterConnection) return;
-    const slotsClaimed = state.players.map((_, i) => orchestrator.isSlotClaimedLocally(i));
+    const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
     const carried = getCarriedOverClaims();
     const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
     masterConnection.broadcastLobbyState({

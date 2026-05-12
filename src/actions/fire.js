@@ -7,7 +7,7 @@
 
 import { state } from '../game/state.js';
 import { fireWeapon, stopAutoFire } from '../game/entities/weapons.js';
-import { inputs } from '../renderer/orchestrator.js';
+import { inputs } from '../orchestrator.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';
 

@@ -4,7 +4,7 @@
 
 import { MAX_FRAME_DELTA_TIME } from './constants.js';
 import { state } from './state.js';
-import { orchestrator } from '../renderer/orchestrator.js';
+import { orchestrator } from '../orchestrator.js';
 import { updateMovement } from './movement.js';
 import { checkSectorDamage } from './player/damage.js';
 import { checkPickups, updatePowerups, checkItemRespawns } from './player/pickups.js';
