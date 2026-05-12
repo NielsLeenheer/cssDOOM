@@ -31,7 +31,7 @@ import { orchestrator } from './src/renderer/orchestrator.js';
 import { DomRenderer } from './src/renderer/dom-renderer.js';
 import { BroadcastSink } from './src/renderer/broadcast-sink.js';
 import { BroadcastClient } from './src/renderer/broadcast-client.js';
-import { BroadcastConnection } from './src/renderer/broadcast-connection.js';
+import { MasterConnection, SecondaryConnection } from './src/renderer/broadcast-connection.js';
 import { tearDownPane, rebuildPane } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
 import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
@@ -261,8 +261,7 @@ function setupMasterBroadcast() {
         masterConnection?.resumeAfterLevelLoad();
     });
 
-    masterConnection = new BroadcastConnection({
-        role: 'master',
+    masterConnection = new MasterConnection({
         snapshotProvider: () => {
             // Allocate (or re-use) a slot for the joiner. If a secondary is
             // already alive (this LOOKING is a duplicate retry from the
@@ -386,8 +385,7 @@ async function initSecondary() {
     const overlay = ensureDisconnectedOverlay();
 
     let client = null;
-    const conn = new BroadcastConnection({
-        role: 'secondary',
+    const conn = new SecondaryConnection({
         onLobbyState: (msg) => {
             applyLobbyState(msg);
             // Re-entering the lobby = match no longer ended on this peer.
