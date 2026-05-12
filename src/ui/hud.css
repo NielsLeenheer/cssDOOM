@@ -445,6 +445,7 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
        silhouette underneath the colored glyph, so leave it off. */
     color: #cb0000;
     text-align: center;
+    line-height: 1.5;
     background: rgba(0, 0, 0, 0.45);
 }
 
@@ -457,17 +458,8 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
     50%      { opacity: 1; }
 }
 
-/* Player-colored READY overlay — the COLR palette is overridden per
- * pane via the same player-color naming we use elsewhere (sprites,
- * billboard tint). `color:` fallback for non-COLR renderers; the value
- * is the brightest shade of each ramp so the silhouette stays readable. */
-.pane[data-player="0"] .join-ready { font-palette: --stcfn-green;  color: #00ff00; }
-.pane[data-player="1"] .join-ready { font-palette: normal;         color: #cb0000; }
-.pane[data-player="2"] .join-ready { font-palette: --stcfn-indigo; color: #5933d9; }
-.pane[data-player="3"] .join-ready { font-palette: --stcfn-brown;  color: #ff9940; }
-
 /* "prompting" — this pane's slot is the next one to claim. Show the
-   PRESS BUTTON TO JOIN overlay. Only one pane is in this state at a time
+   PRESS BUTTON TO CONNECT CONTROLLER overlay. Only one pane is in this state at a time
    (sequential join, left → right). Suppressed during attract: attract
    calls resetMatch() (so the next walk-up starts on a fresh roster),
    which re-enters lobby state and re-paints data-claim-state — without

@@ -35,7 +35,7 @@ import { BroadcastConnection } from './src/renderer/broadcast-connection.js';
 import { tearDownPane, rebuildPane } from './src/renderer/scene/scene.js';
 import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
 import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
-import { initLobby } from './src/ui/lobby.js';
+import { initLobby, getCarriedOverClaims } from './src/ui/lobby.js';
 import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
 import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
 import { isMatchLobby, setMatchEndBroadcaster } from './src/game/match.js';
@@ -358,9 +358,12 @@ function setupMasterBroadcast() {
 function broadcastLobbyState() {
     if (!masterConnection) return;
     const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
+    const carried = getCarriedOverClaims();
+    const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
     masterConnection.broadcastLobbyState({
         inLobby: isMatchLobby(),
         slotsClaimed,
+        slotsCarriedOver,
     });
 }
 

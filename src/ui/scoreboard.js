@@ -34,13 +34,13 @@ const CELL_WIDTH = 2;
 const TOTAL_WIDTH = 2;
 
 /**
- * Slot index → display name. UX refers to players by color rather than
- * slot number ("RED WINS", "GREEN READY") to match the visual identity
- * each pane already carries — STFB swatches in the HUD, color-tinted
- * READY overlays, color-tinted sprite billboards. Exported so lobby
- * code can use the same names.
+ * Slot index → display name. The scoreboard banner reads "RED WINS" /
+ * "GREEN WINS" to match the visual identity each pane carries (STFB
+ * swatches, sprite tint). The lobby's READY overlay used to follow the
+ * same convention but is now a generic red "READY!" — keeping this
+ * table local since only the banner reads it.
  */
-export const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
+const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 
 /**
  * Render the scoreboard into every `.pane-win` element in the DOM.

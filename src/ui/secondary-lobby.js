@@ -20,8 +20,6 @@
  * an `await loadMap` and `LOBBY_STATE` may arrive in the meantime.
  */
 
-import { PLAYER_COLOR_NAME } from './scoreboard.js';
-
 let mySlot = null;
 let pendingLobbyState = null;
 
@@ -57,25 +55,21 @@ export function applyLobbyState(msg) {
     }
 
     // Same algorithm as lobby.js's updateLobbyUI: lowest unclaimed slot
-    // is the one currently 'prompting'; lower-indexed claimed slots are
-    // 'ready'; higher-indexed unclaimed slots are 'waiting'; outside the
-    // lobby every slot is 'active'.
+    // is the one currently 'prompting'; freshly-claimed slots get
+    // 'ready' (READY flash); slots whose claim carried over from the
+    // previous match behave like 'active' (no flash, since nobody just
+    // pressed a button for them); higher-indexed unclaimed slots are
+    // 'waiting'; outside the lobby every slot is 'active'.
     let claimState;
     if (!msg.inLobby) {
         claimState = 'active';
     } else if (msg.slotsClaimed[mySlot]) {
-        claimState = 'ready';
+        claimState = msg.slotsCarriedOver?.[mySlot] ? 'active' : 'ready';
     } else {
         const promptingSlot = msg.slotsClaimed.findIndex(c => !c);
         claimState = (mySlot === promptingSlot) ? 'prompting' : 'waiting';
     }
 
     const paneEl = document.querySelector(`.pane[data-player="${mySlot}"]`);
-    if (paneEl) {
-        paneEl.dataset.claimState = claimState;
-        // Mirror master's "<COLOR> READY" overlay text. PLAYER_COLOR_NAME
-        // maps slot index → display name so master + secondary agree.
-        const readyEl = paneEl.querySelector('.join-ready');
-        if (readyEl) readyEl.textContent = `${PLAYER_COLOR_NAME[mySlot] ?? `PLAYER ${mySlot + 1}`} READY`;
-    }
+    if (paneEl) paneEl.dataset.claimState = claimState;
 }

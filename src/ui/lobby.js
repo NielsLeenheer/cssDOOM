@@ -25,9 +25,23 @@ import { state } from '../game/state.js';
 import { resetTransientInputs } from '../input/index.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
-import { PLAYER_COLOR_NAME } from './scoreboard.js';
 
 let externalSlotsRef = () => new Set();
+
+// Snapshot of which slots were already claimed at the start of the
+// current lobby session (set on cssdoom:match-reset). Slots in this set
+// are "carried over" — they shouldn't flash READY when the new lobby
+// begins, because nobody just pressed a button for them. Slots claimed
+// AFTER the session started (i.e., during the current lobby) are the
+// "fresh" ones that get the READY overlay.
+let carriedOverClaims = new Set();
+
+/** Slots carried over from the previous match — used by index.js to
+ *  broadcast the same fresh-vs-carried distinction to the secondary so
+ *  it suppresses its own READY flash on a back-to-back rematch. */
+export function getCarriedOverClaims() {
+    return carriedOverClaims;
+}
 
 /**
  * Wire up listeners. Pass a getter that returns the set of slots
@@ -46,6 +60,14 @@ export function initLobby({ getExternallyClaimedSlots }) {
         // games. The kiosk loop is players standing side-by-side — we
         // do NOT want their assignments to shuffle between matches.
         resetTransientInputs();
+        // Snapshot already-claimed slots so they're treated as carried
+        // over (no READY flash) in the new lobby session. Any claim
+        // added AFTER this point is "fresh" and will flash READY.
+        carriedOverClaims = new Set();
+        const ext = externalSlotsRef();
+        for (let i = 0; i < state.players.length; i++) {
+            if (isSlotClaimedLocally(i) || ext.has(i)) carriedOverClaims.add(i);
+        }
         updateLobbyUI();
     });
 }
@@ -94,19 +116,16 @@ export function updateLobbyUI() {
         if (!inLobby) {
             claimState = 'active';
         } else if (isClaimed(slot)) {
-            claimState = 'ready';
+            // Fresh claim (made this lobby session) gets the READY flash;
+            // a claim that carried over from before match-reset behaves
+            // like 'active' — no overlay, just normal scene.
+            claimState = carriedOverClaims.has(slot) ? 'active' : 'ready';
         } else if (slot === promptingSlot) {
             claimState = 'prompting';
         } else {
             claimState = 'waiting';
         }
         paneEl.dataset.claimState = claimState;
-
-        // Personalize the ready overlay text per player slot. UX refers
-        // to players by color name to match the per-pane visual identity
-        // (face backdrop, READY palette, billboard tint).
-        const readyEl = paneEl.querySelector('.join-ready');
-        if (readyEl) readyEl.textContent = `${PLAYER_COLOR_NAME[slot] ?? `PLAYER ${slot + 1}`} READY`;
     }
 
     // Auto-start trigger for Local DM: when all slots in the player
