@@ -53,13 +53,8 @@ export function getGameState() {
 
 /**
  * Transition to a new state. Mirrors `body.dataset.gameState` so CSS
- * (and hidden DOM rules like `body[data-game-state="lobby"]`) follows.
- *
- * Also keeps the legacy per-state body attributes in sync so existing
- * CSS rules (`body[data-attract="true"]`, `body[data-match-ended]`,
- * `body[data-intermission]`, `body[data-match-lobby]`) continue to
- * work without touching every selector. We'll collapse those into a
- * single `data-game-state` selector in a follow-up CSS pass.
+ * keys off the current state directly (selectors of the form
+ * `body[data-game-state="attract"] …` etc. — see [ui/hud.css](../ui/hud.css)).
  *
  * Notifies subscribers AFTER the DOM is updated so handlers can read
  * the freshly-set attribute.
@@ -87,18 +82,7 @@ function applyTransition(next) {
     const prev = current;
     current = next;
     if (typeof document !== 'undefined') {
-        const body = document.body;
-        body.dataset.gameState = next;
-        // Legacy mirror. Cleared first, then re-set for the one matching
-        // state — keeps `:not([data-attract="true"])`-style guards working.
-        body.removeAttribute('data-attract');
-        body.removeAttribute('data-match-ended');
-        body.removeAttribute('data-intermission');
-        body.removeAttribute('data-match-lobby');
-        if (next === GAME_STATE.ATTRACT) body.dataset.attract = 'true';
-        else if (next === GAME_STATE.ENDED) body.dataset.matchEnded = 'true';
-        else if (next === GAME_STATE.INTERMISSION) body.dataset.intermission = 'true';
-        else if (next === GAME_STATE.LOBBY) body.dataset.matchLobby = 'true';
+        document.body.dataset.gameState = next;
     }
     for (const cb of listeners) cb(next, prev);
 }

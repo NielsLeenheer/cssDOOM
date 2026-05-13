@@ -464,7 +464,7 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
    calls resetMatch() (so the next walk-up starts on a fresh roster),
    which re-enters lobby state and re-paints data-claim-state — without
    the :not gate the prompts would render on top of the attract loop. */
-body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="prompting"] .join-prompt {
+body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="prompting"] .join-prompt {
     display: flex;
 }
 
@@ -472,14 +472,14 @@ body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="
    formally started yet (still waiting on later panes). The bound player
    can move around in warmup; the READY overlay sits on top so the user
    knows the join took. */
-body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="ready"] .join-ready {
+body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="ready"] .join-ready {
     display: flex;
 }
 
 /* "waiting" — this pane is later in the sequence than the one currently
    prompting. Dim it out so attention focuses on the prompting pane.
    Suppressed during attract for the same reason as the join overlays. */
-body[data-mode="deathmatch"]:not([data-attract="true"]) .pane[data-claim-state="waiting"] {
+body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="waiting"] {
     filter: brightness(0.3);
 }
 
@@ -520,7 +520,7 @@ body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
     pointer-events: none;
 }
 
-body[data-match-ended="true"] .pane-win {
+body[data-game-state="ended"] .pane-win {
     display: flex;
 }
 
@@ -640,7 +640,8 @@ body[data-match-ended="true"] .pane-win {
    Single-player intermission — KILLS / ITEMS / SECRET / TIME on the
    WIMAP0 backdrop, shown between levels. Same `.pane-intermission`
    container pattern as the DM scoreboard's `.pane-win`. Visibility
-   driven by body[data-intermission="true"] (set in intermission.js).
+   driven by body[data-game-state="intermission"] (set by transitionTo
+   in src/game/game-state.js).
    ======================================================================== */
 
 .pane-intermission {
@@ -655,7 +656,7 @@ body[data-match-ended="true"] .pane-win {
     pointer-events: none;
 }
 
-body[data-intermission="true"] .pane-intermission {
+body[data-game-state="intermission"] .pane-intermission {
     display: flex;
 }
 
@@ -754,8 +755,8 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
 
 /* ========================================================================
    Attract Loop
-   Shown when body[data-attract="true"] — kiosk idle prompt. Camera is
-   slow-rotated by attract.js; this overlay sits on top with a dimmed
+   Shown when body[data-game-state="attract"] — kiosk idle prompt. Camera
+   is slow-rotated by attract.js; this overlay sits on top with a dimmed
    background and a pulsing "PRESS START" prompt. Lives per-pane inside
    .pane; default position is fixed (full window) for split-screen.
    Video-wall flips to absolute so each monitor gets its own copy.
@@ -800,17 +801,17 @@ body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     50%      { opacity: 1; }
 }
 
-body[data-attract="true"] .pane-attract {
+body[data-game-state="attract"] .pane-attract {
     display: flex;
 }
 
 /* Hide HUD chrome (and the cssDOOM logo button) behind the attract
    overlay. The big M_DOOM splash in .pane-attract carries the branding
    now, so the tiny corner button would just clutter the idle screen. */
-body[data-attract="true"] .hud,
-body[data-attract="true"] #spectator,
-body[data-attract="true"] #ui-buttons,
-body[data-attract="true"] #menu-button {
+body[data-game-state="attract"] .hud,
+body[data-game-state="attract"] #spectator,
+body[data-game-state="attract"] #ui-buttons,
+body[data-game-state="attract"] #menu-button {
     display: none;
 }
 

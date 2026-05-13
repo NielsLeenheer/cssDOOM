@@ -9,9 +9,9 @@
  * `position: absolute` so each monitor gets its own bezel-safe overlay.
  * The same renderer paints every container.
  *
- * Visibility is driven by `body[data-match-ended="true"]` (set in
- * match.js); this module only owns the DOM structure inside the
- * overlay.
+ * Visibility is driven by `body[data-game-state="ended"]` (set by
+ * the game-state machine when `endMatch()` runs); this module only
+ * owns the DOM structure inside the overlay.
  *
  * On the secondary window the same module renders the broadcasted
  * snapshot — the data shape is identical to what match.js produces, so

@@ -2,10 +2,11 @@
  * Lobby controller — owns the press-to-claim UX for Local DM.
  *
  * Responsibilities:
- *   - Drives the `body[data-match-lobby]` attribute (CSS keys off this
- *     to show join prompts and hide HUD numbers in lobby state).
- *   - Drives per-pane `[data-claimed]` attributes so each pane's join
- *     prompt knows whether its slot has an input bound to it.
+ *   - Drives per-pane `[data-claim-state]` attributes so each pane's
+ *     join prompt knows whether its slot is prompting / ready / waiting /
+ *     active. (Lobby vs. active mode itself is driven by
+ *     `body[data-game-state="lobby"]`, set by the game-state machine
+ *     when `resetMatch()` runs.)
  *   - Auto-starts the match when all expected slots are claimed.
  *
  * Listens to:
@@ -92,9 +93,9 @@ export function initLobby({ getExternallyClaimedSlots }) {
  */
 export function updateLobbyUI() {
     const inLobby = isMatchLobby();
-    // The body[data-match-lobby] attribute is mirrored by game-state's
-    // transitionTo — we don't write it here. updateLobbyUI fires on
-    // every claim change, after match transitions are already settled.
+    // body[data-game-state] is owned by game-state's transitionTo — we
+    // don't write it here. updateLobbyUI fires on every claim change,
+    // after match transitions are already settled.
 
     const externalSlots = externalSlotsRef();
     const isClaimed = (slot) => isSlotClaimedLocally(slot) || externalSlots.has(slot);

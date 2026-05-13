@@ -11,7 +11,7 @@
  * Built into every `.pane-intermission` element — same pattern as the
  * DM scoreboard. In SP only pane 0 is visible so the second pane's
  * copy is hidden by CSS (display: none on .pane-intermission unless
- * body[data-intermission="true"]).
+ * body[data-game-state="intermission"]).
  */
 
 import { captureSpStats } from '../game/sp-stats.js';

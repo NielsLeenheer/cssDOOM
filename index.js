@@ -359,14 +359,11 @@ async function initSecondary() {
             showScoreboard(msg);
         },
         onGameState: ({ state }) => {
-            // Mirror master's game-state machine. body[data-game-state]
-            // and the legacy per-state attributes both get set by
-            // applyRemoteGameState — covers what setAttract /
-            // data-match-ended / data-intermission / data-match-lobby
-            // used to do via separate paths. We also clear the
-            // scoreboard when leaving ENDED so a rematch doesn't keep
-            // the old DOM behind the dim overlay.
-            const wasEnded = document.body.dataset.matchEnded === 'true';
+            // Mirror master's game-state machine — applyRemoteGameState
+            // writes body[data-game-state]. We also clear the scoreboard
+            // when leaving ENDED so a rematch doesn't keep the old DOM
+            // behind the dim overlay.
+            const wasEnded = document.body.dataset.gameState === 'ended';
             applyRemoteGameState(state);
             if (wasEnded && state !== 'ended') hideScoreboard();
         },

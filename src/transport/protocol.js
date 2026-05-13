@@ -45,9 +45,10 @@ export const MSG = {
     // on a fresh state.
     LEVEL_CHANGE: 'level-change',
     // Master → secondary: current lobby state. Secondary mirrors it onto
-    // its own DOM (body[data-match-lobby] + pane data-claim-state) so
-    // the existing CSS shows the same PRESS BUTTON TO JOIN / READY /
-    // waiting visuals as the local split-screen pane would.
+    // the per-pane data-claim-state attribute so the existing CSS shows
+    // the same PRESS BUTTON TO JOIN / READY / waiting visuals as the
+    // local split-screen pane would. (Lobby vs. active mode itself is
+    // mirrored separately via the GAME_STATE envelope below.)
     LOBBY_STATE: 'lobby-state',
     // Master → secondary: match has ended. Carries the kill matrix,
     // per-player scores, map name, and winner so the secondary renders
@@ -55,11 +56,9 @@ export const MSG = {
     // by re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
     MATCH_END: 'match-end',
     // Master → secondary: game-state transition. Secondary mirrors
-    // master's game-state machine so its CSS gates (data-attract /
-    // data-match-ended / data-intermission / data-match-lobby + the
-    // unified data-game-state) stay in sync without the separate
-    // attract/match-end/lobby paths each having to write their own
-    // attribute.
+    // master's game-state machine so its body[data-game-state] attribute
+    // stays in sync — keeping all the attract/match-end/lobby/intermission
+    // CSS gates unified under a single namespaced attribute.
     GAME_STATE: 'game-state',
 };
 

@@ -10,9 +10,11 @@
  * the player sitting at the secondary's screen knows when to press their
  * button on master. Master broadcasts a `LOBBY_STATE` envelope on every
  * lobby-relevant change, and this module reflects it onto the secondary's
- * DOM via `body[data-match-lobby]` + the secondary pane's `data-claim-
- * state` attribute. The same CSS that drives master's split-screen
- * lobby prompts (`.join-prompt` / `.join-ready`) then renders correctly.
+ * DOM via the pane's `data-claim-state` attribute. (`body[data-game-state]`
+ * is mirrored separately by the GAME_STATE envelope — see index.js's
+ * initSecondary onGameState handler.) The same CSS that drives master's
+ * split-screen lobby prompts (`.join-prompt` / `.join-ready`) then renders
+ * correctly.
  *
  * `setSecondarySlot` is called from `initSecondary`'s onAck once master
  * has assigned a slot. Until then, any incoming `LOBBY_STATE` is buffered
@@ -48,9 +50,9 @@ export function applyLobbyState(msg) {
         return;
     }
 
-    // body[data-match-lobby] is now mirrored by the GAME_STATE envelope
-    // (see index.js initSecondary's onGameState handler). This module
-    // only updates the per-pane data-claim-state attribute.
+    // body[data-game-state] is mirrored by the GAME_STATE envelope (see
+    // index.js initSecondary's onGameState handler). This module only
+    // updates the per-pane data-claim-state attribute.
 
     // Same algorithm as lobby.js's updateLobbyUI: lowest unclaimed slot
     // is the one currently 'prompting'; freshly-claimed slots get

@@ -172,8 +172,8 @@ function exitAttract() {
     // resetMatch already transitioned us to LOBBY; we just need to
     // un-set the ATTRACT state. transitionTo(LOBBY) is a no-op if we're
     // somehow not in ATTRACT (e.g., direct dismissIntermission called
-    // pingActivity). The body's data-attract attribute is cleared by
-    // game-state's mirror; the secondary mirrors via GAME_STATE.
+    // pingActivity). The body[data-game-state] attribute follows, and
+    // the secondary mirrors via the GAME_STATE envelope.
     transitionTo(GAME_STATE.LOBBY);
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the
