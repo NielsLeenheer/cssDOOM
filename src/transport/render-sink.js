@@ -52,6 +52,15 @@ export class RenderSink {
             args,
         });
     }
+
+    /** Post a world-sound envelope (called from the orchestrator). */
+    forwardSound(name, opts) {
+        this.channel.send({
+            type: MSG.SOUND,
+            name,
+            opts,
+        });
+    }
 }
 
 for (const [name, { serialize }] of Object.entries(PER_PANE_COMMANDS)) {
