@@ -10,7 +10,7 @@
  */
 @font-face {
     font-family: 'STCFN';
-    src: url('/assets/fonts/STCFN.ttf') format('truetype');
+    src: url('/assets/fonts/STCFN.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -25,7 +25,7 @@
  */
 @font-face {
     font-family: 'STBIG';
-    src: url('/assets/fonts/STBIG.ttf') format('truetype');
+    src: url('/assets/fonts/STBIG.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -37,7 +37,7 @@
  */
 @font-face {
     font-family: 'STYSN';
-    src: url('/assets/fonts/STYSN.ttf') format('truetype');
+    src: url('/assets/fonts/STYSN.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
@@ -51,7 +51,7 @@
  */
 @font-face {
     font-family: 'WINUM';
-    src: url('/assets/fonts/WINUM.ttf') format('truetype');
+    src: url('/assets/fonts/WINUM.woff2') format('woff2');
     font-weight: normal;
     font-style: normal;
     font-display: swap;
