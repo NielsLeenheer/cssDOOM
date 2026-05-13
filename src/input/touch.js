@@ -10,15 +10,27 @@
  *
  * Discrete actions emit on the input event bus (`fire-down`, `fire-up`,
  * `use`, `weapon-next`). The per-frame analog input provider returns
- * the joystick + look-zone state for `inputs[0]`.
+ * the joystick + look-zone state.
+ *
+ * Slot routing: touch follows the standard claim-registry resolution via
+ * `getDriverSlot('touch')`. SP sets `defaultSlot=0` so touch drives
+ * player 0; a Network DM phone-remote sets `defaultSlot=mySlot` (in
+ * client.js's `initClient`) so touch drives that
+ * remote's slot. Local DM sets `defaultSlot=null`, so touch contributes
+ * nothing — split-screen DM assumes physical controllers, not touch.
  */
 
 import { registerInputProvider } from '../orchestrator.js';
+import { getDriverSlot } from './claim-registry.js';
 import { emit } from './event-bus.js';
 import * as A from './actions.js';
 
 const TOUCH_DEVICE_ID = 'touch';
-const TOUCH_SLOT = 0;  // touch is single-player only
+
+/** Resolved per-emit: SP → 0, Network DM remote → mySlot, Local DM → null. */
+function touchSlot() {
+    return getDriverSlot(TOUCH_DEVICE_ID);
+}
 
 const JOYSTICK_MAX_RADIUS = 50;
 const JOYSTICK_DEADZONE = 0.15;
@@ -43,8 +55,8 @@ let touchControls;
 export function initTouchInput() {
     if (!('ontouchstart' in window) && navigator.maxTouchPoints === 0) return;
 
-    // Touch is single-player only — always targets slot 0.
-    registerInputProvider(() => TOUCH_SLOT, getInput);
+    // Provider routes via claim-registry; see touchSlot() above.
+    registerInputProvider(touchSlot, getInput);
     createTouchUI();
     setupPointerHandlers();
 }
@@ -182,14 +194,14 @@ function setupPointerHandlers() {
         e.stopPropagation();
         fireOverlay.setPointerCapture(e.pointerId);
         activePointers.set(e.pointerId, { type: 'fire' });
-        emit({ kind: A.FIRE_DOWN, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
+        emit({ kind: A.FIRE_DOWN, slot: touchSlot(), deviceId: TOUCH_DEVICE_ID });
     });
 
     const releaseFire = e => {
         const ptr = activePointers.get(e.pointerId);
         if (!ptr || ptr.type !== 'fire') return;
         activePointers.delete(e.pointerId);
-        emit({ kind: A.FIRE_UP, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
+        emit({ kind: A.FIRE_UP, slot: touchSlot(), deviceId: TOUCH_DEVICE_ID });
     };
     fireOverlay.addEventListener('pointerup', releaseFire);
     fireOverlay.addEventListener('pointercancel', releaseFire);
@@ -197,7 +209,7 @@ function setupPointerHandlers() {
     // --- Use button ---
     useButton.addEventListener('pointerdown', e => {
         e.preventDefault();
-        emit({ kind: A.USE, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
+        emit({ kind: A.USE, slot: touchSlot(), deviceId: TOUCH_DEVICE_ID });
     });
 
     // --- Weapon cycling by tapping the ARMS panel ---
@@ -207,7 +219,7 @@ function setupPointerHandlers() {
         armsPanel.addEventListener('pointerdown', e => {
             e.preventDefault();
             e.stopPropagation();
-            emit({ kind: A.WEAPON_NEXT, slot: TOUCH_SLOT, deviceId: TOUCH_DEVICE_ID });
+            emit({ kind: A.WEAPON_NEXT, slot: touchSlot(), deviceId: TOUCH_DEVICE_ID });
         });
     }
 

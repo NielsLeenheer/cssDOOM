@@ -828,8 +828,9 @@ body[data-game-state="attract"] #menu-button {
    Outside of kiosk mode, both panes are visible in the same window and
    would otherwise render their fullscreen position:fixed overlays
    stacked identically. Hide pane 1's copy so only pane 0's renders.
-   Carved out for master+secondary and secondary-window since they
-   already hide one pane via viewport.css.
+   Carved out for client-active (master with a client bound) and
+   client-window (a joined client) since they already hide one pane via
+   viewport.css.
    ======================================================================== */
 
 body.kiosk .pane-attract,
@@ -839,10 +840,10 @@ body.kiosk .pane-timer {
     position: absolute;
 }
 
-body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
-body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-win,
-body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
-body[data-mode="deathmatch"]:not(.secondary-active):not(.secondary-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
+body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
+body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-win,
+body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
+body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
     display: none;
 }
 

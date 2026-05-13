@@ -15,7 +15,7 @@
  * World commands are forwarded separately via `forwardWorld(method, args)`
  * — see Orchestrator's world dispatch for the call site. The master also
  * applies the world command locally (helpers iterate every pane); the
- * sink still forwards because the secondary window has its own DOM tree
+ * sink still forwards because the client window has its own DOM tree
  * and needs its own copy of the update.
  */
 

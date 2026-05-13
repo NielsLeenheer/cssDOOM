@@ -38,7 +38,7 @@ let externalSlotsRef = () => new Set();
 let carriedOverClaims = new Set();
 
 /** Slots carried over from the previous match — used by index.js to
- *  broadcast the same fresh-vs-carried distinction to the secondary so
+ *  broadcast the same fresh-vs-carried distinction to clients so
  *  it suppresses its own READY flash on a back-to-back rematch. */
 export function getCarriedOverClaims() {
     return carriedOverClaims;

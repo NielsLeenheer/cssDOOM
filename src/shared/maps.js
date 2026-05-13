@@ -50,10 +50,10 @@ export function clearMap() {
 export async function loadMap(name) {
     const isInitialLoad = !currentMap;
 
-    // Tell any connected secondary window that the scene is about to be
-    // rebuilt. Skipped on the very first load (no secondary could be
-    // connected yet, nothing to do). Listener lives in index.js's master
-    // setup; the dispatch is fire-and-forget.
+    // Tell any connected client that the scene is about to be rebuilt.
+    // Skipped on the very first load (no client could be connected yet,
+    // nothing to do). Listener lives in index.js's master setup; the
+    // dispatch is fire-and-forget.
     if (!isInitialLoad) {
         window.dispatchEvent(new CustomEvent('cssdoom:level-changing', { detail: { level: name } }));
         await showLevelTransition();
@@ -127,7 +127,7 @@ export async function loadMap(name) {
     }
 
     // Tell master's broadcast layer that the scene is rebuilt and it's
-    // safe to accept secondary reconnections again. Fires on every load
+    // safe to accept client reconnections again. Fires on every load
     // (initial too); the master listener handles the no-op case.
     window.dispatchEvent(new CustomEvent('cssdoom:level-loaded', { detail: { level: name } }));
 }

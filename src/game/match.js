@@ -21,10 +21,10 @@ import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
 const DEFAULT_FRAG_LIMIT = 20;
 const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
 
-// Master-side hook for broadcasting the kill matrix + scores to the
-// secondary window on endMatch. Set by index.js once the BroadcastConnection
-// is up; null in secondary or before init. Decoupling via a setter keeps
-// match.js free of broadcast / connection imports.
+// Master-side hook for broadcasting the kill matrix + scores to any
+// connected client on endMatch. Set by index.js once the master's
+// MasterConnection is up; null on clients or before init. Decoupling
+// via a setter keeps match.js free of transport / connection imports.
 let broadcastMatchEnd = null;
 export function setMatchEndBroadcaster(fn) { broadcastMatchEnd = fn; }
 
@@ -198,7 +198,7 @@ export function endMatch() {
 }
 
 /**
- * Snapshot of the post-match scoreboard. Shipped verbatim to the secondary
+ * Snapshot of the post-match scoreboard. Shipped verbatim to any client
  * via MSG.MATCH_END so it can render the same grid without needing the
  * authoritative state.match.
  */

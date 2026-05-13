@@ -90,30 +90,31 @@ body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] {
     flex: 1 1 50%;
 }
 
-/* Secondary window mode (?join URL param) — the secondary represents one
-   remote slot the master assigned to it. Visually only one pane is shown
-   regardless of which slot the master picked. Position-based selector
-   (first/last .pane) is used for visibility instead of data-player, so
-   the layout doesn't break if the slot's data-player attribute is
-   dynamic (slot 2 or 3 in multi-remote configs). The data-player
-   attribute itself is still set on the visible pane to match the slot,
-   so the "hide own billboard" CSS rule keys correctly. */
-body.secondary-window .pane:first-of-type {
+/* Client window mode (?join URL param) — the client represents one slot
+   the master assigned to it (Local DM secondary or Network DM remote).
+   Visually only one pane is shown regardless of which slot the master
+   picked. Position-based selector (first/last .pane) is used for
+   visibility instead of data-player, so the layout doesn't break if the
+   slot's data-player attribute is dynamic (slot 2 or 3 in multi-remote
+   configs). The data-player attribute itself is still set on the visible
+   pane to match the slot, so the "hide own billboard" CSS rule keys
+   correctly. */
+body.client-window .pane:first-of-type {
     display: none;
 }
-body.secondary-window .pane:last-of-type {
+body.client-window .pane:last-of-type {
     flex: 1;
 }
 
-/* Master with an active secondary window — hide the local copy of the
-   pane the secondary is rendering (player 1's pane on master), so the
-   master only shows player 0 full-screen. The world DOM for pane 1 still
+/* Master with a client bound to a slot — hide the local copy of the pane
+   the client is rendering (player 1's pane on master), so the master
+   only shows player 0 full-screen. The world DOM for pane 1 still
    exists and still receives world updates internally (we don't tear it
    down so we can swap back instantly on disconnect), it's just hidden. */
-body.secondary-active[data-mode="deathmatch"] .pane[data-player="1"] {
+body.client-active[data-mode="deathmatch"] .pane[data-player="1"] {
     display: none;
 }
-body.secondary-active[data-mode="deathmatch"] .pane[data-player="0"] {
+body.client-active[data-mode="deathmatch"] .pane[data-player="0"] {
     flex: 1;
 }
 

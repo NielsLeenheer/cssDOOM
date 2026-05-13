@@ -29,14 +29,14 @@
     }
 }
 
-/* On the secondary window the logo stays visible (it's part of the DOOM
+/* On a client window the logo stays visible (it's part of the DOOM
    look) but the button does nothing — game state lives on master, opening
    the menu over here would just be dead UI. */
-body.secondary-window #menu-button {
+body.client-window #menu-button {
     pointer-events: none;
     cursor: default;
 }
-body.secondary-window #menu-button:hover { filter: none; }
+body.client-window #menu-button:hover { filter: none; }
 
 
 /* ========================================================================

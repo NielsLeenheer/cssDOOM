@@ -3,10 +3,12 @@
  *
  * Two execution modes:
  *   - Master (default): full game loop, input, audio. Listens on the
- *     broadcast channel for secondary windows wanting to join.
- *   - Secondary (`?join` URL param): renderer-only mirror of the master.
- *     Skips game loop and input, runs a RenderClient that applies
- *     incoming renderer commands to a local DomRenderer + Orchestrator.
+ *     transport for client windows wanting to join.
+ *   - Client (`?join` URL param): connects to master and renders the slot
+ *     master assigns. Skips game loop. Runs `initClient` which wires a
+ *     RenderClient that applies incoming renderer commands to a local
+ *     DomRenderer + Orchestrator (and, for Network DM remotes, also
+ *     wires the local input pipeline to forward input to master).
  */
 
 import { state } from './src/game/state.js';
@@ -30,22 +32,22 @@ import './src/ui/spectator.js';
 
 import { orchestrator } from './src/orchestrator.js';
 import { isSlotClaimedLocally, onClaimChange } from './src/input/claim-registry.js';
-import { RenderClient } from './src/transport/render-client.js';
-import { MasterConnection, SecondaryConnection } from './src/transport/peer-connection.js';
+import { initClient } from './src/client.js';
+import { MasterConnection, ClientConnection } from './src/transport/peer-connection.js';
 import { updatePerspective } from './src/renderer/scene/scene.js';
-import { initRemoteInputReceiver, applyRemoteInput } from './src/input/remote-master.js';
+import { initRemoteInput, applyRemoteInput } from './src/input/remote.js';
 import { initLobby, getCarriedOverClaims } from './src/ui/lobby.js';
-import { setSecondarySlot, applyLobbyState } from './src/ui/secondary-lobby.js';
+import { setClientSlot, applyLobbyState } from './src/ui/client-lobby.js';
 import { showScoreboard, hideScoreboard } from './src/ui/scoreboard.js';
 import { isMatchLobby, setMatchEndBroadcaster } from './src/game/match.js';
 import { setGameStateBroadcaster, applyRemoteGameState, getGameState } from './src/game/game-state.js';
 import {
     rendererState,
     bindRendererStateToMaster,
-    initSecondaryRendererState,
+    initClientRendererState,
 } from './src/renderer/renderer-state.js';
 
-const isSecondary = new URLSearchParams(location.search).has('join');
+const isClient = new URLSearchParams(location.search).has('join');
 const isKiosk = new URLSearchParams(location.search).has('kiosk');
 if (isKiosk) document.body.classList.add('kiosk');
 
@@ -64,10 +66,10 @@ window.debug = function() {
  * panes beyond the player count (mirror mode) fall back to player 0.
  *
  * No `wallElements.length === 0` early-exit here even though some panes
- * may be empty (SP's pane 1, or DM's pane 1 after secondary teardown):
+ * may be empty (SP's pane 1, or DM's pane 1 after client teardown):
  * updateCamera / updateHud are routed through the orchestrator, and the
  * orchestrator's per-pane target may be a RenderSink that needs to
- * forward to a secondary regardless of local DOM state. Skipping here
+ * forward to a client regardless of local DOM state. Skipping here
  * would starve the sink. Writing CSS variables on a hidden / empty pane
  * is harmless.
  */
@@ -87,8 +89,8 @@ function renderAllActivePanes() {
  * rendererState.cameras for camera position, rendererState.things for live
  * thing positions, and the spectator toggle for ceiling-skip behavior.
  *
- * Same code runs on master and secondary: on master rendererState aliases
- * the live game state, on secondary it's populated by inbound broadcast
+ * Same code runs on master and client: on master rendererState aliases
+ * the live game state, on a client it's populated by inbound broadcast
  * envelopes. Culling can't tell the difference.
  *
  * During attract mode the camera rotates so slowly (~12°/sec) that we
@@ -170,7 +172,7 @@ function gameLoop(timestamp) {
 
 /**
  * Master initialization — full game loop, plus a broadcast listener so a
- * secondary window can join and receive a streamed view of pane 1.
+ * client window can join and receive a streamed view of pane 1.
  */
 async function initMaster() {
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
@@ -187,16 +189,16 @@ async function initMaster() {
     initTouchInput();
     initGamepadInput();
     // Register a player-1 input provider that's driven by remote input
-    // events forwarded from a connected secondary window. Provider stays
-    // registered even when no secondary is connected — it just contributes
-    // zeros until events arrive.
-    initRemoteInputReceiver();
+    // events forwarded from a connected client. Provider stays registered
+    // even when no client is connected — it just contributes zeros until
+    // events arrive.
+    initRemoteInput();
 
     // Lobby controller — manages the press-to-claim UX, watches input
     // claims to drive the join-prompt overlay, and auto-starts the
     // match when all slots are claimed in Local DM.
     //
-    // Local DM has no "externally claimed" slots: a connected secondary
+    // Local DM has no "externally claimed" slots: a connected Local DM secondary
     // is display-only and doesn't claim slot 1 — master's local kbm-B /
     // gamepad must do that explicitly. Network DM will swap in a getter
     // returning remote-occupied slots.
@@ -233,7 +235,7 @@ async function initMaster() {
 }
 
 /**
- * Set up the master-side broadcast connection. Listens for a secondary
+ * Set up the master-side broadcast connection. Listens for a client
  * window's LOOKING announcement and routes join / leave events into the
  * orchestrator, which owns the slot lifecycle (target swap, pane
  * teardown, visibility). This function is now mostly wiring.
@@ -242,7 +244,7 @@ let masterConnection = null;
 function setupMasterBroadcast() {
     // Track the level we're transitioning to. `currentMap` from maps.js
     // doesn't get updated until partway through loadMap (after the fetch),
-    // so a fast secondary reconnecting in the middle of a level change
+    // so a fast client reconnecting in the middle of a level change
     // would otherwise receive an ACK pointing at the OLD level — and end
     // up loading stale geometry while master streams new-level deltas at
     // it. Stashing the intended new level here means snapshotProvider
@@ -268,15 +270,15 @@ function setupMasterBroadcast() {
         onJoin: (payload) => {
             const slot = payload.slotIndex;
             if (slot == null) {
-                console.warn('[broadcast] secondary join refused — no free slots');
+                console.warn('[broadcast] client join refused — no free slots');
                 return;
             }
-            // Don't mark slot as externally claimed: secondary is
-            // display-only, master's local kbm-B / gamepad must still be
-            // able to claim it. (Network DM will revisit.)
+            // Don't mark slot as externally claimed: the Local DM secondary
+            // is display-only, master's local kbm-B / gamepad must still
+            // be able to claim it. (Network DM will revisit.)
             orchestrator.bindRemoteSlot(slot, masterConnection.channel);
             // Send current lobby state right away so the freshly-
-            // connected secondary's pane shows the correct prompt
+            // connected client's pane shows the correct prompt
             // immediately (instead of waiting for the next claim event).
             broadcastLobbyState();
         },
@@ -285,20 +287,20 @@ function setupMasterBroadcast() {
         },
     });
 
-    // Mirror master's lobby state onto any connected secondary. Fires on
+    // Mirror master's lobby state onto any connected client. Fires on
     // every local claim add/remove (via the orchestrator's claim notify)
-    // and on match-reset so the secondary's overlay tracks live.
+    // and on match-reset so the client's overlay tracks live.
     onClaimChange(broadcastLobbyState);
     window.addEventListener('cssdoom:match-reset', broadcastLobbyState);
 
-    // Mirror match-end scoreboard onto any connected secondary. match.js
+    // Mirror match-end scoreboard onto any connected client. match.js
     // calls this from endMatch(); we just hand the payload to the
     // connection, which gates on peerAlive.
     setMatchEndBroadcaster((payload) => {
         masterConnection?.broadcastMatchEnd(payload);
     });
 
-    // Mirror every game-state transition onto the secondary. game-state.js
+    // Mirror every game-state transition onto the client. game-state.js
     // calls this on each transitionTo. The connection gates on
     // peerAlive — no broadcast when nobody's listening.
     setGameStateBroadcaster((state) => {
@@ -308,7 +310,7 @@ function setupMasterBroadcast() {
 
 /**
  * Build current lobby state and send it to all connected sinks. No-op
- * when no secondary is alive (the underlying broadcast is gated on
+ * when no client is alive (the underlying broadcast is gated on
  * `peerAlive`).
  */
 function broadcastLobbyState() {
@@ -324,30 +326,31 @@ function broadcastLobbyState() {
 }
 
 /**
- * Secondary initialization — renderer-only mode. Open a BroadcastConnection
- * in the secondary role; on ACK, sync mode/level locally so the renderer
- * has the same scene as the master, and start a RenderClient to apply
- * incoming renderer commands.
+ * Client window boot. Runs in any window with `?join` in the URL —
+ * a Local DM secondary today, a Network DM remote tomorrow. Opens a
+ * ClientConnection; on ACK, syncs mode/level locally so the renderer
+ * has the same scene as master, then stands up the client coordinator
+ * ([src/client.js](src/client.js)) which wires the RenderClient half
+ * (and, for Network DM remotes, the input forwarder).
  *
  * Disconnect handling: when master goes silent (closed, reloaded, crashed),
  * the connection's watchdog fires onLeave. We show a DISCONNECTED overlay
  * and the connection keeps sending LOOKING in the background. If a master
- * comes back, the simplest correct behavior is to reload the secondary —
+ * comes back, the simplest correct behavior is to reload this window —
  * any deltas that flowed through during the original session left the
  * scene out of sync with whatever the new master starts at.
  */
-async function initSecondary() {
-    document.body.classList.add('secondary-window');
+async function initClientWindow() {
+    document.body.classList.add('client-window');
 
-    // Stand up the renderer-state arrays sized for the secondary's two-pane
-    // DOM. The RenderClient's apply* calls populate them as updates flow
-    // in from master; until then they sit at spawn-default zeros.
-    initSecondaryRendererState(sceneStates.length);
+    // Stand up the renderer-state arrays sized for the client's two-pane
+    // DOM. The mirror callbacks (declared in commands.js) populate them as
+    // updates flow in from master; until then they sit at spawn-default zeros.
+    initClientRendererState(sceneStates.length);
 
     const overlay = ensureDisconnectedOverlay();
 
-    let client = null;
-    const conn = new SecondaryConnection({
+    const conn = new ClientConnection({
         onLobbyState: (msg) => {
             // Per-pane claim-state mirror only — body[data-match-lobby]
             // is now driven by the GAME_STATE handler below.
@@ -382,14 +385,14 @@ async function initSecondary() {
                 await loadMap(payload.level);
             }
             // Mirror master's current game-state immediately — without
-            // this the secondary's body attributes would lag until the
+            // this the client's body attributes would lag until the
             // master's next transition. Applies via applyRemoteGameState
             // (no echo back to the channel).
             if (payload.gameState) applyRemoteGameState(payload.gameState);
 
             // Master assigns us a slot; default to 1 if it's missing
             // (e.g., older master that doesn't include slotIndex). The
-            // local DomRenderer always paints to pane 1 of secondary's
+            // local DomRenderer always paints to pane 1 of the client's
             // HTML; the data-player attribute is set to match the slot
             // so the "hide own billboard" CSS keys correctly even if the
             // assigned slot isn't 1.
@@ -401,9 +404,13 @@ async function initSecondary() {
             // this to pick our slot's bit out of incoming LOBBY_STATE
             // broadcasts. Replays any LOBBY_STATE that arrived during
             // onAck's await loadMap.
-            setSecondarySlot(slotIndex);
+            setClientSlot(slotIndex);
 
-            client = new RenderClient(conn.channel, slotIndex, orchestrator.target(1), orchestrator);
+            // Local DM secondary is display-only: master sees the same
+            // physical inputs directly and forwarding would double-
+            // process every press. Network DM remotes drop the flag and
+            // get the full input pipeline shipped over the wire.
+            initClient(conn.channel, slotIndex, { forwardInput: false });
             console.log('[broadcast] client wired up at slot', slotIndex);
         },
         onLeave: () => {
@@ -411,12 +418,6 @@ async function initSecondary() {
             overlay.classList.add('visible');
         },
     });
-
-    // Local DM: secondary is display-only. Input always comes from
-    // master's keyboard / gamepads; no forwarding needed. Network DM
-    // (future) will wire input forwarding via a different code path —
-    // `initRemoteInputForwarder` stays in `src/input/remote-secondary.js`
-    // as scaffolding for that.
 
     requestAnimationFrame(cullingLoop);
     window.addEventListener('resize', updatePerspective);
@@ -458,8 +459,8 @@ function ensureDisconnectedOverlay() {
     return el;
 }
 
-if (isSecondary) {
-    initSecondary();
+if (isClient) {
+    initClientWindow();
 } else {
     initMaster();
 }

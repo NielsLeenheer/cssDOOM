@@ -13,9 +13,9 @@
  * the game-state machine when `endMatch()` runs); this module only
  * owns the DOM structure inside the overlay.
  *
- * On the secondary window the same module renders the broadcasted
- * snapshot — the data shape is identical to what match.js produces, so
- * there's no master/secondary divergence here.
+ * On a client window the same module renders the broadcasted snapshot
+ * — the data shape is identical to what match.js produces, so there's
+ * no master/client divergence here.
  *
  * Layout — CSS Grid, (N + 2) columns × (N + 1) rows:
  *

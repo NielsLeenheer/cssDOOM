@@ -1,6 +1,6 @@
 /**
- * Connection lifecycle for master ↔ remote (today: secondary window via
- * BroadcastChannel; tomorrow: network peer via WebRTC).
+ * Connection lifecycle for master ↔ client (today: Local DM secondary
+ * window via BroadcastChannel; tomorrow: Network DM remote via WebRTC).
  *
  * Master and remote share a `Transport` (see [transport.js](transport.js))
  * and a small set of envelope conventions ([protocol.js](protocol.js)'s
@@ -8,15 +8,15 @@
  *
  *   - Master accepts LOOKING, replies with ACK, then keeps the link
  *     alive with PING. Tracks one peer at a time. Pauses LOOKING
- *     acceptance during loadMap so a fast-reconnecting secondary
+ *     acceptance during loadMap so a fast-reconnecting client
  *     doesn't ACK against a half-built scene.
  *
- *   - Secondary sends LOOKING on construction, retries on a timer
+ *   - Client sends LOOKING on construction, retries on a timer
  *     until ACK, replies to PING with PONG, and watches for master
  *     silence to flip back to "looking" mode.
  *
  * To keep each role's logic readable we use two classes
- * (`MasterConnection`, `SecondaryConnection`) sharing the tiny
+ * (`MasterConnection`, `ClientConnection`) sharing the tiny
  * `PeerConnectionBase` for transport + post + unload + close. The
  * per-pane and world renderer commands flow through `RenderSink` /
  * `RenderClient`, which share the same Transport via the `.channel`
@@ -73,16 +73,16 @@ class PeerConnectionBase {
 // ============================================================================
 
 /**
- * Master-side connection. Replies to a secondary's LOOKING with ACK,
- * pings on a heartbeat, and reports the secondary's lifecycle via the
+ * Master-side connection. Replies to a client's LOOKING with ACK,
+ * pings on a heartbeat, and reports the client's lifecycle via the
  * `onJoin` / `onLeave` callbacks so the application can swap render
  * targets between a local DomRenderer and a RenderSink.
  *
  * @param {object} options
  * @param {() => object} options.snapshotProvider Returns ACK payload (mode/level/slot).
- * @param {(payload: object) => void} [options.onJoin]    Fires once when a secondary connects.
- * @param {() => void}                [options.onLeave]   Fires when the secondary goes silent.
- * @param {(msg: object) => void}     [options.onRemoteInput] Forwarded INPUT envelopes.
+ * @param {(payload: object) => void} [options.onJoin]    Fires once when a client connects.
+ * @param {() => void}                [options.onLeave]   Fires when the client goes silent.
+ * @param {(msg: object) => void}     [options.onRemoteInput] Forwarded ACTION/ANALOG envelopes.
  */
 export class MasterConnection extends PeerConnectionBase {
     constructor({ snapshotProvider, onJoin, onLeave, onRemoteInput } = {}) {
@@ -92,7 +92,7 @@ export class MasterConnection extends PeerConnectionBase {
         this.onLeave = onLeave;
         this.onRemoteInput = onRemoteInput;
         // While paused, master ignores LOOKING. Used during loadMap so a
-        // reconnecting secondary doesn't ACK against a half-built scene
+        // reconnecting client doesn't ACK against a half-built scene
         // and start receiving mid-rebuild deltas.
         this.paused = false;
         this.lastPong = 0;
@@ -118,17 +118,17 @@ export class MasterConnection extends PeerConnectionBase {
             this.lastPong = performance.now();
         } else if (msg.type === MSG.LEAVING) {
             this._handlePeerGone();
-        } else if (msg.type === MSG.INPUT) {
+        } else if (msg.type === MSG.ACTION || msg.type === MSG.ANALOG) {
             this.onRemoteInput?.(msg);
         }
     }
 
     /**
-     * Tell the connected secondary the scene is about to rebuild, and
+     * Tell the connected client the scene is about to rebuild, and
      * pause LOOKING acceptance so a reconnecting peer doesn't ACK
      * against a half-built scene. resumeAfterLevelLoad() unpauses. We
      * pause unconditionally — the next loadMap might attract a fresh
-     * secondary mid-load even with no current peer.
+     * client mid-load even with no current peer.
      */
     signalLevelChange() {
         this.paused = true;
@@ -144,7 +144,7 @@ export class MasterConnection extends PeerConnectionBase {
 
     /**
      * Broadcast a lobby-state envelope. Caller passes
-     * `{ inLobby, slotsClaimed, slotsCarriedOver }`; secondary mirrors
+     * `{ inLobby, slotsClaimed, slotsCarriedOver }`; client mirrors
      * it onto its own DOM. No-op when no peer is alive.
      */
     broadcastLobbyState(state) {
@@ -154,7 +154,7 @@ export class MasterConnection extends PeerConnectionBase {
 
     /**
      * Broadcast the end-of-match scoreboard. Payload mirrors what
-     * scoreboard.js's renderer expects so the secondary hands it
+     * scoreboard.js's renderer expects so the client hands it
      * straight through.
      */
     broadcastMatchEnd(payload) {
@@ -163,7 +163,7 @@ export class MasterConnection extends PeerConnectionBase {
     }
 
     /**
-     * Broadcast a game-state transition. The secondary mirrors via
+     * Broadcast a game-state transition. The client mirrors via
      * `applyRemoteGameState` so its CSS body attributes track ours.
      */
     broadcastGameState(state) {
@@ -203,13 +203,14 @@ export class MasterConnection extends PeerConnectionBase {
 
 
 // ============================================================================
-// Secondary
+// Client
 // ============================================================================
 
 /**
- * Secondary-side connection. Repeatedly sends LOOKING on construction
- * (and again after the master goes silent), finalizes setup on ACK via
- * `onAck`, replies to PING with PONG, and watches for master silence.
+ * Client-side connection (Local DM secondary OR Network DM remote).
+ * Repeatedly sends LOOKING on construction (and again after master
+ * goes silent), finalizes setup on ACK via `onAck`, replies to PING
+ * with PONG, and watches for master silence.
  *
  * @param {object} options
  * @param {(payload: object, isReconnect: boolean) => void} [options.onAck]
@@ -220,7 +221,7 @@ export class MasterConnection extends PeerConnectionBase {
  * @param {(msg: object) => void} [options.onMatchEnd]    MATCH_END envelope arrived.
  * @param {(msg: object) => void} [options.onGameState]   GAME_STATE envelope arrived.
  */
-export class SecondaryConnection extends PeerConnectionBase {
+export class ClientConnection extends PeerConnectionBase {
     constructor({ onAck, onLeave, onLobbyState, onMatchEnd, onGameState } = {}) {
         super();
         this.onAck = onAck;

@@ -11,7 +11,7 @@
  *   - renderer/index — flat-namespace re-exports for backward compat.
  *
  * Adding a new command becomes one entry in COMMANDS. Forgetting to wire
- * it through the four files used to be a silent secondary-window desync;
+ * it through the four files used to be a silent client desync;
  * with the registry it's impossible.
  *
  * Two kinds:
@@ -24,12 +24,12 @@
  *   `world`     — no pane. impl signature is (...args). The orchestrator
  *                 calls impl locally (existing helpers iterate panes
  *                 internally) and forwards the call to every sink so
- *                 secondary windows mirror the same world change.
+ *                 clients mirror the same world change.
  *
  * Optional `mirror` callback — runs on the receive side (RenderClient)
  * before dispatching to the local DomRenderer/Orchestrator. Keeps the
- * secondary's `rendererState` (camera positions, thing positions,
- * collected flags) in sync with the master so the secondary's culling
+ * client's `rendererState` (camera positions, thing positions,
+ * collected flags) in sync with the master so the client's culling
  * loop reads fresh values. Signature mirrors the wire-format args:
  *
  *   per-pane: mirror(paneIndex, ...serializedArgs)

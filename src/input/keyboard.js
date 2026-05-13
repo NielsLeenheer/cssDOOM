@@ -34,7 +34,7 @@
  *
  * The actual key→action emit lives in
  * [kbm-input-handler.js](kbm-input-handler.js) and is shared with
- * `mouse.js` + `remote-master.js`. This file owns: Escape menu toggle,
+ * `mouse.js`. This file owns: Escape menu toggle,
  * Tab dev swap, isMenuOpen gating of movement keys, event.repeat
  * suppression, blur reset, attract wake-up, and the input-provider
  * hookup.

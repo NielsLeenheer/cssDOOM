@@ -1,10 +1,11 @@
 /**
- * Broadcast protocol constants and message types.
+ * Wire-protocol constants and message types.
  *
- * Both master (game-running window) and secondary (renderer-only window)
- * open a BroadcastChannel of the same name and exchange messages.
+ * Master and each client (Local DM secondary, or a Network DM remote)
+ * share a Transport (see [transport.js](transport.js)) and exchange
+ * envelopes using the constants below.
  *
- * Master → secondary:
+ * Master → client:
  *   { type: 'cmd-pane', target, method, args }   per-pane renderer command,
  *                                                 `target` is master's paneIndex
  *                                                 the sink represents
@@ -13,15 +14,20 @@
  *   { type: 'ack', for: 'looking-for-session' }  master accepts a join
  *   { type: 'pong', t }                          heartbeat reply
  *
- * Secondary → master:
+ * Client → master:
  *   { type: 'looking-for-session' }              announce on load
  *   { type: 'ready', target }                    snapshot applied, ready for deltas
  *   { type: 'leaving', target }                  graceful disconnect
- *   { type: 'input', slot, kind, data }          controller input forwarded back
+ *   { type: 'action', kind, slot, deviceId, …}   logical action event already
+ *                                                 interpreted by the client
+ *                                                 (FIRE_DOWN, USE, …) — master
+ *                                                 just re-emits on its bus
+ *   { type: 'analog', slot, moveX, moveY,         per-tick analog snapshot
+ *           turn, turnDelta, run }                 (movement + look)
  *   { type: 'ping', t }                          heartbeat
  *
- * `target` identifies which master-side pane slot the secondary represents.
- * Most installs only ever have one secondary; multi-secondary support is a
+ * `target` identifies which master-side pane slot the client represents.
+ * Most installs only ever have one client; multi-client support is a
  * future concern.
  */
 
@@ -37,32 +43,42 @@ export const MSG = {
     LOOKING: 'looking-for-session',
     READY: 'ready',
     LEAVING: 'leaving',
-    INPUT: 'input',
+    // Remote → master: a logical action event the remote already
+    // interpreted on its own event bus (FIRE_DOWN, USE, WEAPON_NEXT,
+    // …). Master re-emits on its bus; its `src/actions/*` handlers
+    // run as if the action were local. Carries `kind, slot, deviceId`
+    // plus any action-specific extras (e.g. `weapon` for WEAPON_SELECT).
+    ACTION: 'action',
+    // Remote → master: per-tick analog snapshot ({ slot, moveX, moveY,
+    // turn, turnDelta, run }). Updates the receiver's latest-snapshot
+    // cache which orchestrator.collectInputs polls each frame via the
+    // registered input provider.
+    ANALOG: 'analog',
     PING: 'ping',
     // Master is about to teardown + rebuild the scene (initial load,
-    // level transition, attract entry). Secondary should reload itself
-    // so the next reconnect arrives after master's loadMap has settled
-    // on a fresh state.
+    // level transition, attract entry). Client should reload itself so
+    // the next reconnect arrives after master's loadMap has settled on
+    // a fresh state.
     LEVEL_CHANGE: 'level-change',
-    // Master → secondary: current lobby state. Secondary mirrors it onto
-    // the per-pane data-claim-state attribute so the existing CSS shows
-    // the same PRESS BUTTON TO JOIN / READY / waiting visuals as the
-    // local split-screen pane would. (Lobby vs. active mode itself is
-    // mirrored separately via the GAME_STATE envelope below.)
+    // Master → client: current lobby state. Client mirrors it onto the
+    // per-pane data-claim-state attribute so the existing CSS shows the
+    // same PRESS BUTTON TO JOIN / READY / waiting visuals as the local
+    // split-screen pane would. (Lobby vs. active mode itself is mirrored
+    // separately via the GAME_STATE envelope below.)
     LOBBY_STATE: 'lobby-state',
-    // Master → secondary: match has ended. Carries the kill matrix,
-    // per-player scores, map name, and winner so the secondary renders
-    // the same scoreboard. resetMatch / restartMatch implicitly clear
-    // by re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
+    // Master → client: match has ended. Carries the kill matrix,
+    // per-player scores, map name, and winner so the client renders the
+    // same scoreboard. resetMatch / restartMatch implicitly clear by
+    // re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
     MATCH_END: 'match-end',
-    // Master → secondary: game-state transition. Secondary mirrors
-    // master's game-state machine so its body[data-game-state] attribute
-    // stays in sync — keeping all the attract/match-end/lobby/intermission
+    // Master → client: game-state transition. Client mirrors master's
+    // game-state machine so its body[data-game-state] attribute stays
+    // in sync — keeping all the attract/match-end/lobby/intermission
     // CSS gates unified under a single namespaced attribute.
     GAME_STATE: 'game-state',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within
-// PING_TIMEOUT_MS, assume the secondary is gone and rebuild pane locally.
+// PING_TIMEOUT_MS, assume the client is gone and rebuild pane locally.
 export const PING_INTERVAL_MS = 500;
 export const PING_TIMEOUT_MS = 2000;

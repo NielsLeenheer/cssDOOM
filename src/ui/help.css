@@ -106,11 +106,12 @@ kbd {
 }
 
 /* Detach button — opens a secondary window that mirrors player 1's view.
-   Hidden unless we're in deathmatch on the master, not fullscreen, and
-   not already pointing a secondary at us. Also hidden on touch (no popup
-   windows there). */
+   This affordance specifically opens a same-machine secondary; Network DM
+   remotes connect via their own URL. Hidden unless we're in deathmatch on
+   the master, not fullscreen, and don't already have a client bound to a
+   slot. Also hidden on touch (no popup windows there). */
 #detach-button { display: none; }
-body[data-mode="deathmatch"]:not(.fullscreen):not(.secondary-window):not(.secondary-active) #detach-button {
+body[data-mode="deathmatch"]:not(.fullscreen):not(.client-window):not(.client-active) #detach-button {
     display: block;
 }
 @media (pointer: coarse) {

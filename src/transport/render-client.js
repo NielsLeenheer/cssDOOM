@@ -1,6 +1,6 @@
 /**
- * RenderClient — the receiving end in a secondary window (or, in future,
- * a network remote).
+ * RenderClient — the receiving end in a client window (Local DM
+ * secondary or, in future, a Network DM remote).
  *
  * Subscribes to a Transport and dispatches incoming envelopes to a
  * local DomRenderer (per-pane commands) and the local Orchestrator
@@ -26,9 +26,9 @@ export class RenderClient {
     /**
      * @param {{onMessage: (cb: (msg: object) => void) => () => void}} channel
      *        Transport instance shared with the master-side connection.
-     * @param {number} slotIndex    master-side slot this secondary represents
-     * @param {object} domRenderer  the secondary's local DomRenderer
-     * @param {object} orchestrator the secondary's local Orchestrator (for world commands)
+     * @param {number} slotIndex    master-side slot this client represents
+     * @param {object} domRenderer  the client's local DomRenderer
+     * @param {object} orchestrator the client's local Orchestrator (for world commands)
      */
     constructor(channel, slotIndex, domRenderer, orchestrator) {
         this.channel = channel;

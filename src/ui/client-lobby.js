@@ -1,35 +1,36 @@
 /**
- * Secondary-window lobby state mirror.
+ * Client-side lobby state mirror.
  *
- * In the master+secondary host layout (Local DM today, Network DM later)
- * the secondary window is **display-only** — it renders the slot held by
- * the host's second local player but contributes no input. The press-to-
- * claim ceremony happens entirely on master.
+ * Runs on any client window (the Local DM secondary today, Network DM
+ * remotes later). The client renders the slot it owns but contributes
+ * input only when the forwarder is wired (Network DM remotes); the
+ * Local DM secondary is display-only and master handles its claim
+ * locally.
  *
- * The secondary still needs to *show* the lobby prompt for that slot, so
- * the player sitting at the secondary's screen knows when to press their
- * button on master. Master broadcasts a `LOBBY_STATE` envelope on every
- * lobby-relevant change, and this module reflects it onto the secondary's
+ * The client still needs to *show* the lobby prompt for its slot, so
+ * the player sitting at the client's screen knows when to press their
+ * button. Master broadcasts a `LOBBY_STATE` envelope on every
+ * lobby-relevant change, and this module reflects it onto the client's
  * DOM via the pane's `data-claim-state` attribute. (`body[data-game-state]`
  * is mirrored separately by the GAME_STATE envelope — see index.js's
- * initSecondary onGameState handler.) The same CSS that drives master's
- * split-screen lobby prompts (`.join-prompt` / `.join-ready`) then renders
- * correctly.
+ * initClient onGameState handler.) The same CSS that drives master's
+ * split-screen lobby prompts (`.join-prompt` / `.join-ready`) then
+ * renders correctly.
  *
- * `setSecondarySlot` is called from `initSecondary`'s onAck once master
- * has assigned a slot. Until then, any incoming `LOBBY_STATE` is buffered
- * and replayed when the slot becomes known — necessary because onAck has
- * an `await loadMap` and `LOBBY_STATE` may arrive in the meantime.
+ * `setClientSlot` is called from `initClient`'s onAck once master has
+ * assigned a slot. Until then, any incoming `LOBBY_STATE` is buffered
+ * and replayed when the slot becomes known — necessary because onAck
+ * has an `await loadMap` and `LOBBY_STATE` may arrive in the meantime.
  */
 
 let mySlot = null;
 let pendingLobbyState = null;
 
 /**
- * Tell this module which slot the secondary represents. Called from
- * initSecondary after master's ACK assigns us a slot.
+ * Tell this module which slot the client represents. Called from
+ * initClient after master's ACK assigns us a slot.
  */
-export function setSecondarySlot(slot) {
+export function setClientSlot(slot) {
     mySlot = slot;
     if (pendingLobbyState) {
         const buffered = pendingLobbyState;
@@ -39,8 +40,9 @@ export function setSecondarySlot(slot) {
 }
 
 /**
- * Apply an incoming `LOBBY_STATE` from master. Sets body + pane attributes
- * so the existing lobby CSS does the right thing on the secondary window.
+ * Apply an incoming `LOBBY_STATE` from master. Sets the pane's
+ * data-claim-state attribute so the existing lobby CSS does the right
+ * thing on the client window.
  *
  * @param {{ inLobby: boolean, slotsClaimed: boolean[] }} msg
  */
@@ -51,7 +53,7 @@ export function applyLobbyState(msg) {
     }
 
     // body[data-game-state] is mirrored by the GAME_STATE envelope (see
-    // index.js initSecondary's onGameState handler). This module only
+    // index.js initClient's onGameState handler). This module only
     // updates the per-pane data-claim-state attribute.
 
     // Same algorithm as lobby.js's updateLobbyUI: lowest unclaimed slot

@@ -2,7 +2,7 @@
  * Keyboard + mouse input pipeline.
  *
  * The heart of [keyboard.js](keyboard.js), [mouse.js](mouse.js), and
- * [remote-master.js](remote-master.js) — they all need the same
+ * [remote.js](remote.js) — they all need the same
  * key→action mapping and analog movement, differing only in *which
  * slot* the input drives.
  *
@@ -12,8 +12,8 @@
  *
  *   - Local kbm — slot resolved from the active virtual kbm device
  *     (keyboard.js owns this; mouse.js shares the same instance).
- *   - Remote kbm — slot 1, fed from a secondary window's forwarded
- *     events (remote-master.js).
+ *   - Remote kbm — slot 1, fed from a client's forwarded
+ *     events (remote.js).
  *   - (future, multi-remote) one per remote.
  *
  * The handler emits logical action events on the input event bus

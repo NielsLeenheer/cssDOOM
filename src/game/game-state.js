@@ -34,8 +34,8 @@ let current = GAME_STATE.ACTIVE;
 const listeners = new Set();
 
 // Optional master-side broadcaster — set by index.js when the
-// MasterConnection is up so every transition mirrors to the secondary.
-// Null on the secondary (or on master before init); receivers should
+// MasterConnection is up so every transition mirrors to clients.
+// Null on a client (or on master before init); receivers should
 // guard with `?.`.
 let broadcastGameState = null;
 export function setGameStateBroadcaster(fn) { broadcastGameState = fn; }
@@ -61,17 +61,17 @@ export function getGameState() {
  */
 export function transitionTo(next) {
     applyTransition(next);
-    // Mirror to any connected secondary. The hook is a no-op on the
-    // secondary side (no broadcaster registered) and on master when no
+    // Mirror to any connected client. The hook is a no-op on the
+    // client side (no broadcaster registered) and on master when no
     // peer is alive (MasterConnection gates on peerAlive).
     broadcastGameState?.(next);
 }
 
 /**
  * Apply a remote game-state transition without re-broadcasting.
- * Called by the secondary when a GAME_STATE envelope arrives from
- * master. We intentionally bypass the broadcaster hook so we don't
- * echo the transition back into the channel.
+ * Called by a client when a GAME_STATE envelope arrives from master.
+ * We intentionally bypass the broadcaster hook so we don't echo the
+ * transition back into the channel.
  */
 export function applyRemoteGameState(next) {
     applyTransition(next);

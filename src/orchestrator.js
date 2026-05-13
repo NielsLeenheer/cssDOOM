@@ -14,16 +14,16 @@
  *
  *   1. Render-target dispatch — per-pane commands route to one target by
  *      paneIndex; world commands invoke the local impl once and fan out
- *      to every RenderSink so secondary windows mirror the change.
+ *      to every RenderSink so clients mirror the change.
  *      Command names are generated from
  *      [renderer/commands.js](renderer/commands.js).
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
- *      `unbindRemoteSlot`. A joining secondary triggers bind: target
+ *      `unbindRemoteSlot`. A joining client triggers bind: target
  *      swaps for a RenderSink, the master-side pane DOM is torn down,
- *      `body.secondary-active` hides the empty pane, perspective is
+ *      `body.client-active` hides the empty pane, perspective is
  *      refreshed. Unbind is the reverse with a grace-period deferred
- *      unhide so a quickly-reloading secondary doesn't flash.
+ *      unhide so a quickly-reloading client doesn't flash.
  *
  *   3. Per-frame input collection — `collectInputs` zeros + sums every
  *      provider's contribution into the per-slot `inputs[]` array, which
@@ -60,13 +60,13 @@ import {
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
-// (rendered to master's pane N) or a Remote (RenderSink → secondary).
+// (rendered to master's pane N) or a Remote (RenderSink → client).
 const MAX_SLOTS = 4;
 
-// Deferred-unhide window. When a secondary disconnects, the target swap
+// Deferred-unhide window. When a client disconnects, the target swap
 // (sink → DomRenderer) happens immediately so master's per-frame commands
 // keep the local pane DOM current. The visual "show pane again" toggle is
-// deferred this long so a quickly-reloading secondary can reconnect
+// deferred this long so a quickly-reloading client can reconnect
 // without the user seeing master's pane flash visible.
 const RECONNECT_GRACE_MS = 500;
 
@@ -104,16 +104,16 @@ class Orchestrator {
     constructor() {
         // Default registration: one DomRenderer per pane in the current
         // sceneStates layout (always 2 in current HTML). bindRemoteSlot
-        // swaps one of these for a RenderSink when a secondary joins.
+        // swaps one of these for a RenderSink when a client joins.
         this.targets = [new DomRenderer(0), new DomRenderer(1)];
 
         // Remote-slot bookkeeping. `occupiedRemoteSlots` is the set of
-        // slots currently held by a secondary. `currentSecondarySlot` is
-        // the single-secondary fast path (Local DM today; multi-secondary
-        // network DM would generalize). `savedRemoteTarget` is the
-        // DomRenderer we swapped out, kept so unbind can restore it.
+        // slots currently held by a client. `currentRemoteSlot` is the
+        // single-client fast path (Local DM today; multi-client Network
+        // DM would generalize). `savedRemoteTarget` is the DomRenderer
+        // we swapped out, kept so unbind can restore it.
         this._occupiedRemoteSlots = new Set();
-        this._currentSecondarySlot = null;
+        this._currentRemoteSlot = null;
         this._savedRemoteTarget = null;
         this._unbindGraceTimer = null;
     }
@@ -159,7 +159,7 @@ class Orchestrator {
 
     /**
      * Return the slot the snapshot provider should advertise to a joining
-     * secondary. Reuses the active single-secondary slot if there is one
+     * client. Reuses the active single-client slot if there is one
      * (a duplicate LOOKING retry from an already-alive peer); otherwise
      * allocates the lowest free remote slot. Returns null if no slot
      * is free.
@@ -168,23 +168,23 @@ class Orchestrator {
      * in `bindRemoteSlot` once the peer answers with JOIN.
      */
     nextOrCurrentRemoteSlot() {
-        if (this._currentSecondarySlot != null) return this._currentSecondarySlot;
+        if (this._currentRemoteSlot != null) return this._currentRemoteSlot;
         for (let i = 1; i < MAX_SLOTS; i++) {
             if (!this._occupiedRemoteSlots.has(i)) return i;
         }
         return null;
     }
 
-    /** Returns the slot currently held by a remote secondary, or null. */
+    /** Returns the slot currently held by a remote client, or null. */
     currentRemoteSlot() {
-        return this._currentSecondarySlot;
+        return this._currentRemoteSlot;
     }
 
     /**
-     * Bind a connected secondary to the given slot. Installs a
+     * Bind a connected client to the given slot. Installs a
      * RenderSink in place of the DomRenderer, tears down master's
-     * local DOM for that pane (since the secondary now renders it),
-     * hides the pane via `body.secondary-active`, and refreshes
+     * local DOM for that pane (since the client now renders it),
+     * hides the pane via `body.client-active`, and refreshes
      * perspectives because the remaining pane just grew from 50% → 100%
      * width. Cancels any pending unbind grace timer in case this join is
      * a reconnect that landed mid-grace.
@@ -195,7 +195,7 @@ class Orchestrator {
             return;
         }
 
-        // A reconnecting secondary cancels any pending visual-unhide so
+        // A reconnecting client cancels any pending visual-unhide so
         // the user doesn't see a flash during reload.
         if (this._unbindGraceTimer) {
             clearTimeout(this._unbindGraceTimer);
@@ -203,7 +203,7 @@ class Orchestrator {
         }
 
         this._occupiedRemoteSlots.add(slot);
-        this._currentSecondarySlot = slot;
+        this._currentRemoteSlot = slot;
 
         const sink = new RenderSink(channel, slot);
         this._savedRemoteTarget = this.replaceTarget(slot, sink);
@@ -212,39 +212,39 @@ class Orchestrator {
         // commands and the culling loop both early-exit on the now-empty
         // sceneStates[slot] arrays after teardown.
         tearDownPane(slot);
-        document.body.classList.add('secondary-active');
+        document.body.classList.add('client-active');
         updatePerspective();
 
-        console.log('[orchestrator] secondary bound at slot', slot, '- pane torn down');
+        console.log('[orchestrator] client bound at slot', slot, '- pane torn down');
     }
 
     /**
      * Reverse of bindRemoteSlot. Restores the DomRenderer immediately so
      * master's per-frame commands keep the local pane DOM in sync, but
      * defers the visual unhide for RECONNECT_GRACE_MS so a reloading
-     * secondary's reconnect doesn't flash the pane visible. After the
+     * client's reconnect doesn't flash the pane visible. After the
      * grace expires, the pane DOM is rebuilt from pane 0's current state
      * before unhiding (otherwise the user sees an empty .scene for a
      * frame).
      */
     unbindRemoteSlot() {
-        const slot = this._currentSecondarySlot;
+        const slot = this._currentRemoteSlot;
         if (slot != null) {
             this.replaceTarget(slot, this._savedRemoteTarget ?? new DomRenderer(slot));
             this._occupiedRemoteSlots.delete(slot);
         }
         this._savedRemoteTarget = null;
-        this._currentSecondarySlot = null;
+        this._currentRemoteSlot = null;
 
         if (this._unbindGraceTimer) clearTimeout(this._unbindGraceTimer);
         this._unbindGraceTimer = setTimeout(() => {
             this._unbindGraceTimer = null;
             if (slot != null) rebuildPane(slot);
-            document.body.classList.remove('secondary-active');
+            document.body.classList.remove('client-active');
             updatePerspective();
         }, RECONNECT_GRACE_MS);
 
-        console.log('[orchestrator] secondary unbound from slot', slot);
+        console.log('[orchestrator] client unbound from slot', slot);
     }
 
     // ── Per-frame input collection ───────────────────────────────────────
@@ -316,7 +316,7 @@ for (const name of Object.keys(PER_PANE_COMMANDS)) {
 }
 
 // World commands: invoke local impl, then fan out to every sink so
-// secondary windows mirror the change.
+// clients mirror the change.
 for (const [name, { impl }] of Object.entries(WORLD_COMMANDS)) {
     Orchestrator.prototype[name] = function (...args) {
         impl(...args);

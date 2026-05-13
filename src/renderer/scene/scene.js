@@ -83,9 +83,9 @@ export function teardownScene() {
  * Recompute each pane's `--perspective` from its current rendered
  * width. Perspective = half the pane's width gives a ~90° horizontal
  * FOV; reading `clientWidth` per pane means split-screen, kiosk,
- * mirror, single-pane SP, and master+secondary all just work without
+ * mirror, single-pane SP, and master+client all just work without
  * mode branching. Call after any layout change that resizes the panes
- * — secondary join/leave, kiosk toggle, window resize.
+ * — client join/leave, kiosk toggle, window resize.
  */
 export function updatePerspective() {
     for (let i = 0; i < dom.viewports.length; i++) {
@@ -167,7 +167,7 @@ function cloneSceneToOtherPanes(paneCount) {
  *
  * Idempotent — `targetSceneEl.replaceChildren()` clears any prior tree
  * before re-cloning. Safe to call repeatedly to rebuild a torn-down
- * pane after a secondary disconnects.
+ * pane after a client disconnects.
  */
 function cloneSceneToPane(pi) {
     const sourceSceneEl = dom.scenes[0];
@@ -241,8 +241,8 @@ function cloneSceneToPane(pi) {
 }
 
 /**
- * Tear down a single pane's DOM and sceneState. Used when a secondary
- * window connects and takes over rendering for that slot — clearing
+ * Tear down a single pane's DOM and sceneState. Used when a client
+ * connects and takes over rendering for that slot — clearing
  * sceneStates[paneIndex] makes world commands (setEnemyState,
  * updateThingPosition, etc.) and the culling loop both early-exit when
  * they iterate that pane's empty arrays. Saves CPU/DOM work that would
@@ -273,7 +273,7 @@ export function tearDownPane(paneIndex) {
 
 /**
  * Rebuild a single pane by cloning pane 0's current DOM tree into it.
- * Counterpart to tearDownPane — used when a secondary disconnects and
+ * Counterpart to tearDownPane — used when a client disconnects and
  * master needs the local pane back. The clone is from pane 0's *live*
  * state, so accumulated runtime mutations (open doors, dead enemies,
  * collected items) carry over correctly.

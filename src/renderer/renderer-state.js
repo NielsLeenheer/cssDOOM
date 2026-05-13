@@ -8,11 +8,12 @@
  *   in `state.players` / `state.things` so the renderer reads the
  *   authoritative simulation values directly. No copy step.
  *
- *   Secondary: there is no `state.players` / `state.things` worth
- *   speaking of — only spawn-time defaults. `cameras` and `things` are
+ *   Client: there is no `state.players` / `state.things` worth speaking
+ *   of — only spawn-time defaults. `cameras` and `things` are
  *   independent objects populated by inbound broadcast envelopes
  *   (`updateCamera`, `updateThingPosition`, `killEnemy`, `collectItem`,
- *   `uncollectItem`). The renderer can't tell the difference.
+ *   `uncollectItem`) via the `mirror` callbacks declared in
+ *   [commands.js](commands.js). The renderer can't tell the difference.
  *
  * Field set is the minimum the renderer + culler actually read. Adding
  * a new render-time read means adding a field here AND updating the
@@ -41,11 +42,11 @@ export function bindRendererStateToMaster(state) {
 }
 
 /**
- * Secondary-side init: stand up empty arrays sized for the local
- * scene. The broadcast handlers below populate them as updates flow
- * in from the master.
+ * Client-side init: stand up empty arrays sized for the local scene.
+ * The mirror callbacks declared in [commands.js](commands.js) populate
+ * them as updates flow in from the master.
  */
-export function initSecondaryRendererState(cameraCount) {
+export function initClientRendererState(cameraCount) {
     rendererState.cameras = Array.from({ length: cameraCount }, () => makeCamera());
     rendererState.things = [];
 }
@@ -59,7 +60,7 @@ function makeThing() {
 }
 
 /**
- * Apply an inbound camera update on the secondary. Mirrors the fields
+ * Apply an inbound camera update on a client. Mirrors the fields
  * the renderer's camera transform reads (`x/y/z/angle/floorHeight`)
  * plus `isFiring` for the spectator-marker firing class.
  */
@@ -75,7 +76,7 @@ export function applyCameraUpdate(slot, payload) {
 }
 
 /**
- * Apply an inbound thing update on the secondary. Extends the things
+ * Apply an inbound thing update on a client. Extends the things
  * array lazily so out-of-order arrivals (or thingIndex gaps) don't
  * lose the update.
  */
