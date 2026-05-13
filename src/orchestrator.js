@@ -95,9 +95,17 @@ const inputProviders = [];
  *   runtime-mutable.
  * @param {() => object} getInput  Returns the provider's contribution to
  *   the input state for this frame.
+ * @returns {() => void}  Unregister function. Call when the source goes
+ *   away (gamepad disconnect, future Network DM remote leaving) so the
+ *   orchestrator stops polling a defunct provider.
  */
 export function registerInputProvider(getPlayerIndex, getInput) {
-    inputProviders.push({ getPlayerIndex, getInput });
+    const entry = { getPlayerIndex, getInput };
+    inputProviders.push(entry);
+    return () => {
+        const i = inputProviders.indexOf(entry);
+        if (i >= 0) inputProviders.splice(i, 1);
+    };
 }
 
 class Orchestrator {

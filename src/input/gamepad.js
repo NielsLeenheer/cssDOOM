@@ -315,8 +315,13 @@ function setupGamepad(gamepad) {
 
     // Per-gamepad provider — contributes to whichever slot the press-to-
     // claim system has bound this gamepad to. SP auto-binds to slot 0,
-    // DM requires fire-press claim before contributing.
-    registerInputProvider(() => getDriverSlot(deviceId), () => padState);
+    // DM requires fire-press claim before contributing. The unregister
+    // function is stashed on padState so handleDisconnect can remove
+    // the provider when the pad goes away.
+    padState._unregister = registerInputProvider(
+        () => getDriverSlot(deviceId),
+        () => padState,
+    );
 
     // Resume any saved binding from this tab's sessionStorage so reloads
     // keep the same controller on the same pane. Gamepad indices are
@@ -369,21 +374,18 @@ function setupGamepad(gamepad) {
 }
 
 /**
- * Reset a gamepad's state on disconnect. The padState entry is kept (not
- * deleted) so the registered input provider's closure stays valid; if
- * the gamepad reconnects at the same index, the poll loop repopulates
- * the state in place. Released claim lets a different device take the
- * slot in DM lobby.
+ * Drop a gamepad on disconnect. Unregisters the input provider so the
+ * orchestrator stops polling a defunct closure, drops the padState
+ * entry, and releases the slot claim so a different device can take it
+ * in DM lobby. On reconnect (same or different index) the standard
+ * `gamepadconnected` path / poll-loop late-detect runs setupGamepad
+ * fresh — a new padState + new provider.
  */
 function handleDisconnect(gamepadIndex) {
     const padState = padStates.get(gamepadIndex);
     if (padState) {
-        padState.moveX = 0;
-        padState.moveY = 0;
-        padState.turn = 0;
-        padState.run = false;
-        padState._prevButtons = [];
-        padState._wasConnected = false;
+        padState._unregister?.();
+        padStates.delete(gamepadIndex);
     }
     const deviceId = gamepadDeviceId(gamepadIndex);
     const claimedSlot = getDriverSlot(deviceId);
