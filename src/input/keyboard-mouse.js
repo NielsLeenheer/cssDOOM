@@ -44,13 +44,10 @@
  *   - Tab (dev only) claims the *other* kbm device for the next free
  *     slot and flips active to it.
  *   - Once both are claimed, Tab toggles which one is active.
- *
- * `body[data-kbm-target=N]` tracks the active kbm's current slot so CSS
- * can outline the pane the keyboard is driving.
  */
 
 import { registerInputProvider } from '../orchestrator.js';
-import { getDriverSlot, tryClaimSlot, onClaimChange, applySavedClaim } from './claim-registry.js';
+import { getDriverSlot, tryClaimSlot, applySavedClaim } from './claim-registry.js';
 import { isMenuOpen } from '../ui/menu.js';
 import { pingActivity } from '../ui/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
@@ -188,21 +185,6 @@ function releaseHeldFire() {
     if (slot != null) emit({ kind: A.FIRE_UP, slot, deviceId: activeKbm });
 }
 
-// ── Body-attribute sync ────────────────────────────────────────────────
-
-/**
- * Update body[data-kbm-target] to reflect the active kbm's current slot.
- * Removes the attribute when the active kbm is unbound (no outline).
- */
-function syncKbmTargetAttribute() {
-    const slot = activeSlot();
-    if (slot == null) {
-        delete document.body.dataset.kbmTarget;
-    } else {
-        document.body.dataset.kbmTarget = String(slot);
-    }
-}
-
 // ── Tab debug swap ─────────────────────────────────────────────────────
 
 /**
@@ -228,7 +210,6 @@ function handleTab() {
     releaseHeldFire();
     resetKeys();
     activeKbm = other;
-    syncKbmTargetAttribute();
 }
 
 // ── Public init ────────────────────────────────────────────────────────
@@ -240,13 +221,11 @@ function handleTab() {
  */
 export function initKeyboardMouse() {
     registerInputProvider(activeSlot, getInput);
-    onClaimChange(syncKbmTargetAttribute);
     // Resume any KBM bindings from the previous page load in this tab
     // (sessionStorage). Keyboard is always "connected" so we can do
     // this synchronously at init.
     applySavedClaim(KBM_A);
     applySavedClaim(KBM_B);
-    syncKbmTargetAttribute();
 
     // ── Keyboard ──────────────────────────────────────────────────
 
@@ -273,7 +252,7 @@ export function initKeyboardMouse() {
         // here too.
         if (isMenuOpen()) return;
 
-        // Tab — debug-only kbm-target swap.
+        // Tab — debug-only KBM_A ↔ KBM_B device swap.
         if (event.code === 'Tab') {
             event.preventDefault();
             handleTab();

@@ -118,18 +118,6 @@ body.client-active[data-mode="deathmatch"] .pane[data-player="0"] {
     flex: 1;
 }
 
-/* Keyboard+mouse target indicator — yellow outline on the pane whose
-   player is currently driven by keyboard+mouse. Only shown in deathmatch
-   so single-player play (the only place keyboard always points at pane 0)
-   stays visually clean. body[data-kbm-target] is set by keyboard-mouse.js to
-   the active kbm device's current slot; Tab toggles the active device
-   when one keyboard is driving two players in debug. */
-body[data-mode="deathmatch"][data-kbm-target="0"] .pane[data-player="0"] .renderer,
-body[data-mode="deathmatch"][data-kbm-target="1"] .pane[data-player="1"] .renderer {
-    outline: 2px solid #ffd700;
-    outline-offset: -2px;
-}
-
 /* The .renderer fills its pane; .viewport and .hud both inset:0 it.
    The container-query context for this pane's HUD lives here (moved
    from .pane) so .pane stays free of CSS-contain side effects — without
