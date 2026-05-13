@@ -1,7 +1,7 @@
 /**
  * Input event bus.
  *
- * Input modules (keyboard, mouse, gamepad, touch, remote) emit
+ * Input modules (keyboard-mouse, gamepad, touch, remote) emit
  * logical action events here; handlers in `src/actions/*` subscribe to
  * route them into game-side calls. The point of the bus is to keep the
  * input layer free of game-function imports — input only knows about

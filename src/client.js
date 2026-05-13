@@ -31,8 +31,7 @@ import { RenderClient } from './transport/render-client.js';
 import { MSG } from './transport/protocol.js';
 import { orchestrator, inputs } from './orchestrator.js';
 import { setDefaultSlot } from './input/claim-registry.js';
-import { initKeyboardInput } from './input/keyboard.js';
-import { initMouseInput } from './input/mouse.js';
+import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initTouchInput } from './input/touch.js';
 import { on } from './input/event-bus.js';
@@ -77,8 +76,7 @@ function initInputForwarder(transport, mySlot) {
     // register their analog contribution with the local orchestrator —
     // exactly the same as a local SP install. Touch is a no-op on
     // non-touch devices (initTouchInput's own guard).
-    initKeyboardInput();
-    initMouseInput();
+    initKeyboardMouse();
     initGamepadInput();
     initTouchInput();
 

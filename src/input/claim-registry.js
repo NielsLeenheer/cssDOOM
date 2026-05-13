@@ -139,7 +139,7 @@ function notifyClaimChange() {
  * slot or null. Idempotent within a session: after the first successful
  * restore the saved entry is consumed.
  *
- * Called from each input module at startup (keyboard.js for KBM_A/B,
+ * Called from each input module at startup (keyboard-mouse.js for KBM_A/B,
  * gamepad.js on connect / at init for already-connected pads) so the
  * same controllers land on the same panes after a tab reload.
  */

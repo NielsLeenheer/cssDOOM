@@ -20,8 +20,7 @@ import { updateCamera, updateHud } from './src/renderer/index.js';
 import { sceneStates } from './src/renderer/dom.js';
 import { updateMenuSelection, loadSavedMode, applyMode } from './src/ui/menu.js';
 import { hideInitialOverlay } from './src/ui/overlay.js';
-import { initKeyboardInput } from './src/input/keyboard.js';
-import { initMouseInput } from './src/input/mouse.js';
+import { initKeyboardMouse } from './src/input/keyboard-mouse.js';
 import { initTouchInput } from './src/input/touch.js';
 import { initGamepadInput } from './src/input/gamepad.js';
 import { initActions } from './src/actions/index.js';
@@ -184,8 +183,7 @@ async function initMaster() {
     // produce events on the bus; handlers in src/actions/* subscribe to
     // them and dispatch into game functions.
     initActions();
-    initKeyboardInput();
-    initMouseInput();
+    initKeyboardMouse();
     initTouchInput();
     initGamepadInput();
     // Register a player-1 input provider that's driven by remote input
