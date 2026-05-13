@@ -57,6 +57,7 @@ import { hideInitialOverlay } from './ui/overlay.js';
 import { loadMap } from './shared/maps.js';
 import { setClientSlot, applyLobbyState } from './ui/client-lobby.js';
 import { showScoreboard, hideScoreboard } from './ui/scoreboard.js';
+import { ensureDisconnectedOverlay } from './ui/disconnected-overlay.js';
 import { applyRemoteGameState } from './game/game-state.js';
 
 // How often to push analog snapshots. 60 Hz matches master's game loop;
@@ -234,39 +235,4 @@ export async function initClientWindow() {
     });
     window.addEventListener('resize', updatePerspective);
     hideInitialOverlay();
-}
-
-/**
- * Lazily create a fullscreen overlay that announces a disconnection from
- * the master. CSS lives inline because there's no other consumer.
- */
-function ensureDisconnectedOverlay() {
-    let el = document.getElementById('disconnected-overlay');
-    if (el) return el;
-    el = document.createElement('div');
-    el.id = 'disconnected-overlay';
-    el.textContent = 'DISCONNECTED — RECONNECTING…';
-    Object.assign(el.style, {
-        position: 'fixed',
-        inset: '0',
-        background: 'rgba(0,0,0,0.85)',
-        color: '#ff4444',
-        font: 'bold 32px monospace',
-        display: 'none',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: '9999',
-        letterSpacing: '0.05em',
-        textShadow: '0 2px 0 #220000',
-        pointerEvents: 'none',
-    });
-    document.body.appendChild(el);
-    const styleId = 'disconnected-overlay-style';
-    if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = '#disconnected-overlay.visible { display: flex; }';
-        document.head.appendChild(style);
-    }
-    return el;
 }
