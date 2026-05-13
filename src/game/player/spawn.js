@@ -15,7 +15,7 @@ import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { getFloorHeightAt, getSectorAt } from '../physics.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import * as renderer from '../../renderer/index.js';
 
 // Don't spawn a player within this distance of any living player. Picked
@@ -99,7 +99,7 @@ export function spawnPlayer(player) {
     // Spawn-fog effect + sound, matching DOOM-authentic respawn feel.
     renderer.createTeleportFog(player.x, player.floorHeight, player.y);
     renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
-    playSound('DSTELEPT');
+    orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
 }
 
 /**

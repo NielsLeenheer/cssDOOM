@@ -22,7 +22,7 @@ import {
 
 import { state } from '../state.js';
 import { equipWeapon } from '../entities/weapons.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { recordPickup } from '../sp-stats.js';
 import * as renderer from '../../renderer/index.js';
 
@@ -144,7 +144,7 @@ export function checkPickups(player) {
  * pick up an item. Rapid successive pickups restart the flash animation.
  */
 function triggerPickupFlash(player) {
-    playSound('DSITEMUP');
+    orchestrator.playSound('DSITEMUP', { x: player.x, y: player.y });
     renderer.triggerFlash(player.viewportIndex, 'pickup-flash');
 }
 

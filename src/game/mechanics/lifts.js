@@ -22,8 +22,8 @@
 import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../constants.js';
 
 import { state } from '../state.js';
-import { mapData } from '../../shared/maps.js';
-import { playSound } from '../../audio/audio.js';
+import { mapData, sectorCenter } from '../../shared/maps.js';
+import { orchestrator } from '../../orchestrator.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 
@@ -31,23 +31,6 @@ const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation dur
 
 // Cached flat array of { sectorIndex, entry } for zero-alloc iteration in the hot path
 let liftEntries = [];
-
-/**
- * Approximate centroid of a sector's outer polygon — average of its
- * vertices. Used to determine which side of a collision edge is
- * "inside" the lift footprint (vs outside). Good enough for the convex
- * / mildly-concave lift platforms typical in DOOM E1 maps; for a
- * pathologically concave shape it might miss, but those don't occur on
- * lifts in practice.
- */
-function computeSectorCentroid(sectorIndex) {
-    const poly = mapData.sectorPolygons?.[sectorIndex];
-    if (!poly?.boundaries?.[0]) return null;
-    const pts = poly.boundaries[0];
-    let cx = 0, cy = 0;
-    for (const p of pts) { cx += p.x; cy += p.y; }
-    return { x: cx / pts.length, y: cy / pts.length };
-}
 
 export function initLifts() {
     state.liftState = new Map();
@@ -67,7 +50,7 @@ export function initLifts() {
         // this, a player stepping off a raised lift would be trapped
         // within PLAYER_RADIUS of the edge: blocked forward by the
         // circle/edge overlap, blocked backward by the step-up height.
-        const centroid = computeSectorCentroid(lift.sectorIndex);
+        const centroid = sectorCenter(lift.sectorIndex);
         const annotatedEdges = (lift.collisionEdges || []).map(e => {
             const dx = e.end.x - e.start.x;
             const dy = e.end.y - e.start.y;
@@ -142,7 +125,8 @@ export function activateLift(sectorIndex) {
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
     renderer.setLiftState(sectorIndex, 'lowered');
-    playSound('DSPSTART');
+    const lowerCenter = sectorCenter(sectorIndex);
+    if (lowerCenter) orchestrator.playSound('DSPSTART', lowerCenter);
 
     // One-way lifts (e.g. type 36) stay lowered permanently
     if (!liftState.oneWay) {
@@ -161,7 +145,8 @@ function raiseLift(sectorIndex) {
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
     renderer.setLiftState(sectorIndex, 'raised');
-    playSound('DSPSTOP');
+    const raiseCenter = sectorCenter(sectorIndex);
+    if (raiseCenter) orchestrator.playSound('DSPSTOP', raiseCenter);
     liftState.timer = null;
 }
 

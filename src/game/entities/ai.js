@@ -15,7 +15,7 @@ import * as renderer from '../../renderer/index.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { isSectorAlerted } from '../sound-propagation.js';
 import { damagePlayer } from '../player/damage.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { setEnemyState, respawnEnemy } from './enemies.js';
 import { isMatchLobby } from '../match.js';
 import { enemyHitscanAttack, enemyHitscanAttackEnemy, checkMissileRange, damageEnemy } from './combat.js';
@@ -406,7 +406,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                     // don't produce a cacophony of overlapping cries
                     if (currentTime - lastAlertSoundTime > 500) {
                         lastAlertSoundTime = currentTime;
-                        playSound(enemyAI.alertSound);
+                        orchestrator.playSound(enemyAI.alertSound, { x: enemy.x, y: enemy.y });
                     }
                 }
             }
@@ -466,7 +466,10 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                         }
                     }
                     // Demon/Spectre: sfx_sgtatk, Imp/Baron: sfx_claw
-                    playSound(enemy.type === 3002 || enemy.type === 58 ? 'DSSGTATK' : 'DSCLAW');
+                    orchestrator.playSound(
+                        enemy.type === 3002 || enemy.type === 58 ? 'DSSGTATK' : 'DSCLAW',
+                        { x: enemy.x, y: enemy.y },
+                    );
                 } else {
                     // Ranged attack: either spawn a projectile or use hitscan
                     const projectileDefinition = ENEMY_PROJECTILES[enemy.type];

@@ -9,7 +9,7 @@ import { Player } from '../player/player.js';
 import { rayHitPoint, getFloorHeightAt } from '../physics.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { damageEnemy } from './combat.js';
 import { rocketExplosion } from './weapons.js';
 import * as renderer from '../../renderer/index.js';
@@ -61,7 +61,7 @@ export function updateProjectiles() {
             const impactX = hitPoint ? hitPoint.x - dirX * 25 : projectile.x;
             const impactY = hitPoint ? hitPoint.y - dirY * 25 : projectile.y;
             spawnFireballExplosion(impactX, impactY, projectile.z);
-            playSound(projectile.hitSound);
+            orchestrator.playSound(projectile.hitSound, { x: impactX, y: impactY });
             if (projectile.isPlayerRocket) rocketExplosion(impactX, impactY, projectile.source);
             renderer.removeProjectile(projectile.id);
             state.projectiles.splice(index, 1);
@@ -77,7 +77,7 @@ export function updateProjectiles() {
         const floorHeight = getFloorHeightAt(newX, newY);
         if (newZ <= floorHeight) {
             spawnFireballExplosion(newX, newY, floorHeight);
-            playSound(projectile.hitSound);
+            orchestrator.playSound(projectile.hitSound, { x: newX, y: newY });
             if (projectile.isPlayerRocket) rocketExplosion(newX, newY, projectile.source);
             renderer.removeProjectile(projectile.id);
             state.projectiles.splice(index, 1);
@@ -96,7 +96,7 @@ export function updateProjectiles() {
             const playerDeltaY = projectile.y - player.y;
             if (playerDeltaX * playerDeltaX + playerDeltaY * playerDeltaY < PROJECTILE_HIT_RADIUS * PROJECTILE_HIT_RADIUS) {
                 spawnFireballExplosion(projectile.x, projectile.y, projectile.z);
-                playSound(projectile.hitSound);
+                orchestrator.playSound(projectile.hitSound, { x: projectile.x, y: projectile.y });
                 // Player rockets deal direct hit damage + splash; enemy projectiles
                 // roll damage on impact: (P_Random()%8+1) * missileDamage.
                 // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() missile damage.
@@ -130,7 +130,7 @@ export function updateProjectiles() {
             const enemyDeltaY = projectile.y - thing.y;
             if (enemyDeltaX * enemyDeltaX + enemyDeltaY * enemyDeltaY < (PROJECTILE_HIT_RADIUS + enemyRadius) * (PROJECTILE_HIT_RADIUS + enemyRadius)) {
                 spawnFireballExplosion(projectile.x, projectile.y, projectile.z);
-                playSound(projectile.hitSound);
+                orchestrator.playSound(projectile.hitSound, { x: projectile.x, y: projectile.y });
                 // Player rockets deal direct hit damage + splash damage in a radius
                 if (projectile.isPlayerRocket) {
                     damageEnemy(thing, projectile.damage, projectile.source);
@@ -235,5 +235,5 @@ export function spawnProjectile(enemy, projectileDefinition) {
     };
 
     state.projectiles.push(projectile);
-    playSound(projectileDefinition.sound);
+    orchestrator.playSound(projectileDefinition.sound, { x: projectile.x, y: projectile.y });
 }

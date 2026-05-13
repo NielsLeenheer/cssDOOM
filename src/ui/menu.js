@@ -11,6 +11,7 @@ import { loadMap } from '../shared/maps.js';
 import { setMirrorMode } from '../renderer/scene/scene.js';
 import { resetMatch, clearMatch } from '../game/match.js';
 import { setDefaultSlot } from '../input/claim-registry.js';
+import { configureAudio } from '../audio/audio.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 
@@ -104,6 +105,12 @@ export function applyMode(mode) {
     // mirroring would build an invisible second scene for nothing.
     const isKiosk = document.body.classList.contains('kiosk');
     setMirrorMode(isKiosk && mode === 'singleplayer');
+
+    // (Re)build per-listener AudioRenderers for the new roster. SP gets
+    // one bearing-pan renderer; DM gets two pane-side-locked renderers
+    // (slot 0 left, slot 1 right). No-op on a Local DM secondary —
+    // setAudioEnabled(false) was called in initClient.
+    configureAudio(state.players.length);
 }
 
 /**

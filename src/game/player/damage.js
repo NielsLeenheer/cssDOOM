@@ -4,7 +4,7 @@
 
 import { SECTOR_DAMAGE } from '../constants.js';
 import { state } from '../state.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { pointInPolygon } from '../geometry.js';
 import { forEachSectorAt } from '../spatial-grid.js';
 import { equipWeapon } from '../entities/weapons.js';
@@ -66,7 +66,7 @@ export function damagePlayer(player, damageAmount, attacker = null) {
     player.lastDamagedTime = performance.now();
 
     renderer.triggerFlash(player.viewportIndex, 'hurt');
-    playSound('DSPLPAIN');
+    orchestrator.playSound('DSPLPAIN', { x: player.x, y: player.y });
 
     if (player.health <= 0) {
         player.health = 0;
@@ -106,7 +106,7 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         }
 
         renderer.setPlayerDead(player.viewportIndex, true);
-        playSound('DSPLDETH');
+        orchestrator.playSound('DSPLDETH', { x: player.x, y: player.y });
     }
 }
 

@@ -232,3 +232,21 @@ export function getNextMap() {
 export function getSecretExitMap() {
     return 'E1M9';
 }
+
+/**
+ * Approximate centroid of a sector — average of its outer-boundary
+ * vertices. Used by audio dispatch to give sector-bound sounds (door
+ * open/close, lift start/stop) a world position so positional audio
+ * works. Good enough for convex / mildly-concave sectors typical in
+ * DOOM E1; truly pathological concave shapes might miss but those
+ * don't matter for audio. Returns `{x, y}` or null if the sector has
+ * no polygon.
+ */
+export function sectorCenter(sectorIndex) {
+    const poly = mapData?.sectorPolygons?.[sectorIndex];
+    if (!poly?.boundaries?.[0]) return null;
+    const pts = poly.boundaries[0];
+    let cx = 0, cy = 0;
+    for (const p of pts) { cx += p.x; cy += p.y; }
+    return { x: cx / pts.length, y: cy / pts.length };
+}

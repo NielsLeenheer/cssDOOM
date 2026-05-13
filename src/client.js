@@ -54,6 +54,7 @@ import { spectatorActive } from './ui/spectator.js';
 import { initClientRendererState } from './renderer/renderer-state.js';
 import { applyMode } from './ui/menu.js';
 import { hideInitialOverlay } from './ui/overlay.js';
+import { setAudioEnabled } from './audio/audio.js';
 import { loadMap } from './shared/maps.js';
 import { setClientSlot, applyLobbyState } from './ui/client-lobby.js';
 import { showScoreboard, hideScoreboard } from './ui/scoreboard.js';
@@ -78,8 +79,21 @@ const NON_FORWARDED_ACTIONS = new Set([A.MENU_TOGGLE, A.KBM_SWAP]);
  * @param {boolean} [options.forwardInput=true]
  *   Set to false for the Local DM secondary, where master sees the same
  *   physical inputs and forwarding would double-process every press.
+ * @param {boolean} [options.playAudio]
+ *   Defaults to `forwardInput` — a Local DM secondary sharing a room
+ *   with master must stay silent to avoid echo; a Network DM remote on
+ *   a separate machine plays its own audio. Override explicitly when
+ *   the heuristic doesn't fit.
  */
-export function initClient(transport, mySlot, { forwardInput = true } = {}) {
+export function initClient(transport, mySlot, {
+    forwardInput = true,
+    playAudio = forwardInput,
+} = {}) {
+    // Audio gate first — applyMode (called from onAck before this) may
+    // have already called configureAudio, but with the master switch
+    // off the renderer list is empty. Re-configure if needed.
+    if (!playAudio) setAudioEnabled(false);
+
     // Renderer in.
     new RenderClient(transport, mySlot, orchestrator.target(mySlot), orchestrator);
 

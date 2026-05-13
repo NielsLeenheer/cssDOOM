@@ -76,6 +76,10 @@ export const MSG = {
     // in sync — keeping all the attract/match-end/lobby/intermission
     // CSS gates unified under a single namespaced attribute.
     GAME_STATE: 'game-state',
+    // Master → client: world sound trigger. Carries `name` (sound asset)
+    // and `opts` ({x, y} only — UI sounds are local and never broadcast).
+    // The client's orchestrator re-plays it through its own AudioRenderers.
+    SOUND: 'sound',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

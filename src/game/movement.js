@@ -5,7 +5,7 @@
 
 import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED, PLAYER_RADIUS } from './constants.js';
 import { canMoveTo, getFloorHeightAt, getSectorAt } from './physics.js';
-import { playSound } from '../audio/audio.js';
+import { orchestrator } from '../orchestrator.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
 import * as renderer from '../renderer/index.js';
 import { inputs } from '../orchestrator.js';
@@ -166,6 +166,6 @@ function updateHeight(player) {
     // DOOM plays sfx_oof when momz < -GRAVITY*8. With gravity=1 unit/tic²,
     // that velocity is reached after falling 32 units (v²=2gh → h=8²/2=32).
     if (prevFloorHeight - player.floorHeight > 32) {
-        playSound('DSOOF');
+        orchestrator.playSound('DSOOF', { x: player.x, y: player.y });
     }
 }

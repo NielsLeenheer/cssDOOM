@@ -53,6 +53,10 @@ export class RenderClient {
             case MSG.CMD_WORLD:
                 this._dispatchWorldCommand(msg);
                 break;
+            case MSG.SOUND:
+                // Re-play through the local orchestrator → local AudioRenderers.
+                this.orchestrator.playSound(msg.name, msg.opts);
+                break;
             // Handshake / lifecycle messages are handled by a separate
             // connection manager that wraps this class.
             default:

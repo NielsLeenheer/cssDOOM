@@ -21,7 +21,7 @@ import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
 import { getFloorHeightAt } from '../physics.js';
 import * as renderer from '../../renderer/index.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { damageEnemy } from '../entities/combat.js';
 
 /**
@@ -91,7 +91,7 @@ export function checkTeleporters() {
                 renderer.createTeleportFog(departX, departZ, departY);
                 renderer.createTeleportFog(player.x, player.floorHeight, player.y);
                 renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
-                playSound('DSTELEPT');
+                orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
 
                 // Update the moving player's camera immediately so there's no
                 // frame of the old position.

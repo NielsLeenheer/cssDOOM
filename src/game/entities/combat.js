@@ -14,7 +14,7 @@ import { currentMap } from '../../shared/maps.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';
 import { hasPowerup } from '../player/pickups.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { setEnemyState } from './enemies.js';
 import { recordKill } from '../sp-stats.js';
 import * as renderer from '../../renderer/index.js';
@@ -40,7 +40,7 @@ import * as renderer from '../../renderer/index.js';
  */
 export function enemyHitscanAttack(enemy, enemyAI, targetPlayer) {
     if (!hasLineOfSight(enemy.x, enemy.y, targetPlayer.x, targetPlayer.y)) {
-        playSound(enemyAI.hitscanSound);
+        orchestrator.playSound(enemyAI.hitscanSound, { x: enemy.x, y: enemy.y });
         return;
     }
 
@@ -69,7 +69,7 @@ export function enemyHitscanAttack(enemy, enemyAI, targetPlayer) {
         }
     }
 
-    playSound(enemyAI.hitscanSound);
+    orchestrator.playSound(enemyAI.hitscanSound, { x: enemy.x, y: enemy.y });
     if (totalDamage > 0) {
         damagePlayer(targetPlayer, totalDamage, enemy);
     }
@@ -86,7 +86,7 @@ export function enemyHitscanAttackEnemy(attacker, attackerAI) {
     if (!target || target.collected) return;
 
     if (!hasLineOfSight(attacker.x, attacker.y, target.x, target.y)) {
-        playSound(attackerAI.hitscanSound);
+        orchestrator.playSound(attackerAI.hitscanSound, { x: attacker.x, y: attacker.y });
         return;
     }
 
@@ -105,7 +105,7 @@ export function enemyHitscanAttackEnemy(attacker, attackerAI) {
         }
     }
 
-    playSound(attackerAI.hitscanSound);
+    orchestrator.playSound(attackerAI.hitscanSound, { x: attacker.x, y: attacker.y });
     if (totalDamage > 0) {
         damageEnemy(target, totalDamage, attacker);
     }
@@ -232,10 +232,10 @@ export function damageEnemy(target, damage, source) {
         recordKill(target);
 
         if (target.type === 2035) {
-            playSound('DSBAREXP');
+            orchestrator.playSound('DSBAREXP', { x: target.x, y: target.y });
             barrelExplosion(target, source);
         } else {
-            playSound('DSPODTH1');
+            orchestrator.playSound('DSPODTH1', { x: target.x, y: target.y });
             // Based on: linuxdoom-1.10/p_mobj.c:P_NightmareRespawn()
             // Nightmare: enemies respawn 12 seconds after death
             if (state.skillLevel === 5 && target.ai) {
@@ -244,13 +244,13 @@ export function damageEnemy(target, damage, source) {
             // Based on: linuxdoom-1.10/p_enemy.c:A_BossDeath()
             // E1M8: when all Barons (type 3003) are dead, lower tag 666 sector floor
             if (target.type === 3003 && currentMap === 'E1M8') {
-                checkBossDeath();
+                checkBossDeath(target);
             }
         }
     } else {
         // Target survived — play pain sound (barrels have no pain sound)
         if (target.type !== 2035) {
-            playSound('DSPOPAIN');
+            orchestrator.playSound('DSPOPAIN', { x: target.x, y: target.y });
         }
 
         if (target.ai) {
@@ -282,11 +282,14 @@ export function damageEnemy(target, damage, source) {
  * Checks if all Barons of Hell are dead. If so, lowers the tag 666 sector
  * floor to open the exit on E1M8.
  */
-function checkBossDeath() {
+function checkBossDeath(lastBaron) {
     const allThings = state.things;
     for (let i = 0, len = allThings.length; i < len; i++) {
         if (allThings[i].type === 3003 && !allThings[i].collected) return;
     }
     renderer.lowerTaggedFloor(666);
-    playSound('DSPSTART');
+    // Source position: the dying boss is in the arena where the floor
+    // lowers (E1M8 layout puts them in the same room). Good enough proxy
+    // without needing to look up the tag-666 sector center.
+    orchestrator.playSound('DSPSTART', { x: lastBaron.x, y: lastBaron.y });
 }

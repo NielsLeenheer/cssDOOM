@@ -13,7 +13,7 @@ import { getFloorHeightAt, rayHitPoint } from '../physics.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';
 import { hasPowerup } from '../player/pickups.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
 import { setEnemyState } from './enemies.js';
 import { damageEnemy } from './combat.js';
 import * as renderer from '../../renderer/index.js';
@@ -89,7 +89,7 @@ export function fireWeapon(player) {
     if (weapon.ammoType) player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
     player.isFiring = true;
 
-    playSound(weapon.sound);
+    orchestrator.playSound(weapon.sound, { x: player.x, y: player.y });
 
     renderer.startFiring(player.viewportIndex);
 
@@ -117,7 +117,7 @@ export function fireWeapon(player) {
                 return;
             }
             if (weapon.ammoType) player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
-            playSound(weapon.sound);
+            orchestrator.playSound(weapon.sound, { x: player.x, y: player.y });
             checkWeaponHit(player);
             alertNearbyEnemies(player);
         }, weapon.fireRate);

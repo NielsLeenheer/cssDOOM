@@ -23,7 +23,8 @@ import { USE_RANGE, DOOR_CLOSE_DELAY } from '../constants.js';
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
 import { getSectorAt } from '../physics.js';
-import { playSound } from '../../audio/audio.js';
+import { orchestrator } from '../../orchestrator.js';
+import { sectorCenter } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 
@@ -106,7 +107,7 @@ export function toggleDoor(sectorIndex, player) {
     // Based on: linuxdoom-1.10/p_doors.c:EV_VerticalDoor()
     if (doorEntry.keyRequired && !doorEntry.open) {
         if (!player.collectedKeys.has(doorEntry.keyRequired)) {
-            playSound('DSOOF');
+            orchestrator.playSound('DSOOF', { x: player.x, y: player.y });
             return;
         }
     }
@@ -123,7 +124,8 @@ export function toggleDoor(sectorIndex, player) {
     clearTimeout(doorEntry.passableTimer);
     doorEntry.passableTimer = setTimeout(() => { doorEntry.passable = true; }, DOOR_PASSABLE_DELAY * 1000);
     renderer.setDoorState(sectorIndex, 'open');
-    playSound('DSDOROPN');
+    const openCenter = sectorCenter(sectorIndex);
+    if (openCenter) orchestrator.playSound('DSDOROPN', openCenter);
     doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
 }
 
@@ -152,7 +154,8 @@ function closeDoor(sectorIndex) {
     clearTimeout(doorEntry.passableTimer);
     doorEntry.timer = null;
     renderer.setDoorState(sectorIndex, 'closed');
-    playSound('DSDORCLS');
+    const closeCenter = sectorCenter(sectorIndex);
+    if (closeCenter) orchestrator.playSound('DSDORCLS', closeCenter);
 }
 
 /**

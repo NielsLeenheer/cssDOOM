@@ -48,6 +48,7 @@
 import { DomRenderer } from './renderer/dom-renderer.js';
 import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
+import * as audio from './audio/audio.js';
 import {
     clonePanes as clonePanesHelper,
     setMirrorMode as setMirrorModeHelper,
@@ -162,6 +163,25 @@ class Orchestrator {
     setMirrorMode(value) { setMirrorModeHelper(value); }
     isMirrorMode() { return isMirrorModeHelper(); }
     viewportsForEffect(playerIndex) { return viewportsForEffectHelper(playerIndex); }
+
+    // ── Audio dispatch ───────────────────────────────────────────────────
+
+    /**
+     * Play a sound. Game code calls this for every sound — the orchestrator
+     * decides whether to also broadcast to clients.
+     *
+     *   playSound('DSPISTOL', { x, y })   → world: local play + fan-out to sinks
+     *   playSound('DSSWTCHN', { ui: true }) → UI: centered local play, no broadcast
+     *
+     * UI sounds are local to whichever window initiated them (menu select on
+     * master plays on master only; same for a client).
+     */
+    playSound(name, opts) {
+        audio.playLocal(name, opts);
+        if (opts && !opts.ui) {
+            for (const sink of this._sinks()) sink.forwardSound(name, opts);
+        }
+    }
 
     // ── Remote-slot lifecycle ────────────────────────────────────────────
 
