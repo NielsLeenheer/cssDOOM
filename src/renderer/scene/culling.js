@@ -19,6 +19,7 @@
  */
 
 import { dom, sceneStates } from '../dom.js';
+import { rendererState } from '../renderer-state.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
 
 // Culling flags — toggled by the debug menu
@@ -471,5 +472,51 @@ export function updateCulling(player, worldThings, spectatorActive, viewportInde
     cullingStats.afterSky = cullingStats.afterFrustum - skyCulled;
 }
 
-/** How often the culling loop runs, in frames. Used by the loop owner. */
-export const CULLING_INTERVAL = 3;
+/** How often the culling loop runs, in frames. */
+const CULLING_INTERVAL = 3;
+/** Slower cadence used during attract — camera moves slowly, so we don't
+ *  need to recompute visibility every few frames. ~10 Hz at 60 Hz RAF. */
+const CULLING_INTERVAL_ATTRACT = 6;
+
+/**
+ * Start the self-running cull loop. Same code runs on master and client:
+ * on master `rendererState` aliases the live game state, on a client it's
+ * populated by inbound broadcast envelopes. The culler can't tell the
+ * difference.
+ *
+ * Iterates every populated pane each tick, reading the camera from
+ * `rendererState.cameras[i]` and the thing positions from
+ * `rendererState.things`. Empty panes (no walls built) early-exit.
+ *
+ * During attract mode the camera rotates ~12°/sec — culling falls back
+ * to ~10 Hz so the kiosk's GPU compositor isn't recomputing a
+ * vanishingly different scene every few frames.
+ *
+ * UI dependencies (attract / spectator) are injected at call time
+ * instead of imported directly — both ui modules import from
+ * shared/maps.js which imports updateCulling from this file, so
+ * importing them here would create a cycle.
+ *
+ * @param {object} hooks
+ * @param {() => boolean} hooks.isAttract           true if attract is active.
+ * @param {() => boolean} hooks.getSpectatorActive  current spectator flag.
+ */
+export function startCullingLoop({ isAttract, getSpectatorActive }) {
+    let frame = 0;
+    function tick() {
+        frame++;
+        const interval = isAttract() ? CULLING_INTERVAL_ATTRACT : CULLING_INTERVAL;
+        if (frame >= interval) {
+            frame = 0;
+            const spectator = getSpectatorActive();
+            for (let i = 0; i < sceneStates.length; i++) {
+                if (sceneStates[i].wallElements.length === 0) continue;
+                const camera = rendererState.cameras[i] || rendererState.cameras[0];
+                if (!camera) continue;
+                updateCulling(camera, rendererState.things, spectator, i);
+            }
+        }
+        requestAnimationFrame(tick);
+    }
+    requestAnimationFrame(tick);
+}
