@@ -15,11 +15,63 @@ import { recordSectorEnter } from './sp-stats.js';
 
 const wasMovingByPlayer = new Map();
 
+// ── Movement-axis smoothing ───────────────────────────────────────────
+//
+// Keyboard movement is binary on/off — pressing W jumps moveY straight
+// to 1, releasing it drops to 0. Gamepad sticks are already analog and
+// feel right. To make keyboard feel less robotic we ramp the
+// moveX/moveY axes toward the input value over ~125ms when the source
+// is digital. Detection: a value of exactly ±1 or 0 is treated as
+// digital; anything in between is analog (gamepad stick) and passes
+// through unchanged.
+//
+// Turn is intentionally NOT smoothed — keyboard tap-turns would feel
+// laggy. Mouse turn is already delta-based, naturally smooth.
+//
+// Smoothed state is per-slot and persists across frames. It resets to
+// zero whenever the player is dead or the match is in lobby so resumed
+// play starts fresh — no residual velocity carried over from a prior
+// match.
+
+const RAMP_RATE = 8; // per second — 0→1 in ~125ms
+const smoothedAxes = new Map(); // slot → { moveX, moveY }
+
+function isDigital(v) {
+    return v === 1 || v === -1 || v === 0;
+}
+
+function rampToward(current, target, dt) {
+    if (current === target) return target;
+    const step = RAMP_RATE * dt;
+    if (Math.abs(target - current) <= step) return target;
+    return current + Math.sign(target - current) * step;
+}
+
+function smoothedInputFor(player, dt) {
+    const raw = inputs[player.index];
+    let s = smoothedAxes.get(player.index);
+    if (!s) {
+        s = { moveX: 0, moveY: 0 };
+        smoothedAxes.set(player.index, s);
+    }
+    s.moveX = isDigital(raw.moveX) ? rampToward(s.moveX, raw.moveX, dt) : raw.moveX;
+    s.moveY = isDigital(raw.moveY) ? rampToward(s.moveY, raw.moveY, dt) : raw.moveY;
+    return { ...raw, moveX: s.moveX, moveY: s.moveY };
+}
+
+function resetSmoothedAxes(slot) {
+    const s = smoothedAxes.get(slot);
+    if (s) { s.moveX = 0; s.moveY = 0; }
+}
+
 export function updateMovement(player, deltaTime, timestamp) {
     // Dead players don't move — their input is gated upstream and their
     // camera drops to floor via the .renderer.dead CSS rule. Other players
     // continue updating independently.
-    if (player.isDead) return;
+    if (player.isDead) {
+        resetSmoothedAxes(player.index);
+        return;
+    }
 
     // DM lobby: claimed players can't run around the map before the
     // match formally begins (same applies in Network DM while waiting
@@ -28,21 +80,19 @@ export function updateMovement(player, deltaTime, timestamp) {
     // `player.z` resolved from `floorHeight` so the camera isn't stuck
     // below the platform during the lobby wait.
     const inLobby = isMatchLobby();
+    if (inLobby) resetSmoothedAxes(player.index);
 
-    if (!inLobby) {
-        updateLocation(player, deltaTime);
-    }
+    const input = inLobby ? null : smoothedInputFor(player, deltaTime);
+
+    if (input) updateLocation(player, deltaTime, input);
     updatePlayerFromLift(timestamp);
     updateHeight(player);
-    if (!inLobby) {
-        updateMovingState(player);
-    }
+    if (input) updateMovingState(player, input);
 }
 
-function updateLocation(player, deltaTime) {
-    const input = inputs[player.index];
-
-    // Speed modifier
+function updateLocation(player, deltaTime, input) {
+    // Speed modifier (run, turn, turnDelta come straight from the raw
+    // input — only moveX/moveY are smoothed; see smoothedInputFor above)
     const speed = input.run ? MOVE_SPEED * RUN_MULTIPLIER : MOVE_SPEED;
     const turnSpeed = input.run ? TURN_SPEED * RUN_MULTIPLIER : TURN_SPEED;
 
@@ -139,8 +189,7 @@ export function clearMovingState(player) {
     renderer.setPlayerMoving(player.viewportIndex, false);
 }
 
-function updateMovingState(player) {
-    const input = inputs[player.index];
+function updateMovingState(player, input) {
     const isMoving = input.moveX !== 0 || input.moveY !== 0;
     const wasMoving = wasMovingByPlayer.get(player.index) ?? false;
     if (isMoving !== wasMoving) {

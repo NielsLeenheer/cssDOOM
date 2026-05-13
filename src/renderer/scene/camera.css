@@ -38,8 +38,15 @@ body.head-bob {
                 calc(var(--player-z) * 1px + var(--bob, 0) * 1px),
                 calc(var(--player-y) * 1px)
             );
+        /* Animation is always on — paused by default, runs only while
+           moving. Pausing freezes at the current frame instead of
+           snapping back to base position, so stopping mid-stride no
+           longer feels jarring. Same pattern as the player billboard
+           sprite walk cycle in enemies.css. */
+        animation: head-bob 400ms ease-in-out infinite;
+        animation-play-state: paused;
     }
     .moving .scene {
-        animation: head-bob 400ms ease-in-out infinite;
+        animation-play-state: running;
     }
 }

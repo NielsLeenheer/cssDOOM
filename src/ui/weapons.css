@@ -53,8 +53,16 @@
     100%     { transform: translateX(40px)  translateY(-24px); }
 }
 
-body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
+/* Bob is always on the weapon (when not firing/switching) — paused by
+   default, runs only while moving. Pausing freezes at the current
+   frame, so stopping mid-stride no longer snaps the hand back to its
+   default position. Same pattern as the head-bob in camera.css. */
+body:not(.spectator) .renderer .weapon:not(.firing):not(.switching) {
     animation: weapon-bob 1.4s linear infinite;
+    animation-play-state: paused;
+}
+body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
+    animation-play-state: running;
 }
 
 /* ========================================================================
