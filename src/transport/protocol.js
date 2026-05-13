@@ -10,13 +10,13 @@
  *                                                 `target` is master's paneIndex
  *                                                 the sink represents
  *   { type: 'cmd-world', method, args }          world renderer command, fan-out
- *   { type: 'snapshot', levelId, state }         initial state on join (TBD)
- *   { type: 'ack', for: 'looking-for-session' }  master accepts a join
+ *   { type: 'ack', payload: { mode, level,        master accepts a join; carries
+ *                              gameState,           the snapshot a freshly-joined
+ *                              slotIndex } }       client needs to bootstrap
  *   { type: 'pong', t }                          heartbeat reply
  *
  * Client → master:
  *   { type: 'looking-for-session' }              announce on load
- *   { type: 'ready', target }                    snapshot applied, ready for deltas
  *   { type: 'leaving', target }                  graceful disconnect
  *   { type: 'action', kind, slot, deviceId, …}   logical action event already
  *                                                 interpreted by the client
@@ -29,6 +29,11 @@
  * `target` identifies which master-side pane slot the client represents.
  * Most installs only ever have one client; multi-client support is a
  * future concern.
+ *
+ * No mid-match join — every Network DM remote joins during the lobby
+ * phase, so the ACK payload is enough to bootstrap. A heavier
+ * `snapshot` envelope (door states, scores, things in flight) would
+ * only be needed for late joining, which is intentionally out of scope.
  */
 
 export const BROADCAST_CHANNEL_NAME = 'cssdoom-mp';
@@ -37,11 +42,9 @@ export const BROADCAST_CHANNEL_NAME = 'cssdoom-mp';
 export const MSG = {
     CMD_PANE: 'cmd-pane',
     CMD_WORLD: 'cmd-world',
-    SNAPSHOT: 'snapshot',
     ACK: 'ack',
     PONG: 'pong',
     LOOKING: 'looking-for-session',
-    READY: 'ready',
     LEAVING: 'leaving',
     // Remote → master: a logical action event the remote already
     // interpreted on its own event bus (FIRE_DOWN, USE, WEAPON_NEXT,

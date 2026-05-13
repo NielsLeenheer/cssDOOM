@@ -15,8 +15,8 @@
  * COMMANDS — no edits here.
  *
  * This class only handles message dispatch. Connection lifecycle
- * (announce, handshake, snapshot replay, heartbeat, disconnect) is
- * layered on top of this in [peer-connection.js](peer-connection.js).
+ * (announce, handshake, heartbeat, disconnect) is layered on top of
+ * this in [peer-connection.js](peer-connection.js).
  */
 
 import { MSG } from './protocol.js';
