@@ -455,7 +455,16 @@ export function updateCulling(player, worldThings, spectatorActive, viewportInde
         }
 
         if (!hide && skyPlanes && skyPlanes.length > 0) {
-            if (behindSkyWall(tx, ty, 0, -1, playerX, playerY, skyPlanes, skyGroupOf)) {
+            // Test against the thing's top, not z=0. behindSkyWall's
+            // height-gate (`if (z < plane.floorZ) continue`) was skipping
+            // most planes for things when z=0, leaving sprites visible
+            // behind sky boundaries. 56 ≈ DOOM enemy height — tall enough
+            // for the gate to pass for typical sprites at world floor.
+            // sectorIndex enables the same-sky-group exemption so things
+            // standing in outdoor sky-sector areas don't get culled by
+            // their own sky perimeter.
+            const tz = (gameEntry?.floorHeight ?? 0) + 56;
+            if (behindSkyWall(tx, ty, tz, t.sectorIndex ?? -1, playerX, playerY, skyPlanes, skyGroupOf)) {
                 hide = true; skyCulled++;
             }
         }

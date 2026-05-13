@@ -376,7 +376,7 @@ export function createPlayerSprite(thingIndex, playerIndex, x, y, floorHeight, s
         }
 
         sState.thingDom.set(thingIndex, { element: container, sprite });
-        sState.thingContainers.push({ element: container, x, y, gameId: thingIndex });
+        sState.thingContainers.push({ element: container, x, y, sectorIndex, gameId: thingIndex });
     }
 }
 

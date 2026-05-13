@@ -54,8 +54,8 @@ export function buildThing(spec) {
 
     if (spec.gameId !== undefined) {
         sceneState.thingDom.set(spec.gameId, { element: thingContainer, sprite: spriteElement });
-        sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, gameId: spec.gameId });
+        sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, sectorIndex: spec.sectorIndex, gameId: spec.gameId });
     } else {
-        sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y });
+        sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, sectorIndex: spec.sectorIndex });
     }
 }
