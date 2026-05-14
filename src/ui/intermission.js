@@ -248,3 +248,28 @@ function levelNameSpriteSrc(mapName) {
     const idx = Number(match[1]) - 1;
     return `${LABEL_BASE}/WILV0${idx}.png`;
 }
+
+// ── L2.7 renderer-command entry points ─────────────────────────────────
+// Game pushes showIntermission / hideIntermission through the
+// orchestrator (see src/renderer/commands.js). renderIntermission is
+// a thin wrapper that delegates to the existing showIntermission with
+// a no-op advance callback — today's switches.js still calls the full
+// showIntermission with a real loadMap callback, and switches.js's
+// call ran later in the synchronous emit/branch chain (the emit fires
+// before the SP/DM branching in switches.js), so its callback wins.
+// Game's path renders harmlessly-redundant DOM until L4 cuts over.
+
+/** Renderer-command impl for showIntermission. Game pushes this after
+ *  receiving Level's `level-complete` event in SP. The body re-uses the
+ *  full overlay flow but installs no callback — switches.js still
+ *  controls the dismiss-and-advance path until L4. */
+export function renderIntermission(payload) {
+    showIntermission(payload?.nextMap ?? null, () => {});
+}
+
+/** Renderer-command impl for hideIntermission. Mirrors the existing
+ *  hideIntermission tear-down without depending on a particular
+ *  caller. */
+export function clearIntermission() {
+    hideIntermission();
+}

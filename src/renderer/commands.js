@@ -62,6 +62,7 @@ import {
 // logic but the command surface here stays.
 import * as lobbyOverlay from '../ui/lobby.js';
 import * as networkLobbyOverlay from '../ui/network-lobby.js';
+import * as intermissionOverlay from '../ui/intermission.js';
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -199,6 +200,20 @@ export const COMMANDS = {
             lobbyOverlay.clearLobby();
             networkLobbyOverlay.clearLobby();
         },
+    },
+
+    // ── World: intermission overlay (L2.7) ────────────────────────────────
+    // Driven by Game._onLevelComplete (showIntermission for SP) and
+    // Game.advance (hideIntermission). World-kind matches the lobby
+    // commands so master fans the visual to clients via sinks; SP has
+    // no clients today but the channel exists for future co-op.
+    showIntermission: {
+        kind: 'world',
+        impl: (payload) => intermissionOverlay.renderIntermission(payload),
+    },
+    hideIntermission: {
+        kind: 'world',
+        impl: () => intermissionOverlay.clearIntermission(),
     },
 };
 

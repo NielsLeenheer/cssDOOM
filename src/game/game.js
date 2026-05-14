@@ -175,7 +175,25 @@ export class Game {
         this._emit('match-restarted', { mapCursor: this.mapCursor });
     }
 
-    advance()            { /* L2.7 */ }
+    /**
+     * SP intermission dismiss — INTERMISSION → LOADING + load next map.
+     * Game pushes hideIntermission via orchestrator, advances mapCursor
+     * to the pending next map (captured by _onLevelComplete), then
+     * delegates to beginPlay() for the construct-load-start sequence.
+     *
+     * Today's gates.js still calls intermission.js::dismissIntermission
+     * which invokes switches.js's loadMap callback; advance() is the
+     * parallel future path that gates.js will call once L4 cuts over.
+     * Dead code until a caller wires it.
+     */
+    async advance() {
+        orchestrator.hideIntermission();
+        if (this._pendingNextMap) {
+            this.mapCursor = this._pendingNextMap;
+            this._pendingNextMap = null;
+        }
+        await this.beginPlay();
+    }
 
     on(event, handler) {
         if (!this._listeners.has(event)) this._listeners.set(event, new Set());
@@ -228,7 +246,12 @@ export class Game {
      */
     _onLevelComplete(payload) {
         if (this.gameMode === 'singleplayer') {
+            // Stash the next map so advance() can pick it up when the
+            // user dismisses the intermission overlay. switches.js
+            // still owns the actual dismiss-and-loadMap path until L4.
+            this._pendingNextMap = payload?.nextMap ?? null;
             this._transitionTo('INTERMISSION');
+            orchestrator.showIntermission(payload);
         } else {
             this._transitionTo('RESULTS');
         }
