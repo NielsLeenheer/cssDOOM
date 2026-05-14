@@ -28,6 +28,7 @@ import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
+import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
 export class Game {
     constructor(modeConfig) {
@@ -88,9 +89,50 @@ export class Game {
             slots: this.roster,
             mapCursor: this.mapCursor,
         });
+
+        // Subscribe to device→slot claim changes so Local DM
+        // auto-starts when both slots are claimed. _checkAutoStart
+        // is mode-gated (Local DM only) and state-gated (LOBBY
+        // only — so the subscription is harmless after Game.stop
+        // marks _state ENDED).
+        //
+        // claim-registry's onClaimChange currently has no
+        // unsubscribe API; multiple Games over a session each
+        // accumulate a subscription. The state-gate keeps stale
+        // subscriptions inert (they bail before doing anything).
+        //
+        // SP doesn't need this — start() drops straight into
+        // beginPlay below. Network DM uses host-fire-start via the
+        // NETWORK_START gate, not all-claimed auto-start.
+        onClaimChange(() => this._checkAutoStart());
+
         if (this.gameMode === 'singleplayer') {
             await this.beginPlay();
         }
+    }
+
+    /**
+     * Local DM auto-start trigger. Subscribed to claim-registry
+     * onClaimChange in start(). Guards:
+     *   - _state must still be LOBBY (no-op after stop / once
+     *     beginPlay has fired).
+     *   - mode must be Local DM (SP starts via start()'s SP branch;
+     *     Network DM uses host-fire).
+     *   - All slots in the roster must be claimed (local OR remote
+     *     — the registry tracks both via isSlotClaimedLocally and
+     *     external slot sets owned by network code, but Local DM
+     *     only has local claims).
+     */
+    _checkAutoStart() {
+        if (this._state !== 'LOBBY') return;
+        if (this.gameMode !== 'deathmatch') return;
+        if (this.networkMode !== 'standalone') return;
+
+        for (let i = 0; i < this.roster.length; i++) {
+            if (!isSlotClaimedLocally(i)) return;
+        }
+
+        this.beginPlay();
     }
     pause()              { /* L5 */ }
     resume()             { /* L5 */ }
