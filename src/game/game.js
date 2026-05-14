@@ -28,7 +28,7 @@ import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
-import { resetMatch } from './match.js';
+import { resetMatch, startMatch } from './match.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
 export class Game {
@@ -109,7 +109,41 @@ export class Game {
 
         if (this.gameMode === 'singleplayer') {
             await this.beginPlay();
+            return;
         }
+
+        if (this.gameMode === 'deathmatch' && this.networkMode === 'standalone') {
+            // §3b Local DM: construct + load Level immediately so the
+            // lobby UI sits on top of a loaded paused scene rather
+            // than on an empty pane. beginPlay later just calls
+            // level.start() — skipping the LOADING phase per the
+            // §3b happy path.
+            await this._preloadLevel();
+            return;
+        }
+
+        // Network DM (host): no preload. Level constructs on
+        // host-fire-start (L6 wiring).
+    }
+
+    /**
+     * Construct + load this.mapCursor's Level and leave it paused.
+     * Used by start()'s Local DM branch and (if added later) by
+     * post-restart preload so the next match's lobby also sits on
+     * top of a loaded world. Idempotent — calling when this.level
+     * already exists is a no-op.
+     */
+    async _preloadLevel() {
+        if (this.level) return;
+        this.level = new Level({
+            map: this.mapCursor,
+            players: this.roster,
+            rules: this.rules,
+            orchestrator,
+        });
+        this._subscribeLevel(this.level);
+        await this.level.load();
+        _setCurrentLevel(this.level);
     }
 
     /**
@@ -230,18 +264,37 @@ export class Game {
      */
     async beginPlay() {
         orchestrator.hideLobby();
-        this._transitionTo('LOADING');
-        this.level = new Level({
-            map: this.mapCursor,
-            players: this.roster,
-            rules: this.rules,
-            orchestrator,
-        });
-        this._subscribeLevel(this.level);
-        await this.level.load();
+
+        if (!this.level) {
+            // Network DM / fallback (preload missed for some reason):
+            // construct + load now. LOBBY → LOADING → PLAYING.
+            this._transitionTo('LOADING');
+            this.level = new Level({
+                map: this.mapCursor,
+                players: this.roster,
+                rules: this.rules,
+                orchestrator,
+            });
+            this._subscribeLevel(this.level);
+            await this.level.load();
+            _setCurrentLevel(this.level);
+        }
+        // Local DM happy path lands here with this.level already
+        // preloaded by start() — direct LOBBY → PLAYING, no LOADING
+        // splash, per §3b.
+
         this.level.start();
-        _setCurrentLevel(this.level);
         this._transitionTo('PLAYING');
+
+        // Sync legacy game-state.js → ACTIVE so the body's
+        // `data-game-state="lobby"` flips to "active" and CSS-driven
+        // overlays (lobby press-to-claim prompts, etc.) hide. Until
+        // L7 retires game-state.js, Game must drive both state
+        // machines. startMatch is a no-op for SP (early-returns when
+        // state.match is null).
+        if (this.gameMode === 'deathmatch') {
+            startMatch();
+        }
     }
 
     /**
