@@ -29,22 +29,19 @@
  *        - DOOM Z (height)      → CSS -Y axis (positive here because CSS Y
  *          points down, but the state already stores the negated value)
  *
- * Per-player: each pane has its own `.viewport` element that owns its own
- * `--player-x/y/z/floor/angle` custom properties. updateCamera(player) writes
- * those properties on dom.viewports[player.viewportIndex] so each pane reads
- * its own values via CSS variable inheritance.
+ * Per-renderer: each renderer owns a `.viewport` element. updateCamera writes
+ * its `--player-x/y/z/floor/angle` custom properties so the scene transform
+ * reads its own values via CSS variable inheritance.
  */
-
-import { dom } from '../dom.js';
 
 /**
  * Pushes the given player's position and viewing angle to CSS custom
- * properties on that player's viewport element. The CSS transform on the
- * pane's `.scene` reads these properties to compute the inverse camera
- * transform each frame.
+ * properties on the renderer's viewport element. The CSS transform on
+ * the pane's `.scene` reads these properties to compute the inverse
+ * camera transform each frame.
  */
-export function updateCamera(player, viewportIndex = player.viewportIndex) {
-    const viewportStyle = dom.viewports[viewportIndex].style;
+export function updateCamera(renderer, player) {
+    const viewportStyle = renderer.viewportEl.style;
 
     // Horizontal position along the east-west axis
     viewportStyle.setProperty('--player-x', player.x);
@@ -63,8 +60,9 @@ export function updateCamera(player, viewportIndex = player.viewportIndex) {
 
     // Toggle firing class on player marker for spectator mode visual feedback.
     // Spectator is single-player only (will be disabled in DM), so reading
-    // player 0's firing flag here is correct.
-    const marker = document.querySelector('#player > .marker');
+    // player 0's firing flag here is correct. Each renderer has its own
+    // marker (built into its own scene fragment), so query within it.
+    const marker = renderer.sceneEl.querySelector('#player > .marker');
     if (marker) {
         marker.classList.toggle('firing', player.isFiring);
     }

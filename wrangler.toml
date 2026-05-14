@@ -1,8 +1,45 @@
 name = "doomcss"
+main = "worker/index.js"
 compatibility_date = "2025-11-01"
 
 [assets]
 directory = "./dist"
+binding = "ASSETS"
 
 [build]
 command = "npm run build"
+
+# ── Network DM signaling — one Durable Object per room, ephemeral ──
+# Holds WebSockets from master + joining remotes, relays WebRTC
+# offer / answer / ICE candidates between them. No persistent storage
+# (pure in-memory state inside the DO). Uses the Hibernation API so
+# idle WebSockets don't accrue compute duration billing.
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "RoomDO"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomDO"]
+
+# ── Staging environment ──────────────────────────────────────────────
+# Deployed as a separate Worker named `doomcss-staging`. Inherits the
+# top-level `main`, `compatibility_date`, `build`, and `migrations`.
+# Has its own assets binding and DO binding — meaning DO state in
+# staging is completely isolated from production. A room created in
+# staging does NOT exist in production, and vice versa.
+#
+# Deploy: `wrangler deploy --env staging`
+# URL:    `doomcss-staging.<account>.workers.dev`
+
+[env.staging]
+name = "doomcss-staging"
+
+[env.staging.assets]
+directory = "./dist"
+binding = "ASSETS"
+
+[[env.staging.durable_objects.bindings]]
+name = "ROOMS"
+class_name = "RoomDO"

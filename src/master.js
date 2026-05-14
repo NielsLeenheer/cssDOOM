@@ -23,14 +23,16 @@
  */
 
 import { state } from './game/state.js';
-import { mapData, currentMap } from './shared/maps.js';
+import { mapData, currentMap, addPlayerThing } from './shared/maps.js';
 import { updateGame } from './game/index.js';
 import { loadMap } from './shared/maps.js';
 import { updateCamera, updateHud } from './renderer/index.js';
-import { sceneStates } from './renderer/dom.js';
 import { startCullingLoop } from './renderer/scene/culling.js';
 import { updatePerspective } from './renderer/scene/scene.js';
-import { updateMenuSelection, loadSavedMode, applyMode } from './ui/menu.js';
+import { updateMenuSelection } from './ui/menu.js';
+import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
+import { spawnPlayer } from './game/player/spawn.js';
+import { configureAudio } from './audio/audio.js';
 import { hideInitialOverlay } from './ui/overlay.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
@@ -42,6 +44,10 @@ import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
 import { isSlotClaimedLocally, onClaimChange } from './input/claim-registry.js';
 import { MasterConnection } from './transport/peer-connection.js';
+import { BroadcastChannelTransport } from './transport/transport.js';
+import { BROADCAST_CHANNEL_NAME } from './transport/protocol.js';
+import { setMasterConnection } from './network-host.js';
+import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
 import { isMatchLobby, setMatchEndBroadcaster } from './game/match.js';
@@ -65,23 +71,16 @@ window.debug = function () {
 // ── Render-all-panes ───────────────────────────────────────────────────
 
 /**
- * Render every pane. Pane index i uses state.players[i] when present;
- * panes beyond the player count (mirror mode) fall back to player 0.
- *
- * No `wallElements.length === 0` early-exit here even though some panes
- * may be empty (SP's pane 1, or DM's pane 1 after client teardown):
- * updateCamera / updateHud are routed through the orchestrator, and the
- * orchestrator's per-pane target may be a RenderSink that needs to
- * forward to a client regardless of local DOM state. Skipping here
- * would starve the sink. Writing CSS variables on a hidden / empty pane
- * is harmless.
+ * Push each player's camera + HUD through the orchestrator. The
+ * orchestrator's per-player dispatch fans the call to every render
+ * target (DomRenderer or RenderSink) whose `playerIndex` matches —
+ * mirror SP fans player 0 to both panes, DM splits, Network DM
+ * forwards via the sink to the client.
  */
 function renderAllActivePanes() {
-    for (let i = 0; i < sceneStates.length; i++) {
-        const player = state.players[i] || state.players[0];
-        if (!player) continue;
-        updateHud(player, i);
-        updateCamera(player, i);
+    for (const player of state.players) {
+        updateHud(player, player.viewportIndex);
+        updateCamera(player, player.viewportIndex);
     }
 }
 
@@ -122,10 +121,8 @@ function gameLoop(timestamp) {
     // alive player keeps playing; the dead player's camera shows the
     // death-cam view at their corpse until they fire to respawn.
     if (state.players.every(p => p.isDead)) {
-        for (let i = 0; i < sceneStates.length; i++) {
-            const player = state.players[i] || state.players[0];
-            if (!player) continue;
-            updateCamera(player, i);
+        for (const player of state.players) {
+            updateCamera(player, player.viewportIndex);
         }
         requestAnimationFrame(gameLoop);
         return;
@@ -167,14 +164,14 @@ function setupMasterBroadcast() {
     });
 
     masterConnection = new MasterConnection({
-        snapshotProvider: () => ({
-            mode: state.mode,
+        snapshotProvider: (peerKey) => ({
+            gameMode: state.gameMode,
             level: pendingLevel ?? currentMap,
             gameState: getGameState(),
-            slotIndex: orchestrator.nextOrCurrentRemoteSlot(),
+            slotIndex: orchestrator.nextOrCurrentRemoteSlot(peerKey),
         }),
-        onRemoteInput: applyRemoteInput,
-        onJoin: (payload) => {
+        onRemoteInput: (msg, _peerKey) => applyRemoteInput(msg),
+        onJoin: (payload, peerKey) => {
             const slot = payload.slotIndex;
             if (slot == null) {
                 console.warn('[broadcast] client join refused — no free slots');
@@ -183,16 +180,77 @@ function setupMasterBroadcast() {
             // Don't mark slot as externally claimed: the Local DM secondary
             // is display-only, master's local kbm-B / gamepad must still
             // be able to claim it. (Network DM will revisit.)
-            orchestrator.bindRemoteSlot(slot, masterConnection.channel);
+            const transport = masterConnection.transportFor(peerKey);
+            // suppressAudio mirrors the peer's playsAudioLocally flag —
+            // when the remote plays its own audio on its own device,
+            // master skips that slot's listener to avoid double-playing.
+            // Default false matches Local DM (secondary calls
+            // setAudioEnabled(false), so master keeps playing both slots).
+            const suppressAudio = masterConnection.playsAudioLocallyFor(peerKey);
+            orchestrator.bindRemoteSlot(slot, transport, peerKey, { suppressAudio });
+            // Mirror the connection into the network lobby UI when we're
+            // in network mode and this is an actual remote (not the
+            // Local DM 'local' BroadcastChannel peer).
+            if (state.networkMode === 'host' && peerKey !== 'local') {
+                setNetworkSlotState(slot, { occupant: 'remote' });
+            }
             // Send current lobby state right away so the freshly-
             // connected client's pane shows the correct prompt
             // immediately (instead of waiting for the next claim event).
             broadcastLobbyState();
         },
-        onLeave: () => {
-            orchestrator.unbindRemoteSlot();
+        onReady: (peerKey) => {
+            // Client has confirmed its RenderClient is subscribed. NOW
+            // it's safe to spawn the player and fire the initial-state
+            // burst — the switchWeapon / createPlayerSprite world
+            // commands these produce land on a listening transport.
+            if (state.networkMode !== 'host' || peerKey === 'local') return;
+            const slot = orchestrator.currentRemoteSlot(peerKey);
+            if (slot == null) return;
+            ensurePlayerCount(slot + 1);
+            const player = state.players[slot];
+            spawnPlayer(player);
+            addPlayerThing(player);
+            // Reflect the new roster size in audio listener config — a
+            // fresh AudioRenderer for the new slot if needed.
+            configureAudio(state.players.length);
+        },
+        onLeave: (peerKey) => {
+            // Capture the slot before unbinding — the orchestrator
+            // forgets the peer after unbindRemoteSlot, and we need
+            // the slot index to clear its row in the network lobby UI.
+            const slot = orchestrator.currentRemoteSlot(peerKey);
+            orchestrator.unbindRemoteSlot(peerKey);
+            if (state.networkMode === 'host' && peerKey !== 'local' && slot != null) {
+                // Mark the departed player as dead + collected so they
+                // drop out of the visible world (no sprite, no collision)
+                // but their state.players entry and scoreboard row stay
+                // until match end. A reconnect at the same slot would
+                // reuse the same Player and re-spawn them.
+                const player = state.players[slot];
+                if (player) {
+                    player.isDead = true;
+                    if (player.thingRef) player.thingRef.collected = true;
+                }
+                setNetworkSlotState(slot, { occupant: 'empty' });
+                // Re-broadcast so any still-connected joiners drop
+                // the departed peer's row to "WAITING FOR PLAYER".
+                broadcastLobbyState();
+            }
         },
     });
+
+    // Hand the MasterConnection to the network-host module so its
+    // openRoom() / closeRoom() (driven by applyMode in menu.js) can
+    // wire signaling peers into it.
+    setMasterConnection(masterConnection);
+
+    // Register the Local DM secondary as a peer. The BroadcastChannel
+    // transport is constructed here (not inside MasterConnection) so the
+    // connection itself is transport-agnostic — Network DM peers are
+    // added the same way, each with their own WebRTCDataChannelTransport.
+    const localTransport = new BroadcastChannelTransport(BROADCAST_CHANNEL_NAME);
+    masterConnection.addPeer(localTransport, 'local');
 
     // Mirror master's lobby state onto any connected client. Fires on
     // every local claim add/remove (via the orchestrator's claim notify)
@@ -229,6 +287,10 @@ function broadcastLobbyState() {
         inLobby: isMatchLobby(),
         slotsClaimed,
         slotsCarriedOver,
+        // Network DM joiners mirror the 4-slot list from this; Local
+        // DM clients ignore the field (their lobby uses the per-pane
+        // data-claim-state attribute fed from slotsClaimed).
+        slotOccupants: getNetworkSlotOccupants(),
     });
 }
 
@@ -277,7 +339,7 @@ export async function initMaster({ isKiosk = false } = {}) {
     // Restore the previously chosen mode (default singleplayer) before the
     // initial map load so the scene is built with the right pane count and
     // DM gets player 2 + match state from the first frame.
-    applyMode(isKiosk ? 'deathmatch' : loadSavedMode());
+    applyMode(isKiosk ? 'deathmatch' : loadSavedGameMode(), 'standalone');
 
     await loadMap('E1M1');
     startCullingLoop({

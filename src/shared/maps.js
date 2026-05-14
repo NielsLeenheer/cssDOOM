@@ -15,8 +15,7 @@ import { EYE_HEIGHT, PLAYER_RADIUS } from '../game/constants.js';
 export const MAPS = ['E1M1', 'E1M2', 'E1M3', 'E1M4', 'E1M5', 'E1M6', 'E1M7', 'E1M8', 'E1M9'];
 import { state } from '../game/state.js';
 import { transitionToLevel, resetGameState } from '../game/player/damage.js';
-import { teardownScene, buildScene, isMirrorMode } from '../renderer/scene/scene.js';
-import { sceneStates } from '../renderer/dom.js';
+import { domRenderers } from '../renderer/dom.js';
 import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
 import { buildSectorAdjacency } from '../game/sound-propagation.js';
 import { getSectorAt } from '../game/physics.js';
@@ -74,28 +73,28 @@ export async function loadMap(name) {
     }
 
     if (!isInitialLoad) {
-        // Tear down old scene and yield to the browser so iOS Safari can
-        // release GPU-backed texture memory before we allocate new elements.
-        teardownScene();
+        // Tear down every renderer's scene and yield to the browser so
+        // iOS Safari can release GPU-backed texture memory before the
+        // next loadMap allocates new elements.
+        for (const r of domRenderers) r.clear();
         clearSpatialGrid();
         await new Promise(r => setTimeout(r, 100));
     }
 
-    // Build static renderer geometry (sectors/walls/floors/ceilings/player).
-    await buildScene();
-
-    // Game-side init that mutates state.* and issues per-entity renderer
-    // commands (initThings → renderer.buildThing, initDoors → renderer.buildDoor,
-    // etc). All of this must run on pane 0 before cloning to other panes.
+    // Game-side level init: mutates state.* (state.things, state.doorState,
+    // state.liftState, state.crusherState), annotates mapData with the
+    // render specs that buildScene reads (mapData.thingRenderSpecs,
+    // door.trackWalls). No renderer commands fire here.
     initThings();
     initDoors();
     initLifts();
     initCrushers();
 
-    // Now pane 0 has its complete DOM (statics + things + mechanics).
-    // Clone it to the remaining panes if we have any.
-    const paneCount = isMirrorMode() ? sceneStates.length : state.players.length;
-    renderer.clonePanes(paneCount);
+    // Build every local renderer's scene independently. The `domRenderers`
+    // registry already reflects what this window needs (1 in SP, 2 in
+    // mirror SP / DM, 1 on a non-kiosk client, etc.) — boot / mode-switch
+    // code constructs and destroys to match.
+    await Promise.all(domRenderers.map(r => r.loadMap()));
 
     // Game-side post-build: spatial grid (needs state.things), player thing
     // entries (creates player billboards via renderer command), sound graph.
@@ -108,11 +107,14 @@ export async function loadMap(name) {
     // Initial render pass — primes camera transforms and runs culling once
     // synchronously so the browser doesn't have to composite the entire
     // level on the first frame. spectatorActive is false at scene-build
-    // time (the toggle is user-driven and only fires after init).
-    for (let i = 0; i < paneCount; i++) {
-        const player = state.players[i] || state.players[0];
-        renderer.updateCamera(player, i);
-        updateCulling(player, state.things, false, i);
+    // time (the toggle is user-driven and only fires after init). The
+    // orchestrator's per-player dispatch fans updateCamera to all
+    // renderers with matching playerIndex (covers mirror SP for free).
+    for (const player of state.players) {
+        renderer.updateCamera(player, player.viewportIndex);
+    }
+    for (const r of domRenderers) {
+        updateCulling(r, state.things, false);
     }
 
     // Drop camera from intro height to eye level after scene is ready —
@@ -146,7 +148,7 @@ export async function loadMap(name) {
  * updateHeight() frame will resample to the actual sector floor.
  */
 function applyPlayerStart() {
-    if (state.mode === 'deathmatch') {
+    if (state.gameMode === 'deathmatch') {
         applyDeathmatchStarts();
     } else {
         applySinglePlayerStart();
@@ -192,36 +194,43 @@ function applyDeathmatchStarts() {
 }
 
 /**
- * Pushes a thing entry into state.things for every active player. Lets
- * physics.canMoveTo's solid-thing loop see the player as a collider (skipped
- * via excludeThing for the moving player), and lets hitscan/projectile/AI
- * code treat the player as a damageable target. Each entry's x/y is synced
- * from player.x/y by movement.js after each position update.
+ * Push a single player's thing entry into state.things and create their
+ * billboard sprite in every renderer. Idempotent — calling twice for the
+ * same player is a no-op (re-uses the existing thingRef).
+ *
+ * Lets physics.canMoveTo's solid-thing loop see the player as a collider
+ * (skipped via excludeThing for the moving player), and lets hitscan /
+ * projectile / AI code treat the player as a damageable target. Each
+ * entry's x/y is synced from player.x/y by movement.js after each
+ * position update.
  */
+export function addPlayerThing(player) {
+    if (player.thingRef) return;
+    const sector = getSectorAt(player.x, player.y);
+    const sectorIndex = sector?.sectorIndex;
+    const thingRef = {
+        kind: 'player',
+        player,
+        x: player.x,
+        y: player.y,
+        floorHeight: player.floorHeight,
+        // Convert the player's north-convention angle (player.angle:
+        // 0=north) to the thing facing convention (atan2 east-radians:
+        // 0=east) for updateEnemyRotation's billboard math.
+        facing: Math.PI / 2 + player.angle,
+        type: -1,
+        solidRadius: PLAYER_RADIUS,
+        collected: player.isDead || false,
+    };
+    const thingIndex = state.things.length;
+    state.things.push(thingRef);
+    player.thingRef = thingRef;
+    player.thingIndex = thingIndex;
+    renderer.createPlayerSprite(thingIndex, player.index, player.x, player.y, player.floorHeight, sectorIndex);
+}
+
 function addPlayerThings() {
-    for (const player of state.players) {
-        const sector = getSectorAt(player.x, player.y);
-        const sectorIndex = sector?.sectorIndex;
-        const thingRef = {
-            kind: 'player',
-            player,
-            x: player.x,
-            y: player.y,
-            floorHeight: player.floorHeight,
-            // Convert the player's north-convention angle (player.angle:
-            // 0=north) to the thing facing convention (atan2 east-radians:
-            // 0=east) for updateEnemyRotation's billboard math.
-            facing: Math.PI / 2 + player.angle,
-            type: -1,
-            solidRadius: PLAYER_RADIUS,
-            collected: player.isDead || false,
-        };
-        const thingIndex = state.things.length;
-        state.things.push(thingRef);
-        player.thingRef = thingRef;
-        player.thingIndex = thingIndex;
-        renderer.createPlayerSprite(thingIndex, player.index, player.x, player.y, player.floorHeight, sectorIndex);
-    }
+    for (const player of state.players) addPlayerThing(player);
 }
 
 export function getNextMap() {

@@ -5,39 +5,17 @@
  */
 
 import { culling, cullingStats, debugSkyTrace } from '../renderer/scene/culling.js';
-import { sceneState } from '../renderer/dom.js';
 import { state, debug } from '../game/state.js';
 import { EYE_HEIGHT } from '../game/constants.js';
 import { THING_NAMES } from '../renderer/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
-import { updateCamera } from '../renderer/scene/camera.js';
-import { setMirrorMode } from '../renderer/scene/scene.js';
+import { updateCamera } from '../renderer/index.js';
+import { domRenderers } from '../renderer/dom.js';
 import { mapData, currentMap, loadMap, getNextMap } from '../shared/maps.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { endMatch } from '../game/match.js';
 import { enterAttract } from './attract.js';
 import { showIntermission } from './intermission.js';
-
-/**
- * Debug: enable a pane-1 mirror — clones pane 0's scene tree into pane 1 and
- * shows both panes side by side, both rendering player 0's view. Used to
- * visually verify the two-pane rendering before Phase 4 lights up an actual
- * second player. Reload the map to apply (cleanest path); or call
- * disablePane1Mirror() to undo.
- */
-window.enablePane1Mirror = async function () {
-    setMirrorMode(true);
-    document.body.dataset.mode = 'deathmatch';
-    await loadMap(currentMap);
-    console.log('Pane 1 mirror enabled. Reload or call disablePane1Mirror() to undo.');
-};
-
-window.disablePane1Mirror = async function () {
-    setMirrorMode(false);
-    document.body.dataset.mode = 'singleplayer';
-    await loadMap(currentMap);
-    console.log('Pane 1 mirror disabled.');
-};
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 
@@ -386,8 +364,10 @@ export function initDebugMenu() {
         checkbox.addEventListener('change', () => {
             document.body.classList.toggle(toggle.name, checkbox.checked);
             if (toggle.name === 'show-wall-ids') {
-                for (const el of sceneState.wallElements) {
-                    el.textContent = checkbox.checked ? (el.id || '') : '';
+                for (const r of domRenderers) {
+                    for (const el of r.sceneState.wallElements) {
+                        el.textContent = checkbox.checked ? (el.id || '') : '';
+                    }
                 }
             }
         });

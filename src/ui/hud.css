@@ -164,13 +164,13 @@
    the matching DOOM STFB sprite. P0 keeps the default STFB0 (green). The
    STBAR layer is repeated here to preserve the layered background-image
    stack (face backdrop on top, status-bar slice beneath). */
-body[data-mode="deathmatch"] .pane[data-player="1"] .hud-section-face {
+body[data-game-mode="deathmatch"] .pane[data-player="1"] .hud-section-face {
     background-image: url('/assets/hud/STFB3.png'), url('/assets/hud/STBAR.png');
 }
-body[data-mode="deathmatch"] .pane[data-player="2"] .hud-section-face {
+body[data-game-mode="deathmatch"] .pane[data-player="2"] .hud-section-face {
     background-image: url('/assets/hud/STFB1.png'), url('/assets/hud/STBAR.png');
 }
-body[data-mode="deathmatch"] .pane[data-player="3"] .hud-section-face {
+body[data-game-mode="deathmatch"] .pane[data-player="3"] .hud-section-face {
     background-image: url('/assets/hud/STFB2.png'), url('/assets/hud/STBAR.png');
 }
 
@@ -245,8 +245,8 @@ body[data-mode="deathmatch"] .pane[data-player="3"] .hud-section-face {
    we hide the arms section so the FRAG label is visible. */
 .hud-section-frags { display: none; }
 
-body[data-mode="deathmatch"] .hud-section-arms { display: none; }
-body[data-mode="deathmatch"] .hud-section-frags { display: block; }
+body[data-game-mode="deathmatch"] .hud-section-arms { display: none; }
+body[data-game-mode="deathmatch"] .hud-section-frags { display: block; }
 
 /* DM frags counter — two-digit STBIG number with optional leading minus.
    text-align:right inside a 2-char-wide slot keeps single digits in the
@@ -409,7 +409,7 @@ body[data-mode="deathmatch"] .hud-section-frags { display: block; }
 /* Show only when this pane's player is dead AND we're in deathmatch.
    Fades in after a 2-second delay matching the respawn cooldown so the
    prompt appears exactly when fire is allowed to respawn. */
-body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
+body[data-game-mode="deathmatch"] .renderer.dead .respawn-prompt {
     display: flex;
     animation: respawn-prompt-fade-in 0.4s ease-out 2s forwards;
 }
@@ -464,7 +464,7 @@ body[data-mode="deathmatch"] .renderer.dead .respawn-prompt {
    calls resetMatch() (so the next walk-up starts on a fresh roster),
    which re-enters lobby state and re-paints data-claim-state — without
    the :not gate the prompts would render on top of the attract loop. */
-body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="prompting"] .join-prompt {
+body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="prompting"] .join-prompt {
     display: flex;
 }
 
@@ -472,22 +472,22 @@ body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-s
    formally started yet (still waiting on later panes). The bound player
    can move around in warmup; the READY overlay sits on top so the user
    knows the join took. */
-body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="ready"] .join-ready {
+body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="ready"] .join-ready {
     display: flex;
 }
 
 /* "waiting" — this pane is later in the sequence than the one currently
    prompting. Dim it out so attention focuses on the prompting pane.
    Suppressed during attract for the same reason as the join overlays. */
-body[data-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="waiting"] {
+body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="waiting"] {
     filter: brightness(0.3);
 }
 
 /* Hide HUD numbers in any non-active lobby state — there's no player
    stats to show until the match actually starts. */
-body[data-mode="deathmatch"] .pane[data-claim-state="prompting"] .hud .status,
-body[data-mode="deathmatch"] .pane[data-claim-state="ready"] .hud .status,
-body[data-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
+body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .hud .status,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .hud .status,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
     visibility: hidden;
 }
 
@@ -748,7 +748,7 @@ body[data-game-state="intermission"] .pane-intermission {
     pointer-events: none;
 }
 
-body[data-mode="deathmatch"][data-timer-active="true"] .pane-timer {
+body[data-game-mode="deathmatch"][data-timer-active="true"] .pane-timer {
     display: block;
 }
 
@@ -836,14 +836,16 @@ body[data-game-state="attract"] #menu-button {
 body.kiosk .pane-attract,
 body.kiosk .pane-win,
 body.kiosk .pane-intermission,
-body.kiosk .pane-timer {
+body.kiosk .pane-timer,
+body.kiosk .pane-network-lobby {
     position: absolute;
 }
 
-body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
-body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-win,
-body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
-body[data-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-timer {
+body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
+body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-win,
+body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
+body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-timer,
+body[data-network-mode="host"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-network-lobby {
     display: none;
 }
 

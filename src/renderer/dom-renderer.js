@@ -1,36 +1,143 @@
 /**
- * DomRenderer — represents one pane's renderer target.
+ * DomRenderer — one rendering unit, one pane, one player's view.
  *
- * Per-pane methods are generated from the command registry
- * ([commands.js](commands.js)) at module load. Each becomes a thin shim
- * that calls the registered impl with `this.paneIndex` baked in:
+ * Each DomRenderer owns:
  *
- *     domRenderer.triggerFlash('damage')
- *       → COMMANDS.triggerFlash.impl(this.paneIndex, 'damage')
- *       → effects.triggerFlash(this.paneIndex, 'damage')
+ *   - Its DOM subtree: a `<div class="pane">` it created from
+ *     `#pane-template`, plus the cached `rendererEl / sceneEl / viewportEl
+ *     / statusEl / weaponEl` children.
+ *   - Its per-pane scene state: arrays / Maps holding the wall, sector,
+ *     thing, door, lift, crusher, sky, projectile DOM references for
+ *     this pane.
+ *   - Its camera state (the viewer's position, updated by updateCamera).
+ *   - Its `playerIndex` — the player whose view it renders.
  *
- * World-level commands are NOT instance methods — they live on the
- * Orchestrator and call into the underlying renderer module once. Today
- * those helpers iterate every pane internally, so calling at the
- * orchestrator level updates every pane in lockstep.
+ * No DomRenderer reaches into another DomRenderer's state. Cross-pane
+ * fan-out is the orchestrator's job (it iterates renderers).
  *
- * Implementation note: state (`dom.scenes`, `sceneStates`, etc.) still
- * lives at module scope in dom.js. A follow-on cleanup migrates that
- * state into the instance itself; for now this facade is enough to give
- * the orchestrator a swappable target abstraction (DomRenderer ↔
- * RenderSink) without rewriting twenty renderer files.
+ * Per-player and world methods on the prototype are generated from
+ * [commands.js](commands.js)'s PER_PANE_COMMANDS / WORLD_COMMANDS at
+ * module load. Each method calls the registered `impl` with `this`
+ * (the renderer) baked in as the first arg, so impls operate directly
+ * on `this.sceneState` / `this.sceneEl` / `this.viewportEl` / etc.
+ * The orchestrator's per-player dispatch fans to renderers whose
+ * `playerIndex` matches; its world dispatch fans to every target.
  */
 
-import { PER_PANE_COMMANDS } from './commands.js';
+import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './commands.js';
+import { buildScene } from './scene/scene.js';
+import { rendererState } from './renderer-state.js';
 
 export class DomRenderer {
-    constructor(paneIndex) {
-        this.paneIndex = paneIndex;
+    /**
+     * @param {object} options
+     * @param {number} options.playerIndex   the player this renderer is for
+     * @param {HTMLElement} options.gameContainer  `#game` — where the pane is appended
+     * @param {HTMLTemplateElement} options.paneTemplate  `#pane-template`
+     */
+    constructor({ playerIndex, gameContainer, paneTemplate }) {
+        this.playerIndex = playerIndex;
+
+        // Build the pane DOM. The template carries the full per-pane
+        // subtree (.renderer > .viewport > .scene + .hud + overlays).
+        this.paneEl = document.createElement('div');
+        this.paneEl.className = 'pane';
+        this.paneEl.dataset.player = String(playerIndex);
+        this.paneEl.appendChild(paneTemplate.content.cloneNode(true));
+        gameContainer.appendChild(this.paneEl);
+
+        // Cache per-pane element refs.
+        this.rendererEl  = this.paneEl.querySelector('.renderer');
+        this.sceneEl     = this.paneEl.querySelector('.scene');
+        this.viewportEl  = this.paneEl.querySelector('.viewport');
+        this.statusEl    = this.paneEl.querySelector('.status');
+        this.weaponEl    = this.paneEl.querySelector('.weapon');
+
+        // Per-pane scene state (walls, sectors, things, doors, lifts,
+        // crushers, sky planes, projectile DOM, perspective). Rebuilt
+        // each map load.
+        this.sceneState = makeSceneState();
+    }
+
+    /**
+     * Live camera the culler / audio read for this renderer's viewer.
+     *
+     * On master, `rendererState.cameras` aliases `state.players` so the
+     * lookup returns the live Player object the simulation mutates each
+     * frame. On a client the array is a local mirror populated by
+     * `applyCameraUpdate`. Either way, indexing by this renderer's
+     * `playerIndex` gives us "the camera this pane is rendering for" —
+     * including mirror SP, where both renderers share playerIndex 0 and
+     * therefore both read player 0's pose.
+     */
+    get camera() {
+        return rendererState.cameras[this.playerIndex];
+    }
+
+    /**
+     * Tear the pane out of the DOM. Scene-state arrays are left in
+     * place — a follow-on map load would re-populate them — and the
+     * referenced DOM nodes are gone with the pane.
+     */
+    destroy() {
+        this.paneEl.remove();
+    }
+
+    /**
+     * Build this renderer's scene from the current mapData + state and
+     * absorb it. Each renderer calls this independently — no cloning,
+     * no cross-pane coupling. The Object.assign mutates the existing
+     * sceneState object in place so consumers caching references to it
+     * keep seeing the updated arrays/Maps.
+     */
+    async loadMap() {
+        const { fragment, sceneState } = await buildScene();
+        this.sceneEl.replaceChildren(fragment);
+        Object.assign(this.sceneState, sceneState);
+    }
+
+    /**
+     * Drop this renderer's DOM and reset its scene-state. Used by the
+     * orchestrator when a remote client takes over this slot — master
+     * stops painting an invisible subtree until the client disconnects
+     * (at which point loadMap() rebuilds it).
+     */
+    clear() {
+        this.sceneEl.replaceChildren();
+        Object.assign(this.sceneState, makeSceneState());
     }
 }
 
+export function makeSceneState() {
+    return {
+        wallElements: [],
+        surfaceElements: [],
+        sectorContainers: [],
+        thingContainers: [],
+        doorContainers: new Map(),
+        liftContainers: new Map(),
+        crusherContainers: new Map(),
+        skyWallPlanes: [],             // sky wall occluders
+        skySectors: new Set(),         // sector indices with sky ceilings
+        skyGroupOf: new Map(),         // Map<sectorIndex, groupId>
+        thingDom: new Map(),           // Map<thingIndex, { element, sprite }>
+        projectileDom: new Map(),      // Map<projectileId, element>
+        perspectiveValue: 700,
+    };
+}
+
+// Generate per-player and world prototype methods from the COMMANDS
+// registry. Each method calls its impl with `this` (the renderer) as the
+// first arg. The orchestrator's per-player dispatch invokes per-pane
+// methods on renderers whose playerIndex matches; its world dispatch
+// invokes world methods on every target.
 for (const [name, { impl }] of Object.entries(PER_PANE_COMMANDS)) {
     DomRenderer.prototype[name] = function (...args) {
-        return impl(this.paneIndex, ...args);
+        return impl(this, ...args);
+    };
+}
+for (const [name, { impl }] of Object.entries(WORLD_COMMANDS)) {
+    DomRenderer.prototype[name] = function (...args) {
+        return impl(this, ...args);
     };
 }

@@ -1,18 +1,14 @@
 /**
  * Switch rendering — visual state toggle.
  *
- * Pane 0's switch element keeps its `id={wallId}`; cloned switch elements in
- * other panes have `data-orig-id={wallId}` instead (id uniqueness rule —
- * see scene.js cloneSceneToOtherPanes). This helper toggles state on every
- * pane's matching element so all panes flip in sync.
+ * Each renderer has its own switch element with `id={wallId}` inside its
+ * scene tree. This impl toggles the state on the renderer's own copy.
+ * The orchestrator's world dispatch fans the call to every renderer so
+ * all panes flip in lockstep.
  */
 
-export function toggleSwitchState(wallId) {
-    const orig = document.getElementById(wallId);
-    if (!orig) return;
-    const newState = orig.dataset.state === 'on' ? 'off' : 'on';
-    orig.dataset.state = newState;
-    for (const el of document.querySelectorAll(`[data-orig-id="${wallId}"]`)) {
-        el.dataset.state = newState;
-    }
+export function toggleSwitchState(renderer, wallId) {
+    const el = renderer.sceneEl.querySelector(`[id="${wallId}"]`);
+    if (!el) return;
+    el.dataset.state = el.dataset.state === 'on' ? 'off' : 'on';
 }

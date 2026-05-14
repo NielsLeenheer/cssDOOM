@@ -41,18 +41,17 @@ export function bindRendererStateToMaster(state) {
     rendererState.things = state.things;
 }
 
-/**
- * Client-side init: stand up empty arrays sized for the local scene.
- * The mirror callbacks declared in [commands.js](commands.js) populate
- * them as updates flow in from the master.
- */
-export function initClientRendererState(cameraCount) {
-    rendererState.cameras = Array.from({ length: cameraCount }, () => makeCamera());
-    rendererState.things = [];
-}
-
 function makeCamera() {
     return { x: 0, y: 0, z: 0, angle: 0, floorHeight: 0, isFiring: false };
+}
+
+function ensureCamera(slot) {
+    let cam = rendererState.cameras[slot];
+    if (!cam) {
+        cam = makeCamera();
+        rendererState.cameras[slot] = cam;
+    }
+    return cam;
 }
 
 function makeThing() {
@@ -62,11 +61,12 @@ function makeThing() {
 /**
  * Apply an inbound camera update on a client. Mirrors the fields
  * the renderer's camera transform reads (`x/y/z/angle/floorHeight`)
- * plus `isFiring` for the spectator-marker firing class.
+ * plus `isFiring` for the spectator-marker firing class. Lazily extends
+ * the cameras array so the very first update for a new slot still lands.
  */
 export function applyCameraUpdate(slot, payload) {
-    const cam = rendererState.cameras[slot];
-    if (!cam || !payload) return;
+    if (!payload) return;
+    const cam = ensureCamera(slot);
     cam.x = payload.x;
     cam.y = payload.y;
     cam.z = payload.z;

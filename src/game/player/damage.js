@@ -234,7 +234,7 @@ export function transitionToLevel() {
         // gates doors by collected keys; DM doesn't, so on a level change
         // we re-grant them here just like resetGameState does for the
         // dead/initial path.
-        if (state.mode === 'deathmatch') {
+        if (state.gameMode === 'deathmatch') {
             for (const color of ['blue', 'yellow', 'red']) {
                 player.collectedKeys.add(color);
                 renderer.collectKey(player.viewportIndex, color);
@@ -264,7 +264,7 @@ export function resetGameState() {
     // all three keys (DOOM-authentic — DM doesn't gate doors by keys).
     for (const player of state.players) {
         equipWeapon(player, player.currentWeapon);
-        if (state.mode === 'deathmatch') {
+        if (state.gameMode === 'deathmatch') {
             for (const color of ['blue', 'yellow', 'red']) {
                 player.collectedKeys.add(color);
                 renderer.collectKey(player.viewportIndex, color);

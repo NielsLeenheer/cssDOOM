@@ -1,43 +1,38 @@
 /**
  * Weapon element rendering — switching animation, fire animation, sprite swaps.
  *
- * Per-player: each pane has its own weapon element in dom.weaponElements[i].
- * Each function takes a playerIndex so the right pane's weapon animates.
- * In mirror mode, viewportsForEffect() fans out player 0's weapon visuals to
- * pane 1 so both panes show the same weapon sprite/animation.
+ * Each function takes a renderer instance and animates its `weaponEl`.
+ * Mirror-mode fan-out is handled at the orchestrator dispatch layer — every
+ * renderer whose `playerIndex` matches receives the call.
  */
 
-import { dom } from './dom.js';
-import { viewportsForEffect } from './scene/scene.js';
+import { domRenderers } from './dom.js';
 
 /**
- * Switch to a new weapon for the given player. If the weapon is different
- * from the current one and no switch is already in progress, plays a
- * lower-then-raise animation and swaps the sprite at the midpoint. Otherwise
- * applies immediately.
+ * Switch to a new weapon. If the weapon is different from the current one
+ * and no switch is already in progress, plays a lower-then-raise animation
+ * and swaps the sprite at the midpoint. Otherwise applies immediately.
  */
-export function switchWeapon(playerIndex, weaponName, fireRate) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        const weaponElement = dom.weaponElements[i];
-        const currentType = weaponElement.dataset.type;
-        const needsAnimation = weaponName !== currentType
-            && !weaponElement.classList.contains('switching');
+export function switchWeapon(renderer, weaponName, fireRate) {
+    const weaponElement = renderer.weaponEl;
+    const currentType = weaponElement.dataset.type;
+    const needsAnimation = weaponName !== currentType
+        && !weaponElement.classList.contains('switching');
 
-        if (needsAnimation) {
-            weaponElement.classList.remove('firing');
-            weaponElement.classList.add('switching');
+    if (needsAnimation) {
+        weaponElement.classList.remove('firing');
+        weaponElement.classList.add('switching');
 
-            setTimeout(() => applyWeaponVisuals(weaponElement, weaponName, fireRate), 200);
+        setTimeout(() => applyWeaponVisuals(weaponElement, weaponName, fireRate), 200);
 
-            weaponElement.addEventListener('animationend', function onEnd(event) {
-                if (event.animationName === 'weapon-switch') {
-                    weaponElement.classList.remove('switching');
-                    weaponElement.removeEventListener('animationend', onEnd);
-                }
-            });
-        } else {
-            applyWeaponVisuals(weaponElement, weaponName, fireRate);
-        }
+        weaponElement.addEventListener('animationend', function onEnd(event) {
+            if (event.animationName === 'weapon-switch') {
+                weaponElement.classList.remove('switching');
+                weaponElement.removeEventListener('animationend', onEnd);
+            }
+        });
+    } else {
+        applyWeaponVisuals(weaponElement, weaponName, fireRate);
     }
 }
 
@@ -48,30 +43,27 @@ function applyWeaponVisuals(weaponElement, weaponName, fireRate) {
     weaponElement.style.setProperty('--fire-duration', `${fireRate}ms`);
 }
 
-/** Start the given player's weapon fire CSS animation (restart via forced reflow). */
-export function startFiring(playerIndex) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        const weaponElement = dom.weaponElements[i];
-        weaponElement.classList.remove('firing');
-        void weaponElement.offsetWidth;
-        weaponElement.classList.add('firing');
-    }
+/** Start this renderer's weapon fire CSS animation (restart via forced reflow). */
+export function startFiring(renderer) {
+    const weaponElement = renderer.weaponEl;
+    weaponElement.classList.remove('firing');
+    void weaponElement.offsetWidth;
+    weaponElement.classList.add('firing');
 }
 
-/** Remove the firing class from the given player's weapon element. */
-export function stopFiring(playerIndex) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        dom.weaponElements[i].classList.remove('firing');
-    }
+/** Remove the firing class from this renderer's weapon element. */
+export function stopFiring(renderer) {
+    renderer.weaponEl.classList.remove('firing');
 }
 
-// Clean up the firing class when a CSS fire animation completes on any pane's
-// weapon element, so the weapon returns to its idle sprite frame.
+// Clean up the firing class when a CSS fire animation completes on any
+// pane's weapon element, so the weapon returns to its idle sprite frame.
 document.addEventListener('animationend', event => {
-    if (event.animationName === 'weapon-fire') {
-        const target = event.target;
-        if (dom.weaponElements.includes(target)) {
-            target.classList.remove('firing');
+    if (event.animationName !== 'weapon-fire') return;
+    for (const r of domRenderers) {
+        if (r.weaponEl === event.target) {
+            r.weaponEl.classList.remove('firing');
+            return;
         }
     }
 });

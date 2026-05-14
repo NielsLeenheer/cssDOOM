@@ -12,9 +12,19 @@ export const state = {
     // Skill level 1-5 (maps to DOOM flag bits for thing spawning)
     skillLevel: 1,
 
-    // Game mode. Currently 'singleplayer' or 'deathmatch'. The menu sets
-    // this when starting a match; CSS layout (body[data-mode]) follows.
-    mode: 'singleplayer',
+    // Gameplay rules: 'singleplayer' or 'deathmatch'. Drives game-side
+    // behavior (spawn rules, item respawn, scoring, etc.). The menu
+    // selects this; CSS layout reads `body[data-game-mode]`.
+    gameMode: 'singleplayer',
+
+    // Transport context: 'standalone' (no peers), 'host' (master with a
+    // signaling room open accepting Network DM remotes), or 'client'
+    // (this window is a remote / Local DM secondary connected to a
+    // master). Orthogonal to gameMode — Network DM is
+    // (gameMode='deathmatch', networkMode='host'); a remote joining a DM
+    // host is (gameMode='deathmatch', networkMode='client'). CSS layout
+    // reads `body[data-network-mode]` where relevant.
+    networkMode: 'standalone',
 
     // Deathmatch match state. Null in SP. Set by resetMatch() to
     // { fragLimit, timeLimit, startTime, ended, winner }.

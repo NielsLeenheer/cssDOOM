@@ -14,7 +14,7 @@
     }
 
     /* Touch is single-player only — split-screen DM uses gamepads. */
-    body[data-mode="deathmatch"] #touch-controls {
+    body[data-game-mode="deathmatch"] #touch-controls {
         display: none;
     }
 }

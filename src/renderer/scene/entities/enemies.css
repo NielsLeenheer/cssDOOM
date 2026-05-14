@@ -127,7 +127,7 @@ body.all-enemies-shadow .enemy .sprite {
    there. The default rule above only hides each pane's "own" sprite
    by matching data-player-index === data-player; in mirror SP we
    want player-0's sprite hidden in pane 1 too. */
-body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] .enemy.player[data-player-index="0"] {
+body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"] .enemy.player[data-player-index="0"] {
     display: none;
 }
 

@@ -85,7 +85,7 @@ export function tryUseSwitch(player) {
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();
-                    if (state.mode === 'singleplayer') {
+                    if (state.gameMode === 'singleplayer') {
                         showIntermission(nextMap, (next) => {
                             if (next) loadMap(next);
                         });

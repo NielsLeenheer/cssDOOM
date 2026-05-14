@@ -45,7 +45,6 @@ import * as lifts from './scene/mechanics/lifts.js';
 import * as crushers from './scene/mechanics/crushers.js';
 import { toggleSwitchState } from './scene/mechanics/switches.js';
 import { lowerTaggedFloor } from './scene/surfaces/floors.js';
-import { buildThing as buildThingHelper } from './scene/entities/things.js';
 import * as effects from './effects.js';
 import * as weapons from './weapons.js';
 import { updateHud } from './hud.js';
@@ -68,45 +67,58 @@ const stripCameraTransform = (player) => [{
     isFiring: player.isFiring,
 }];
 
-// HUD-relevant subset of the player. ownedWeapons is sent as a Set
-// (structured clone preserves it) so the receiving updateHud can call
-// .has() — Array would throw.
+// HUD-relevant subset of the player. ownedWeapons goes on the wire as
+// an Array because JSON.stringify (used by WebRTCDataChannelTransport)
+// reduces a Set to `{}`; the Local-DM BroadcastChannel preserves Set
+// via structured clone, but for parity we send Array on both transports
+// and `updateHud` re-Sets it on entry.
 const stripHudData = (player) => [{
     currentWeapon: player.currentWeapon,
     ammo: { ...player.ammo },
     maxAmmo: { ...player.maxAmmo },
     health: player.health,
     armor: player.armor,
-    ownedWeapons: new Set(player.ownedWeapons),
+    ownedWeapons: [...player.ownedWeapons],
     score: player.score,
 }];
 
+// Enemy rotation runs every frame for every visible enemy and every
+// viewer. The impl only reads enemy.{x,y,facing} and viewer.{x,y}; the
+// raw enemy / Player objects contain cyclic refs (ai.target, thingRef)
+// and Set fields that JSON.stringify can't cleanly serialize. Strip to
+// just what the renderer needs.
+const stripEnemyRotation = (thingIndex, enemy, viewers) => [
+    thingIndex,
+    { x: enemy.x, y: enemy.y, facing: enemy.facing },
+    viewers.map(p => ({ x: p.x, y: p.y })),
+];
+
 export const COMMANDS = {
-    // ── Per-pane: camera & HUD ────────────────────────────────────────────
+    // ── Per-player: camera & HUD ──────────────────────────────────────────
     updateCamera: {
         kind: 'per-pane',
-        impl: (pane, player) => updateCamera(player, pane),
+        impl: updateCamera,
         serialize: stripCameraTransform,
         mirror: (pane, transform) => applyCameraUpdate(pane, transform),
     },
-    updateHud: { kind: 'per-pane', impl: (pane, player) => updateHud(player, pane), serialize: stripHudData },
+    updateHud: { kind: 'per-pane', impl: updateHud, serialize: stripHudData },
 
-    // ── Per-pane: effects ─────────────────────────────────────────────────
-    triggerFlash: { kind: 'per-pane', impl: (pane, type) => effects.triggerFlash(pane, type) },
-    showPowerup: { kind: 'per-pane', impl: (pane, name) => effects.showPowerup(pane, name) },
-    flickerPowerup: { kind: 'per-pane', impl: (pane, name) => effects.flickerPowerup(pane, name) },
-    hidePowerup: { kind: 'per-pane', impl: (pane, name) => effects.hidePowerup(pane, name) },
+    // ── Per-player: effects ───────────────────────────────────────────────
+    triggerFlash: { kind: 'per-pane', impl: effects.triggerFlash },
+    showPowerup: { kind: 'per-pane', impl: effects.showPowerup },
+    flickerPowerup: { kind: 'per-pane', impl: effects.flickerPowerup },
+    hidePowerup: { kind: 'per-pane', impl: effects.hidePowerup },
 
-    // ── Per-pane: weapon visuals ──────────────────────────────────────────
-    switchWeapon: { kind: 'per-pane', impl: (pane, name, rate) => weapons.switchWeapon(pane, name, rate) },
-    startFiring: { kind: 'per-pane', impl: (pane) => weapons.startFiring(pane) },
-    stopFiring: { kind: 'per-pane', impl: (pane) => weapons.stopFiring(pane) },
+    // ── Per-player: weapon visuals ────────────────────────────────────────
+    switchWeapon: { kind: 'per-pane', impl: weapons.switchWeapon },
+    startFiring: { kind: 'per-pane', impl: weapons.startFiring },
+    stopFiring: { kind: 'per-pane', impl: weapons.stopFiring },
 
-    // ── Per-pane: player visuals ──────────────────────────────────────────
-    setPlayerDead: { kind: 'per-pane', impl: (pane, ...args) => playerVisuals.setPlayerDead(pane, ...args) },
-    setPlayerMoving: { kind: 'per-pane', impl: (pane, isMoving) => playerVisuals.setPlayerMoving(pane, isMoving) },
-    clearKeys: { kind: 'per-pane', impl: (pane) => playerVisuals.clearKeys(pane) },
-    collectKey: { kind: 'per-pane', impl: (pane, ...args) => playerVisuals.collectKey(pane, ...args) },
+    // ── Per-player: player visuals ────────────────────────────────────────
+    setPlayerDead: { kind: 'per-pane', impl: playerVisuals.setPlayerDead },
+    setPlayerMoving: { kind: 'per-pane', impl: playerVisuals.setPlayerMoving },
+    clearKeys: { kind: 'per-pane', impl: playerVisuals.clearKeys },
+    collectKey: { kind: 'per-pane', impl: playerVisuals.collectKey },
 
     // ── World: enemies / things / projectiles / effects ───────────────────
     setEnemyState: { kind: 'world', impl: sprites.setEnemyState },
@@ -116,7 +128,7 @@ export const COMMANDS = {
         impl: sprites.killEnemy,
         mirror: (thingIndex) => applyThingCollected(thingIndex, true),
     },
-    updateEnemyRotation: { kind: 'world', impl: sprites.updateEnemyRotation },
+    updateEnemyRotation: { kind: 'world', impl: sprites.updateEnemyRotation, serialize: stripEnemyRotation },
     updateThingPosition: {
         kind: 'world',
         impl: sprites.updateThingPosition,
@@ -144,13 +156,9 @@ export const COMMANDS = {
     createCorpse: { kind: 'world', impl: sprites.createCorpse },
     playPlayerAttack: { kind: 'world', impl: sprites.playPlayerAttack },
 
-    // ── World: thing / mechanics construction ─────────────────────────────
-    buildThing: { kind: 'world', impl: buildThingHelper },
-    buildDoor: { kind: 'world', impl: doors.buildDoor },
+    // ── World: mechanics state ────────────────────────────────────────────
     setDoorState: { kind: 'world', impl: doors.setDoorState },
-    buildLift: { kind: 'world', impl: lifts.buildLift },
     setLiftState: { kind: 'world', impl: lifts.setLiftState },
-    buildCrusher: { kind: 'world', impl: crushers.buildCrusher },
     setCrusherOffset: { kind: 'world', impl: crushers.setCrusherOffset },
     toggleSwitchState: { kind: 'world', impl: toggleSwitchState },
 

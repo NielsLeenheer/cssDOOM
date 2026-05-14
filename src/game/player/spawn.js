@@ -89,7 +89,7 @@ export function spawnPlayer(player) {
     renderer.clearKeys(player.viewportIndex);
     equipWeapon(player, player.currentWeapon);
     // DM rule: every respawn comes back with all three keys.
-    if (state.mode === 'deathmatch') {
+    if (state.gameMode === 'deathmatch') {
         for (const color of ['blue', 'yellow', 'red']) {
             player.collectedKeys.add(color);
             renderer.collectKey(player.viewportIndex, color);

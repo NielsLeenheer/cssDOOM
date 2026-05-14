@@ -20,10 +20,9 @@
  */
 
 import { THING_SPRITES, THING_NAMES } from '../constants.js';
-import { sceneState } from '../../dom.js';
 import { appendToSector } from '../sectors.js';
 
-export function buildThing(spec) {
+export function buildThing(ctx, spec) {
     const thingName = THING_NAMES[spec.type];
     const staticSprite = THING_SPRITES[spec.type];
     if (!thingName && !staticSprite) return;
@@ -50,12 +49,16 @@ export function buildThing(spec) {
     }
 
     thingContainer.hidden = true;
-    appendToSector(thingContainer, spec.sectorIndex);
+    appendToSector(
+        { sceneState: ctx.sceneState, root: ctx.fragment },
+        thingContainer,
+        spec.sectorIndex,
+    );
 
     if (spec.gameId !== undefined) {
-        sceneState.thingDom.set(spec.gameId, { element: thingContainer, sprite: spriteElement });
-        sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, sectorIndex: spec.sectorIndex, gameId: spec.gameId });
+        ctx.sceneState.thingDom.set(spec.gameId, { element: thingContainer, sprite: spriteElement });
+        ctx.sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, sectorIndex: spec.sectorIndex, gameId: spec.gameId });
     } else {
-        sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, sectorIndex: spec.sectorIndex });
+        ctx.sceneState.thingContainers.push({ element: thingContainer, x: spec.x, y: spec.y, sectorIndex: spec.sectorIndex });
     }
 }

@@ -11,22 +11,14 @@
  * the pane's status container (separate sprite-based rendering for the
  * small yellow STYSNUM digits — different font, not yet migrated).
  *
- * Per-player: each pane has its own status element in dom.statusElements[i]
- * and its own .renderer in dom.renderers[i]. updateHud(player) writes that
- * player's stats to their pane. The prev cache is keyed by player index so
- * unchanged values are skipped per-pane.
+ * Each renderer caches its previously-written values in `renderer._hudPrev`
+ * so unchanged values skip DOM touches.
  */
 
-import { dom } from './dom.js';
+import { domRenderers } from './dom.js';
 import { WEAPONS } from '../game/constants.js';
 
 const AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
-
-// Previous values per viewport — only touch the DOM when something changes.
-// Keyed by viewportIndex (the destination pane), not player.index, so mirror
-// mode (writing player 0's stats to two panes) tracks each pane's own
-// last-written values independently.
-const prevByViewport = new Map();
 
 function freshPrev() {
     return {
@@ -42,15 +34,15 @@ function freshPrev() {
 // Pre-built class name strings to avoid per-frame template literal allocation
 const WEAPON_CLASSES = { 2: 'has-weapon-2', 3: 'has-weapon-3', 4: 'has-weapon-4', 5: 'has-weapon-5', 6: 'has-weapon-6', 7: 'has-weapon-7' };
 
-export function updateHud(player, viewportIndex = player.viewportIndex) {
-    const statusEl = dom.statusElements[viewportIndex];
+export function updateHud(renderer, player) {
+    const statusEl = renderer.statusEl;
     const style = statusEl.style;
-    const rendererEl = dom.renderers[viewportIndex];
+    const rendererEl = renderer.rendererEl;
 
-    let prev = prevByViewport.get(viewportIndex);
+    let prev = renderer._hudPrev;
     if (!prev) {
         prev = freshPrev();
-        prevByViewport.set(viewportIndex, prev);
+        renderer._hudPrev = prev;
     }
 
     const weapon = WEAPONS[player.currentWeapon];
@@ -101,9 +93,16 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
         }
     }
 
-    // Weapon ownership — per-pane, reflecting this player's weapons
+    // Weapon ownership — per-pane, reflecting this player's weapons.
+    // Master passes the live Player (ownedWeapons is a Set); a client
+    // receives the same field as an Array off the wire (Set doesn't
+    // survive JSON.stringify — see commands.js stripHudData). Normalize
+    // here so both calling conventions work.
+    const owned = player.ownedWeapons instanceof Set
+        ? player.ownedWeapons
+        : new Set(player.ownedWeapons ?? []);
     for (let weaponSlot = 2; weaponSlot <= 7; weaponSlot++) {
-        rendererEl.classList.toggle(WEAPON_CLASSES[weaponSlot], player.ownedWeapons.has(weaponSlot));
+        rendererEl.classList.toggle(WEAPON_CLASSES[weaponSlot], owned.has(weaponSlot));
     }
 
     // DM frags counter (only meaningful in deathmatch; cheap to update
@@ -111,24 +110,23 @@ export function updateHud(player, viewportIndex = player.viewportIndex) {
     // is uncapped).
     if (player.score !== prev.frags) {
         prev.frags = player.score;
-        updateFragsDisplay(viewportIndex, player.score);
+        updateFragsDisplay(statusEl, player.score);
     }
 }
 
-function updateFragsDisplay(viewportIndex, score) {
+function updateFragsDisplay(statusEl, score) {
     // Display range clamped to -9..99 (the slot is 2 chars wide + an
     // optional leading minus). Underlying player.score is uncapped.
     const display = Math.max(-9, Math.min(99, score));
-    const status = dom.statusElements[viewportIndex];
-    const fragsEl = status.querySelector('.frags-display');
+    const fragsEl = statusEl.querySelector('.frags-display');
     if (!fragsEl) return;
     fragsEl.textContent = String(display);
 }
 
 export function clearWeaponSlots() {
-    // Clear weapon ownership classes on every pane.
-    for (const rendererEl of dom.renderers) {
-        rendererEl.classList.remove(
+    // Clear weapon ownership classes on every renderer.
+    for (const r of domRenderers) {
+        r.rendererEl.classList.remove(
             'has-weapon-2', 'has-weapon-3', 'has-weapon-4',
             'has-weapon-5', 'has-weapon-6', 'has-weapon-7'
         );

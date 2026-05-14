@@ -16,6 +16,12 @@
  * (re)builds the renderer list — solo gets one bearing-pan renderer;
  * split-screen gets one pane-side renderer per slot.
  *
+ * `setSlotAudioSuppressed(slot, true)` drops a slot from the renderer
+ * list — used in Network DM when a slot's player is a remote peer that
+ * plays its own audio on its own device, so master shouldn't double-play.
+ * If suppression leaves only one slot active, that slot reverts to
+ * bearing-based pan (the natural single-listener mode).
+ *
  * Buffers are fetched + decoded on first use and cached. iOS Safari
  * requires a user gesture to unlock the AudioContext; global listeners
  * handle this at module load.
@@ -76,6 +82,8 @@ function loadBuffer(name) {
 
 let enabled = true;
 let renderers = [];
+let suppressedSlots = new Set();
+let lastSlotCount = 0;
 
 // ── Distance + bearing math ────────────────────────────────────────────
 
@@ -150,27 +158,60 @@ function playBuffer(name, volume, pan) {
 // ── Public API ─────────────────────────────────────────────────────────
 
 /**
- * (Re)build the listener list for the current mode.
+ * (Re)build the listener list for the current mode. Suppressed slots
+ * (set via `setSlotAudioSuppressed`) are skipped — effective listener
+ * count drives the pan mode:
  *
- *   slotCount === 1  → one renderer, bearing-based pan (solo)
- *   slotCount >= 2   → one renderer per slot, locked to L/R pane side
- *                       (split-screen layout)
+ *   effective count === 1  → one renderer, bearing-based pan (solo
+ *                            mode, or split-screen with one slot bound
+ *                            to a Network DM remote)
+ *   effective count >= 2   → one renderer per active slot, locked to
+ *                            L/R pane side (Local DM split-screen)
  *
- * Called by `applyMode` whenever the player roster resizes. Cheap; the
- * renderer instances themselves hold no Web Audio nodes — those are
- * created per-sound in playBuffer.
+ * Called by `applyMode` whenever the player roster resizes; also called
+ * internally when a slot's suppression flips. Cheap — the renderer
+ * instances themselves hold no Web Audio nodes; those are created
+ * per-sound in `playBuffer`.
  */
 export function configureAudio(slotCount) {
+    lastSlotCount = slotCount;
+    rebuildRenderers();
+}
+
+function rebuildRenderers() {
     if (!enabled) {
         renderers = [];
         return;
     }
-    const split = slotCount >= 2;
-    renderers = [];
-    for (let i = 0; i < slotCount; i++) {
-        const paneSide = split ? (i === 0 ? 'left' : 'right') : null;
-        renderers.push(new AudioRenderer({ slot: i, paneSide }));
+    const active = [];
+    for (let i = 0; i < lastSlotCount; i++) {
+        if (suppressedSlots.has(i)) continue;
+        active.push(i);
     }
+    const split = active.length >= 2;
+    renderers = active.map((slot, idx) => {
+        const paneSide = split ? (idx === 0 ? 'left' : 'right') : null;
+        return new AudioRenderer({ slot, paneSide });
+    });
+}
+
+/**
+ * Suppress (or unsuppress) audio rendering for a slot. Used by the
+ * orchestrator when a slot is bound to a Network DM remote: the remote
+ * plays its own audio on its own device, so master skips that listener
+ * to avoid double-playing. Triggers a renderer rebuild — passing the
+ * only-slot-remaining case down to bearing-based pan automatically.
+ */
+export function setSlotAudioSuppressed(slot, value) {
+    const before = suppressedSlots.has(slot);
+    if (value && !before) {
+        suppressedSlots.add(slot);
+    } else if (!value && before) {
+        suppressedSlots.delete(slot);
+    } else {
+        return; // no change
+    }
+    rebuildRenderers();
 }
 
 /**
@@ -181,6 +222,7 @@ export function configureAudio(slotCount) {
 export function setAudioEnabled(value) {
     enabled = value;
     if (!enabled) renderers = [];
+    else rebuildRenderers();
 }
 
 /**

@@ -1,12 +1,13 @@
 /**
  * Renderer public API — game code's single entry point into rendering.
  *
- * The flat-namespace exports below mirror what was here before the
- * orchestrator refactor. Per-pane commands take `(paneIndex, ...args)`;
- * world commands take `(...args)`. Two helpers (`updateCamera`,
- * `updateHud`) accept the legacy `(player, paneIndex)` signature with
- * paneIndex falling back to `player.viewportIndex` when omitted —
- * preserved for callers like teleporters.js and debug.js.
+ * Per-player commands take `(playerIndex, ...args)` — the orchestrator
+ * iterates render targets and dispatches to every renderer whose
+ * `playerIndex` matches (mirror SP has two renderers sharing playerIndex
+ * 0; Network DM has a RenderSink at each remote player's slot). World
+ * commands take `(...args)`. updateCamera/updateHud accept the legacy
+ * `(player, playerIndex?)` shape with playerIndex falling back to
+ * `player.viewportIndex` (callers like debug.js / teleporters.js omit it).
  *
  * All re-exports are generated from the command registry
  * ([commands.js](commands.js)). Adding a renderer command is one entry
@@ -20,19 +21,19 @@ const exported = {};
 
 for (const [name, { kind }] of Object.entries(COMMANDS)) {
     if (kind === 'per-pane') {
-        exported[name] = (paneIndex, ...args) => orchestrator[name](paneIndex, ...args);
+        exported[name] = (playerIndex, ...args) => orchestrator[name](playerIndex, ...args);
     } else {
         exported[name] = (...args) => orchestrator[name](...args);
     }
 }
 
-// Legacy callers pass (player, paneIndex) — and some omit paneIndex,
-// relying on `player.viewportIndex`. Override the generated wrappers
-// for these two so the public signature stays as it was.
-exported.updateCamera = (player, paneIndex) =>
-    orchestrator.updateCamera(paneIndex ?? player.viewportIndex, player);
-exported.updateHud = (player, paneIndex) =>
-    orchestrator.updateHud(paneIndex ?? player.viewportIndex, player);
+// updateCamera / updateHud public signature is `(player, playerIndex?)`,
+// with playerIndex defaulting to `player.viewportIndex`. Override the
+// generated wrappers to match.
+exported.updateCamera = (player, playerIndex) =>
+    orchestrator.updateCamera(playerIndex ?? player.viewportIndex, player);
+exported.updateHud = (player, playerIndex) =>
+    orchestrator.updateHud(playerIndex ?? player.viewportIndex, player);
 
 // ── Camera & HUD ──────────────────────────────────────────────────────────
 export const updateCamera = exported.updateCamera;
@@ -63,9 +64,6 @@ export const createPlayerSprite = exported.createPlayerSprite;
 export const createCorpse = exported.createCorpse;
 export const playPlayerAttack = exported.playPlayerAttack;
 
-// ── Thing DOM construction ────────────────────────────────────────────────
-export const buildThing = exported.buildThing;
-
 // ── Player visuals ────────────────────────────────────────────────────────
 export const setPlayerDead = exported.setPlayerDead;
 export const clearKeys = exported.clearKeys;
@@ -78,22 +76,13 @@ export const startFiring = exported.startFiring;
 export const stopFiring = exported.stopFiring;
 
 // ── Mechanics ─────────────────────────────────────────────────────────────
-export const buildDoor = exported.buildDoor;
 export const setDoorState = exported.setDoorState;
-export const buildLift = exported.buildLift;
 export const setLiftState = exported.setLiftState;
-export const buildCrusher = exported.buildCrusher;
 export const setCrusherOffset = exported.setCrusherOffset;
 export const toggleSwitchState = exported.toggleSwitchState;
 
 // ── Surfaces ──────────────────────────────────────────────────────────────
 export const lowerTaggedFloor = exported.lowerTaggedFloor;
-
-// ── Scene controls (orchestrator-only) ────────────────────────────────────
-export const clonePanes = (paneCount) => orchestrator.clonePanes(paneCount);
-export const setMirrorMode = (value) => orchestrator.setMirrorMode(value);
-export const isMirrorMode = () => orchestrator.isMirrorMode();
-export const viewportsForEffect = (playerIndex) => orchestrator.viewportsForEffect(playerIndex);
 
 // Direct access for code that benefits from instance-shaped API
 export { orchestrator };

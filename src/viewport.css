@@ -1,8 +1,8 @@
 /* ==========================================================================
    Game container — split-screen wrapper around the panes
    ==========================================================================
-   Both panes always exist in the DOM. body[data-mode="singleplayer"] hides
-   pane 1 so SP fills the screen with pane 0; body[data-mode="deathmatch"]
+   Both panes always exist in the DOM. body[data-game-mode="singleplayer"] hides
+   pane 1 so SP fills the screen with pane 0; body[data-game-mode="deathmatch"]
    splits 50/50.
 */
 
@@ -52,15 +52,23 @@ body.kiosk { --screen-scale: 1; }
        moved to. */
 }
 
-body[data-mode="deathmatch"] .pane {
+body[data-game-mode="deathmatch"] .pane,
+body.kiosk[data-network-mode="host"] .pane {
     flex: 1 1 50%;
 }
 
-body[data-mode="singleplayer"] .pane[data-player="0"] {
+/* Non-kiosk single-pane layouts: pane 0 fills, pane 1 hides. The
+   :not(.client-window) gate is critical for Network DM — a remote
+   joiner has body.client-window and renders pane 1 (the one bound to
+   their assigned slot), so we must defer to the body.client-window
+   rules below, which already do pane-0-hide / pane-1-fill. */
+body[data-game-mode="singleplayer"] .pane[data-player="0"],
+body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player="0"] {
     flex: 1;
 }
 
-body[data-mode="singleplayer"] .pane[data-player="1"] {
+body[data-game-mode="singleplayer"] .pane[data-player="1"],
+body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player="1"] {
     display: none;
 }
 
@@ -82,27 +90,18 @@ body.kiosk #game {
    mirror state is set by menu.applyMode → setMirrorMode based on
    body.kiosk + singleplayer). Override SP's default "hide pane 1" so
    both panes split the top-half capture 50/50, matching DM layout. */
-body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] {
+body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"] {
     display: block;
 }
-body.kiosk[data-mode="singleplayer"] .pane[data-player="0"],
-body.kiosk[data-mode="singleplayer"] .pane[data-player="1"] {
+body.kiosk[data-game-mode="singleplayer"] .pane[data-player="0"],
+body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"] {
     flex: 1 1 50%;
 }
 
-/* Client window mode (?join URL param) — the client represents one slot
-   the master assigned to it (Local DM secondary or Network DM remote).
-   Visually only one pane is shown regardless of which slot the master
-   picked. Position-based selector (first/last .pane) is used for
-   visibility instead of data-player, so the layout doesn't break if the
-   slot's data-player attribute is dynamic (slot 2 or 3 in multi-remote
-   configs). The data-player attribute itself is still set on the visible
-   pane to match the slot, so the "hide own billboard" CSS rule keys
-   correctly. */
-body.client-window .pane:first-of-type {
-    display: none;
-}
-body.client-window .pane:last-of-type {
+/* Client window mode (?join URL param) — the client constructs exactly
+   one DomRenderer for the slot the master assigned, so there's just one
+   pane in the DOM. Stretch it to fill the window. */
+body.client-window .pane {
     flex: 1;
 }
 
@@ -111,10 +110,10 @@ body.client-window .pane:last-of-type {
    only shows player 0 full-screen. The world DOM for pane 1 still
    exists and still receives world updates internally (we don't tear it
    down so we can swap back instantly on disconnect), it's just hidden. */
-body.client-active[data-mode="deathmatch"] .pane[data-player="1"] {
+body.client-active[data-game-mode="deathmatch"] .pane[data-player="1"] {
     display: none;
 }
-body.client-active[data-mode="deathmatch"] .pane[data-player="0"] {
+body.client-active[data-game-mode="deathmatch"] .pane[data-player="0"] {
     flex: 1;
 }
 

@@ -247,8 +247,8 @@ body.spectator #spectator-button img {
    button can't be tapped and the aim-line / controls never appear. The
    button now lives in #ui-buttons (outside #spectator), so it gets its
    own hide rule below. */
-body[data-mode="deathmatch"] #spectator,
-body[data-mode="deathmatch"] #spectator-button {
+body[data-game-mode="deathmatch"] #spectator,
+body[data-game-mode="deathmatch"] #spectator-button {
     display: none;
 }
 

@@ -45,7 +45,7 @@ const SECRET_SPECIAL = 9;
  * No-op outside single-player.
  */
 export function initSpStats() {
-    if (state.mode !== 'singleplayer') {
+    if (state.gameMode !== 'singleplayer') {
         state.sp = null;
         return;
     }

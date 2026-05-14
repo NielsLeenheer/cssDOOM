@@ -187,13 +187,21 @@ function releaseHeldFire() {
 
 // ── Tab debug swap ─────────────────────────────────────────────────────
 
+function isTabSwapEnabled() {
+    const host = location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    if (host.includes('-staging.')) return true;
+    return false;
+}
+
 /**
  * Tab pressed — debug affordance for driving two players from one
- * keyboard. Gated to the dev server so installation play can't
- * accidentally land in a half-claimed state from an idle keypress.
+ * keyboard. Enabled on dev (`localhost`) and staging
+ * (`*-staging.*workers.dev`) for smoke-testing two-player Local DM
+ * from one keyboard; disabled on production / the kiosk URL.
  */
 function handleTab() {
-    if (!import.meta.env.DEV) return;
+    if (!isTabSwapEnabled()) return;
     if (activeSlot() == null) return;
 
     const other = activeKbm === KBM_A ? KBM_B : KBM_A;

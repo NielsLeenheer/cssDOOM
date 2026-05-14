@@ -8,7 +8,6 @@
 
 import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
-import { sceneState } from '../../dom.js';
 import { appendToSector } from '../sectors.js';
 
 /**
@@ -33,7 +32,7 @@ function isRectangular(vertices, minX, maxX, minY, maxY) {
  * - Sectors with holes use path() with SVG evenodd fill rule.
  * - Rectangular sectors need no clip-path.
  */
-export function buildHorizontalSurface(sector, height, textureName, surfaceType) {
+export function buildHorizontalSurface(ctx, sector, height, textureName, surfaceType) {
     const outerBoundary = sector.boundaries[0];
     if (!outerBoundary || outerBoundary.length < 3) return;
 
@@ -126,6 +125,6 @@ export function buildHorizontalSurface(sector, height, textureName, surfaceType)
     surfaceElement._bboxH = boundingBoxHeight;
 
     surfaceElement.hidden = true;
-    appendToSector(surfaceElement, sector.sectorIndex);
-    sceneState.surfaceElements.push(surfaceElement);
+    appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, surfaceElement, sector.sectorIndex);
+    ctx.sceneState.surfaceElements.push(surfaceElement);
 }

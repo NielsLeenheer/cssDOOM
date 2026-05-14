@@ -1,89 +1,108 @@
 /**
- * Cached DOM element references and renderer-specific state.
+ * DomRenderer registry + global UI element refs.
  *
- * Per-pane: every pane has its own full subtree (.renderer > .viewport >
- * .scene plus .hud and overlays). The whole subtree is defined once in
- * #pane-template and cloned into each .pane at module load — that keeps
- * per-pane markup in a single source of truth and means the panes
- * themselves are empty containers in the parsed HTML.
+ * `domRenderers` is the mutable list of `DomRenderer` instances live in
+ * this window. It starts empty — boot code on master / client constructs
+ * renderers based on the active mode (SP = 1, mirror SP / DM = 2 local,
+ * Network DM = 1 local on non-kiosk / 2 on kiosk, plus any sinks live
+ * in the orchestrator's targets array). Mode switches reshape the list.
  *
- * Arrays (`dom.renderers`, `dom.scenes`, `dom.viewports`, `dom.statusElements`,
- * `dom.weaponElements`) are length matching the number of .pane elements in
- * HTML (currently 2). Whether pane 1 is visible is controlled by
- * body[data-mode="singleplayer"] / body[data-mode="deathmatch"] in CSS. The
- * legacy singletons (`dom.renderer`, `dom.scene`, etc.) point at pane 0 —
- * they remain as migration aliases until every reader uses an indexed form.
- *
- * UI elements that are NOT per-pane (menu, fullscreen control) stay as
- * single references.
+ * `dom` holds only references to global, never-per-pane UI elements.
+ * Per-pane elements (scene, viewport, renderer, status, weapon) live on
+ * each `DomRenderer` instance.
  */
 
-// Clone the pane template into each .pane before any querySelector for
-// per-pane elements runs. Both panes always exist in the HTML; whether
-// pane 1 is visible is controlled by body.mode-* in CSS.
-const paneTemplate = document.querySelector('#pane-template');
-const panes = [...document.querySelectorAll('.pane')];
-for (const pane of panes) {
-    pane.appendChild(paneTemplate.content.cloneNode(true));
-}
+import { DomRenderer } from './dom-renderer.js';
+import { orchestrator } from '../orchestrator.js';
 
-const renderers = [...document.querySelectorAll('.renderer')];
-const scenes = [...document.querySelectorAll('.scene')];
-const viewports = [...document.querySelectorAll('.viewport')];
-const statusElements = [...document.querySelectorAll('.status')];
-const weaponElements = [...document.querySelectorAll('.weapon')];
+const gameContainer = document.getElementById('game');
+const paneTemplate = document.querySelector('#pane-template');
 
 export const dom = {
-    // Per-pane element arrays — length matches the number of panes (always 2
-    // in current HTML; whether pane 1 is visible is a CSS concern).
-    renderers,
-    scenes,
-    viewports,
-    statusElements,
-    weaponElements,
-
-    // Migration aliases pointing at pane 0. Will be removed once every reader
-    // uses an indexed form.
-    renderer: renderers[0],
-    scene: scenes[0],
-    viewport: viewports[0],
-    status: statusElements[0],
-    weaponElement: weaponElements[0],
-
-    // Global UI — never per-pane.
     menuButton: document.getElementById('menu-button'),
     menuOverlay: document.getElementById('menu-overlay'),
     ammoPanel: document.getElementById('ammo-panel'),
 };
 
+/** Live `DomRenderer` instances in this window. */
+export const domRenderers = [];
+
 /**
- * Renderer-specific state — arrays of DOM elements representing the 3D scene.
- * Rebuilt each map load. Game logic should not access these.
- *
- * Each entry in `sceneStates` owns its own wallElements/surfaceElements/
- * thingDom/etc. for one pane. The legacy `sceneState` export is
- * `sceneStates[0]` for backwards compatibility and will be removed once all
- * readers iterate the array.
+ * Construct a new `DomRenderer` for the given player, append its pane
+ * to the game container, and push it into `domRenderers`. The caller
+ * is responsible for installing it as a render target in the orchestrator
+ * (via `orchestrator.replaceTarget`) at the right slot.
  */
-function makeSceneState() {
-    return {
-        wallElements: [],
-        surfaceElements: [],
-        sectorContainers: [],
-        thingContainers: [],
-        doorContainers: new Map(),
-        liftContainers: new Map(),
-        crusherContainers: new Map(),
-        skyWallPlanes: [],             // Array of { nx, ny, px, py, ax, ay, bx, by } — sky wall occluders
-        skySectors: new Set(),         // Sector indices with sky ceilings
-        skyGroupOf: new Map(),         // Map<sectorIndex, groupId> — connected sky sector groups
-        thingDom: new Map(),           // Map<thingIndex, { element, sprite }>
-        projectileDom: new Map(),      // Map<projectileId, element>
-        // CSS perspective distance in pixels. Determines the field of view;
-        // also used as a translateZ offset to position the camera correctly.
-        perspectiveValue: 700,
-    };
+export function createDomRenderer(playerIndex) {
+    const renderer = new DomRenderer({ playerIndex, gameContainer, paneTemplate });
+    domRenderers.push(renderer);
+    return renderer;
 }
 
-export const sceneStates = renderers.map(() => makeSceneState());
-export const sceneState = sceneStates[0];
+/**
+ * Remove a renderer from the registry and tear its pane out of the DOM.
+ * Caller is responsible for clearing any orchestrator target slot that
+ * held this renderer beforehand.
+ */
+export function destroyDomRenderer(renderer) {
+    const i = domRenderers.indexOf(renderer);
+    if (i >= 0) domRenderers.splice(i, 1);
+    renderer.destroy();
+}
+
+/**
+ * Construct / destroy local DomRenderers to match what master needs for
+ * a given (gameMode, networkMode) combination:
+ *
+ *   - SP standalone non-kiosk: 1 renderer at slot 0 (playerIndex 0).
+ *   - SP standalone kiosk:     2 renderers at slots 0 + 1, both
+ *                               playerIndex 0 — mirror. Player 0's
+ *                               per-player commands fan to both panes
+ *                               so the right monitor mirrors the left.
+ *   - Local DM (deathmatch+standalone):  2 renderers, playerIndex 0 + 1.
+ *   - Network host non-kiosk:  1 local renderer at slot 0. Slots 1..3
+ *                               fill with sinks when remotes join.
+ *   - Network host kiosk:      2 local renderers (slots 0 + 1,
+ *                               playerIndex 0 + 1). Slots 2..3 sinks.
+ *
+ * Renderers are reused across mode switches where possible — only the
+ * delta count is created or destroyed, and `playerIndex` updates in
+ * place for existing ones. Each renderer is installed into / removed
+ * from `orchestrator.targets[slot]` to match. Client windows manage
+ * their single renderer separately (see client.js); this helper is
+ * master-side only.
+ */
+export function reshapeMasterRenderers(gameMode, networkMode) {
+    const isKiosk = document.body.classList.contains('kiosk');
+    const mirror = gameMode === 'singleplayer' && isKiosk;
+    const needsTwoLocal = (gameMode === 'deathmatch' && networkMode === 'standalone')
+        || mirror
+        || (gameMode === 'deathmatch' && networkMode === 'host' && isKiosk);
+    const desiredCount = needsTwoLocal ? 2 : 1;
+
+    // Tear down extras (from the end so indices stay stable).
+    while (domRenderers.length > desiredCount) {
+        const r = domRenderers[domRenderers.length - 1];
+        const slot = orchestrator.targets.indexOf(r);
+        if (slot >= 0) orchestrator.replaceTarget(slot, null);
+        destroyDomRenderer(r);
+    }
+
+    // Create missing renderers at the next free slot.
+    while (domRenderers.length < desiredCount) {
+        const slot = domRenderers.length;
+        const playerIndex = mirror ? 0 : slot;
+        const r = createDomRenderer(playerIndex);
+        orchestrator.replaceTarget(slot, r);
+    }
+
+    // Update playerIndex on existing renderers in case mirror just
+    // toggled. Pane element's `data-player` follows the playerIndex so
+    // CSS hide rules (`body[data-game-mode] .pane[data-player="0"]` …) and
+    // the player-sprite "hide own billboard" selector key correctly.
+    for (let slot = 0; slot < domRenderers.length; slot++) {
+        const r = domRenderers[slot];
+        r.playerIndex = mirror ? 0 : slot;
+        r.paneEl.dataset.player = String(r.playerIndex);
+    }
+}

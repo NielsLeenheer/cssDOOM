@@ -2,15 +2,14 @@
  * Lift rendering — scene construction and visual state updates.
  */
 
-import { dom, sceneState, sceneStates } from '../../dom.js';
 import { createWallElement, setContainerLight } from '../surfaces/walls.js';
 
 /**
- * Builds the visual representation of a lift in the scene. Reparents floor
- * surfaces into the animated platform, creates shaft wall elements, and adds
- * them to state.wallElements.
+ * Builds the visual representation of a lift into the build context.
+ * Reparents floor surfaces into the animated platform, creates shaft wall
+ * elements, and adds them to the scene state's wallElements.
  */
-export function buildLift(lift) {
+export function buildLift(ctx, lift) {
     const heightDelta = lift.upperHeight - lift.lowerHeight;
 
     const liftGroup = document.createElement('div');
@@ -23,7 +22,7 @@ export function buildLift(lift) {
     liftGroup.appendChild(liftPlatform);
 
     // Move floor surfaces into the platform
-    for (const surfaceElement of sceneState.surfaceElements) {
+    for (const surfaceElement of ctx.sceneState.surfaceElements) {
         if (surfaceElement._sectorIndex === lift.sectorIndex && surfaceElement._type === 'floor') {
             liftPlatform.appendChild(surfaceElement);
         }
@@ -49,16 +48,14 @@ export function buildLift(lift) {
         } else {
             liftGroup.appendChild(el);
         }
-        sceneState.wallElements.push(el);
+        ctx.sceneState.wallElements.push(el);
     }
 
-    dom.scene.appendChild(liftGroup);
-    sceneState.liftContainers.set(lift.sectorIndex, liftPlatform);
+    ctx.fragment.appendChild(liftGroup);
+    ctx.sceneState.liftContainers.set(lift.sectorIndex, liftPlatform);
 }
 
-export function setLiftState(sectorIndex, liftState) {
-    for (const sState of sceneStates) {
-        const container = sState.liftContainers.get(sectorIndex);
-        if (container) container.dataset.state = liftState;
-    }
+export function setLiftState(renderer, sectorIndex, liftState) {
+    const container = renderer.sceneState.liftContainers.get(sectorIndex);
+    if (container) container.dataset.state = liftState;
 }

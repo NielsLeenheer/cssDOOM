@@ -24,7 +24,7 @@ import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../constants.js';
 import { state } from '../state.js';
 import { mapData, sectorCenter } from '../../shared/maps.js';
 import { orchestrator } from '../../orchestrator.js';
-import * as renderer from '../../renderer/index.js';
+import { setLiftState, updateThingPosition } from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 
 const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation duration
@@ -39,9 +39,6 @@ export function initLifts() {
     for (const lift of mapData.lifts) {
         const heightDelta = lift.upperHeight - lift.lowerHeight;
         if (heightDelta <= 0) continue;
-
-        // Build the visual representation via the renderer
-        renderer.buildLift(lift);
 
         // Annotate each collision edge with the "inside sign" — which side
         // of the edge is inside the lift's footprint. Used by canMoveTo
@@ -124,7 +121,7 @@ export function activateLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    renderer.setLiftState(sectorIndex, 'lowered');
+    setLiftState(sectorIndex, 'lowered');
     const lowerCenter = sectorCenter(sectorIndex);
     if (lowerCenter) orchestrator.playSound('DSPSTART', lowerCenter);
 
@@ -144,7 +141,7 @@ function raiseLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    renderer.setLiftState(sectorIndex, 'raised');
+    setLiftState(sectorIndex, 'raised');
     const raiseCenter = sectorCenter(sectorIndex);
     if (raiseCenter) orchestrator.playSound('DSPSTOP', raiseCenter);
     liftState.timer = null;
@@ -188,7 +185,7 @@ export function updatePlayerFromLift(timestamp) {
             const thing = things[i];
             if (thing.sectorIndex !== sectorIndex) continue;
             thing.floorHeight = liftState.currentHeight;
-            renderer.updateThingPosition(i, thing.x, thing.y, liftState.currentHeight);
+            updateThingPosition(i, thing.x, thing.y, liftState.currentHeight);
         }
     }
 }

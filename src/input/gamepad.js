@@ -177,16 +177,7 @@ function logChangesIfEnabled(rawPad) {
 // beyond ~3× the expected interval (now setInterval-based at 8ms). With
 // the timer-driven poll we expect ~8–16ms gaps; sustained gaps near 44ms
 // would mean the timer itself is being throttled, not just RAF.
-let _lastPollTimestamp = 0;
-const POLL_GAP_LOG_THRESHOLD_MS = 25;
-
 function pollGamepads() {
-    const now = performance.now();
-    if (_lastPollTimestamp && now - _lastPollTimestamp > POLL_GAP_LOG_THRESHOLD_MS) {
-        console.warn(`[gamepad] poll gap ${Math.round(now - _lastPollTimestamp)}ms (attract=${document.body.dataset.attract === 'true'})`);
-    }
-    _lastPollTimestamp = now;
-
     const rawPads = navigator.getGamepads ? navigator.getGamepads() : [];
 
     for (let i = 0; i < rawPads.length; i++) {

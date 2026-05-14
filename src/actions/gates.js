@@ -9,6 +9,7 @@
  *   INTERMISSION    — fire dismisses the SP intermission.
  *   MATCH_END       — fire restarts the DM match after scoreboard.
  *   MENU_OPEN       — block all gameplay actions when the menu is up.
+ *   NETWORK_START   — host's fire starts a Network DM match once ≥ 2 slots filled.
  *   CLAIM           — first press from an unbound device claims a slot in DM lobby.
  *   DEAD_RESPAWN    — fire respawns / restarts after the death cooldown.
  *
@@ -23,11 +24,12 @@
 
 import { state } from '../game/state.js';
 import { isMenuOpen } from '../ui/menu.js';
-import { isMatchEnded, restartMatch } from '../game/match.js';
+import { isMatchEnded, restartMatch, startMatch, isMatchLobby } from '../game/match.js';
 import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { tryClaimSlot } from '../input/claim-registry.js';
 import { currentMap, loadMap } from '../shared/maps.js';
+import { countOccupied as countNetworkLobbyOccupied } from '../ui/network-lobby.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';
 
@@ -35,11 +37,12 @@ const DM_RESPAWN_COOLDOWN_MS = 2000;
 const SP_RESTART_COOLDOWN_MS = 4000;
 
 export const GATE_PRIORITY = {
-    INTERMISSION: 900,
-    MATCH_END:    800,
-    MENU_OPEN:    700,
-    CLAIM:        600,
-    DEAD_RESPAWN: 500,
+    INTERMISSION:  900,
+    MATCH_END:     800,
+    MENU_OPEN:     700,
+    NETWORK_START: 650,
+    CLAIM:         600,
+    DEAD_RESPAWN:  500,
 };
 
 export function initGates() {
@@ -70,12 +73,29 @@ export function initGates() {
     on(A.WEAPON_NEXT,   menuBlock, { priority: GATE_PRIORITY.MENU_OPEN });
     on(A.WEAPON_SELECT, menuBlock, { priority: GATE_PRIORITY.MENU_OPEN });
 
+    // ── Network DM host-fire-to-start — when ≥ 2 slots are filled in
+    // the network lobby and slot 0's input fires, transition LOBBY →
+    // ACTIVE. Must run BEFORE the CLAIM gate so a host who already
+    // owns slot 0 doesn't get a phantom claim attempt. Must also run
+    // after MENU_OPEN so an open menu can't trigger the start.
+    on(A.FIRE_DOWN, ({ slot }) => {
+        if (state.networkMode !== 'host') return;
+        if (!isMatchLobby()) return;
+        if (slot !== 0) return;
+        if (countNetworkLobbyOccupied() < 2) return;
+        startMatch();
+        return true;
+    }, { priority: GATE_PRIORITY.NETWORK_START });
+
     // ── Press-to-claim — first discrete press from an unbound device in
-    // a DM lobby promotes the device into a slot. Consume so the same
-    // press doesn't immediately fire or use.
+    // a DM lobby promotes the device into a slot. Also active for Network
+    // DM's kiosk variant (slots 0 and 1 claimable; non-kiosk uses
+    // setDefaultSlot(0) so event.slot is never null there and the
+    // function passes through). Consume so the same press doesn't
+    // immediately fire or use.
     const tryClaim = (event) => {
         if (event.slot != null) return;             // already claimed → pass through
-        if (state.mode !== 'deathmatch') return;    // SP uses default-slot fallback
+        if (state.gameMode !== 'deathmatch') return;
         if (event.deviceId == null) return;
         if (isMatchEnded()) return;                  // match-end gate handles its own
         const claimed = tryClaimSlot(event.deviceId);
@@ -96,11 +116,11 @@ export function initGates() {
         if (slot == null) return;
         const player = state.players[slot];
         if (!player?.isDead) return;
-        const cooldown = state.mode === 'deathmatch'
+        const cooldown = state.gameMode === 'deathmatch'
             ? DM_RESPAWN_COOLDOWN_MS
             : SP_RESTART_COOLDOWN_MS;
         if (performance.now() - player.deathTime <= cooldown) return true;
-        if (state.mode === 'deathmatch') {
+        if (state.gameMode === 'deathmatch') {
             spawnPlayer(player);
         } else {
             loadMap(currentMap);

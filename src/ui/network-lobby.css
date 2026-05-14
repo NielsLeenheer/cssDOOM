@@ -1,0 +1,171 @@
+/* ========================================================================
+   Network DM lobby — per-pane.
+   ------------------------------------------------------------------------
+   The lobby DOM lives inside the pane template, alongside .pane-win and
+   .pane-intermission. Every pane (master's panes and each remote's single
+   pane) gets its own copy of this subtree; the JS in
+   src/ui/network-lobby.js keeps the slot rows + room code in sync across
+   all copies. The per-pane action prompt is driven by CSS.
+   ======================================================================== */
+
+.pane-network-lobby {
+    display: none;
+    position: fixed;
+    inset: 0;
+    /* Match .pane-win / .pane-intermission (z-index: 1200) so the HUD
+       (z-index: 1000) is hidden underneath the lobby — same behaviour
+       the user already sees during the post-match scoreboard and the
+       SP intermission. */
+    z-index: 1200;
+    background: url('/assets/intermission/WIMAP0.png') center / cover no-repeat;
+    image-rendering: pixelated;
+    color: #fff;
+    font-family: 'STCFN', monospace;
+    pointer-events: none;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Show one copy per pane while we're in the network lobby. */
+body[data-network-mode="host"][data-game-state="lobby"] .pane-network-lobby {
+    display: flex;
+}
+
+.network-lobby-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    padding: 32px;
+    min-width: 360px;
+}
+
+.network-lobby-title {
+    font-size: 28px;
+    color: #dc0000;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+}
+
+/* Slot list ------------------------------------------------------------ */
+
+.network-slots {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.network-slot {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 12px;
+    font-size: 16px;
+    text-transform: uppercase;
+
+    & .network-slot-label {
+        color: #ccc;
+    }
+}
+
+/* Colored swatch — same per-player palette and size as the post-match
+   scoreboard. STFB0/3/1/2 backing image, STFST00 face overlay when
+   the slot has an occupant. Stays full opacity regardless of state so
+   every player's color is visible at a glance. */
+
+.network-slot-swatch {
+    position: relative;
+    width: calc(48px * var(--screen-scale, 1));
+    height: calc(48px * var(--screen-scale, 1));
+    background: no-repeat center / cover;
+    border: 1px solid rgba(0, 0, 0, 0.4);
+    image-rendering: pixelated;
+    flex-shrink: 0;
+
+    &.player-0 { background-image: url('/assets/hud/STFB0.png'); }
+    &.player-1 { background-image: url('/assets/hud/STFB3.png'); }
+    &.player-2 { background-image: url('/assets/hud/STFB1.png'); }
+    &.player-3 { background-image: url('/assets/hud/STFB2.png'); }
+}
+
+.network-slot:not([data-occupant="empty"]) .network-slot-swatch::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: url('/assets/hud/STFST00.png') no-repeat center / contain;
+    image-rendering: pixelated;
+}
+
+/* Invite section ----------------------------------------------------- */
+
+.network-invite {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.network-invite-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+}
+
+.network-invite-label {
+    font-size: 12px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.network-invite-code {
+    font-size: 28px;
+    color: #fff;
+    letter-spacing: 6px;
+}
+
+.network-invite-qr {
+    width: 160px;
+    height: 160px;
+    background: #fff;
+    padding: 8px;
+    box-sizing: content-box;
+
+    & svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+        /* Keep the QR's hard pixel edges crisp at any kiosk resolution. */
+        shape-rendering: crispEdges;
+    }
+}
+
+.network-invite-qr:empty { display: none; }
+
+/* Per-pane action prompt ---------------------------------------------
+   Hidden by default. body[data-network-ready="true"] (set by the JS
+   when ≥ 2 slots are occupied) flips it on. The text differs per
+   pane: pane 0 (the host's view) prompts the host to fire; every
+   other pane shows the waiting message. */
+
+.network-action-prompt {
+    font-size: 16px;
+    color: #dc0000;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    min-height: 1.2em;
+    margin-top: 8px;
+}
+
+body[data-network-ready="true"] .pane[data-player="0"] .network-action-prompt::after {
+    content: 'Press fire to start game';
+}
+body[data-network-ready="true"] .pane:not([data-player="0"]) .network-action-prompt::after {
+    content: 'Waiting for game to start';
+    color: #ccc;
+}

@@ -45,19 +45,12 @@
  * is unchanged.
  */
 
-import { DomRenderer } from './renderer/dom-renderer.js';
+import { domRenderers } from './renderer/dom.js';
 import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import * as audio from './audio/audio.js';
-import {
-    clonePanes as clonePanesHelper,
-    setMirrorMode as setMirrorModeHelper,
-    isMirrorMode as isMirrorModeHelper,
-    viewportsForEffect as viewportsForEffectHelper,
-    tearDownPane,
-    rebuildPane,
-    updatePerspective,
-} from './renderer/scene/scene.js';
+import { setSlotAudioSuppressed } from './audio/audio.js';
+import { updatePerspective } from './renderer/scene/scene.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -79,7 +72,7 @@ const RECONNECT_GRACE_MS = 500;
 // `fireHeld` is set/cleared by event handlers and persists across frames
 // so chaingun auto-fire can poll it. The other fields are zeroed and
 // resummed every frame by `collectInputs`.
-const NUM_INPUT_SLOTS = 2;
+const NUM_INPUT_SLOTS = 4;
 function makeInputSlot() {
     return { moveX: 0, moveY: 0, turn: 0, turnDelta: 0, run: false, fireHeld: false };
 }
@@ -111,39 +104,42 @@ export function registerInputProvider(getPlayerIndex, getInput) {
 
 class Orchestrator {
     constructor() {
-        // Default registration: one DomRenderer per pane in the current
-        // sceneStates layout (always 2 in current HTML). bindRemoteSlot
-        // swaps one of these for a RenderSink when a client joins.
-        this.targets = [new DomRenderer(0), new DomRenderer(1)];
+        // One target per slot. Starts empty — boot code on master /
+        // client installs DomRenderers via `replaceTarget` based on the
+        // active mode (SP = 1 local renderer at slot 0; mirror SP / DM
+        // = 2 locals; Network DM master = 1 local + sinks at remote
+        // slots). Each DomRenderer owns its own pane DOM and sceneState
+        // — see dom-renderer.js.
+        this.targets = [null, null, null, null];
 
-        // Remote-slot bookkeeping. `occupiedRemoteSlots` is the set of
-        // slots currently held by a client. `currentRemoteSlot` is the
-        // single-client fast path (Local DM today; multi-client Network
-        // DM would generalize). `savedRemoteTarget` is the DomRenderer
-        // we swapped out, kept so unbind can restore it.
+        // Remote-slot bookkeeping. `_occupiedRemoteSlots` is the set of
+        // slots currently held by any remote client. `_remoteBindings`
+        // is keyed by peerKey ('local' for Local DM, peerId per remote
+        // for Network DM) and carries the per-peer state we need at
+        // unbind time: which slot, the target we swapped out (so we
+        // can restore it; may be null for network-only slots that never
+        // had a local pane), and the deferred-unhide grace timer.
         this._occupiedRemoteSlots = new Set();
-        this._currentRemoteSlot = null;
-        this._savedRemoteTarget = null;
-        this._unbindGraceTimer = null;
+        this._remoteBindings = new Map(); // peerKey → { slot, savedTarget, unbindGraceTimer }
     }
 
-    /** Returns the target for a given pane index, or null if out of range. */
-    target(paneIndex) {
-        return this.targets[paneIndex] ?? null;
+    /** Returns the target for a given slot, or null. */
+    target(slot) {
+        return this.targets[slot] ?? null;
     }
 
     /**
-     * Swap the target at a given pane index. Low-level — `bindRemoteSlot`
-     * is the higher-level entrypoint that also handles pane teardown and
-     * the visibility toggle. Returned: the previous target.
+     * Swap the target at a given slot. Low-level — `bindRemoteSlot` is
+     * the higher-level entrypoint that also handles pane teardown and
+     * the visibility toggle. Returned: the previous target (may be null).
      */
-    replaceTarget(paneIndex, target) {
-        const previous = this.targets[paneIndex];
-        this.targets[paneIndex] = target;
+    replaceTarget(slot, target) {
+        const previous = this.targets[slot];
+        this.targets[slot] = target;
         return previous;
     }
 
-    /** All sink targets currently registered (used to fan out world commands). */
+    /** All sink targets currently registered (used to fan out sounds). */
     _sinks() {
         const out = [];
         for (const t of this.targets) {
@@ -151,18 +147,6 @@ class Orchestrator {
         }
         return out;
     }
-
-    /** Forward a world command to all registered sinks. */
-    _broadcastWorld(method, args) {
-        for (const sink of this._sinks()) sink.forwardWorld(method, args);
-    }
-
-    // ── Scene controls (orchestrator-only, no per-target dispatch) ───────
-
-    clonePanes(paneCount) { clonePanesHelper(paneCount); }
-    setMirrorMode(value) { setMirrorModeHelper(value); }
-    isMirrorMode() { return isMirrorModeHelper(); }
-    viewportsForEffect(playerIndex) { return viewportsForEffectHelper(playerIndex); }
 
     // ── Audio dispatch ───────────────────────────────────────────────────
 
@@ -187,92 +171,142 @@ class Orchestrator {
 
     /**
      * Return the slot the snapshot provider should advertise to a joining
-     * client. Reuses the active single-client slot if there is one
-     * (a duplicate LOOKING retry from an already-alive peer); otherwise
-     * allocates the lowest free remote slot. Returns null if no slot
-     * is free.
+     * client. Reuses the slot already bound to this peer if there is one
+     * (a duplicate LOOKING retry from an already-alive peer, including a
+     * mid-grace reconnect); otherwise allocates the lowest free remote
+     * slot. Returns null if no slot is free.
      *
      * Pure allocation — no binding happens here. The actual swap occurs
      * in `bindRemoteSlot` once the peer answers with JOIN.
      */
-    nextOrCurrentRemoteSlot() {
-        if (this._currentRemoteSlot != null) return this._currentRemoteSlot;
+    nextOrCurrentRemoteSlot(peerKey) {
+        const existing = this._remoteBindings.get(peerKey);
+        if (existing) return existing.slot;
         for (let i = 1; i < MAX_SLOTS; i++) {
             if (!this._occupiedRemoteSlots.has(i)) return i;
         }
         return null;
     }
 
-    /** Returns the slot currently held by a remote client, or null. */
-    currentRemoteSlot() {
-        return this._currentRemoteSlot;
+    /** Returns the slot bound to the given peerKey, or null. */
+    currentRemoteSlot(peerKey) {
+        return this._remoteBindings.get(peerKey)?.slot ?? null;
     }
 
     /**
-     * Bind a connected client to the given slot. Installs a
-     * RenderSink in place of the DomRenderer, tears down master's
-     * local DOM for that pane (since the client now renders it),
-     * hides the pane via `body.client-active`, and refreshes
-     * perspectives because the remaining pane just grew from 50% → 100%
-     * width. Cancels any pending unbind grace timer in case this join is
-     * a reconnect that landed mid-grace.
+     * Bind a connected peer to the given slot. Installs a RenderSink in
+     * place of the DomRenderer, tears down master's local DOM for that
+     * pane (since the client now renders it), hides the pane via
+     * `body.client-active`, and refreshes perspectives because the
+     * remaining pane just grew from 50% → 100% width. Cancels any
+     * pending unbind grace timer in case this join is a reconnect (same
+     * peerKey) that landed mid-grace, OR another peer's grace that's
+     * still pending on the same slot.
      */
-    bindRemoteSlot(slot, channel) {
+    bindRemoteSlot(slot, transport, peerKey, opts = {}) {
         if (slot == null) {
             console.warn('[orchestrator] bindRemoteSlot called with null slot');
             return;
         }
 
-        // A reconnecting client cancels any pending visual-unhide so
-        // the user doesn't see a flash during reload.
-        if (this._unbindGraceTimer) {
-            clearTimeout(this._unbindGraceTimer);
-            this._unbindGraceTimer = null;
+        const suppressAudio = opts.suppressAudio === true;
+
+        // Mid-grace reconnect by the same peer: cancel its visual-unhide
+        // so the user doesn't see a flash, and recover its savedTarget.
+        const previous = this._remoteBindings.get(peerKey);
+        let savedTarget = previous?.savedTarget ?? null;
+        if (previous?.unbindGraceTimer) {
+            clearTimeout(previous.unbindGraceTimer);
+        }
+
+        // A *different* peer's binding is still mid-grace on this slot
+        // (rare in practice — would mean someone left and another joined
+        // within RECONNECT_GRACE_MS). Cancel that timer too so its
+        // loadMap rebuild doesn't stomp the new sink's output.
+        for (const [otherKey, b] of this._remoteBindings) {
+            if (otherKey === peerKey) continue;
+            if (b.slot === slot && b.unbindGraceTimer) {
+                clearTimeout(b.unbindGraceTimer);
+                this._remoteBindings.delete(otherKey);
+                savedTarget = savedTarget ?? b.savedTarget;
+            }
         }
 
         this._occupiedRemoteSlots.add(slot);
-        this._currentRemoteSlot = slot;
 
-        const sink = new RenderSink(channel, slot);
-        this._savedRemoteTarget = this.replaceTarget(slot, sink);
+        // Capture the DomRenderer (if any) currently at this slot BEFORE
+        // we replace the target — if one lived here, that's the renderer
+        // we need to clear on master.
+        const previousRenderer = this.targets[slot];
+        const wasLocalRenderer = previousRenderer && typeof previousRenderer.clear === 'function';
+
+        const sink = new RenderSink(transport, slot);
+        const swappedOut = this.replaceTarget(slot, sink);
+        this._remoteBindings.set(peerKey, {
+            slot,
+            savedTarget: savedTarget ?? swappedOut,
+            unbindGraceTimer: null,
+            suppressAudio,
+        });
 
         // Master skips the wasted work on an invisible subtree — world
         // commands and the culling loop both early-exit on the now-empty
-        // sceneStates[slot] arrays after teardown.
-        tearDownPane(slot);
+        // sceneState arrays after clear(). No clear needed if the slot
+        // didn't have a local renderer (e.g. Network DM slot 2 or 3 bound
+        // from empty state straight to a remote).
+        if (wasLocalRenderer) previousRenderer.clear();
         document.body.classList.add('client-active');
+        if (suppressAudio) setSlotAudioSuppressed(slot, true);
         updatePerspective();
 
-        console.log('[orchestrator] client bound at slot', slot, '- pane torn down');
+        console.log('[orchestrator] client bound at slot', slot, '- peer', peerKey);
     }
 
     /**
-     * Reverse of bindRemoteSlot. Restores the DomRenderer immediately so
-     * master's per-frame commands keep the local pane DOM in sync, but
-     * defers the visual unhide for RECONNECT_GRACE_MS so a reloading
-     * client's reconnect doesn't flash the pane visible. After the
-     * grace expires, the pane DOM is rebuilt from pane 0's current state
-     * before unhiding (otherwise the user sees an empty .scene for a
-     * frame).
+     * Reverse of bindRemoteSlot for one peer. Restores the DomRenderer
+     * immediately so master's per-frame commands keep the local pane DOM
+     * in sync, but defers the visual unhide for RECONNECT_GRACE_MS so a
+     * reloading client's reconnect doesn't flash the pane visible. After
+     * the grace expires, the pane DOM is rebuilt from pane 0's current
+     * state before unhiding (otherwise the user sees an empty .scene for
+     * a frame). The `body.client-active` class is only cleared when no
+     * remote peer remains.
      */
-    unbindRemoteSlot() {
-        const slot = this._currentRemoteSlot;
-        if (slot != null) {
-            this.replaceTarget(slot, this._savedRemoteTarget ?? new DomRenderer(slot));
-            this._occupiedRemoteSlots.delete(slot);
-        }
-        this._savedRemoteTarget = null;
-        this._currentRemoteSlot = null;
+    unbindRemoteSlot(peerKey) {
+        const binding = this._remoteBindings.get(peerKey);
+        if (!binding) return;
 
-        if (this._unbindGraceTimer) clearTimeout(this._unbindGraceTimer);
-        this._unbindGraceTimer = setTimeout(() => {
-            this._unbindGraceTimer = null;
-            if (slot != null) rebuildPane(slot);
-            document.body.classList.remove('client-active');
+        const { slot, savedTarget } = binding;
+        // Restore whatever target was here before the bind — typically a
+        // DomRenderer for Local DM (slot 1's pane 1 swap). For Network
+        // DM slots that were never local (slot 2 or 3 bound straight to
+        // a remote), savedTarget is null and we leave the slot empty.
+        this.replaceTarget(slot, savedTarget ?? null);
+        this._occupiedRemoteSlots.delete(slot);
+
+        if (binding.suppressAudio) setSlotAudioSuppressed(slot, false);
+
+        // The restored target rebuilds its own scene at grace-expiry —
+        // it reads the current mapData + state, so accumulated runtime
+        // mutations (open doors, dead enemies, collected items) carry
+        // over correctly via the underlying state.* the build reads from.
+        const rendererToRebuild = (savedTarget && typeof savedTarget.loadMap === 'function')
+            ? savedTarget
+            : null;
+
+        if (binding.unbindGraceTimer) clearTimeout(binding.unbindGraceTimer);
+        binding.unbindGraceTimer = setTimeout(() => {
+            // If a reconnect arrived during grace, bindRemoteSlot
+            // cancelled this timer and we never reach this body.
+            this._remoteBindings.delete(peerKey);
+            rendererToRebuild?.loadMap();
+            if (this._remoteBindings.size === 0) {
+                document.body.classList.remove('client-active');
+            }
             updatePerspective();
         }, RECONNECT_GRACE_MS);
 
-        console.log('[orchestrator] client unbound from slot', slot);
+        console.log('[orchestrator] client unbound from slot', slot, '- peer', peerKey);
     }
 
     // ── Per-frame input collection ───────────────────────────────────────
@@ -334,21 +368,31 @@ class Orchestrator {
     }
 }
 
-// Per-pane commands: route to one target by paneIndex. Target's method
-// (DomRenderer or RenderSink) is responsible for everything past the
-// paneIndex argument.
+// Per-player commands: iterate targets and dispatch to every one whose
+// `playerIndex` matches. In normal modes that's exactly one target. In
+// mirror SP, two DomRenderers share playerIndex 0 and both receive the
+// call. In Network DM, a RenderSink at the player's slot forwards to the
+// wire.
 for (const name of Object.keys(PER_PANE_COMMANDS)) {
-    Orchestrator.prototype[name] = function (paneIndex, ...args) {
-        this.targets[paneIndex]?.[name](...args);
+    Orchestrator.prototype[name] = function (playerIndex, ...args) {
+        for (const t of this.targets) {
+            if (!t) continue;
+            if (t.playerIndex !== playerIndex) continue;
+            t[name](...args);
+        }
     };
 }
 
-// World commands: invoke local impl, then fan out to every sink so
-// clients mirror the change.
-for (const [name, { impl }] of Object.entries(WORLD_COMMANDS)) {
+// World commands: iterate every target. Each DomRenderer runs the impl
+// against itself; each RenderSink forwards to the wire (its client's
+// own orchestrator then iterates its own targets). Build commands are
+// no longer here — they were folded into buildScene in Phase B.
+for (const name of Object.keys(WORLD_COMMANDS)) {
     Orchestrator.prototype[name] = function (...args) {
-        impl(...args);
-        this._broadcastWorld(name, args);
+        for (const t of this.targets) {
+            if (!t) continue;
+            t[name]?.(...args);
+        }
     };
 }
 

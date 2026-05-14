@@ -25,7 +25,7 @@ import { mapData } from '../../shared/maps.js';
 import { getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
 import { sectorCenter } from '../../shared/maps.js';
-import * as renderer from '../../renderer/index.js';
+import { setDoorState } from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 
 const DOOR_PASSABLE_DELAY = 0.8; // seconds — slightly before fully open to allow ducking under
@@ -47,9 +47,10 @@ export function isDoorClosed(wall) {
 }
 
 /**
- * Initialize all doors from map data.
- * Creates container elements for door animation, moves relevant ceiling and
- * face-wall elements into each container, and builds static track side walls.
+ * Initialize all doors from map data — populates state.doorState and
+ * annotates each door with its computed `trackWalls` so buildScene can
+ * draw the door container with its static track side walls. No renderer
+ * commands; buildScene reads mapData.doors directly.
  */
 export function initDoors() {
     state.doorState = new Map();
@@ -79,8 +80,7 @@ export function initDoors() {
             if (isAdjacent) trackWalls.push(wall);
         }
 
-        // Build the visual representation via the renderer
-        renderer.buildDoor(door, trackWalls);
+        door.trackWalls = trackWalls;
 
         state.doorState.set(door.sectorIndex, {
             open: false,
@@ -123,7 +123,7 @@ export function toggleDoor(sectorIndex, player) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.passableTimer = setTimeout(() => { doorEntry.passable = true; }, DOOR_PASSABLE_DELAY * 1000);
-    renderer.setDoorState(sectorIndex, 'open');
+    setDoorState(sectorIndex, 'open');
     const openCenter = sectorCenter(sectorIndex);
     if (openCenter) orchestrator.playSound('DSDOROPN', openCenter);
     doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
@@ -153,7 +153,7 @@ function closeDoor(sectorIndex) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.timer = null;
-    renderer.setDoorState(sectorIndex, 'closed');
+    setDoorState(sectorIndex, 'closed');
     const closeCenter = sectorCenter(sectorIndex);
     if (closeCenter) orchestrator.playSound('DSDORCLS', closeCenter);
 }

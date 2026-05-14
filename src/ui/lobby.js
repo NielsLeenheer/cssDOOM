@@ -92,6 +92,12 @@ export function initLobby({ getExternallyClaimedSlots }) {
  * unclaimed AND every lower-numbered slot is already claimed.
  */
 export function updateLobbyUI() {
+    // Network DM has its own lobby UI in src/ui/network-lobby.js — a
+    // 4-slot list instead of per-pane PRESS FIRE TO JOIN prompts. Skip
+    // the per-pane attribute work entirely; the local-DM-flavoured
+    // overlay is hidden in network mode by CSS anyway.
+    if (state.networkMode === 'host') return;
+
     const inLobby = isMatchLobby();
     // body[data-game-state] is owned by game-state's transitionTo — we
     // don't write it here. updateLobbyUI fires on every claim change,
@@ -184,7 +190,7 @@ function checkAutoStart() {
  * This function just refreshes the lobby UI.
  */
 export function enterLobby() {
-    if (state.mode !== 'deathmatch') return;
+    if (state.gameMode !== 'deathmatch') return;
     if (!state.match) resetMatch();
     updateLobbyUI();
 }

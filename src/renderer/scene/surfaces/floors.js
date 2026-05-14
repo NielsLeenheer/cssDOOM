@@ -3,25 +3,26 @@
  */
 
 import { mapData } from '../../../shared/maps.js';
-import { sceneState, sceneStates } from '../../dom.js';
 import { buildHorizontalSurface } from './horizontal.js';
 
-export function buildFloors() {
+export function buildFloors(ctx) {
     if (!mapData.sectorPolygons) return;
 
     for (const sector of mapData.sectorPolygons) {
-        buildHorizontalSurface(sector, sector.floorHeight, sector.floorTexture, 'floor');
+        buildHorizontalSurface(ctx, sector, sector.floorHeight, sector.floorTexture, 'floor');
     }
 }
 
 /**
  * Lowers all sector floors with the given tag to their lowest adjacent floor
- * height. Updates both the DOM elements (via CSS custom property) and the
- * sectorPolygon data (for physics/collision).
+ * height. Animates this renderer's floor surfaces and (idempotently) updates
+ * the shared sectorPolygon data so physics/collision sees the new heights.
+ * The orchestrator fans this command to every renderer; the mapData mutation
+ * is identical each call so doing it N times is harmless.
  *
  * Based on: linuxdoom-1.10/p_spec.c:P_FindLowestFloorSurrounding()
  */
-export function lowerTaggedFloor(tag) {
+export function lowerTaggedFloor(renderer, tag) {
     const sectors = mapData.sectors;
     const sectorPolygons = mapData.sectorPolygons;
 
@@ -46,21 +47,20 @@ export function lowerTaggedFloor(tag) {
             }
         }
 
-        // Update sectorPolygon floorHeight for physics
+        // Update sectorPolygon floorHeight for physics (idempotent — every
+        // renderer's call writes the same value to the same shared object).
         for (let j = 0, spLen = sectorPolygons.length; j < spLen; j++) {
             if (sectorPolygons[j].sectorIndex === sectorIndex) {
                 sectorPolygons[j].floorHeight = lowestFloor;
             }
         }
 
-        // Animate the floor surface DOM elements down — every pane's clone
-        for (const sState of sceneStates) {
-            for (let j = 0, seLen = sState.surfaceElements.length; j < seLen; j++) {
-                const el = sState.surfaceElements[j];
-                if (el._sectorIndex === sectorIndex && el._type === 'floor') {
-                    el.style.transition = 'transform 2s ease-in-out';
-                    el.style.setProperty('--floor-z', lowestFloor);
-                }
+        // Animate this renderer's floor surface DOM elements down.
+        for (let j = 0, seLen = renderer.sceneState.surfaceElements.length; j < seLen; j++) {
+            const el = renderer.sceneState.surfaceElements[j];
+            if (el._sectorIndex === sectorIndex && el._type === 'floor') {
+                el.style.transition = 'transform 2s ease-in-out';
+                el.style.setProperty('--floor-z', lowestFloor);
             }
         }
     }

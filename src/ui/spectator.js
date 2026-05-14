@@ -15,7 +15,7 @@
  */
 
 import { state } from '../game/state.js';
-import { dom } from '../renderer/dom.js';
+import { domRenderers } from '../renderer/dom.js';
 
 export let spectatorActive = false;
 let spectatorLoopRunning = false;
@@ -26,7 +26,7 @@ const spectatorControls = document.getElementById('spectator-controls');
  * Sets spectator custom properties on the viewport element for CSS to consume.
  */
 function updateSpectatorProperties() {
-    const s = dom.viewport.style;
+    const s = domRenderers[0].viewportEl.style;
     s.setProperty('--spectator-offset-x', spectator.offsetX);
     s.setProperty('--spectator-offset-y', spectator.offsetY);
     s.setProperty('--spectator-height', spectator.height);
@@ -57,7 +57,7 @@ function spectatorLoop() {
         if (spectator.keys.r) spectator.height = Math.max(100, spectator.height - spectator.height * 0.02);
         if (spectator.keys.f) spectator.height += spectator.height * 0.02;
 
-        dom.viewport.style.setProperty('--follow-height', spectator.height);
+        domRenderers[0].viewportEl.style.setProperty('--follow-height', spectator.height);
         updatePlayerSprite(-state.players[0].angle, true);
     }
     requestAnimationFrame(spectatorLoop);
@@ -105,7 +105,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
     }
 
     // Set spectator angle for CSS billboard — CSS handles the actual transform
-    dom.viewport.style.setProperty('--spectator-angle', cameraAngle);
+    domRenderers[0].viewportEl.style.setProperty('--spectator-angle', cameraAngle);
 }
 
 /**
@@ -115,13 +115,13 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
  * the browser captures the "before" state before applying the class change.
  */
 function transitionScene(duration, callback) {
-    dom.scene.style.transition = `translate ${duration}s ease-in-out, rotate ${duration}s ease-in-out, transform ${duration}s ease-in-out`;
+    domRenderers[0].sceneEl.style.transition = `translate ${duration}s ease-in-out, rotate ${duration}s ease-in-out, transform ${duration}s ease-in-out`;
     requestAnimationFrame(() => {
         callback();
-        dom.scene.addEventListener('transitionend', function onEnd(e) {
-            if (e.target !== dom.scene || e.propertyName !== 'rotate') return;
-            dom.scene.removeEventListener('transitionend', onEnd);
-            dom.scene.style.transition = '';
+        domRenderers[0].sceneEl.addEventListener('transitionend', function onEnd(e) {
+            if (e.target !== domRenderers[0].sceneEl || e.propertyName !== 'rotate') return;
+            domRenderers[0].sceneEl.removeEventListener('transitionend', onEnd);
+            domRenderers[0].sceneEl.style.transition = '';
         });
     });
 }
@@ -131,7 +131,7 @@ function transitionScene(duration, callback) {
  * Avoids CSS @starting-style which re-triggers continuously in Safari.
  */
 function transitionCeilings(fadeIn, duration, delay = 0) {
-    for (const el of dom.scene.querySelectorAll('.ceiling')) {
+    for (const el of domRenderers[0].sceneEl.querySelectorAll('.ceiling')) {
         if (fadeIn) {
             el.style.opacity = '0';
             el.style.transition = `opacity ${duration}s ease ${delay}s`;
@@ -160,7 +160,7 @@ window.spectate = function() {
     // Spectator is single-player only — the camera follows state.players[0]
     // and the controls overlay isn't routed per-pane. Refuse to enter from
     // a DM session; allow exit if somehow already active.
-    if (state.mode === 'deathmatch' && !spectatorActive) {
+    if (state.gameMode === 'deathmatch' && !spectatorActive) {
         console.log('Spectator mode is disabled in deathmatch.');
         return;
     }
@@ -174,7 +174,7 @@ window.spectate = function() {
         spectator.keys = {};
 
         updateSpectatorProperties();
-        dom.viewport.style.setProperty('--follow-height', spectator.height);
+        domRenderers[0].viewportEl.style.setProperty('--follow-height', spectator.height);
         if (spectatorControls) spectatorControls.classList.remove('hidden');
 
         // Fade out ceilings, then toggle spectator class which sets display:none
@@ -314,7 +314,7 @@ function switchSpectatorMode(newMode) {
 
     updateSpectatorProperties();
     if (spectator.mode === 'follow') {
-        dom.viewport.style.setProperty('--follow-height', spectator.height);
+        domRenderers[0].viewportEl.style.setProperty('--follow-height', spectator.height);
     }
 
     // Inline transition overrides CSS rule, then toggle class

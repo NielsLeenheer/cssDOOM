@@ -14,7 +14,6 @@
 import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
 import { mapData } from '../../../shared/maps.js';
-import { sceneState } from '../../dom.js';
 import { appendToSector, getSectorLight } from '../sectors.js';
 
 /** Creates a wall DOM element from wall data with the given floor/ceiling heights. */
@@ -51,7 +50,7 @@ export function setContainerLight(container, sectorIndex) {
     container.style.setProperty('--light', getSectorLight(sectorIndex));
 }
 
-export function buildWalls() {
+export function buildWalls(ctx) {
     for (const wall of mapData.walls) {
         const deltaX = wall.end.x - wall.start.x;
         const deltaY = wall.end.y - wall.start.y;
@@ -98,11 +97,11 @@ export function buildWalls() {
         wallElement._sectorIndex = wall.sectorIndex;
 
         wallElement.hidden = true;
-        appendToSector(wallElement, wall.sectorIndex);
-        sceneState.wallElements.push(wallElement);
+        appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, wallElement, wall.sectorIndex);
+        ctx.sceneState.wallElements.push(wallElement);
     }
 
-    buildSkyWalls();
+    buildSkyWalls(ctx);
 }
 
 /**
@@ -116,7 +115,7 @@ export function buildWalls() {
  *
  * Hidden by default; shown via the debug-sky-walls toggle.
  */
-function buildSkyWalls() {
+function buildSkyWalls(ctx) {
     const sectors = mapData.sectors;
     if (!sectors) return;
 
@@ -126,7 +125,7 @@ function buildSkyWalls() {
     }
     if (skyIndices.size === 0) return;
 
-    sceneState.skySectors = skyIndices;
+    ctx.sceneState.skySectors = skyIndices;
 
     // Extend sky walls above the ceiling to occlude distant geometry.
     // Height must cover the sky texture without exposing the fill color.
@@ -173,7 +172,7 @@ function buildSkyWalls() {
         }
         groupId++;
     }
-    sceneState.skyGroupOf = skyGroupOf;
+    ctx.sceneState.skyGroupOf = skyGroupOf;
 
     for (const wall of mapData.walls) {
         if (!skyIndices.has(wall.sectorIndex)) continue;
@@ -210,13 +209,13 @@ function buildSkyWalls() {
         el.style.setProperty('--floor-z', skyFloor);
         el.style.setProperty('--ceiling-z', SKY_TOP);
 
-        appendToSector(el, wall.sectorIndex);
+        appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, el, wall.sectorIndex);
 
         // Store sky wall plane for culling — every sky wall acts as an occluder.
         const wallAngle = Math.atan2(dy, dx);
         const nx = Math.sin(wallAngle);
         const ny = -Math.cos(wallAngle);
-        sceneState.skyWallPlanes.push({
+        ctx.sceneState.skyWallPlanes.push({
             nx, ny,
             px: wall.start.x, py: wall.start.y,
             ax: wall.start.x, ay: wall.start.y,

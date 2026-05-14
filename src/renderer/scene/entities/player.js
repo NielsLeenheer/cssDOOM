@@ -1,18 +1,17 @@
 /**
  * Player entity — construction and visual state.
  *
- * Per-player: state classes (.dead, .moving, .has-{color}-key) are toggled on
- * each pane's .renderer in dom.renderers[playerIndex]. In mirror mode,
- * viewportsForEffect() fans out player 0's state to pane 1 too so the
- * mirror pane's HUD/visuals match. The spectator sprite (#player) lives in
- * dom.scenes[0] only; spectator mode is single-player and is disabled in
- * deathmatch.
+ * Each runtime function takes a renderer instance and toggles classes on
+ * its `rendererEl`. Mirror-mode fan-out (pane 1 mirroring player 0's
+ * dead/moving/keys state) is handled at the orchestrator dispatch layer —
+ * every renderer whose `playerIndex` matches the called playerIndex
+ * receives the call.
+ *
+ * The spectator sprite (#player) is built into every renderer's scene
+ * fragment by buildPlayer; each pane has its own copy.
  */
 
-import { dom } from '../../dom.js';
-import { viewportsForEffect } from '../scene.js';
-
-export function buildPlayer() {
+export function buildPlayer(ctx) {
     const player = document.createElement('div');
     player.id = 'player';
     const marker = document.createElement('div');
@@ -21,30 +20,21 @@ export function buildPlayer() {
     const playerSprite = document.createElement('div');
     playerSprite.className = 'sprite';
     player.appendChild(playerSprite);
-    // Spectator-only sprite — single instance in pane 0.
-    dom.scenes[0].appendChild(player);
+    ctx.fragment.appendChild(player);
 }
 
-export function setPlayerDead(playerIndex, dead) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        dom.renderers[i].classList.toggle('dead', dead);
-    }
+export function setPlayerDead(renderer, dead) {
+    renderer.rendererEl.classList.toggle('dead', dead);
 }
 
-export function setPlayerMoving(playerIndex, moving) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        dom.renderers[i].classList.toggle('moving', moving);
-    }
+export function setPlayerMoving(renderer, moving) {
+    renderer.rendererEl.classList.toggle('moving', moving);
 }
 
-export function collectKey(playerIndex, color) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        dom.renderers[i].classList.add(`has-${color}-key`);
-    }
+export function collectKey(renderer, color) {
+    renderer.rendererEl.classList.add(`has-${color}-key`);
 }
 
-export function clearKeys(playerIndex) {
-    for (const i of viewportsForEffect(playerIndex)) {
-        dom.renderers[i].classList.remove('has-blue-key', 'has-yellow-key', 'has-red-key');
-    }
+export function clearKeys(renderer) {
+    renderer.rendererEl.classList.remove('has-blue-key', 'has-yellow-key', 'has-red-key');
 }

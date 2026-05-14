@@ -2,16 +2,16 @@
  * Door rendering — scene construction and visual state updates.
  */
 
-import { dom, sceneState, sceneStates } from '../../dom.js';
 import { getSectorLight } from '../sectors.js';
 import { createWallElement } from '../surfaces/walls.js';
 
 /**
- * Builds the visual representation of a door in the scene. Reparents ceiling
- * surfaces and face walls into an animated panel, creates track wall elements
- * from the provided wall data, and adds them to state.wallElements.
+ * Builds the visual representation of a door into the build context.
+ * Reparents ceiling surfaces and face walls into an animated panel,
+ * creates track wall elements from the provided wall data, and adds them
+ * to the scene state's wallElements.
  */
-export function buildDoor(door, trackWallData) {
+export function buildDoor(ctx, door, trackWallData) {
     const travelDistance = door.openHeight - door.closedHeight;
 
     const doorGroup = document.createElement('div');
@@ -24,7 +24,7 @@ export function buildDoor(door, trackWallData) {
 
     // Move ceiling surfaces into the panel — use door sector's light
     const doorLight = getSectorLight(door.sectorIndex);
-    for (const surfaceElement of sceneState.surfaceElements) {
+    for (const surfaceElement of ctx.sceneState.surfaceElements) {
         if (surfaceElement._sectorIndex === door.sectorIndex && surfaceElement._type === 'ceiling') {
             surfaceElement.style.setProperty('--light', doorLight);
             doorPanel.appendChild(surfaceElement);
@@ -32,7 +32,7 @@ export function buildDoor(door, trackWallData) {
     }
 
     // Move door face walls into the panel — each wall keeps its own sector's light
-    for (const wallElement of sceneState.wallElements) {
+    for (const wallElement of ctx.sceneState.wallElements) {
         const wallData = wallElement._wall;
         if (!wallData || !wallData.isUpperWall) continue;
         if (wallData.frontSectorIndex !== door.sectorIndex && wallData.backSectorIndex !== door.sectorIndex) continue;
@@ -51,16 +51,14 @@ export function buildDoor(door, trackWallData) {
         }
 
         doorGroup.appendChild(trackEl);
-        sceneState.wallElements.push(trackEl);
+        ctx.sceneState.wallElements.push(trackEl);
     }
 
-    dom.scene.appendChild(doorGroup);
-    sceneState.doorContainers.set(door.sectorIndex, doorGroup);
+    ctx.fragment.appendChild(doorGroup);
+    ctx.sceneState.doorContainers.set(door.sectorIndex, doorGroup);
 }
 
-export function setDoorState(sectorIndex, doorState) {
-    for (const sState of sceneStates) {
-        const container = sState.doorContainers.get(sectorIndex);
-        if (container) container.dataset.state = doorState;
-    }
+export function setDoorState(renderer, sectorIndex, doorState) {
+    const container = renderer.sceneState.doorContainers.get(sectorIndex);
+    if (container) container.dataset.state = doorState;
 }

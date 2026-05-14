@@ -23,7 +23,7 @@ import { state } from '../state.js';
 import { mapData } from '../../shared/maps.js';
 import { getSectorAt } from '../physics.js';
 import { damagePlayer } from '../player/damage.js';
-import * as renderer from '../../renderer/index.js';
+import { setCrusherOffset } from '../../renderer/index.js';
 
 const CRUSHER_SLOW_SPEED = 32;  // Map units per second (DOOM: 1 unit per tic at 35fps ≈ 35/s, we use 32)
 const CRUSHER_FAST_SPEED = 64;  // Fast crushers move at double speed
@@ -41,9 +41,6 @@ export function initCrushers() {
     for (const crusher of mapData.crushers) {
         const travelDistance = crusher.topHeight - crusher.crushHeight;
         if (travelDistance <= 0) continue;
-
-        // Build the visual representation via the renderer
-        renderer.buildCrusher(crusher);
 
         const entry = {
             sectorIndex: crusher.sectorIndex,
@@ -97,7 +94,7 @@ export function updateCrushers(deltaTime) {
 
         // Apply visual offset via renderer
         const offset = entry.topHeight - entry.currentHeight;
-        renderer.setCrusherOffset(entry.sectorIndex, offset);
+        setCrusherOffset(entry.sectorIndex, offset);
 
         // Check each player for being crushed; per-player damage timer so two
         // players in the same crusher accumulate independently.

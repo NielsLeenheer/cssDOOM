@@ -1,83 +1,30 @@
 /**
- * Scene orchestration — teardown, build, and texture preloading.
+ * Scene orchestration — buildScene, perspective.
  *
  * Coordinate mapping from DOOM to CSS 3D:
  *   DOOM X  → CSS X  (left/right)
  *   DOOM Y  → CSS −Z (forward/back — DOOM Y increases northward, CSS Z increases toward viewer)
  *   DOOM Z (height) → CSS −Y (vertical — CSS Y increases downward)
  *
- * Per-pane: pane 0's scene tree is built normally from map data; remaining
- * panes are populated by cloneSceneToOtherPanes(), which deep-clones pane 0's
- * DOM tree and copies the JS expando properties (the `_foo` data used by
- * culling, sprite rotation, etc.) onto the clones. Each clone pane's
- * sceneState arrays/Maps then point at the cloned elements via a
- * source→clone Map populated during the recursive clone walk. Each pane has
- * its own DOM tree so culling and visibility toggle independently.
- *
- * buildScene() builds only the static renderer DOM (sectors, walls, floors,
- * ceilings, player). Things, doors, lifts, crushers are added separately as
- * renderer commands invoked by game-side init code. Cloning to other panes
- * is also a separate command (cloneSceneToOtherPanes). The orchestration of
- * "build scene + populate dynamic things + clone + initial render" lives in
- * the caller (src/shared/maps.js loadMap), not in this file.
+ * Every renderer builds its own scene independently — buildScene() is a
+ * pure function of (mapData + state) and returns `{ fragment, sceneState }`
+ * that the renderer absorbs via DomRenderer.loadMap(). No cloning between
+ * panes; each pane runs the build for itself. See RENDERER_REFACTOR.md
+ * for the migration story.
  */
 
-import { dom, sceneState, sceneStates } from '../dom.js';
+import { domRenderers } from '../dom.js';
+import { makeSceneState } from '../dom-renderer.js';
+import { mapData } from '../../shared/maps.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
 import { buildFloors } from './surfaces/floors.js';
 import { buildCeilings } from './surfaces/ceilings.js';
 import { buildPlayer } from './entities/player.js';
-
-// Module-level flag for the Phase 3 pane-1 mirror debug toggle. When on:
-//   1. The caller should build extra panes by passing paneCount === sceneStates.length
-//      (so pane 1 has a renderable scene even when state.players.length === 1).
-//   2. Per-player visual effects (flash, powerup, weapon-switch, firing,
-//      head-bob, key collect, dead state) fan out from player 0 to pane 1
-//      via viewportsForEffect() below — so pane 1 visually mirrors pane 0.
-// Phase 4's deathmatch mode does NOT set this; it relies on
-// state.players.length === sceneStates.length and per-player effect routing.
-let mirrorMode = false;
-export function setMirrorMode(value) { mirrorMode = value; }
-export function isMirrorMode() { return mirrorMode; }
-
-/**
- * Yields the list of viewport indices that a per-player visual effect should
- * apply to. In normal play this is just the player's own pane. In mirror
- * mode, player 0's effects also fan out to pane 1 so the mirror pane shows
- * weapon switches, head-bob, key flashes, etc. alongside pane 0.
- */
-export function viewportsForEffect(playerIndex) {
-    if (mirrorMode && playerIndex === 0) return [0, 1];
-    return [playerIndex];
-}
-
-/**
- * Tears down the current scene in every pane, releasing DOM nodes and GPU
- * resources. Game-side state (spatial grid, doorState, etc.) must be cleared
- * separately by the caller — this function only owns renderer state.
- */
-export function teardownScene() {
-    for (let i = 0; i < sceneStates.length; i++) {
-        const sState = sceneStates[i];
-        sState.wallElements = [];
-        sState.surfaceElements = [];
-        sState.skyWallPlanes = [];
-        sState.skySectors = new Set();
-        sState.skyGroupOf = new Map();
-        sState.sectorContainers = [];
-        sState.thingContainers = [];
-        sState.doorContainers.clear();
-        sState.liftContainers.clear();
-        sState.crusherContainers.clear();
-        sState.thingDom.clear();
-        sState.projectileDom.clear();
-        // Atomic DOM clear — single reflow instead of one per child removal
-        dom.scenes[i].replaceChildren();
-    }
-    const oldSvg = document.getElementById('clip-svgs');
-    if (oldSvg) oldSvg.remove();
-}
+import { buildThing } from './entities/things.js';
+import { buildDoor } from './mechanics/doors.js';
+import { buildLift } from './mechanics/lifts.js';
+import { buildCrusher } from './mechanics/crushers.js';
 
 /**
  * Recompute each pane's `--perspective` from its current rendered
@@ -88,199 +35,70 @@ export function teardownScene() {
  * — client join/leave, kiosk toggle, window resize.
  */
 export function updatePerspective() {
-    for (let i = 0; i < dom.viewports.length; i++) {
-        const v = dom.viewports[i];
-        const paneWidth = v.clientWidth || window.innerWidth;
+    for (let i = 0; i < domRenderers.length; i++) {
+        const r = domRenderers[i];
+        const paneWidth = r.viewportEl.clientWidth || window.innerWidth;
         const perspectiveValue = paneWidth / 2;
-        sceneStates[i].perspectiveValue = perspectiveValue;
-        v.style.setProperty('--perspective', `${perspectiveValue}px`);
+        r.sceneState.perspectiveValue = perspectiveValue;
+        r.viewportEl.style.setProperty('--perspective', `${perspectiveValue}px`);
     }
 }
 
 /**
- * Builds the static renderer DOM for pane 0: sector containers, walls,
- * floors, ceilings, and the player billboard. Things, doors, lifts, and
- * crushers are NOT built here — the caller invokes those as renderer
- * commands after this function returns and before cloning to other panes.
+ * Builds the renderer scene as a pure DocumentFragment, returning
+ * `{ fragment, sceneState }`. The caller hands these to a renderer:
+ *
+ *   const { fragment, sceneState } = await buildScene();
+ *   renderer.sceneEl.replaceChildren(fragment);
+ *   Object.assign(renderer.sceneState, sceneState);
+ *
+ * No DOM-ownership knowledge in the build code — a second renderer can
+ * call buildScene() again to produce its own independent fragment. The
+ * scene is fully self-contained: static geometry (sectors, walls, floors,
+ * ceilings, player billboard) plus dynamic level objects (things, doors,
+ * lifts, crushers). Game-side init functions are expected to have run
+ * first — they populate `mapData.thingRenderSpecs`, annotate doors with
+ * `trackWalls`, and leave `mapData.lifts` / `mapData.crushers` ready to
+ * read.
  *
  * Async because it preloads textures before returning.
  */
 export async function buildScene() {
     updatePerspective();
 
-    // Build pane 0's scene from map data using the existing helpers (which
-    // operate on the singletons dom.scene / sceneState — both alias pane 0).
-    buildSectorContainers();
-    buildWalls();
-    buildFloors();
-    buildCeilings();
-    buildPlayer();
+    const ctx = {
+        fragment: document.createDocumentFragment(),
+        sceneState: makeSceneState(),
+    };
 
-    await preloadTextures();
-}
+    buildSectorContainers(ctx);
+    buildWalls(ctx);
+    buildFloors(ctx);
+    buildCeilings(ctx);
+    buildPlayer(ctx);
 
-/**
- * Clones pane 0's fully-built scene tree into panes 1..paneCount-1. The
- * caller must invoke this only after all renderer commands that mutate
- * pane 0's DOM (buildThing, buildDoor, buildLift, buildCrusher) have run,
- * so the clone captures the final state.
- */
-export function clonePanes(paneCount) {
-    if (paneCount > 1) {
-        cloneSceneToOtherPanes(paneCount);
+    // Dynamic level objects — game-side init has populated the data
+    // these helpers read.
+    if (mapData?.thingRenderSpecs) {
+        for (const spec of mapData.thingRenderSpecs) buildThing(ctx, spec);
     }
-}
-
-/**
- * Recursively clones pane 0's `.scene` DOM tree into the remaining panes
- * (1..panesToBuild-1), copying expando JS properties (`_midX`, `_wall`,
- * `_sectorIndex`, etc.) onto the clones via a source→clone Map. After the
- * clone walk, each clone pane's sceneState arrays/Maps are populated by
- * mapping pane 0's references through the cloneMap, so culling, sprite
- * rotation, and mechanics state-toggling all work per-pane out of the box.
- *
- * Element ids on cloned elements (DOOM wall ids like "ld489", sector ids
- * like "s0", the spectator "#player" sprite) are demoted to data-orig-id
- * so duplicate ids across panes don't violate the HTML uniqueness rule.
- * Renderer functions that need to find these elements across all panes use
- * `[data-orig-id="..."]` (see toggleSwitchState).
- */
-function cloneSceneToOtherPanes(paneCount) {
-    for (let pi = 1; pi < paneCount; pi++) {
-        cloneSceneToPane(pi);
+    if (mapData?.doors) {
+        for (const door of mapData.doors) buildDoor(ctx, door, door.trackWalls || []);
     }
-}
-
-/**
- * Clone pane 0's current `.scene` DOM tree into the target pane,
- * copying expando JS properties (`_midX`, `_wall`, `_sectorIndex`, etc.)
- * onto the clones via a source→clone Map. After the clone walk, the
- * target pane's sceneState arrays/Maps are populated by mapping pane 0's
- * references through the cloneMap so culling, sprite rotation, and
- * mechanics state-toggling all work per-pane out of the box.
- *
- * Element ids on cloned elements (DOOM wall ids like "ld489", sector
- * ids like "s0", the spectator "#player" sprite) are demoted to
- * data-orig-id so duplicate ids across panes don't violate the HTML
- * uniqueness rule. Renderer functions that need to find these elements
- * across all panes use `[data-orig-id="..."]` (see toggleSwitchState).
- *
- * Idempotent — `targetSceneEl.replaceChildren()` clears any prior tree
- * before re-cloning. Safe to call repeatedly to rebuild a torn-down
- * pane after a client disconnects.
- */
-function cloneSceneToPane(pi) {
-    const sourceSceneEl = dom.scenes[0];
-    const sourceSceneState = sceneStates[0];
-    const targetSceneEl = dom.scenes[pi];
-    const targetSceneState = sceneStates[pi];
-    if (!targetSceneEl || !targetSceneState) return;
-    const cloneMap = new Map();
-
-    function cloneRec(src) {
-        const tgt = src.cloneNode(false);
-        // Promote duplicate id to data-orig-id (cross-pane uniqueness rule).
-        if (tgt.id) {
-            tgt.dataset.origId = tgt.id;
-            tgt.removeAttribute('id');
+    if (mapData?.lifts) {
+        for (const lift of mapData.lifts) {
+            if (lift.upperHeight - lift.lowerHeight > 0) buildLift(ctx, lift);
         }
-        // Copy underscore-prefixed expando properties used by culling/etc.
-        for (const key of Object.getOwnPropertyNames(src)) {
-            if (key.startsWith('_')) tgt[key] = src[key];
+    }
+    if (mapData?.crushers) {
+        for (const crusher of mapData.crushers) {
+            if (crusher.topHeight - crusher.crushHeight > 0) buildCrusher(ctx, crusher);
         }
-        cloneMap.set(src, tgt);
-        for (const child of src.children) {
-            tgt.appendChild(cloneRec(child));
-        }
-        return tgt;
     }
 
-    targetSceneEl.replaceChildren();
-    for (const child of sourceSceneEl.children) {
-        targetSceneEl.appendChild(cloneRec(child));
-    }
+    await preloadTextures(ctx.fragment);
 
-    // Populate per-pane arrays via the source→clone Map.
-    targetSceneState.wallElements = sourceSceneState.wallElements.map(el => cloneMap.get(el));
-    targetSceneState.surfaceElements = sourceSceneState.surfaceElements.map(el => cloneMap.get(el));
-    targetSceneState.sectorContainers = sourceSceneState.sectorContainers.map(el => cloneMap.get(el));
-    targetSceneState.thingContainers = sourceSceneState.thingContainers.map(tc => ({
-        ...tc,
-        element: cloneMap.get(tc.element),
-    }));
-
-    targetSceneState.thingDom.clear();
-    for (const [idx, { element, sprite }] of sourceSceneState.thingDom) {
-        targetSceneState.thingDom.set(idx, {
-            element: cloneMap.get(element),
-            sprite: sprite ? cloneMap.get(sprite) : null,
-        });
-    }
-    targetSceneState.doorContainers.clear();
-    for (const [idx, container] of sourceSceneState.doorContainers) {
-        targetSceneState.doorContainers.set(idx, cloneMap.get(container));
-    }
-    targetSceneState.liftContainers.clear();
-    for (const [idx, container] of sourceSceneState.liftContainers) {
-        targetSceneState.liftContainers.set(idx, cloneMap.get(container));
-    }
-    targetSceneState.crusherContainers.clear();
-    for (const [idx, container] of sourceSceneState.crusherContainers) {
-        targetSceneState.crusherContainers.set(idx, cloneMap.get(container));
-    }
-    targetSceneState.projectileDom.clear();
-    for (const [idx, el] of sourceSceneState.projectileDom) {
-        targetSceneState.projectileDom.set(idx, cloneMap.get(el));
-    }
-
-    // Pure data — duplicate so each pane has its own independent copy.
-    targetSceneState.skyWallPlanes = [...sourceSceneState.skyWallPlanes];
-    targetSceneState.skySectors = new Set(sourceSceneState.skySectors);
-    targetSceneState.skyGroupOf = new Map(sourceSceneState.skyGroupOf);
-    targetSceneState.perspectiveValue = sourceSceneState.perspectiveValue;
-}
-
-/**
- * Tear down a single pane's DOM and sceneState. Used when a client
- * connects and takes over rendering for that slot — clearing
- * sceneStates[paneIndex] makes world commands (setEnemyState,
- * updateThingPosition, etc.) and the culling loop both early-exit when
- * they iterate that pane's empty arrays. Saves CPU/DOM work that would
- * otherwise happen against an invisible subtree.
- *
- * The .scene element itself is preserved (only its children are
- * replaced) — same for the .viewport, .hud, .status, and .weapon
- * elements that live in the pane template. They become empty containers
- * waiting for rebuildPane().
- */
-export function tearDownPane(paneIndex) {
-    const sState = sceneStates[paneIndex];
-    if (!sState) return;
-    sState.wallElements = [];
-    sState.surfaceElements = [];
-    sState.sectorContainers = [];
-    sState.thingContainers = [];
-    sState.skyWallPlanes = [];
-    sState.skySectors = new Set();
-    sState.skyGroupOf = new Map();
-    sState.thingDom.clear();
-    sState.doorContainers.clear();
-    sState.liftContainers.clear();
-    sState.crusherContainers.clear();
-    sState.projectileDom.clear();
-    dom.scenes[paneIndex]?.replaceChildren();
-}
-
-/**
- * Rebuild a single pane by cloning pane 0's current DOM tree into it.
- * Counterpart to tearDownPane — used when a client disconnects and
- * master needs the local pane back. The clone is from pane 0's *live*
- * state, so accumulated runtime mutations (open doors, dead enemies,
- * collected items) carry over correctly.
- */
-export function rebuildPane(paneIndex) {
-    if (paneIndex === 0) return; // pane 0 is the source, never rebuilt from itself
-    cloneSceneToPane(paneIndex);
+    return { fragment: ctx.fragment, sceneState: ctx.sceneState };
 }
 
 /**
@@ -289,20 +107,20 @@ export function rebuildPane(paneIndex) {
  * images are loaded. A timeout ensures the promise resolves even if some
  * textures fail to load.
  */
-function preloadTextures() {
+function preloadTextures(sceneRoot) {
     const urls = new Set();
 
-    for (const el of dom.scene.querySelectorAll('.wall, .floor, .ceiling')) {
+    for (const el of sceneRoot.querySelectorAll('.wall, .floor, .ceiling')) {
         const bg = el.style.backgroundImage;
         const match = bg?.match(/url\(['"]?([^'")\s]+)['"]?\)/);
         if (match) urls.add(match[1]);
     }
 
-    for (const el of dom.scene.querySelectorAll('.switch[data-texture^="SW1"]')) {
+    for (const el of sceneRoot.querySelectorAll('.switch[data-texture^="SW1"]')) {
         urls.add(`/assets/textures/SW2${el.dataset.texture.slice(3)}.png`);
     }
 
-    for (const img of dom.scene.querySelectorAll('img[src]')) {
+    for (const img of sceneRoot.querySelectorAll('img[src]')) {
         urls.add(img.src);
     }
 

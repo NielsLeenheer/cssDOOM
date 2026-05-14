@@ -1,11 +1,10 @@
 /**
- * Initial population of state.things from map data, plus issuing the matching
- * renderer.buildThing calls. Called once per level load, between buildScene
- * (renderer-side static geometry) and cloneScene (renderer-side fan-out to
- * other panes).
- *
- * Mirrors the structure of initDoors / initLifts / initCrushers — game-side
- * function that owns its slice of state.* and asks the renderer to draw it.
+ * Initial population of state.things from map data plus the matching
+ * per-thing render specs on mapData.thingRenderSpecs. Called once per level
+ * load, before buildScene — which reads the specs to build thing DOM into
+ * its fragment. No renderer commands are issued here; the renderer is
+ * driven entirely by data this function (and its initDoors / initLifts /
+ * initCrushers siblings) prepare.
  */
 
 import { mapData } from '../../shared/maps.js';
@@ -15,9 +14,9 @@ import {
     ENEMY_AI_STATS, LINE_OF_SIGHT_CHECK_INTERVAL, SOLID_THING_RADIUS,
 } from '../constants.js';
 import { getFloorHeightAt, getSectorAt } from '../physics.js';
-import * as renderer from '../../renderer/index.js';
 
 export function initThings() {
+    mapData.thingRenderSpecs = [];
     if (!mapData.things) return;
 
     for (const thing of mapData.things) {
@@ -26,7 +25,7 @@ export function initThings() {
         // but not single-player. Honour that: skip MP-only things in
         // SP, allow them through in DM (matches doom.exe -netgame).
         // Based on: linuxdoom-1.10/p_mobj.c P_SpawnMapThing()
-        if ((thing.flags & 16) && state.mode === 'singleplayer') continue;
+        if ((thing.flags & 16) && state.gameMode === 'singleplayer') continue;
         // Skill level flags: bit 0 = skill 1-2, bit 1 = skill 3, bit 2 = skill 4-5
         const skillBit = state.skillLevel <= 2 ? 1 : state.skillLevel === 3 ? 2 : 4;
         if (!(thing.flags & skillBit)) continue;
@@ -106,7 +105,7 @@ export function initThings() {
             state.things.push(entry);
         }
 
-        renderer.buildThing({
+        mapData.thingRenderSpecs.push({
             x: thing.x,
             y: thing.y,
             floorHeight,

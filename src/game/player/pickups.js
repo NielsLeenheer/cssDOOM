@@ -46,7 +46,7 @@ export function checkPickups(player) {
             if (keyColor) {
                 // DM rule: every player has all keys from spawn; map keys
                 // are left in the world but never picked up.
-                if (state.mode === 'deathmatch') continue;
+                if (state.gameMode === 'deathmatch') continue;
                 player.collectedKeys.add(keyColor);
                 renderer.collectKey(player.viewportIndex, keyColor);
                 thing.collected = true;
@@ -222,7 +222,7 @@ export function hasPowerup(player, name) {
  *   - Things that aren't pickups (decorations, enemies, barrels)
  */
 export function checkItemRespawns(deltaTime) {
-    if (state.mode !== 'deathmatch') return;
+    if (state.gameMode !== 'deathmatch') return;
 
     const things = state.things;
     for (let i = 0, len = things.length; i < len; i++) {

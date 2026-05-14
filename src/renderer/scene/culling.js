@@ -10,15 +10,15 @@
  * (not just the center) to avoid incorrectly culling large surfaces that
  * partially overlap the view.
  *
- * Per-player: each pane has its own player position/angle and its own scene
- * tree (in sceneStates[i]). updateCulling(player) culls a single pane.
- * The cullingLoop iterates every player so each pane gets its own visibility
- * pass each tick. cullingStats reflects the most recent pane's stats —
- * adequate for SP and for the debug overlay in DM (will be made per-pane
- * later if needed).
+ * Per-renderer: each DomRenderer owns its own sceneState and its own
+ * camera (`renderer.camera` aliases its player on master, or its local
+ * mirror on a client). The cullingLoop iterates every renderer so each
+ * pane gets its own visibility pass each tick. cullingStats reflects the
+ * most recent renderer's stats — adequate for SP and for the debug
+ * overlay in DM.
  */
 
-import { dom, sceneStates } from '../dom.js';
+import { domRenderers } from '../dom.js';
 import { rendererState } from '../renderer-state.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
 
@@ -191,7 +191,7 @@ const SKY_EXEMPT_DISTANCE_SQ = 1500 * 1500;
  * sky wall segment. If so, and the element is far enough past the crossing
  * point, the element is culled.
  *
- * `skyGroupOf` is the per-pane sceneStates[i].skyGroupOf, passed in to keep
+ * `skyGroupOf` is the renderer's sceneState.skyGroupOf, passed in to keep
  * this function pure.
  */
 function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGroupOf) {
@@ -250,7 +250,7 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
  */
 export function debugSkyTrace(wallId, playerX, playerY) {
     // Debug helper — uses pane 0's scene state.
-    const sState = sceneStates[0];
+    const sState = domRenderers[0].sceneState;
     const el = sState.wallElements.find(e => e.id === wallId);
     if (!el) { console.log(`Wall ${wallId} not found in wallElements`); return; }
 
@@ -311,7 +311,9 @@ export function debugSkyTrace(wallId, playerX, playerY) {
  * culling in spectator mode. Both are plain data — culling.js no longer
  * imports from src/game/ or src/ui/.
  */
-export function updateCulling(player, worldThings, spectatorActive, viewportIndex = player.viewportIndex) {
+export function updateCulling(renderer, worldThings, spectatorActive) {
+    const player = renderer.camera;
+    if (!player) return;
     const anyCulling = culling.frustum || culling.distance || culling.backface || culling.sky;
 
     let total = 0;
@@ -324,7 +326,7 @@ export function updateCulling(player, worldThings, spectatorActive, viewportInde
     const playerX = player.x;
     const playerY = player.y;
     const distSq = MAX_RENDER_DISTANCE * MAX_RENDER_DISTANCE;
-    const sState = sceneStates[viewportIndex];
+    const sState = renderer.sceneState;
     const skyPlanes = culling.sky ? sState.skyWallPlanes : null;
     const skyGroupOf = sState.skyGroupOf;
 
@@ -332,7 +334,7 @@ export function updateCulling(player, worldThings, spectatorActive, viewportInde
     // so side-by-side panes each cull against their own slice of the screen.
     const sinAngle = Math.sin(player.angle);
     const cosAngle = Math.cos(player.angle);
-    const paneWidth = dom.viewports[viewportIndex].clientWidth || window.innerWidth;
+    const paneWidth = renderer.viewportEl.clientWidth || window.innerWidth;
     const halfFov = Math.atan2(paneWidth / 2, sState.perspectiveValue) + FRUSTUM_MARGIN;
 
     // Cull walls
@@ -518,11 +520,10 @@ export function startCullingLoop({ isAttract, getSpectatorActive }) {
         if (frame >= interval) {
             frame = 0;
             const spectator = getSpectatorActive();
-            for (let i = 0; i < sceneStates.length; i++) {
-                if (sceneStates[i].wallElements.length === 0) continue;
-                const camera = rendererState.cameras[i] || rendererState.cameras[0];
-                if (!camera) continue;
-                updateCulling(camera, rendererState.things, spectator, i);
+            for (const renderer of domRenderers) {
+                if (renderer.sceneState.wallElements.length === 0) continue;
+                if (!renderer.camera) continue;
+                updateCulling(renderer, rendererState.things, spectator);
             }
         }
         requestAnimationFrame(tick);

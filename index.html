@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="index.css">
 </head>
 
-<body data-mode="singleplayer">
+<body data-game-mode="singleplayer" data-network-mode="standalone">
 
     <!-- Doom "fuzz" effect for Spectre — displaces pixels using animated noise -->
     <svg width="0" height="0" aria-hidden="true">
@@ -55,15 +55,16 @@
     <div id="loading-overlay" class="visible"></div>
 
     <!-- Game container — split-screen wrapper.
-         Single pane visible when body[data-mode="singleplayer"]; both panes
-         flex 50/50 when body[data-mode="deathmatch"]. Each pane is an empty
+         Single pane visible when body[data-game-mode="singleplayer"]; both panes
+         flex 50/50 when body[data-game-mode="deathmatch"]. Each pane is an empty
          container at parse
          time; dom.js clones <template id="pane-template"> into every .pane
          at module load, so per-pane markup lives in one place. -->
-    <div id="game">
-        <div class="pane" data-player="0"></div>
-        <div class="pane" data-player="1"></div>
-    </div>
+    <!-- Panes are created by src/renderer/dom.js's DomRenderer
+         instances. `#game` starts empty; each renderer appends its
+         own `.pane` subtree (cloned from `#pane-template`) when it's
+         constructed. -->
+    <div id="game"></div>
 
     <!-- Pane template — cloned into each .pane at dom.js load. Owns the
          full per-pane subtree: viewport (which carries CSS perspective),
@@ -166,6 +167,44 @@
             <div class="pane-win"></div>
             <div class="pane-intermission"></div>
             <div class="pane-timer"></div>
+            <!-- Network DM lobby — per-pane, mirrors the .pane-win /
+                 .pane-intermission pattern. Managed by src/ui/network-lobby.js;
+                 visibility gated on body[data-network-mode="host"][data-game-state="lobby"].
+                 Slot rows + room code are kept in sync across all panes by
+                 the JS; per-pane action prompt (PRESS FIRE TO START vs
+                 WAITING) is driven by CSS based on this pane's data-player
+                 and body[data-network-ready]. -->
+            <div class="pane-network-lobby">
+                <div class="network-lobby-inner">
+                    <div class="network-lobby-title">Join game</div>
+                    <ol class="network-slots">
+                        <li class="network-slot" data-slot="0" data-occupant="empty">
+                            <div class="network-slot-swatch player-0"></div>
+                            <span class="network-slot-label">waiting for player</span>
+                        </li>
+                        <li class="network-slot" data-slot="1" data-occupant="empty">
+                            <div class="network-slot-swatch player-1"></div>
+                            <span class="network-slot-label">waiting for player</span>
+                        </li>
+                        <li class="network-slot" data-slot="2" data-occupant="empty">
+                            <div class="network-slot-swatch player-2"></div>
+                            <span class="network-slot-label">waiting for player</span>
+                        </li>
+                        <li class="network-slot" data-slot="3" data-occupant="empty">
+                            <div class="network-slot-swatch player-3"></div>
+                            <span class="network-slot-label">waiting for player</span>
+                        </li>
+                    </ol>
+                    <div class="network-invite">
+                        <div class="network-invite-row">
+                            <span class="network-invite-label">Room code</span>
+                            <span class="network-invite-code">- - - -</span>
+                        </div>
+                        <div class="network-invite-qr"></div>
+                    </div>
+                    <div class="network-action-prompt"></div>
+                </div>
+            </div>
         </div>
     </template>
 
@@ -254,9 +293,14 @@
                     </div>
                     <div class="menu-column" id="menu-modes">
                         <div class="menu-section">
-                            <div class="menu-heading">Mode</div>
+                            <div class="menu-heading">Local</div>
                             <button class="menu-mode" data-mode="singleplayer"><span class="menu-mode-label">Single Player</span></button>
                             <button class="menu-mode" data-mode="deathmatch"><span class="menu-mode-label">Deathmatch</span></button>
+                        </div>
+                        <div class="menu-section">
+                            <div class="menu-heading">Network</div>
+                            <button class="menu-action" data-network="start"><span class="menu-action-label">Start new game</span></button>
+                            <button class="menu-action" data-network="join"><span class="menu-action-label">Join game</span></button>
                         </div>
                     </div>
                 </div>

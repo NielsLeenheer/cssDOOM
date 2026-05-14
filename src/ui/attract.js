@@ -95,7 +95,7 @@ export function attractTick(timestamp) {
     }
 
     // Attract is a DM-only kiosk feature.
-    if (state.mode !== 'deathmatch') {
+    if (state.gameMode !== 'deathmatch') {
         lastActivityAt = timestamp;
         return;
     }

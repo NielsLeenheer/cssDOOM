@@ -4,12 +4,18 @@
  * Each sector gets a container div that groups all geometry (walls, floors,
  * ceilings, things) belonging to that sector. The CSS custom property --light
  * is set once on the container and inherited by all children.
+ *
+ * Per Phase B of the renderer refactor (see RENDERER_REFACTOR.md), the
+ * build helpers here take a `ctx = { fragment, sceneState }` and operate
+ * purely against it — the resulting fragment + sceneState are handed back
+ * to a renderer in one shot by `buildScene`. `appendToSector` keeps the
+ * same shape: callers pass a "scope" with `{ sceneState, root }` where
+ * `root` is wherever non-sectored elements should go (the fragment during
+ * build, a renderer's `.sceneEl` afterward).
  */
 
 import { LIGHT_MINIMUM_BRIGHTNESS, DOOM_LIGHT_MAX, LIGHT_DISTANCE_OFFSET } from './constants.js';
-
 import { mapData } from '../../shared/maps.js';
-import { dom, sceneState } from '../dom.js';
 
 /**
  * Maps DOOM sector special types to CSS animation classes for dynamic lighting effects.
@@ -43,7 +49,12 @@ function doomLightToCSS(lightLevel) {
     return Math.max(LIGHT_MINIMUM_BRIGHTNESS, 1 - colormap / 32);
 }
 
-export function buildSectorContainers() {
+/**
+ * Build sector containers into the given build context. Reads
+ * `mapData.sectors`, creates one `.sector` div per sector, appends it to
+ * `ctx.fragment`, and pushes it into `ctx.sceneState.sectorContainers`.
+ */
+export function buildSectorContainers(ctx) {
     const sectors = mapData.sectors;
     if (!sectors) return;
 
@@ -60,8 +71,8 @@ export function buildSectorContainers() {
             applyLightEffect(container, sector.specialType);
         }
 
-        dom.scene.appendChild(container);
-        sceneState.sectorContainers.push(container);
+        ctx.fragment.appendChild(container);
+        ctx.sceneState.sectorContainers.push(container);
     }
 }
 
@@ -72,10 +83,21 @@ export function getSectorLight(sectorIndex) {
     return doomLightToCSS(sectorData.lightLevel);
 }
 
-export function appendToSector(element, sectorIndex) {
-    if (sectorIndex !== undefined && sceneState.sectorContainers[sectorIndex]) {
-        sceneState.sectorContainers[sectorIndex].appendChild(element);
+/**
+ * Append `element` to the scope's sector container (or to its root if
+ * `sectorIndex` is undefined / out of range).
+ *
+ * `scope` shape: `{ sceneState, root }`. During scene-building, root is
+ * the DocumentFragment being assembled; after-the-fact callers (still-
+ * legacy world commands) pass `{ sceneState: renderer.sceneState, root:
+ * renderer.sceneEl }`. A build context also conforms — its `fragment` is
+ * the root — but pass it as `{ sceneState: ctx.sceneState, root: ctx.fragment }`
+ * for clarity.
+ */
+export function appendToSector(scope, element, sectorIndex) {
+    if (sectorIndex !== undefined && scope.sceneState.sectorContainers[sectorIndex]) {
+        scope.sceneState.sectorContainers[sectorIndex].appendChild(element);
     } else {
-        dom.scene.appendChild(element);
+        scope.root.appendChild(element);
     }
 }

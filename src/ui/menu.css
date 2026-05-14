@@ -216,6 +216,32 @@ body.client-window #menu-button:hover { filter: none; }
     }
 }
 
+/* Network actions — same visual treatment as mode buttons, but they're
+   one-shot actions (start a new room / open join prompt) rather than
+   persistent selections, so no .active state and no skull cursor. */
+
+.menu-action {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.1s;
+
+    &:hover { opacity: 1; }
+
+    & .menu-action-label {
+        font-family: 'STCFN', monospace;
+        font-size: 16px;
+        color: #dc0000;
+        text-transform: uppercase;
+        padding: 4px 0;
+    }
+}
+
 /* Skull cursor for active items */
 
 .menu-level.active::before,
@@ -231,7 +257,8 @@ body.client-window #menu-button:hover { filter: none; }
 
 .menu-level::before,
 .menu-skill::before,
-.menu-mode::before {
+.menu-mode::before,
+.menu-action::before {
     content: '';
     width: 20px;
     height: 19px;

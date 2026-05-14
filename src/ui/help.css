@@ -111,7 +111,7 @@ kbd {
    the master, not fullscreen, and don't already have a client bound to a
    slot. Also hidden on touch (no popup windows there). */
 #detach-button { display: none; }
-body[data-mode="deathmatch"]:not(.fullscreen):not(.client-window):not(.client-active) #detach-button {
+body[data-game-mode="deathmatch"]:not(.fullscreen):not(.client-window):not(.client-active) #detach-button {
     display: block;
 }
 @media (pointer: coarse) {

@@ -20,7 +20,7 @@
  */
 
 import { MSG } from './protocol.js';
-import { PER_PANE_COMMANDS } from '../renderer/commands.js';
+import { PER_PANE_COMMANDS, WORLD_COMMANDS } from '../renderer/commands.js';
 
 export class RenderSink {
     /**
@@ -32,6 +32,9 @@ export class RenderSink {
     constructor(channel, paneIndex) {
         this.channel = channel;
         this.paneIndex = paneIndex;
+        // A sink represents one slot, which is one player position.
+        // The orchestrator's per-player dispatch matches against this.
+        this.playerIndex = paneIndex;
     }
 
     /** Post a per-pane command envelope. */
@@ -67,5 +70,16 @@ for (const [name, { serialize }] of Object.entries(PER_PANE_COMMANDS)) {
     RenderSink.prototype[name] = function (...args) {
         const wireArgs = serialize ? serialize(...args) : args;
         this._post(name, wireArgs);
+    };
+}
+
+// World commands: the orchestrator iterates targets and calls
+// `sink.<name>(...args)`. The sink's job is to put the call on the wire
+// once. The client's orchestrator then iterates its own targets and
+// fans the command into its local DomRenderer.
+for (const [name, { serialize }] of Object.entries(WORLD_COMMANDS)) {
+    RenderSink.prototype[name] = function (...args) {
+        const wireArgs = serialize ? serialize(...args) : args;
+        this.forwardWorld(name, wireArgs);
     };
 }

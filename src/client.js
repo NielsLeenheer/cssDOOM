@@ -39,24 +39,25 @@
 import { RenderClient } from './transport/render-client.js';
 import { MSG } from './transport/protocol.js';
 import { ClientConnection } from './transport/peer-connection.js';
+import { connectToNetworkRoom } from './transport/webrtc-transport.js';
 import { orchestrator, inputs } from './orchestrator.js';
+import { createDomRenderer, destroyDomRenderer, domRenderers } from './renderer/dom.js';
 import { setDefaultSlot } from './input/claim-registry.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initTouchInput } from './input/touch.js';
 import { on } from './input/event-bus.js';
 import * as A from './input/actions.js';
-import { sceneStates } from './renderer/dom.js';
 import { startCullingLoop } from './renderer/scene/culling.js';
 import { updatePerspective } from './renderer/scene/scene.js';
 import { isAttractActive } from './ui/attract.js';
 import { spectatorActive } from './ui/spectator.js';
-import { initClientRendererState } from './renderer/renderer-state.js';
-import { applyMode } from './ui/menu.js';
+import { applyMode } from './mode.js';
 import { hideInitialOverlay } from './ui/overlay.js';
 import { setAudioEnabled } from './audio/audio.js';
 import { loadMap } from './shared/maps.js';
 import { setClientSlot, applyLobbyState } from './ui/client-lobby.js';
+import { applyNetworkLobbyState } from './ui/network-lobby.js';
 import { showScoreboard, hideScoreboard } from './ui/scoreboard.js';
 import { ensureDisconnectedOverlay } from './ui/disconnected-overlay.js';
 import { applyRemoteGameState } from './game/game-state.js';
@@ -101,6 +102,11 @@ export function initClient(transport, mySlot, {
     if (forwardInput) {
         initInputForwarder(transport, mySlot);
     }
+
+    // Tell master we're listening — master defers its spawn / initial-
+    // state burst until this lands, so those world commands aren't fired
+    // into a not-yet-subscribed transport.
+    transport.send({ type: MSG.READY });
 }
 
 function initInputForwarder(transport, mySlot) {
@@ -151,34 +157,90 @@ function initInputForwarder(transport, mySlot) {
 // ── Boot ───────────────────────────────────────────────────────────────
 
 /**
- * Client window boot. Runs in any window with `?join` in the URL —
- * a Local DM secondary today, a Network DM remote tomorrow. Opens a
- * ClientConnection; on ACK, syncs mode/level locally so the renderer
- * has the same scene as master, then calls `initClient` to wire the
- * RenderClient half (and, for Network DM remotes, the input forwarder).
+ * Client window boot. Runs in any window with `?join` in the URL.
+ *
+ *   - `?join` with no value → Local DM secondary. BroadcastChannel
+ *     transport, no input forwarding (master already sees the inputs
+ *     since they're on the same machine), audio off.
+ *   - `?join=ABCD` → Network DM remote. Opens a `WebRTCDataChannelTransport`
+ *     to room ABCD via the Cloudflare-Worker signaling endpoint, then
+ *     forwards input back to master over the same channel. Audio plays
+ *     locally (separate device).
+ *
+ * Opens a ClientConnection; on ACK, syncs mode/level locally so the
+ * renderer has the same scene as master, then calls `initClient` to wire
+ * the RenderClient half (and, for Network DM remotes, the input forwarder).
  *
  * Disconnect handling: when master goes silent (closed, reloaded, crashed),
  * the connection's watchdog fires onLeave. We show a DISCONNECTED overlay
- * and the connection keeps sending LOOKING in the background. If a master
- * comes back, the simplest correct behavior is to reload this window —
- * any deltas that flowed through during the original session left the
- * scene out of sync with whatever the new master starts at.
+ * and the connection keeps sending LOOKING in the background. For Local
+ * DM the overlay just waits; for Network DM the WebRTC connection is
+ * already torn down by then, so the reload-on-ACK path is the only way
+ * back — but that requires the user to re-scan the QR / re-enter the
+ * code. Phase 8 will polish that path.
  */
-export async function initClientWindow() {
+export async function initClientWindow({ roomCode = null } = {}) {
     document.body.classList.add('client-window');
 
-    // Stand up the renderer-state arrays sized for the client's two-pane
-    // DOM. The mirror callbacks (declared in commands.js) populate them as
-    // updates flow in from master; until then they sit at spawn-default zeros.
-    initClientRendererState(sceneStates.length);
+    // rendererState.cameras grows lazily as inbound `updateCamera` mirror
+    // callbacks land — no pre-sizing needed.
 
     const overlay = ensureDisconnectedOverlay();
 
+    // Network DM: open the WebRTC transport before wiring the connection.
+    // The transport's `open` resolves once master's data channel is up.
+    // Show the disconnected overlay until then so the user sees something
+    // happening rather than a blank scene. Local DM skips this entirely
+    // and falls through to the BroadcastChannel default in ClientConnection.
+    let transport = null;
+    if (roomCode) {
+        overlay.classList.add('visible');
+        // Retry a few times — master's signaling listener may be
+        // mid-reconnect (network-host's transient-drop handling), or
+        // the host may be just about to click Start New Game right
+        // before we scan the QR. After CONNECT_RETRIES failures give
+        // up and leave the overlay up so the user knows it didn't take.
+        const CONNECT_RETRIES = 5;
+        const CONNECT_RETRY_DELAY_MS = 2000;
+        let lastErr = null;
+        for (let attempt = 0; attempt < CONNECT_RETRIES; attempt++) {
+            try {
+                transport = await connectToNetworkRoom({ roomCode });
+                overlay.classList.remove('visible');
+                break;
+            } catch (err) {
+                lastErr = err;
+                console.warn(`[client] connect attempt ${attempt + 1} failed:`, err.message ?? err);
+                if (attempt < CONNECT_RETRIES - 1) {
+                    await new Promise(r => setTimeout(r, CONNECT_RETRY_DELAY_MS));
+                }
+            }
+        }
+        if (!transport) {
+            console.error('[client] giving up after retries:', lastErr);
+            return;
+        }
+    }
+
+    // Network DM remotes own a full input pipeline and ship every press
+    // back to master; Local DM secondaries are display-only because
+    // master already sees the same physical inputs.
+    const forwardInput = roomCode != null;
+
     const conn = new ClientConnection({
+        transport, // null for Local DM → BroadcastChannel default
         onLobbyState: (msg) => {
-            // Per-pane claim-state mirror only — body[data-game-state]
-            // is driven by the GAME_STATE handler below.
+            // body[data-game-state] is driven by the GAME_STATE handler
+            // below; this just paints the lobby UI for whichever mode
+            // we're in.
+            //   - Local DM: applyLobbyState updates per-pane
+            //     data-claim-state from `slotsClaimed`.
+            //   - Network DM: applyNetworkLobbyState mirrors the 4-row
+            //     slot list from `slotOccupants`.
+            // Both fields ride on the same envelope; each consumer
+            // ignores the field it doesn't use.
             applyLobbyState(msg);
+            if (msg.slotOccupants) applyNetworkLobbyState(msg.slotOccupants);
         },
         onMatchEnd: (msg) => {
             // body[data-game-state] is driven by GAME_STATE; this
@@ -204,7 +266,26 @@ export async function initClientWindow() {
                 return;
             }
             overlay.classList.remove('visible');
-            if (payload.mode) applyMode(payload.mode);
+            if (payload.gameMode) applyMode(payload.gameMode, 'client');
+
+            // Master assigns us a slot; default to 1 if it's missing
+            // (e.g., older master that doesn't include slotIndex). The
+            // client renders one pane for that slot — playerIndex equals
+            // the slot, and the CSS "hide own billboard" rule keys off
+            // the matching data-player on the pane.
+            const slotIndex = payload.slotIndex ?? 1;
+
+            // Build (or rebuild) the client's local DomRenderer at this
+            // slot before loadMap, so loadMap's per-renderer iteration
+            // has something to write into. Reconnect-friendly: nuke any
+            // prior renderer so we start clean.
+            for (const r of [...domRenderers]) destroyDomRenderer(r);
+            for (let i = 0; i < orchestrator.targets.length; i++) {
+                orchestrator.targets[i] = null;
+            }
+            const renderer = createDomRenderer(slotIndex);
+            orchestrator.replaceTarget(slotIndex, renderer);
+
             if (payload.level) {
                 await loadMap(payload.level);
             }
@@ -214,32 +295,33 @@ export async function initClientWindow() {
             // (no echo back to the channel).
             if (payload.gameState) applyRemoteGameState(payload.gameState);
 
-            // Master assigns us a slot; default to 1 if it's missing
-            // (e.g., older master that doesn't include slotIndex). The
-            // local DomRenderer always paints to pane 1 of the client's
-            // HTML; the data-player attribute is set to match the slot
-            // so the "hide own billboard" CSS keys correctly even if the
-            // assigned slot isn't 1.
-            const slotIndex = payload.slotIndex ?? 1;
-            const visiblePane = document.querySelectorAll('.pane')[1];
-            if (visiblePane) visiblePane.dataset.player = String(slotIndex);
-
             // Tell the lobby mirror which slot we represent — it'll use
             // this to pick our slot's bit out of incoming LOBBY_STATE
             // broadcasts. Replays any LOBBY_STATE that arrived during
             // onAck's await loadMap.
             setClientSlot(slotIndex);
 
-            // Local DM secondary is display-only: master sees the same
-            // physical inputs directly and forwarding would double-
-            // process every press. Network DM remotes drop the flag and
-            // get the full input pipeline shipped over the wire.
-            initClient(conn.channel, slotIndex, { forwardInput: false });
-            console.log('[broadcast] client wired up at slot', slotIndex);
+            // forwardInput captured at boot from the roomCode presence:
+            // Network DM remote (roomCode set) ships its full input
+            // pipeline over the wire; Local DM secondary stays display-
+            // only because master sees the same physical inputs.
+            initClient(conn.channel, slotIndex, { forwardInput });
+            console.log('[client] wired up at slot', slotIndex, forwardInput ? '(network)' : '(local)');
         },
         onLeave: () => {
-            console.log('[broadcast] master went silent — showing DISCONNECTED');
+            console.log('[client] master went silent — showing DISCONNECTED');
             overlay.classList.add('visible');
+            if (roomCode) {
+                // Network DM: WebRTC is gone; the existing ClientConnection's
+                // LOOKING retries would talk to a dead transport. Reloading
+                // re-enters the join flow (which has its own retry loop)
+                // so a brief master blip recovers without user action.
+                // Short delay gives the user a glimpse of the DISCONNECTED
+                // overlay so reloads don't appear silent. Local DM keeps
+                // the old behavior — its BroadcastChannel stays open and
+                // a master reload will re-ACK.
+                setTimeout(() => location.reload(), 2000);
+            }
         },
     });
 

@@ -45,6 +45,12 @@ export const MSG = {
     ACK: 'ack',
     PONG: 'pong',
     LOOKING: 'looking-for-session',
+    // Client → master: "I've processed your ACK, my RenderClient is
+    // subscribed to the wire, and I'm ready to receive renderer
+    // commands." Master defers the spawn / initial-state burst until
+    // this arrives so the burst doesn't fire into a not-yet-subscribed
+    // transport (commands would be dropped on the client otherwise).
+    READY: 'ready',
     LEAVING: 'leaving',
     // Remote → master: a logical action event the remote already
     // interpreted on its own event bus (FIRE_DOWN, USE, WEAPON_NEXT,
@@ -63,11 +69,15 @@ export const MSG = {
     // the next reconnect arrives after master's loadMap has settled on
     // a fresh state.
     LEVEL_CHANGE: 'level-change',
-    // Master → client: current lobby state. Client mirrors it onto the
-    // per-pane data-claim-state attribute so the existing CSS shows the
-    // same PRESS BUTTON TO JOIN / READY / waiting visuals as the local
-    // split-screen pane would. (Lobby vs. active mode itself is mirrored
-    // separately via the GAME_STATE envelope below.)
+    // Master → client: current lobby state. Carries enough info for
+    // both lobbies:
+    //   - Local DM: `slotsClaimed` / `slotsCarriedOver` drive per-pane
+    //     data-claim-state CSS (PRESS BUTTON TO JOIN / READY / waiting).
+    //   - Network DM: `slotOccupants` (an array of
+    //     'empty'|'host'|'local'|'remote' tags by slot) drives the
+    //     4-row slot list in the per-pane network-lobby overlay.
+    // The same envelope is broadcast on every claim/join/leave/match
+    // -reset; clients pick the field they need based on their mode.
     LOBBY_STATE: 'lobby-state',
     // Master → client: match has ended. Carries the kill matrix,
     // per-player scores, map name, and winner so the client renders the

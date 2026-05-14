@@ -1,17 +1,15 @@
 /**
- * Menu — level / skill / mode selection overlay.
+ * Menu — level / skill / mode selection overlay (UI only).
+ *
+ * Renders the buttons, owns menu open/close, and routes clicks into the
+ * mode coordinator (`src/mode.js`) and the map loader (`shared/maps.js`).
+ * No game-state, renderer, audio, or networking logic lives here.
  */
 
 import { state } from '../game/state.js';
-import { Player } from '../game/player/player.js';
-import { currentMap } from '../shared/maps.js';
+import { currentMap, MAPS, loadMap } from '../shared/maps.js';
 import { dom } from '../renderer/dom.js';
-import { MAPS } from '../shared/maps.js';
-import { loadMap } from '../shared/maps.js';
-import { setMirrorMode } from '../renderer/scene/scene.js';
-import { resetMatch, clearMatch } from '../game/match.js';
-import { setDefaultSlot } from '../input/claim-registry.js';
-import { configureAudio } from '../audio/audio.js';
+import { switchMode } from '../mode.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 
@@ -51,88 +49,60 @@ document.querySelectorAll('.menu-skill').forEach(btn => {
     });
 });
 
-// Mode buttons
+// Mode buttons (Local section — singleplayer / deathmatch)
 document.querySelectorAll('.menu-mode').forEach(btn => {
     btn.addEventListener('click', () => {
         const mode = btn.dataset.mode;
-        if (mode === state.mode) return;
+        if (mode === currentModeName()) return;
         switchMode(mode);
         updateMenuSelection();
         toggleMenu(false);
     });
 });
 
-const MODE_STORAGE_KEY = 'cssdoom-mode';
-
 /**
- * Reads the saved mode from localStorage, falling back to 'singleplayer'.
- * Called from boot (index.js) before the initial loadMap so the scene is
- * built with the right pane count from the start.
+ * Resolve the current (gameMode, networkMode) pair back to the menu's
+ * single-string mode identifier ('singleplayer' / 'deathmatch' /
+ * 'network'), so the menu's button data-mode strings stay the source
+ * of truth for "is this button active".
  */
-export function loadSavedMode() {
-    const saved = localStorage.getItem(MODE_STORAGE_KEY);
-    return saved === 'deathmatch' ? 'deathmatch' : 'singleplayer';
+function currentModeName() {
+    if (state.networkMode === 'host') return 'network';
+    return state.gameMode;
 }
 
-/**
- * Applies a mode to global state without triggering a map reload.
- * Shared between boot-time restore and runtime switching: switchMode
- * calls this and then loads the map; the init path calls this then runs
- * its own initial loadMap('E1M1').
- */
-export function applyMode(mode) {
-    state.mode = mode;
-    document.body.dataset.mode = mode;
-
-    // Resize the players array. SP keeps player 0, DM adds player 1.
-    if (mode === 'deathmatch') {
-        if (state.players.length < 2) state.players.push(new Player(1));
-        resetMatch();
-        // DM requires explicit press-to-claim; no default slot.
-        setDefaultSlot(null);
-    } else {
-        state.players.length = 1;
-        clearMatch();
-        // SP: every input device drives player 0 without a claim ceremony.
-        setDefaultSlot(0);
-    }
-
-    // Mirror pane 0 → pane 1 in kiosk SP so the right monitor isn't
-    // dark. The mirror flag drives both the renderer's per-effect
-    // viewport fanout AND the paneCount used at scene build time
-    // (maps.js). DM never wants the mirror — pane 1 holds its own
-    // player there. Outside kiosk, SP just hides pane 1 via CSS, so
-    // mirroring would build an invisible second scene for nothing.
-    const isKiosk = document.body.classList.contains('kiosk');
-    setMirrorMode(isKiosk && mode === 'singleplayer');
-
-    // (Re)build per-listener AudioRenderers for the new roster. SP gets
-    // one bearing-pan renderer; DM gets two pane-side-locked renderers
-    // (slot 0 left, slot 1 right). No-op on a Local DM secondary —
-    // setAudioEnabled(false) was called in initClient.
-    configureAudio(state.players.length);
-}
-
-/**
- * Switch between single-player and deathmatch at runtime. Persists the
- * choice to localStorage so a refresh restores it, then reloads the
- * current map with the new mode applied.
- */
-function switchMode(mode) {
-    // Spectator is single-player only — drop out of it before swapping
-    // modes so its body classes and scene transforms don't bleed into DM.
-    if (mode === 'deathmatch' && document.body.classList.contains('spectator')) {
-        window.spectate?.();
-    }
-
-    applyMode(mode);
-    localStorage.setItem(MODE_STORAGE_KEY, mode);
-
-    // Force a full game state reset by marking player 0 dead before reload.
-    // loadMap's resetGameState path then resets every player's stats.
-    state.players[0].isDead = true;
-    loadMap(currentMap);
-}
+// Network action buttons. These aren't persistent modes — they're
+// one-shot actions on the master's session. START switches to network
+// hosting; JOIN prompts for a room code and navigates the current
+// window into client-window mode.
+document.querySelectorAll('.menu-action').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const action = btn.dataset.network;
+        if (action === 'start') {
+            switchMode('network');
+            updateMenuSelection();
+            toggleMenu(false);
+        } else if (action === 'join') {
+            const code = prompt('Enter room code:');
+            if (code) {
+                const cleaned = code.trim().toUpperCase();
+                // Must match the Worker regex; we generate from a
+                // 27-char subset of the same set, but a user typing a
+                // code by hand could include any A-Z0-9. Accept the
+                // broader set here.
+                if (/^[A-Z0-9]{4,8}$/.test(cleaned)) {
+                    // Navigate the current window into Network DM
+                    // remote mode — index.js parses ?join=CODE and
+                    // routes to initClientWindow with the room code.
+                    location.href = `?join=${cleaned}`;
+                    return;
+                }
+                alert('Invalid room code');
+            }
+            toggleMenu(false);
+        }
+    });
+});
 
 export function updateMenuSelection() {
     document.querySelectorAll('.menu-level').forEach(btn => {
@@ -142,7 +112,7 @@ export function updateMenuSelection() {
         btn.classList.toggle('active', parseInt(btn.dataset.skill) === state.skillLevel);
     });
     document.querySelectorAll('.menu-mode').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.mode === state.mode);
+        btn.classList.toggle('active', btn.dataset.mode === currentModeName());
     });
 }
 
