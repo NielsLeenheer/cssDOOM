@@ -53,7 +53,7 @@ import { setMasterConnection } from './network-host.js';
 import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
-import { isMatchLobby, setMatchEndBroadcaster } from './game/match.js';
+import { isMatchLobby, setMatchEndBroadcaster, onMatch } from './game/match.js';
 import { setGameStateBroadcaster, getGameState } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
@@ -264,7 +264,7 @@ function setupMasterBroadcast() {
     // every local claim add/remove (via the orchestrator's claim notify)
     // and on match-reset so the client's overlay tracks live.
     onClaimChange(broadcastLobbyState);
-    window.addEventListener('cssdoom:match-reset', broadcastLobbyState);
+    onMatch('reset', broadcastLobbyState);
 
     // Mirror match-end scoreboard onto any connected client. match.js
     // calls this from endMatch(); we just hand the payload to the

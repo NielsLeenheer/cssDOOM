@@ -29,6 +29,28 @@ let broadcastMatchEnd = null;
 export function setMatchEndBroadcaster(fn) { broadcastMatchEnd = fn; }
 
 /**
+ * Module-level emitter for match-lifecycle events. Subscribed at boot
+ * by master.js (re-broadcast LOBBY_STATE on reset) and lobby.js
+ * (clear carried-over claims + reset transient inputs). Replaces the
+ * pre-L4.4 `cssdoom:match-reset` window-event side-channel.
+ *
+ * Symmetric with `game/level.js`'s onLevel emitter (L4.3): each
+ * lifecycle module owns its own module-level event channel rather
+ * than going through a generic event bus.
+ */
+const _matchListeners = new Map();
+
+export function onMatch(eventName, handler) {
+    if (!_matchListeners.has(eventName)) _matchListeners.set(eventName, new Set());
+    _matchListeners.get(eventName).add(handler);
+}
+
+function _emitMatchEvent(eventName, payload) {
+    const set = _matchListeners.get(eventName);
+    if (set) for (const h of set) h(payload);
+}
+
+/**
  * Initializes (or resets) state.match and zeros every player's score.
  * Called when entering DM mode and on match restart. Transitions to
  * LOBBY — players may walk around in warmup but scoring + the clock
@@ -55,10 +77,11 @@ export function resetMatch({
     setTimerActive(false);
     lastTimerSeconds = -1;
     transitionTo(GAME_STATE.LOBBY);
-    // Notify the lobby UI so it can clear stale input claims and show
-    // the PRESS FIRE TO JOIN prompts again. Decoupling via event keeps
-    // match.js free of input/UI imports.
-    window.dispatchEvent(new CustomEvent('cssdoom:match-reset'));
+    // Notify lobby UI + master broadcast that a new match cycle
+    // started, so the lobby can clear stale claims and master can
+    // re-broadcast LOBBY_STATE. Decoupling via the module-level
+    // emitter keeps match.js free of input/UI/transport imports.
+    _emitMatchEvent('reset');
 }
 
 /**

@@ -13,8 +13,9 @@
  *   - `onClaimChange` from input/claim-registry — fires when a device
  *     claims or releases a slot, or when external (remote) slot
  *     occupancy changes via setExternallyClaimedSlots.
- *   - `cssdoom:match-reset` — dispatched by maps.js / menu.js when a
- *     fresh match begins so we can re-enter lobby state.
+ *   - match.js's `onMatch('reset', ...)` — fires when a fresh match
+ *     begins so we can re-enter lobby state. Replaced the L4.4-era
+ *     `cssdoom:match-reset` window event.
  *
  * Network DM (future) will use the same claim mechanism but a different
  * match-start trigger (host button instead of all-claimed). The lobby
@@ -25,13 +26,13 @@
 import { state } from '../game/state.js';
 import { orchestrator } from '../orchestrator.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
-import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
+import { startMatch, isMatchLobby, resetMatch, onMatch } from '../game/match.js';
 import { registerOverlayImpl } from '../renderer/commands.js';
 
 let externalSlotsRef = () => new Set();
 
 // Snapshot of which slots were already claimed at the start of the
-// current lobby session (set on cssdoom:match-reset). Slots in this set
+// current lobby session (set on match.js's 'reset' event). Slots in this set
 // are "carried over" — they shouldn't flash READY when the new lobby
 // begins, because nobody just pressed a button for them. Slots claimed
 // AFTER the session started (i.e., during the current lobby) are the
@@ -53,7 +54,7 @@ export function getCarriedOverClaims() {
 export function initLobby({ getExternallyClaimedSlots }) {
     externalSlotsRef = getExternallyClaimedSlots;
     onClaimChange(updateLobbyUI);
-    window.addEventListener('cssdoom:match-reset', () => {
+    onMatch('reset', () => {
         // New match: clear any transient held-input from the previous
         // match (a fire key still down from the kill that ended it
         // would otherwise blow through the lobby into the next match)
