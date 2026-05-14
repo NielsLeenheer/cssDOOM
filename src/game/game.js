@@ -110,4 +110,49 @@ export class Game {
         document.body.dataset.gameState = newState;
         this._emit('state-changed', { from, to: newState });
     }
+
+    /**
+     * Wire this Game's handlers onto a Level's event emitter. Called
+     * by `beginPlay()` (L2.5 / L2.9) immediately after constructing
+     * `this.level`. Not invoked automatically in L2.4 — Game doesn't
+     * own a Level yet — so the handlers below are reachable only via
+     * a manual `g._subscribeLevel(lvl)` from the dev console for now.
+     */
+    _subscribeLevel(level) {
+        level.on('level-complete', (p) => this._onLevelComplete(p));
+        level.on('player-died',    (p) => this._onPlayerDied(p));
+        level.on('player-spawned', (p) => this._onPlayerSpawned(p));
+    }
+
+    /**
+     * Reacts to Level emitting `level-complete` (player crossed an
+     * exit line). In SP: transitions PLAYING → INTERMISSION and
+     * triggers the intermission overlay. In DM: treats as match-end
+     * (vanilla DOOM behavior per §4b) and transitions PLAYING →
+     * RESULTS. Body lands in L2.5; today's switches.js still owns
+     * the SP intermission trigger and the DM loadMap call.
+     */
+    _onLevelComplete(_payload) {
+        // L2.5 wires the mode-specific response.
+    }
+
+    /**
+     * Reacts to Level emitting `player-died`. DM: increment killer's
+     * frag count via awardFrag (already handled by damage.js for now)
+     * and check frag-limit match-end. SP: arm the respawn overlay so
+     * the next fire press reloads the level. Body lands in L2.5;
+     * today's damage.js handles both flows inline.
+     */
+    _onPlayerDied(_payload) {
+        // L2.5 wires DM scoring + SP respawn-overlay flow.
+    }
+
+    /**
+     * Reacts to Level emitting `player-spawned`. Informational —
+     * Game uses this to confirm a slot is live again so it can hide
+     * a respawn overlay or update lobby state. Body lands in L2.5.
+     */
+    _onPlayerSpawned(_payload) {
+        // L2.5 hides the respawn overlay if one was up for this slot.
+    }
 }
