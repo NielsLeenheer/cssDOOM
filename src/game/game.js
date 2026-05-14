@@ -35,8 +35,24 @@ import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js'
 export class Game {
     constructor(modeConfig) {
         this.modeConfig = modeConfig;
-        this.gameMode = modeConfig.gameMode;
-        this.networkMode = modeConfig.networkMode;
+        // gameMode + networkMode are getters below — they read from
+        // `state.gameMode` / `state.networkMode` directly so legacy
+        // applyMode calls and Game stay automatically in sync. The
+        // alternative (storing modeConfig.gameMode on Game) led to a
+        // class of "two state machines running in parallel" bugs
+        // where a legacy applyMode call would update state.gameMode
+        // but leave Game.gameMode stale — e.g. kiosk boot
+        // (Game.gameMode='deathmatch') followed by menu-switch to SP
+        // (state.gameMode='singleplayer') made Game._onLevelComplete
+        // take the wrong branch on SP exit. With getters there's a
+        // single source of truth.
+        //
+        // modeConfig.gameMode / .networkMode are still expected to
+        // match what applyMode set on state before construction —
+        // the caller (app.startLocalGame, master.js boot, switchMode)
+        // is responsible for ensuring applyMode runs first. The
+        // modeConfig itself is retained on `this.modeConfig` for
+        // diagnostic / future use.
         this.rules = modeConfig.rules ?? null;
         this.skillLevel = modeConfig.skillLevel ?? 3;
 
@@ -66,6 +82,10 @@ export class Game {
         this._state = 'LOBBY'; // §4: new Game() → LOBBY always
         this._listeners = new Map();
     }
+
+    /** Reads from state directly — see constructor for rationale. */
+    get gameMode() { return state.gameMode; }
+    get networkMode() { return state.networkMode; }
 
     /**
      * Boot the Game. Enters LOBBY state, pushes the showLobby renderer
@@ -323,6 +343,19 @@ export class Game {
         if (this.gameMode === 'deathmatch') {
             startMatch();
         }
+
+        // Re-render the lobby UI so per-pane `data-claim-state`
+        // flips from 'ready' (post-claim, pre-match) to 'active'
+        // (match running) — which is what CSS reads to hide the
+        // READY! overlay. updateLobbyUI only re-evaluates on
+        // onClaimChange / onMatch('reset') events; neither fires
+        // when beginPlay starts the match, so we have to push the
+        // re-render explicitly. Otherwise the READY! overlay
+        // lingers over the running match.
+        orchestrator.updateLobbyState({
+            slots: this.roster,
+            mapCursor: this.mapCursor,
+        });
     }
 
     /**
