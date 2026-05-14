@@ -155,7 +155,7 @@ export function applyMode(gameMode, networkMode = 'standalone') {
  * gameplay modes (singleplayer / deathmatch) to localStorage so a
  * refresh restores them; 'network' is session-only.
  */
-export function switchMode(name) {
+export async function switchMode(name) {
     const preset = MODE_PRESETS[name];
     if (!preset) {
         console.warn('switchMode: unknown mode name', name);
@@ -175,7 +175,38 @@ export function switchMode(name) {
     }
 
     // Force a full game state reset by marking player 0 dead before reload.
-    // loadMap's resetGameState path then resets every player's stats.
+    // Level.load's resetGameState path then resets every player's stats.
     state.players[0].isDead = true;
-    loadMap(currentMap);
+
+    // Replace the held Game with a fresh one for the new mode. Without
+    // this the boot Game keeps its original gameMode and Level
+    // subscription — leading to Game._onLevelComplete branching the
+    // wrong way on subsequent level transitions (e.g. kiosk-boot DM
+    // → menu SP would still fire showResults on SP exit, because
+    // Game.gameMode stays 'deathmatch'). Reconstructing via
+    // app.startLocalGame:
+    //   - tears down the old Game (Game.stop nulls level, hides
+    //     overlays, transitions to ENDED);
+    //   - constructs a new Game with gameMode/networkMode matching
+    //     the menu pick;
+    //   - kicks off Game.start which for SP awaits beginPlay (loads
+    //     a fresh Level for currentMap) and for Local DM awaits
+    //     _preloadLevel.
+    // applyMode above still runs for its side effects (renderer
+    // reshape, audio reconfig, network signaling room, body data
+    // attributes, state.players sizing) — Game doesn't replicate
+    // those today.
+    if (window.app) {
+        await window.app.startLocalGame({
+            gameMode: preset.gameMode,
+            networkMode: preset.networkMode,
+            skillLevel: state.skillLevel ?? 1,
+            rules: null,
+            startMap: currentMap ?? 'E1M1',
+        });
+    } else {
+        // Fallback if called before app boot (shouldn't happen
+        // post-L4.9 but kept for safety).
+        loadMap(currentMap);
+    }
 }
