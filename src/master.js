@@ -33,6 +33,7 @@ import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { buildModeConfigFromUrl } from './game/mode-config.js';
 import { Game } from './game/game.js';
+import { App } from './app.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { configureAudio } from './audio/audio.js';
 import { hideInitialOverlay } from './ui/overlay.js';
@@ -346,20 +347,24 @@ export async function initMaster({ isKiosk = false } = {}) {
     // L2.2 — package the mode choice into a Game-consumable struct.
     const modeConfig = buildModeConfigFromUrl();
 
-    // L2.9 (Path C) — construct the Game so a single instance is
-    // available throughout the page lifetime, but DO NOT call
-    // .start() yet. Game's state machine + Level ownership + lobby /
-    // intermission / results renderer-command pushes (added in
-    // L2.5a..L2.8) all stay dead until L4 cuts over and disables the
-    // legacy game-state.js + lobby.js / match.js / intermission.js
-    // ownership paths. Until then, today's applyMode + loadMap +
-    // legacy lobby.js + match.js still drive every smoke path.
+    // L2.9 + L3.7 (Path C) — construct a Game and an App so both
+    // instances are available throughout the page lifetime, but do
+    // NOT call App.start() or Game.start(). Game's state machine +
+    // Level ownership + lobby / intermission / results renderer-
+    // command pushes (added in L2.5a..L2.8) all stay dead; App's
+    // boot resolution + state machine + menu/attract methods (L3.1
+    // ..L3.6) stay dead too. Until L4 cuts over, today's applyMode +
+    // loadMap + legacy game-state.js + lobby.js / match.js /
+    // intermission.js drive every smoke path.
     //
-    // Exposed on window.app so the dev console (and the future App
-    // class in L3) has a stable handle. L3.1 replaces this with the
-    // real App instance.
+    // App.game is assigned to the constructed Game so the dev console
+    // handle `window.app.game` continues to work for inspecting
+    // Game state. L3.3's startLocalGame would normally own this
+    // assignment, but it isn't reachable in Path C.
     const game = new Game(modeConfig);
-    window.app = { game };
+    const app = new App();
+    app.game = game;
+    window.app = app;
 
     // Restore the previously chosen mode (default singleplayer) before the
     // initial map load so the scene is built with the right pane count and
