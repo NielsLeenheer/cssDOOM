@@ -312,6 +312,35 @@ export class Game {
      * over.
      */
     restartMatch() {
+        // Tear down the old Level so the next beginPlay constructs a
+        // fresh one. Level.load → clearSceneState (inside
+        // resetGameState/transitionToLevel) clears every player's
+        // isDead flag — the ONLY path that respawns a player who died
+        // before the match ended (e.g. dead at time-limit expiry).
+        //
+        // Time-limit + frag-limit match-ends DON'T go through Game's
+        // _onLevelComplete (those fire only for exit-trigger via
+        // Level events) — legacy match.js::endMatch handles them and
+        // leaves Game.level untouched. So restartMatch must do the
+        // teardown defensively.
+        //
+        // Guard: only tear down when this.level matches the L1.7
+        // registry's current Level. In the DM exit-trigger path the
+        // legacy switches.js setTimeout(loadMap, 1000) may have
+        // already loaded the next map; the registry now points at a
+        // NEW Level instance whose state lives in state.things etc.
+        // Tearing down this.level (the orphaned previous instance)
+        // would clobber that live state via destroy(). Nulling
+        // this.level orphans the stale reference safely.
+        if (this.level) {
+            if (getCurrentLevel() === this.level) {
+                this.level.stop();
+                this.level.destroy();
+                _setCurrentLevel(null);
+            }
+            this.level = null;
+        }
+
         const next = getNextMap();
         if (next) this.mapCursor = next;
         orchestrator.hideResults();
