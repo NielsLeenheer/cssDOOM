@@ -25,7 +25,7 @@
 import { state } from './game/state.js';
 import { mapData, currentMap, addPlayerThing } from './shared/maps.js';
 import { loadMap } from './shared/maps.js';
-import { getCurrentLevel } from './game/level.js';
+import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
 import { startCullingLoop } from './renderer/scene/culling.js';
 import { updatePerspective } from './renderer/scene/scene.js';
@@ -162,11 +162,11 @@ function setupMasterBroadcast() {
     // it. Stashing the intended new level here means snapshotProvider
     // always reflects where master is heading, not where it just left.
     let pendingLevel = null;
-    window.addEventListener('cssdoom:level-changing', (e) => {
-        pendingLevel = e.detail?.level ?? null;
+    onLevel('changing', ({ name }) => {
+        pendingLevel = name ?? null;
         masterConnection?.signalLevelChange();
     });
-    window.addEventListener('cssdoom:level-loaded', () => {
+    onLevel('loaded', () => {
         pendingLevel = null;
         masterConnection?.resumeAfterLevelLoad();
     });

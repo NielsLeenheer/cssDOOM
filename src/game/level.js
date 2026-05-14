@@ -60,6 +60,30 @@ let _currentLevel = null;
 export function getCurrentLevel() { return _currentLevel; }
 export function _setCurrentLevel(lvl) { _currentLevel = lvl; }
 
+/**
+ * Module-level emitter for level-lifecycle events that need to be
+ * observed across Level instances. Per-instance events
+ * (level-complete / player-died / player-spawned) still flow through
+ * each Level's own on / _emit pair — those are bound to a specific
+ * Level. The events emitted here ('changing' / 'loaded') fire from
+ * `Level.load()` and replace the pre-L4.3
+ * `cssdoom:level-changing` / `cssdoom:level-loaded` window-event
+ * side-channel. Subscribers (today: master.js's broadcast setup)
+ * subscribe ONCE at boot and see events from every future Level
+ * instance — no per-instance re-subscription needed.
+ */
+const _levelListeners = new Map();
+
+export function onLevel(eventName, handler) {
+    if (!_levelListeners.has(eventName)) _levelListeners.set(eventName, new Set());
+    _levelListeners.get(eventName).add(handler);
+}
+
+function _emitLevelEvent(eventName, payload) {
+    const set = _levelListeners.get(eventName);
+    if (set) for (const h of set) h(payload);
+}
+
 export class Level {
     constructor({ map, players, rules, orchestrator }) {
         this.map = map;
@@ -77,10 +101,10 @@ export class Level {
 
         // Tell any connected client that the scene is about to be
         // rebuilt. Skipped on the very first load (no client could be
-        // connected yet). Listener lives in master setup; the dispatch
-        // is fire-and-forget. Removed in L4 when window events go away.
+        // connected yet). Subscribers (master.js's broadcast setup)
+        // subscribe via onLevel('changing', ...) at boot.
         if (!isInitialLoad) {
-            window.dispatchEvent(new CustomEvent('cssdoom:level-changing', { detail: { level: name } }));
+            _emitLevelEvent('changing', { name });
             await showLevelTransition();
         }
 
@@ -159,8 +183,8 @@ export class Level {
         // Tell master's broadcast layer that the scene is rebuilt and
         // it's safe to accept client reconnections again. Fires on
         // every load (initial too); the master listener handles the
-        // no-op case. Removed in L4.
-        window.dispatchEvent(new CustomEvent('cssdoom:level-loaded', { detail: { level: name } }));
+        // no-op case.
+        _emitLevelEvent('loaded', { name });
 
         this._state = 'loaded-paused';
     }
