@@ -23,6 +23,9 @@
  * fires, so the two don't race.
  */
 
+import { state } from './state.js';
+import { ensurePlayerCount } from '../mode.js';
+
 export class Game {
     constructor(modeConfig) {
         this.modeConfig = modeConfig;
@@ -31,10 +34,19 @@ export class Game {
         this.rules = modeConfig.rules ?? null;
         this.skillLevel = modeConfig.skillLevel ?? 3;
 
-        // Authoritative roster. Populated in L2.3 via claimSlot(). Aliased
-        // to state.players in L2.3 so legacy code reading state.players
-        // sees Game-driven updates.
-        this.roster = [];
+        // Authoritative roster. Aliased to `state.players` so legacy code
+        // reading state.players (movement, damage, AI, renderer) sees
+        // Game-driven updates with no copy step. `state.players` is
+        // mutated in place (ensurePlayerCount pushes; never reassigns),
+        // so the alias stays stable across the Game's lifetime.
+        //
+        // Per LIFECYCLE_REFACTOR.md §10 the eventual richer shape is
+        // `{ slot, kind, deviceId, ready, player }` per entry. For L2.3
+        // the simpler alias matches the spec's `this.roster = state.players`
+        // sketch and avoids inventing a parallel structure ahead of
+        // L2.6's lobby UI ownership move, when the richer shape will
+        // actually be needed.
+        this.roster = state.players;
 
         // The currently-loaded Level (or null between LOBBY and the
         // first PLAYING entry, and between RESULTS and the next LOBBY).
@@ -53,7 +65,25 @@ export class Game {
     pause()              { /* L5 */ }
     resume()             { /* L5 */ }
     async stop()         { /* L2.5 */ }
-    claimSlot(slot, deviceId) { /* L2.3 */ }
+    /**
+     * Record that `deviceId` has claimed `slot`. Ensures the underlying
+     * `state.players[slot]` Player exists (extending the roster if
+     * needed) and emits `roster-updated` for subscribers.
+     *
+     * L2.3 is intentionally minimal: today's claim flow still runs
+     * through `input/claim-registry.js` (each input module calls
+     * `tryClaimSlot(deviceId)` directly and lobby UI subscribes to
+     * `onClaimChange`). Game.claimSlot is the parallel future entry
+     * point; L2.6 cuts over once lobby UI moves into Game.
+     */
+    claimSlot(slot, deviceId) {
+        ensurePlayerCount(slot + 1);
+        this._emit('roster-updated', {
+            slot,
+            deviceId,
+            roster: this.roster,
+        });
+    }
     beginPlay()          { /* L2.5 / L2.6 */ }
     restartMatch()       { /* L2.5 */ }
     advance()            { /* L2.7 */ }
