@@ -26,6 +26,7 @@ import { state } from '../game/state.js';
 import { orchestrator } from '../orchestrator.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 import { startMatch, isMatchLobby, resetMatch } from '../game/match.js';
+import { registerOverlayImpl } from '../renderer/commands.js';
 
 let externalSlotsRef = () => new Set();
 
@@ -222,3 +223,12 @@ export function renderLobbyState(_payload) {
 export function clearLobby() {
     // No-op for now; CSS handles dismissal.
 }
+
+// L4.2 — register render-only handlers with the late-binding registry
+// on src/renderer/commands.js. Game's orchestrator pushes
+// (orchestrator.showLobby etc.) fan out via the registry to whatever's
+// registered. network-lobby.js registers parallel handlers; each gates
+// on state.networkMode internally so only one paints per call.
+registerOverlayImpl('showLobby',        renderLobbyState);
+registerOverlayImpl('updateLobbyState', renderLobbyState);
+registerOverlayImpl('hideLobby',        clearLobby);

@@ -17,6 +17,7 @@
 import { captureSpStats } from '../game/sp-stats.js';
 import { currentMap } from '../shared/maps.js';
 import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
+import { registerOverlayImpl } from '../renderer/commands.js';
 
 const LABEL_BASE = '/assets/intermission';
 const COUNT_UP_MS = 1200;     // per-row duration
@@ -273,3 +274,7 @@ export function renderIntermission(payload) {
 export function clearIntermission() {
     hideIntermission();
 }
+
+// L4.2 — register with the late-binding overlay registry.
+registerOverlayImpl('showIntermission', renderIntermission);
+registerOverlayImpl('hideIntermission', clearIntermission);

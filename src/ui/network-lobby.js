@@ -36,6 +36,7 @@
 import qrcode from 'qrcode-generator';
 import { state } from '../game/state.js';
 import { isSlotClaimedLocally, onClaimChange } from '../input/claim-registry.js';
+import { registerOverlayImpl } from '../renderer/commands.js';
 
 const MAX_SLOTS = 4;
 
@@ -265,3 +266,10 @@ export function renderLobbyState(_payload) {
 export function clearLobby() {
     // No-op; CSS-driven for now.
 }
+
+// L4.2 — register render-only handlers. Parallel with lobby.js;
+// renderLobbyState() above already gates on state.networkMode='host'
+// so only the network branch paints when networkMode matches.
+registerOverlayImpl('showLobby',        renderLobbyState);
+registerOverlayImpl('updateLobbyState', renderLobbyState);
+registerOverlayImpl('hideLobby',        clearLobby);

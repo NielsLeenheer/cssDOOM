@@ -30,6 +30,8 @@
  * with a negative total — that's intentional, not a bug.
  */
 
+import { registerOverlayImpl } from '../renderer/commands.js';
+
 const CELL_WIDTH = 2;
 const TOTAL_WIDTH = 2;
 
@@ -82,6 +84,10 @@ export function renderResults(payload) {
 export function clearResults() {
     hideScoreboard();
 }
+
+// L4.2 — register with the late-binding overlay registry.
+registerOverlayImpl('showResults', renderResults);
+registerOverlayImpl('hideResults', clearResults);
 
 function buildScoreboardNode({ scores, kills, winnerIndex }) {
     const root = document.createElement('div');

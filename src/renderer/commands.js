@@ -55,18 +55,40 @@ import {
     applyThingPositionUpdate,
     applyThingCollected,
 } from './renderer-state.js';
-// L2.6 / L2.7 / L2.8 commands (showLobby / updateLobbyState / hideLobby
-// / showIntermission / hideIntermission / showResults / hideResults)
-// have NO-OP impls below — the original implementation imported from
-// `../ui/lobby.js` et al., but those modules transitively import
-// `orchestrator`, which imports back from this file. That cycle made
-// renderer/index.js's top-level `Object.entries(COMMANDS)` hit a TDZ
-// on `COMMANDS` at runtime in Firefox (Vite/Node tolerated it; Firefox
-// didn't). Since L2.9 is Path C, Game's overlay push calls don't fire
-// today — the no-op impls are functionally equivalent. L4's cutover
-// installs real impls via a late-binding registry or by relocating
-// the DOM logic into modules outside the orchestrator dependency
-// graph.
+// L2.6 / L2.7 / L2.8 overlay commands (showLobby / updateLobbyState /
+// hideLobby / showIntermission / hideIntermission / showResults /
+// hideResults) dispatch through a late-binding registry rather than
+// importing the ui/* modules directly. Importing them would re-create
+// the cycle that crashed Firefox after L2.6
+// (`commands.js → ui/lobby.js → orchestrator.js → commands.js` —
+// renderer/index.js hit TDZ on COMMANDS).
+//
+// The registry pattern: ui/* modules import `registerOverlayImpl` from
+// here at their own module load time and push their render-only
+// handlers in. commands.js never imports ui/*, so the cycle is broken.
+// Multiple handlers per command are supported (e.g. showLobby has
+// handlers from both lobby.js and network-lobby.js; each gates on
+// state.networkMode internally so only the right one paints).
+
+const overlayImpls = new Map();
+
+/**
+ * Register a render-only handler for an overlay command. Called by
+ * ui/* modules at their own module-eval time. Multiple registrations
+ * for the same command name accumulate — every registered handler
+ * fires when the command is invoked.
+ */
+export function registerOverlayImpl(name, fn) {
+    if (!overlayImpls.has(name)) overlayImpls.set(name, []);
+    overlayImpls.get(name).push(fn);
+}
+
+/** Internal dispatcher used by the overlay command impls below. */
+function fireOverlay(name, ...args) {
+    const fns = overlayImpls.get(name);
+    if (!fns) return;
+    for (const fn of fns) fn(...args);
+}
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -184,13 +206,13 @@ export const COMMANDS = {
     // in sync across master + remote panes without a side-channel
     // envelope. Each impl calls both lobby modules; the modules gate
     // internally on state.networkMode so only the right one paints.
-    showLobby:         { kind: 'world', impl: () => {} },
-    updateLobbyState:  { kind: 'world', impl: () => {} },
-    hideLobby:         { kind: 'world', impl: () => {} },
-    showIntermission:  { kind: 'world', impl: () => {} },
-    hideIntermission:  { kind: 'world', impl: () => {} },
-    showResults:       { kind: 'world', impl: () => {} },
-    hideResults:       { kind: 'world', impl: () => {} },
+    showLobby:        { kind: 'world', impl: (payload) => fireOverlay('showLobby', payload) },
+    updateLobbyState: { kind: 'world', impl: (payload) => fireOverlay('updateLobbyState', payload) },
+    hideLobby:        { kind: 'world', impl: () => fireOverlay('hideLobby') },
+    showIntermission: { kind: 'world', impl: (payload) => fireOverlay('showIntermission', payload) },
+    hideIntermission: { kind: 'world', impl: () => fireOverlay('hideIntermission') },
+    showResults:      { kind: 'world', impl: (payload) => fireOverlay('showResults', payload) },
+    hideResults:      { kind: 'world', impl: () => fireOverlay('hideResults') },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(
