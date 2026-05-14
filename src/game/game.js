@@ -217,8 +217,32 @@ export class Game {
 
         this.beginPlay();
     }
-    pause()              { /* L5 */ }
-    resume()             { /* L5 */ }
+    /**
+     * Pause the held Level. Per §7: pause is only meaningful while
+     * PLAYING (no point pausing LOBBY / LOADING / RESULTS / etc.) —
+     * Level.pause already guards against being called on a non-running
+     * Level, so a redundant call here is also a no-op.
+     *
+     * Renderer-command fan-out (push 'showPaused' so connected clients
+     * also see the paused state) is deferred to L6 when RemoteGame
+     * exists. For SP / Local DM there are no remote clients today; the
+     * local Level.pause is the only side effect.
+     */
+    pause() {
+        if (this._state !== 'PLAYING') return;
+        this.level?.pause();
+    }
+
+    /**
+     * Resume the held Level. Counterpart to pause(); also state-gated.
+     * If something happened to the Level state while paused (unlikely
+     * — pause() only flips the Level's tick flag), the next tick after
+     * resume picks up where it left off.
+     */
+    resume() {
+        if (this._state !== 'PLAYING') return;
+        this.level?.resume();
+    }
     /**
      * Clean teardown. Stops the held Level (if any), destroys it
      * (clears state.things / doorState / liftState / crusherState /

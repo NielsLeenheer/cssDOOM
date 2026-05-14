@@ -139,6 +139,12 @@ export function toggleMenu(show) {
         dom.menuOverlay.offsetHeight;
         dom.menuOverlay.classList.remove('showing');
         updateMenuSelection();
+
+        // L5 — notify App so it can pause the held Game (Level
+        // freezes; per §7 the renderer-command fan-out to clients
+        // lands in L6). App.openMenu also records previousState for
+        // §3c fall-through on close.
+        window.app?.openMenu();
     } else {
         dom.menuOverlay.classList.add('hiding');
         dom.menuOverlay.addEventListener('transitionend', function onEnd() {
@@ -146,6 +152,15 @@ export function toggleMenu(show) {
             dom.menuOverlay.hidden = true;
             dom.menuOverlay.classList.remove('hiding');
         });
+
+        // L5 — App.closeMenu resolves per §3c:
+        //   previousState='IN_GAME' → resume the held Game.
+        //   previousState='ATTRACT' → start a fresh Game with
+        //                             lastModeConfig (kiosk only).
+        //   previousState='BOOT'    → no-op.
+        // Fire-and-forget; closeMenu is async only for the ATTRACT
+        // branch's startLocalGame.
+        window.app?.closeMenu();
     }
 }
 
