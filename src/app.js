@@ -139,7 +139,33 @@ export class App {
         this.transitionTo('MENU');
     }
     destroy()                        { /* dev hot-reload teardown */ }
-    transitionTo(state)              { /* L3.4 */ }
+    /**
+     * Force a state transition. Used by start(), startLocalGame(),
+     * the menu open/close handlers (L3.5), and the attract idle
+     * timeout / wake (L3.6).
+     *
+     * Writes `body.dataset.appState = state`, which is a NEW attribute
+     * — separate from `body.dataset.gameState` that the legacy
+     * `game-state.js` machine writes. Both coexist for L3.4: CSS that
+     * keys on the legacy attribute stays correct, and any future CSS
+     * (or JS) that wants the App-level state has its own attribute.
+     * Per the L3.4 scoping decision, deleting `game-state.js` and the
+     * CSS audit are deferred to L7 (or a dedicated cleanup step) so
+     * L3 lands in a working state.
+     *
+     * Idempotent — a redundant transition to the current state is a
+     * no-op (does NOT overwrite _previousState, which would break the
+     * §3c menu close fall-through that reads _previousState to decide
+     * whether to resume or start fresh).
+     */
+    transitionTo(state) {
+        const from = this._state;
+        if (from === state) return;
+        this._previousState = from;
+        this._state = state;
+        document.body.dataset.appState = state;
+        this._emit('state-changed', { from, to: state });
+    }
     /**
      * Tear down any existing held Game, construct a fresh one with
      * `modeConfig`, persist it for next reload (non-kiosk only per
