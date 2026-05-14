@@ -194,3 +194,31 @@ export function enterLobby() {
     if (!state.match) resetMatch();
     updateLobbyUI();
 }
+
+// ── L2.6 renderer-command entry points ─────────────────────────────────
+// Game pushes showLobby / updateLobbyState / hideLobby through the
+// orchestrator (see src/renderer/commands.js). The impls below are the
+// per-window render-only handlers — they re-derive from current globals
+// (state.players, claim-registry, isMatchLobby) rather than reading the
+// payload, matching today's updateLobbyUI behavior. The payload
+// argument exists for the future cutover (L4) when Game becomes the
+// authoritative source of lobby state and re-derivation moves off
+// global lookups.
+//
+// Until L4, the legacy onClaimChange / cssdoom:match-reset subscriptions
+// in initLobby() above still drive the same DOM mutations. These new
+// entry points fire in addition; both compute the same data-claim-state
+// from the same globals, so no DOM conflict.
+
+/** Renderer-command impl for showLobby + updateLobbyState (same body —
+ *  the distinction is which Game lifecycle event triggered the push). */
+export function renderLobbyState(_payload) {
+    updateLobbyUI();
+}
+
+/** Renderer-command impl for hideLobby. Today's lobby UI disappears via
+ *  CSS when body[data-game-state] flips off LOBBY; explicit per-pane
+ *  teardown isn't needed until L4 removes the body-class side effect. */
+export function clearLobby() {
+    // No-op for now; CSS handles dismissal.
+}

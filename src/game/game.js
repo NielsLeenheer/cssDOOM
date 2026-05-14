@@ -64,7 +64,34 @@ export class Game {
         this._listeners = new Map();
     }
 
-    async start()        { /* L2.5 / L2.6 */ }
+    /**
+     * Boot the Game. Enters LOBBY state, pushes the showLobby renderer
+     * command so panes (local + sinks) paint the lobby overlay, and for
+     * SP auto-finalizes immediately into beginPlay (per §3b — SP roster
+     * is fixed at [Player 0], no claim wait needed).
+     *
+     * Local DM and Network DM stay in LOBBY here; the caller is
+     * responsible for triggering beginPlay later (Local DM: when all
+     * slots claim, Network DM: when host fires start). Once L4 cuts
+     * over, that triggering also moves into Game; today the legacy
+     * lobby.js auto-start and the legacy NETWORK_START gate are still
+     * authoritative.
+     *
+     * No caller yet (L2.9 wires master.js → Game.start). Until then
+     * the only effect of calling start() manually from the dev console
+     * is to push a redundant showLobby command into a UI that's already
+     * being driven by the legacy event subscriptions.
+     */
+    async start() {
+        this._transitionTo('LOBBY');
+        orchestrator.showLobby({
+            slots: this.roster,
+            mapCursor: this.mapCursor,
+        });
+        if (this.gameMode === 'singleplayer') {
+            await this.beginPlay();
+        }
+    }
     pause()              { /* L5 */ }
     resume()             { /* L5 */ }
     async stop()         { /* L2.5 */ }
@@ -81,6 +108,11 @@ export class Game {
      */
     claimSlot(slot, deviceId) {
         ensurePlayerCount(slot + 1);
+        orchestrator.updateLobbyState({
+            slots: this.roster,
+            slot,
+            deviceId,
+        });
         this._emit('roster-updated', {
             slot,
             deviceId,
@@ -107,6 +139,7 @@ export class Game {
      * `app.game.level` directly.
      */
     async beginPlay() {
+        orchestrator.hideLobby();
         this._transitionTo('LOADING');
         this.level = new Level({
             map: this.mapCursor,

@@ -55,6 +55,13 @@ import {
     applyThingPositionUpdate,
     applyThingCollected,
 } from './renderer-state.js';
+// L2.6 — lobby overlay impls live in ui/ today (they own the lobby DOM
+// and computation from globals). Renderer commands import them so Game
+// can push lobby visuals through the same orchestrator pipeline as the
+// rest of the scene. Cross-layer; cleanup in L7 may relocate the DOM
+// logic but the command surface here stays.
+import * as lobbyOverlay from '../ui/lobby.js';
+import * as networkLobbyOverlay from '../ui/network-lobby.js';
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -164,6 +171,35 @@ export const COMMANDS = {
 
     // ── World: surfaces ───────────────────────────────────────────────────
     lowerTaggedFloor: { kind: 'world', impl: lowerTaggedFloor },
+
+    // ── World: lobby overlay (L2.6) ───────────────────────────────────────
+    // Driven by Game.start (showLobby), Game.claimSlot (updateLobbyState),
+    // and Game.beginPlay (hideLobby). World-kind so master fans the same
+    // command to every client's RenderClient and the lobby visual stays
+    // in sync across master + remote panes without a side-channel
+    // envelope. Each impl calls both lobby modules; the modules gate
+    // internally on state.networkMode so only the right one paints.
+    showLobby: {
+        kind: 'world',
+        impl: (payload) => {
+            lobbyOverlay.renderLobbyState(payload);
+            networkLobbyOverlay.renderLobbyState(payload);
+        },
+    },
+    updateLobbyState: {
+        kind: 'world',
+        impl: (payload) => {
+            lobbyOverlay.renderLobbyState(payload);
+            networkLobbyOverlay.renderLobbyState(payload);
+        },
+    },
+    hideLobby: {
+        kind: 'world',
+        impl: () => {
+            lobbyOverlay.clearLobby();
+            networkLobbyOverlay.clearLobby();
+        },
+    },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(

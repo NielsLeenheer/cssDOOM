@@ -243,3 +243,25 @@ onClaimChange(() => {
     syncFromClaims();
     renderAllLabels();
 });
+
+// ── L2.6 renderer-command entry points ─────────────────────────────────
+// Symmetric with src/ui/lobby.js: Game pushes lobby commands and the
+// world-command impls call into both modules. This module gates on
+// `state.networkMode === 'host'` because the network lobby view only
+// renders for the host configuration; non-network DM is handled by
+// lobby.js. See lobby.js's renderLobbyState comment for the broader
+// strangler-fig context.
+
+/** Renderer-command impl for showLobby + updateLobbyState in network
+ *  mode. Re-derives from claim-registry like syncFromClaims does. */
+export function renderLobbyState(_payload) {
+    if (state.networkMode !== 'host') return;
+    syncFromClaims();
+    renderAllLabels();
+}
+
+/** Renderer-command impl for hideLobby — no-op for now (CSS dismisses
+ *  the panel based on body[data-game-state]). */
+export function clearLobby() {
+    // No-op; CSS-driven for now.
+}
