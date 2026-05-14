@@ -17,6 +17,7 @@ import { equipWeapon } from '../entities/weapons.js';
 import { getFloorHeightAt, getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
 import * as renderer from '../../renderer/index.js';
+import { getCurrentLevel } from '../level.js';
 
 // Don't spawn a player within this distance of any living player. Picked
 // to be a generous safety radius — about 4× player radius so the spawning
@@ -101,11 +102,10 @@ export function spawnPlayer(player) {
     renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
     orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
 
-    // L1.6 — informational. Game (subscribed in L2.4) uses this to
-    // confirm a slot is live again so it can hide a respawn overlay
-    // or update lobby state. Today's only listener is whatever the
-    // dev console wires up by hand.
-    window.__currentLevel?._emit('player-spawned', {
+    // Informational. Game (subscribed in L2.4) uses this to confirm
+    // a slot is live again so it can hide a respawn overlay or
+    // update lobby state.
+    getCurrentLevel()?._emit('player-spawned', {
         slot: player.index,
     });
 }

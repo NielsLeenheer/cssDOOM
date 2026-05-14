@@ -32,6 +32,7 @@ import { loadMap, getNextMap, getSecretExitMap } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 import { showIntermission } from '../../ui/intermission.js';
+import { getCurrentLevel } from '../level.js';
 
 export function tryUseSwitch(player) {
     if (isMatchLobby()) return;
@@ -85,13 +86,12 @@ export function tryUseSwitch(player) {
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();
-                    // L1.6 — announce the level-complete event for Game
+                    // Announce the level-complete event for Game
                     // (subscribed in L2.4) to interpret per mode. The
                     // existing SP/DM branching below still runs; once
-                    // Game owns the response, that branch goes away in
-                    // L4. Today's only listener is whatever the dev
-                    // console wires up by hand.
-                    window.__currentLevel?._emit('level-complete', {
+                    // Game owns the response, that branch goes away
+                    // in L4.
+                    getCurrentLevel()?._emit('level-complete', {
                         nextMap,
                         secret: linedef.specialType === SECRET_EXIT_SPECIAL,
                         slot: player.index,

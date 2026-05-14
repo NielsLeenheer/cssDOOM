@@ -28,7 +28,7 @@ import { PLAYER_RADIUS } from '../game/constants.js';
 export const MAPS = ['E1M1', 'E1M2', 'E1M3', 'E1M4', 'E1M5', 'E1M6', 'E1M7', 'E1M8', 'E1M9'];
 import { state } from '../game/state.js';
 import { getSectorAt } from '../game/physics.js';
-import { Level } from '../game/level.js';
+import { Level, _setCurrentLevel } from '../game/level.js';
 import { orchestrator } from '../orchestrator.js';
 import * as renderer from '../renderer/index.js';
 
@@ -80,11 +80,11 @@ export function decorateMapData(_mapData) {
 }
 
 /**
- * Backward-compat shim. Constructs a Level and awaits its load.
- *
- * Stashing on `window.__currentLevel` is transitional; L1.7 replaces
- * this with proper registry helpers exported from `game/level.js`,
- * and L2 hands ownership to Game which constructs Levels directly.
+ * Backward-compat shim. Constructs a Level, awaits its load, starts
+ * it ticking, and registers it as the current Level for this window
+ * via `_setCurrentLevel` (from `game/level.js`). L2 hands ownership
+ * to Game which constructs Levels directly and holds its own
+ * reference, at which point this shim disappears.
  */
 export async function loadMap(name) {
     const lvl = new Level({
@@ -99,9 +99,11 @@ export async function loadMap(name) {
     // resolved. L2's Game will own the load-then-start sequencing
     // explicitly; for now the shim does it inline.
     lvl.start();
-    // L1.7 will hand this Level to a real owner; for now stash globally
-    // so callers that need to reach the current Level instance can.
-    window.__currentLevel = lvl;
+    // Register as "the current Level for this window." Callers
+    // (master.js's RAF, the level-event emit sites in switches.js /
+    // damage.js / spawn.js) read this via `getCurrentLevel()`. L2
+    // replaces the registry with Game-owned reference.
+    _setCurrentLevel(lvl);
     return lvl;
 }
 

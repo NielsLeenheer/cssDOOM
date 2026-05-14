@@ -25,6 +25,7 @@
 import { state } from './game/state.js';
 import { mapData, currentMap, addPlayerThing } from './shared/maps.js';
 import { loadMap } from './shared/maps.js';
+import { getCurrentLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
 import { startCullingLoop } from './renderer/scene/culling.js';
 import { updatePerspective } from './renderer/scene/scene.js';
@@ -127,13 +128,12 @@ function gameLoop(timestamp) {
         return;
     }
 
-    // L1.3 — the per-frame world step is now driven through the
-    // current Level instance, which internally no-ops if its state is
-    // 'loaded-paused' (so this stays correct once L1.4 wires
-    // pause/resume). The `window.__currentLevel` global is a
-    // transitional handle — L1.7 replaces it with a `getCurrentLevel`
-    // registry helper.
-    window.__currentLevel?.tick(timestamp);
+    // The per-frame world step is driven through the current Level
+    // instance, which internally no-ops if paused. The Level reference
+    // lives in `src/game/level.js`'s module-level registry, written
+    // by `shared/maps.js::loadMap` and read here via `getCurrentLevel`.
+    // L2 replaces this with `app.game.level` once Game owns Level.
+    getCurrentLevel()?.tick(timestamp);
     renderAllActivePanes();
 
     if (import.meta.env.DEV || debugEnabled) updateDebugStats();

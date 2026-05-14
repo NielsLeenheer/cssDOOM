@@ -10,6 +10,7 @@ import { forEachSectorAt } from '../spatial-grid.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { getSectorAt } from '../physics.js';
 import { awardFrag } from '../match.js';
+import { getCurrentLevel } from '../level.js';
 import * as renderer from '../../renderer/index.js';
 import { clearWeaponSlots } from '../../renderer/hud.js';
 import { clearMovingState } from '../movement.js';
@@ -108,12 +109,11 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         renderer.setPlayerDead(player.viewportIndex, true);
         orchestrator.playSound('DSPLDETH', { x: player.x, y: player.y });
 
-        // L1.6 — announce the death for Game (subscribed in L2.4) to
-        // run DM scoring / SP respawn-overlay flow. Fired AFTER all
+        // Announce the death for Game (subscribed in L2.4) to run
+        // DM scoring / SP respawn-overlay flow. Fired AFTER all
         // visual/audio side effects so listeners can read the
-        // already-marked-dead Player. Today's only listener is
-        // whatever the dev console wires up by hand.
-        window.__currentLevel?._emit('player-died', {
+        // already-marked-dead Player.
+        getCurrentLevel()?._emit('player-died', {
             slot: player.index,
             attacker,
         });

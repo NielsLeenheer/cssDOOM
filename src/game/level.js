@@ -44,6 +44,22 @@ import {
     addPlayerThings,
 } from '../shared/maps.js';
 
+/**
+ * Module-level registry for "the Level currently being simulated by
+ * this window." Set by `loadMap()` (the L1.2 shim) and read by the
+ * RAF tick + the level-event call sites. Transitional — L2 hands
+ * Level ownership to Game (each Game holds its own Level reference),
+ * at which point this registry goes away.
+ *
+ * Two accessors are intentional: `getCurrentLevel` is the
+ * stable read API used by callers (tick, emit-call-sites). The
+ * underscored `_setCurrentLevel` is for the shim only — by convention,
+ * no caller outside `shared/maps.js::loadMap` should mutate it.
+ */
+let _currentLevel = null;
+export function getCurrentLevel() { return _currentLevel; }
+export function _setCurrentLevel(lvl) { _currentLevel = lvl; }
+
 export class Level {
     constructor({ map, players, rules, orchestrator }) {
         this.map = map;
