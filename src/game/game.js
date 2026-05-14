@@ -25,6 +25,9 @@
 
 import { state } from './state.js';
 import { ensurePlayerCount } from '../mode.js';
+import { Level, _setCurrentLevel } from './level.js';
+import { orchestrator } from '../orchestrator.js';
+import { getNextMap } from '../shared/maps.js';
 
 export class Game {
     constructor(modeConfig) {
@@ -84,8 +87,61 @@ export class Game {
             roster: this.roster,
         });
     }
-    beginPlay()          { /* L2.5 / L2.6 */ }
-    restartMatch()       { /* L2.5 */ }
+    /**
+     * Roster is finalized — construct the Level for `this.mapCursor`,
+     * load it, start it, and transition through LOBBY → LOADING →
+     * PLAYING. Today's match.js still owns the actual match-start
+     * trigger (`startMatch`); L2.5b cuts match.js over to call this.
+     *
+     * SP and Local DM use the same monolithic load-then-start path
+     * for L2.5a. The Local DM "background load during claim UI" /
+     * direct LOBBY → PLAYING optimization from §3b lands when lobby
+     * UI moves into Game (L2.6). Network DM extension (LOAD_MAP
+     * broadcast + ready-to-play handshake per §12) is L6.
+     *
+     * `_setCurrentLevel(this.level)` keeps the legacy `getCurrentLevel`
+     * registry in sync so the existing per-frame tick caller in
+     * master.js and the level-event emit sites in switches.js /
+     * damage.js / spawn.js continue to find the right Level
+     * instance. L7 retires the registry once master.js routes through
+     * `app.game.level` directly.
+     */
+    async beginPlay() {
+        this._transitionTo('LOADING');
+        this.level = new Level({
+            map: this.mapCursor,
+            players: this.roster,
+            rules: this.rules,
+            orchestrator,
+        });
+        this._subscribeLevel(this.level);
+        await this.level.load();
+        this.level.start();
+        _setCurrentLevel(this.level);
+        this._transitionTo('PLAYING');
+    }
+
+    /**
+     * RESULTS → LOBBY transition for DM. Advances `mapCursor` per
+     * the §4b cycle (currently uses `getNextMap` from shared/maps.js;
+     * secret-exit handling per §4b is deferred to L2.8 along with the
+     * results overlay).
+     *
+     * Does NOT tear down `this.level` — that already happened at
+     * PLAYING → RESULTS per §12 (Match end). RESULTS → LOBBY is the
+     * pure state transition; the next match's Level is constructed
+     * lazily by the next `beginPlay()`.
+     *
+     * Today's match.js owns the actual restart trigger; L2.5b cuts
+     * over.
+     */
+    restartMatch() {
+        const next = getNextMap();
+        if (next) this.mapCursor = next;
+        this._transitionTo('LOBBY');
+        this._emit('match-restarted', { mapCursor: this.mapCursor });
+    }
+
     advance()            { /* L2.7 */ }
 
     on(event, handler) {
@@ -125,34 +181,44 @@ export class Game {
     }
 
     /**
-     * Reacts to Level emitting `level-complete` (player crossed an
-     * exit line). In SP: transitions PLAYING → INTERMISSION and
-     * triggers the intermission overlay. In DM: treats as match-end
-     * (vanilla DOOM behavior per §4b) and transitions PLAYING →
-     * RESULTS. Body lands in L2.5; today's switches.js still owns
-     * the SP intermission trigger and the DM loadMap call.
+     * Reacts to Level emitting `level-complete`. SP: PLAYING →
+     * INTERMISSION. DM: PLAYING → RESULTS (vanilla DOOM exit-ends-
+     * match per §4b). Re-emits at the Game layer so App-side
+     * listeners can react.
+     *
+     * Does NOT trigger UI side effects yet — today's switches.js
+     * still owns the SP `showIntermission` call and the DM
+     * `setTimeout(loadMap, 1000)` path. UI ownership migrates in
+     * L2.7 (intermission) / L2.8 (results), at which point the
+     * inline switches.js paths get torn out and Game becomes the
+     * single trigger.
      */
-    _onLevelComplete(_payload) {
-        // L2.5 wires the mode-specific response.
+    _onLevelComplete(payload) {
+        if (this.gameMode === 'singleplayer') {
+            this._transitionTo('INTERMISSION');
+        } else {
+            this._transitionTo('RESULTS');
+        }
+        this._emit('level-complete', payload);
     }
 
     /**
-     * Reacts to Level emitting `player-died`. DM: increment killer's
-     * frag count via awardFrag (already handled by damage.js for now)
-     * and check frag-limit match-end. SP: arm the respawn overlay so
-     * the next fire press reloads the level. Body lands in L2.5;
-     * today's damage.js handles both flows inline.
+     * Reacts to Level emitting `player-died`. DM scoring + frag-limit
+     * detection still lives in damage.js / match.js for L2.5a; Game's
+     * handler is a pure re-emit so App-side observers can subscribe
+     * without duplicating side effects. L4 cleans up the legacy
+     * inline handling once Game owns the response end-to-end.
      */
-    _onPlayerDied(_payload) {
-        // L2.5 wires DM scoring + SP respawn-overlay flow.
+    _onPlayerDied(payload) {
+        this._emit('player-died', payload);
     }
 
     /**
-     * Reacts to Level emitting `player-spawned`. Informational —
-     * Game uses this to confirm a slot is live again so it can hide
-     * a respawn overlay or update lobby state. Body lands in L2.5.
+     * Reacts to Level emitting `player-spawned`. Informational — pure
+     * re-emit. The respawn-overlay-hide work is deferred to L2.8
+     * along with the rest of the per-slot overlay lifecycle.
      */
-    _onPlayerSpawned(_payload) {
-        // L2.5 hides the respawn overlay if one was up for this slot.
+    _onPlayerSpawned(payload) {
+        this._emit('player-spawned', payload);
     }
 }
