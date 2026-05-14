@@ -240,6 +240,52 @@ export class App {
     }
 
     /**
+     * Enter ATTRACT state (warm path — IN_GAME → ATTRACT idle
+     * timeout per §16). Tears down the held Game so state.things /
+     * doorState / etc. clear, then transitions App into ATTRACT.
+     *
+     * **L3.6 scope** (Path-C friendly): this method only handles the
+     * App-level state change and Game teardown. The rotation RAF,
+     * HUD / weapon / player-billboard hide commands, and the
+     * captured-pose seeding from `state.players[0]` are all deferred
+     * to a later dedicated attract-cutover step (likely L4 or
+     * post-L4). Until then, ATTRACT is just a state label — no
+     * visible attract reel runs.
+     *
+     * Idempotent — no-op when already in ATTRACT.
+     */
+    async enterAttract() {
+        if (this._state === 'ATTRACT') return;
+        await this.endGame();
+        this.transitionTo('ATTRACT');
+        // TODO (dedicated attract step):
+        //   1. Capture pose from state.players[0] BEFORE endGame
+        //      (currently lost because endGame fires first).
+        //   2. orchestrator.hideHud / hideWeapon / hidePlayerBillboards
+        //      renderer commands.
+        //   3. Seed attract camera object with captured pose.
+        //   4. Start rotation RAF and call orchestrator.updateCamera(0, ...).
+    }
+
+    /**
+     * Exit ATTRACT state (wake → IN_GAME per §16). Per the uniform
+     * wake path locked in Q13, every ATTRACT exit lands in a Game in
+     * LOBBY — fire/use uses lastModeConfig directly; menu button
+     * routes through openMenu/closeMenu, which calls startLocalGame
+     * on close anyway. So both paths end here in startLocalGame.
+     *
+     * L3.6 scope: the rotation RAF stop is deferred (no RAF wired).
+     *
+     * Idempotent — no-op when not in ATTRACT.
+     */
+    async exitAttract() {
+        if (this._state !== 'ATTRACT') return;
+        const cfg = this.lastModeConfig ?? KIOSK_DEFAULT_MODE_CONFIG;
+        await this.startLocalGame(cfg);
+        // startLocalGame already transitions to IN_GAME.
+    }
+
+    /**
      * Close the menu overlay. Resolves the destination per §3c using
      * the previously-recorded state:
      *
