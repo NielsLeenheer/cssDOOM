@@ -32,6 +32,7 @@ import { updatePerspective } from './renderer/scene/scene.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { buildModeConfigFromUrl } from './game/mode-config.js';
+import { Game } from './game/game.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { configureAudio } from './audio/audio.js';
 import { hideInitialOverlay } from './ui/overlay.js';
@@ -343,11 +344,22 @@ export async function initMaster({ isKiosk = false } = {}) {
     initLobby({ getExternallyClaimedSlots: () => new Set() });
 
     // L2.2 — package the mode choice into a Game-consumable struct.
-    // Not wired into a Game constructor yet (that's L2.9); the call
-    // exists here so the resolution lives in one place when L2.9
-    // arrives. Today's applyMode call below still owns the actual
-    // boot-time mode application.
-    const _modeConfig = buildModeConfigFromUrl();
+    const modeConfig = buildModeConfigFromUrl();
+
+    // L2.9 (Path C) — construct the Game so a single instance is
+    // available throughout the page lifetime, but DO NOT call
+    // .start() yet. Game's state machine + Level ownership + lobby /
+    // intermission / results renderer-command pushes (added in
+    // L2.5a..L2.8) all stay dead until L4 cuts over and disables the
+    // legacy game-state.js + lobby.js / match.js / intermission.js
+    // ownership paths. Until then, today's applyMode + loadMap +
+    // legacy lobby.js + match.js still drive every smoke path.
+    //
+    // Exposed on window.app so the dev console (and the future App
+    // class in L3) has a stable handle. L3.1 replaces this with the
+    // real App instance.
+    const game = new Game(modeConfig);
+    window.app = { game };
 
     // Restore the previously chosen mode (default singleplayer) before the
     // initial map load so the scene is built with the right pane count and
