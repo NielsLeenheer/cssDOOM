@@ -26,6 +26,54 @@
  * App for any cross-cutting concerns (analytics, recording, etc.).
  */
 
+/**
+ * Kiosk default modeConfig per Q12 — Local DM. DM is the installation's
+ * headline feature, so kiosk boots straight into a DM lobby rather
+ * than asking the attendee to pick a mode. Skill / startMap defaults
+ * match what `mode-config.js::buildModeConfigFromUrl` already returns
+ * for the kiosk branch.
+ */
+const KIOSK_DEFAULT_MODE_CONFIG = {
+    gameMode: 'deathmatch',
+    networkMode: 'standalone',
+    skillLevel: 1,
+    rules: null,
+    startMap: 'E1M1',
+};
+
+/**
+ * sessionStorage key the App uses for the non-kiosk "last picked mode"
+ * autostart hint per Q12. Session-scoped (cleared on tab close,
+ * restored on reload-in-same-tab) so dev iteration lands back in
+ * whatever was running, but a fresh tab opens to MENU.
+ *
+ * Distinct from `mode.js`'s legacy `cssdoom-game-mode` localStorage
+ * key — the legacy stores only gameMode and persists across page
+ * reloads. Both keys will coexist until L3.7 cuts master.js over to
+ * App.start; at that point the legacy key can be retired or migrated.
+ */
+const LAST_USED_MODE_STORAGE_KEY = 'cssdoom:lastUsedMode';
+
+/**
+ * Read the saved modeConfig from sessionStorage. Returns null when
+ * absent or malformed (defensive — never throws). The shape is
+ * whatever startLocalGame writes back in L3.3; for now that's the
+ * full Q12 modeConfig.
+ */
+function readLastUsedMode() {
+    try {
+        const raw = sessionStorage.getItem(LAST_USED_MODE_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && parsed.gameMode) {
+            return parsed;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
 export class App {
     constructor() {
         this._state = 'BOOT';
@@ -45,7 +93,49 @@ export class App {
         this._listeners = new Map();
     }
 
-    async start()                    { /* L3.2 */ }
+    /**
+     * Boot resolution per LIFECYCLE_REFACTOR.md §3 + Q12:
+     *
+     *   ?join=ROOM      → joinRemoteGame(roomCode). Any platform.
+     *   ?kiosk          → startLocalGame(kiosk default = Local DM).
+     *                     Q12 kiosk default is
+     *                     { gameMode: 'deathmatch', networkMode: 'standalone' }.
+     *   sessionStorage  → startLocalGame(stored). Non-kiosk only —
+     *                     kiosk does NOT write sessionStorage (every
+     *                     kiosk reload is a fresh attendee).
+     *   else            → transitionTo('MENU'). Non-kiosk first boot.
+     *
+     * No caller wires this yet. L3.7 replaces master.js's procedural
+     * boot with `await new App().start()`. Until then, the only effect
+     * of running App.start() from the dev console is to no-op through
+     * the stubbed inner methods (startLocalGame / joinRemoteGame /
+     * transitionTo all land in L3.3+).
+     */
+    async start() {
+        if (this._state !== 'BOOT') return;
+
+        const params = new URLSearchParams(location.search);
+        const joinParam = params.get('join');
+        const isKiosk = params.has('kiosk');
+
+        if (joinParam !== null) {
+            await this.joinRemoteGame(joinParam || null);
+            return;
+        }
+
+        if (isKiosk) {
+            await this.startLocalGame(KIOSK_DEFAULT_MODE_CONFIG);
+            return;
+        }
+
+        const stored = readLastUsedMode();
+        if (stored) {
+            await this.startLocalGame(stored);
+            return;
+        }
+
+        this.transitionTo('MENU');
+    }
     destroy()                        { /* dev hot-reload teardown */ }
     transitionTo(state)              { /* L3.4 */ }
     async startLocalGame(modeConfig) { /* L3.3 */ }
