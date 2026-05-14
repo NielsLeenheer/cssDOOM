@@ -169,8 +169,30 @@ export class Level {
         updateGame(timestamp);
     }
 
-    pause()   { /* L1.4 */ }
-    resume()  { /* L1.4 */ }
+    /**
+     * Stop ticking without destroying state. The next `resume()` (or
+     * `start()`) picks up from the same world snapshot. Idempotent —
+     * already-paused or unloaded Levels are unchanged. Used by Game
+     * when the App menu opens (wired in L5).
+     */
+    pause() {
+        if (this._state === 'loaded-running') {
+            this._state = 'loaded-paused';
+        }
+    }
+
+    /**
+     * Resume ticking after a pause. Same effect as `start()` but named
+     * for the post-pause path. Idempotent — already-running or
+     * unloaded Levels are unchanged. Calling resume on an `unloaded`
+     * Level is intentionally a no-op rather than an error, so
+     * Game.resume() doesn't have to special-case "no level loaded yet".
+     */
+    resume() {
+        if (this._state === 'loaded-paused') {
+            this._state = 'loaded-running';
+        }
+    }
     stop()    { /* L1.5 */ }
     destroy() { /* L1.5 */ }
 
