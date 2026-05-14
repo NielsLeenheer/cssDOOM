@@ -100,6 +100,14 @@ export function spawnPlayer(player) {
     renderer.createTeleportFog(player.x, player.floorHeight, player.y);
     renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
     orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
+
+    // L1.6 — informational. Game (subscribed in L2.4) uses this to
+    // confirm a slot is live again so it can hide a respawn overlay
+    // or update lobby state. Today's only listener is whatever the
+    // dev console wires up by hand.
+    window.__currentLevel?._emit('player-spawned', {
+        slot: player.index,
+    });
 }
 
 /**

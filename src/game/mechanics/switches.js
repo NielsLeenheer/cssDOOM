@@ -85,6 +85,17 @@ export function tryUseSwitch(player) {
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();
+                    // L1.6 — announce the level-complete event for Game
+                    // (subscribed in L2.4) to interpret per mode. The
+                    // existing SP/DM branching below still runs; once
+                    // Game owns the response, that branch goes away in
+                    // L4. Today's only listener is whatever the dev
+                    // console wires up by hand.
+                    window.__currentLevel?._emit('level-complete', {
+                        nextMap,
+                        secret: linedef.specialType === SECRET_EXIT_SPECIAL,
+                        slot: player.index,
+                    });
                     if (state.gameMode === 'singleplayer') {
                         showIntermission(nextMap, (next) => {
                             if (next) loadMap(next);

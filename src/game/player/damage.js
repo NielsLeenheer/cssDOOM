@@ -107,6 +107,16 @@ export function damagePlayer(player, damageAmount, attacker = null) {
 
         renderer.setPlayerDead(player.viewportIndex, true);
         orchestrator.playSound('DSPLDETH', { x: player.x, y: player.y });
+
+        // L1.6 — announce the death for Game (subscribed in L2.4) to
+        // run DM scoring / SP respawn-overlay flow. Fired AFTER all
+        // visual/audio side effects so listeners can read the
+        // already-marked-dead Player. Today's only listener is
+        // whatever the dev console wires up by hand.
+        window.__currentLevel?._emit('player-died', {
+            slot: player.index,
+            attacker,
+        });
     }
 }
 
