@@ -339,9 +339,7 @@ export class Game {
      * Today's match.js owns the actual restart trigger; L2.5b cuts
      * over.
      */
-    restartMatch() {
-        const next = getNextMap();
-        if (next) this.mapCursor = next;
+    async restartMatch() {
         orchestrator.hideResults();
 
         // Reset legacy match state (kill matrix, scores, frag clock,
@@ -349,20 +347,8 @@ export class Game {
         // moves match-state ownership onto Game, this remains
         // authoritative; calling it here also fires match.js's
         // onMatch('reset') event that lobby.js + master broadcast
-        // both subscribe to. Without this, restarting a DM match
-        // would carry the previous match's kill matrix + scores into
-        // the next.
+        // both subscribe to.
         resetMatch();
-
-        // Respawn any player who was dead at match end. Pre-cutover,
-        // the restart's loadMap → clearSceneState path cleared
-        // player.isDead for every player. Post-cutover the next
-        // match reuses the same Level (no reload) so clearSceneState
-        // doesn't fire — without an explicit respawn here, a player
-        // dead at time-limit stays dead through the next match.
-        for (const player of this.roster) {
-            if (player?.isDead) spawnPlayer(player);
-        }
 
         this._transitionTo('LOBBY');
         orchestrator.showLobby({
@@ -371,13 +357,41 @@ export class Game {
         });
         this._emit('match-restarted', { mapCursor: this.mapCursor });
 
-        // On kiosk where claims persist across matches, all slots are
-        // typically still claimed when the new lobby opens. The
+        // Reload the Level so state.things / state.projectiles /
+        // state.doorState / state.liftState / state.crusherState all
+        // reset, and the renderer rebuilds its scene from fresh
+        // mapData. Without this, beginPlay's "level exists → just
+        // start()" idempotent path would keep the previous match's
+        // mid-match world (corpses, picked-up items, opened doors,
+        // half-killed enemies) live into the next match. Mirrors the
+        // pre-cutover `resetMatch + loadMap(currentMap)` flow from
+        // legacy match.js::restartMatch.
+        //
+        // Calling Level.load on the existing instance re-runs the
+        // full load body (fade-in → fetch → init → scene rebuild
+        // → fade-out). Map cycling per §4b is deferred — restart
+        // reloads the SAME map, matching legacy behavior.
+        if (this.level) {
+            await this.level.load();
+        }
+
+        // Level.load's clearSceneState clears isDead+powerups but
+        // doesn't reset HP / weapons / ammo / keys. spawnPlayer
+        // does the full reset to DM defaults + picks a DM start
+        // avoiding nearby players. Apply to every roster slot so
+        // dead and damaged players both come back fresh.
+        for (const player of this.roster) {
+            if (player) spawnPlayer(player);
+        }
+
+        // On kiosk where claims persist across matches, all slots
+        // are typically still claimed when the new lobby opens. The
         // onClaimChange subscription wouldn't fire without an actual
         // change, so explicitly run the auto-start check here. For
         // Local DM non-kiosk this is a no-op unless both slots happen
         // to still be claimed; for kiosk it fires immediately and
-        // beginPlay constructs the next match's Level.
+        // beginPlay's idempotent level.start() + transition to
+        // PLAYING + startMatch land the new match cleanly.
         this._checkAutoStart();
     }
 
