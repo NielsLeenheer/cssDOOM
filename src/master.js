@@ -31,6 +31,7 @@ import { startCullingLoop } from './renderer/scene/culling.js';
 import { updatePerspective } from './renderer/scene/scene.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
+import { buildModeConfigFromUrl } from './game/mode-config.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { configureAudio } from './audio/audio.js';
 import { hideInitialOverlay } from './ui/overlay.js';
@@ -340,6 +341,13 @@ export async function initMaster({ isKiosk = false } = {}) {
     // gamepad must do that explicitly. Network DM will swap in a getter
     // returning remote-occupied slots.
     initLobby({ getExternallyClaimedSlots: () => new Set() });
+
+    // L2.2 — package the mode choice into a Game-consumable struct.
+    // Not wired into a Game constructor yet (that's L2.9); the call
+    // exists here so the resolution lives in one place when L2.9
+    // arrives. Today's applyMode call below still owns the actual
+    // boot-time mode application.
+    const _modeConfig = buildModeConfigFromUrl();
 
     // Restore the previously chosen mode (default singleplayer) before the
     // initial map load so the scene is built with the right pane count and
