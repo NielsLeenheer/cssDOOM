@@ -219,6 +219,63 @@ export class App {
         this.game = null;
     }
 
+    /**
+     * Open the menu overlay. Captures the current state as
+     * _previousState (so closeMenu can resolve per §3c) and pauses
+     * the held Game. Idempotent — calling openMenu while already in
+     * MENU is a no-op.
+     *
+     * Game.pause() is still a stub from L2.1 / L5; it'll grow real
+     * pause-broadcast semantics in L5. For L3.5 the call is plumbing.
+     *
+     * No caller yet — menu.js still owns its own open/close logic
+     * and talks to legacy game-state.js. L3.7 (or a later cutover
+     * step) wires the menu UI to call this.
+     */
+    openMenu() {
+        if (this._state === 'MENU') return;
+        // transitionTo records _previousState automatically.
+        this.transitionTo('MENU');
+        this.game?.pause();
+    }
+
+    /**
+     * Close the menu overlay. Resolves the destination per §3c using
+     * the previously-recorded state:
+     *
+     *   previousState='IN_GAME' → resume the held Game.
+     *   previousState='ATTRACT' → start a fresh Game with
+     *                             lastModeConfig (the §3c "menu
+     *                             opened during attract is a signal
+     *                             to play" rule). Falls back to the
+     *                             kiosk default when lastModeConfig
+     *                             is null (shouldn't happen in
+     *                             practice — attract is kiosk-only
+     *                             and kiosk seeded lastModeConfig
+     *                             on boot).
+     *   previousState='BOOT'    → unreachable per §3c (BOOT→MENU
+     *                             only happens when MENU has no
+     *                             close affordance). Fallback: do
+     *                             nothing.
+     *
+     * Idempotent against being called when not in MENU.
+     */
+    async closeMenu() {
+        if (this._state !== 'MENU') return;
+        const prev = this._previousState;
+        if (prev === 'IN_GAME') {
+            this.transitionTo('IN_GAME');
+            this.game?.resume();
+            return;
+        }
+        if (prev === 'ATTRACT') {
+            const cfg = this.lastModeConfig ?? KIOSK_DEFAULT_MODE_CONFIG;
+            await this.startLocalGame(cfg);
+            return;
+        }
+        // BOOT or other — see §3c. No-op fallback.
+    }
+
     on(event, handler) {
         if (!this._listeners.has(event)) this._listeners.set(event, new Set());
         this._listeners.get(event).add(handler);
