@@ -171,7 +171,12 @@ export class Game {
     restartMatch() {
         const next = getNextMap();
         if (next) this.mapCursor = next;
+        orchestrator.hideResults();
         this._transitionTo('LOBBY');
+        orchestrator.showLobby({
+            slots: this.roster,
+            mapCursor: this.mapCursor,
+        });
         this._emit('match-restarted', { mapCursor: this.mapCursor });
     }
 
@@ -253,9 +258,35 @@ export class Game {
             this._transitionTo('INTERMISSION');
             orchestrator.showIntermission(payload);
         } else {
+            // DM: vanilla DOOM exit ends the match (§4b). Today's
+            // switches.js DM branch still does setTimeout(loadMap,
+            // 1000), so the scoreboard pushed here will briefly
+            // appear before that auto-load fires. L4 removes the
+            // switches.js DM branch once Game owns the response.
             this._transitionTo('RESULTS');
+            orchestrator.showResults(this._buildResultsPayload());
         }
         this._emit('level-complete', payload);
+    }
+
+    /**
+     * Build the payload for `showResults`. Reads `state.match` (when
+     * present) for the kill matrix and players' `score` field. Until
+     * L4 wires match-end determination into Game, winnerIndex falls
+     * back to -1 (which the scoreboard renders as "TIE") because the
+     * `state.match.winner` field is only set by `match.js::endMatch`,
+     * which doesn't run on a DM exit.
+     */
+    _buildResultsPayload() {
+        const m = state.match;
+        return {
+            scores: this.roster.map(p => p?.score ?? 0),
+            kills: m
+                ? m.kills.map(row => row.slice())
+                : this.roster.map(() => this.roster.map(() => 0)),
+            winnerIndex: m?.winner?.index ?? -1,
+            mapName: this.mapCursor,
+        };
     }
 
     /**

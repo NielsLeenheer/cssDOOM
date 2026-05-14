@@ -63,6 +63,7 @@ import {
 import * as lobbyOverlay from '../ui/lobby.js';
 import * as networkLobbyOverlay from '../ui/network-lobby.js';
 import * as intermissionOverlay from '../ui/intermission.js';
+import * as resultsOverlay from '../ui/scoreboard.js';
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -214,6 +215,20 @@ export const COMMANDS = {
     hideIntermission: {
         kind: 'world',
         impl: () => intermissionOverlay.clearIntermission(),
+    },
+
+    // ── World: results / scoreboard overlay (L2.8) ────────────────────────
+    // Driven by Game._onLevelComplete DM branch (showResults) and
+    // Game.restartMatch (hideResults). World-kind so the scoreboard
+    // fans to every client's RenderClient via sinks — Network DM
+    // remotes see the same scoreboard the host does.
+    showResults: {
+        kind: 'world',
+        impl: (payload) => resultsOverlay.renderResults(payload),
+    },
+    hideResults: {
+        kind: 'world',
+        impl: () => resultsOverlay.clearResults(),
     },
 };
 

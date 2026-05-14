@@ -64,6 +64,25 @@ export function hideScoreboard() {
     }
 }
 
+// ── L2.8 renderer-command entry points ─────────────────────────────────
+// Game pushes showResults / hideResults through the orchestrator
+// (see src/renderer/commands.js). Same strangler-fig shape as L2.6 /
+// L2.7: legacy match.js::endMatch still calls showScoreboard directly;
+// Game's push runs in parallel once L2.9 wires it. L4 cuts over.
+
+/** Renderer-command impl for showResults. Delegates to showScoreboard
+ *  with whatever payload Game builds (typically scores, kills,
+ *  winnerIndex, mapName). Idempotent against repeated calls — DOM is
+ *  fully rebuilt each time via replaceChildren. */
+export function renderResults(payload) {
+    showScoreboard(payload);
+}
+
+/** Renderer-command impl for hideResults. Delegates to hideScoreboard. */
+export function clearResults() {
+    hideScoreboard();
+}
+
 function buildScoreboardNode({ scores, kills, winnerIndex }) {
     const root = document.createElement('div');
     root.className = 'scoreboard';
