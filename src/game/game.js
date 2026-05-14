@@ -25,7 +25,7 @@
 
 import { state } from './state.js';
 import { ensurePlayerCount } from '../mode.js';
-import { Level, _setCurrentLevel } from './level.js';
+import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
 
@@ -94,7 +94,54 @@ export class Game {
     }
     pause()              { /* L5 */ }
     resume()             { /* L5 */ }
-    async stop()         { /* L2.5 */ }
+    /**
+     * Clean teardown. Stops the held Level (if any), destroys it
+     * (clears state.things / doorState / liftState / crusherState /
+     * projectiles), nulls `this.level`, clears the L1.7 registry,
+     * hides any open overlays, and transitions to ENDED.
+     *
+     * Idempotent — stop() on an already-ENDED Game is a no-op.
+     *
+     * Subscriber cleanup: the arrow-function handlers registered via
+     * `_subscribeLevel(level)` are held by the Level's own _listeners
+     * Map. When `this.level = null` clears the Game's last reference
+     * and `level.destroy()` runs, the Level becomes unreachable; the
+     * handlers go with it. No explicit unsubscribe needed.
+     *
+     * Caveat for the L4 sequence: `_transitionTo('ENDED')` writes
+     * body.dataset.gameState = 'ENDED'. Legacy CSS keyed on the
+     * `body[data-game-state="ended"]` selector triggers the
+     * scoreboard overlay — but here we mean "Game lifecycle ended",
+     * not "DM match ended with scoreboard." L4.8 audits + resolves
+     * the body-class vocabulary collision. Until then Game.stop is
+     * only invoked from dead-code paths (App.endGame, which has no
+     * runtime caller until L4.9 cuts master.js over), so the bad
+     * write never fires at runtime.
+     */
+    async stop() {
+        if (this._state === 'ENDED') return;
+
+        if (this.level) {
+            this.level.stop();
+            this.level.destroy();
+            if (getCurrentLevel() === this.level) {
+                _setCurrentLevel(null);
+            }
+            this.level = null;
+        }
+
+        // Hide any open overlays. Impls are no-ops until L4.2
+        // installs real ones via the late-binding registry; calling
+        // them keeps teardown semantics correct so future-us doesn't
+        // discover stale lobby/intermission/results visuals after a
+        // Game switch.
+        orchestrator.hideLobby();
+        orchestrator.hideIntermission();
+        orchestrator.hideResults();
+
+        this._transitionTo('ENDED');
+        this._emit('game-ended', {});
+    }
     /**
      * Record that `deviceId` has claimed `slot`. Ensures the underlying
      * `state.players[slot]` Player exists (extending the roster if
