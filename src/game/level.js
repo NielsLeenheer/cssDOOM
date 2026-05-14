@@ -193,8 +193,51 @@ export class Level {
             this._state = 'loaded-running';
         }
     }
-    stop()    { /* L1.5 */ }
-    destroy() { /* L1.5 */ }
+    /**
+     * Halt the per-frame tick without clearing world state. Same flag
+     * effect as `pause()`, but named for the teardown path: Game calls
+     * `stop()` before `destroy()` so the world stops advancing while
+     * destruction happens. Idempotent.
+     *
+     * Why stop() exists alongside pause() despite identical body: §5
+     * of LIFECYCLE_REFACTOR.md distinguishes them semantically. pause()
+     * is a transient interruption with an expected `resume()` on the
+     * same Level instance (e.g. App menu open/close). stop() is the
+     * pre-destruction halt — no `resume()` will ever follow, so naming
+     * it `stop()` at the call site makes intent obvious.
+     */
+    stop() {
+        if (this._state === 'loaded-running') {
+            this._state = 'loaded-paused';
+        }
+    }
+
+    /**
+     * Clear the world-state singletons this Level was simulating into,
+     * and mark the instance as unloaded. After destroy(), tick() is
+     * a no-op even if start()/resume() were somehow called again.
+     *
+     * Touches ONLY `state.*` fields owned by Level per
+     * LIFECYCLE_REFACTOR.md §5 / §7 (things, projectiles, doors,
+     * lifts, crushers). Does NOT touch Game-owned fields (players,
+     * match, gameMode, etc.) or renderer DOM — the latter is
+     * deliberate: kiosk warm attract (IN_GAME → ATTRACT, §13b) relies
+     * on the scene surviving Level teardown so attract can fade the
+     * HUD and rotate the captured camera over the same geometry.
+     *
+     * No caller yet — Game wires this in L2 (and the L4 cleanup of
+     * cssdoom:* events). Today's loadMap still does its own
+     * teardown-then-rebuild inline.
+     */
+    destroy() {
+        state.things.length = 0;
+        state.projectiles.length = 0;
+        state.nextProjectileId = 0;
+        state.doorState.clear();
+        state.liftState.clear();
+        state.crusherState.clear();
+        this._state = 'unloaded';
+    }
 
     on(event, handler) {
         if (!this._listeners.has(event)) this._listeners.set(event, new Set());
