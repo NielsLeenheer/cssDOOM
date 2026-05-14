@@ -366,12 +366,22 @@ export async function initMaster({ isKiosk = false } = {}) {
     app.game = game;
     window.app = app;
 
-    // Restore the previously chosen mode (default singleplayer) before the
-    // initial map load so the scene is built with the right pane count and
-    // DM gets player 2 + match state from the first frame.
+    // Restore the previously chosen mode (default singleplayer) before
+    // app.start runs. applyMode still owns state.gameMode/networkMode,
+    // body data attributes, player count, audio config, network
+    // signaling room, and DomRenderer reshaping — Game doesn't
+    // replicate those today. App.start sees a fully-configured world
+    // when it kicks off Game.start.
     applyMode(isKiosk ? 'deathmatch' : loadSavedGameMode(), 'standalone');
 
-    await loadMap('E1M1');
+    // L4.9 atomic cutover — App owns the boot. Replaces the legacy
+    // `await loadMap('E1M1')` direct call. For SP, app.start auto-
+    // finalizes via game.beginPlay → Level.load (functionally the
+    // same as loadMap('E1M1')). For Local DM, app.start enters LOBBY
+    // and waits for Game._checkAutoStart (L4.5) to trigger beginPlay
+    // when both slots are claimed. Kiosk-SP and Network-DM-host map
+    // to the same paths.
+    await app.start();
     startCullingLoop({
         isAttract: isAttractActive,
         getSpectatorActive: () => spectatorActive,

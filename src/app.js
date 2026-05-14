@@ -75,6 +75,7 @@ function readLastUsedMode() {
 }
 
 import { Game } from './game/game.js';
+import { state } from './game/state.js';
 
 export class App {
     constructor() {
@@ -133,6 +134,25 @@ export class App {
         const stored = readLastUsedMode();
         if (stored) {
             await this.startLocalGame(stored);
+            return;
+        }
+
+        // L4.9 fallback: applyMode (in master.js) already initialized
+        // state.gameMode / state.networkMode from the legacy
+        // localStorage cssdoom-game-mode (or default 'singleplayer').
+        // Use that as the boot config so we land in a Game rather
+        // than routing to MENU. Q12's first-boot-MENU behavior is a
+        // future UX choice deferred until menu mode-switching also
+        // routes through app.startLocalGame; until then, legacy
+        // localStorage acts as the source of truth.
+        if (state.gameMode) {
+            await this.startLocalGame({
+                gameMode: state.gameMode,
+                networkMode: state.networkMode,
+                skillLevel: state.skillLevel ?? 1,
+                rules: null,
+                startMap: 'E1M1',
+            });
             return;
         }
 

@@ -166,6 +166,26 @@ function allSlotsClaimedNow() {
  * the pending timer is cancelled.
  */
 function checkAutoStart() {
+    // L4.9 — Game owns auto-start for Local DM via the L4.5
+    // onClaimChange subscription. Bail here to avoid a race that
+    // would fire both legacy `match.js::startMatch` (transitions
+    // game-state to ACTIVE) and `Game.beginPlay` (constructs a
+    // fresh Level). Without the guard, the same all-claimed event
+    // would re-load the map twice and leave state.gameState +
+    // Game._state divergent.
+    //
+    // Guard is intentionally narrow: only the Local DM driving
+    // case skips. SP doesn't have a lobby. Network DM uses host-
+    // fire-start (NETWORK_START gate), not auto-start. So the
+    // remaining live path here is "Game exists but isn't yet the
+    // driver" — which today is dead code, but the guard keeps the
+    // legacy auto-start as a fallback if Game is somehow absent.
+    if (window.app?.game?._state === 'LOBBY'
+        && window.app?.game?.gameMode === 'deathmatch'
+        && window.app?.game?.networkMode === 'standalone') {
+        return;
+    }
+
     if (!allSlotsClaimedNow()) {
         if (autoStartTimer) {
             clearTimeout(autoStartTimer);

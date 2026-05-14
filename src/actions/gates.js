@@ -46,17 +46,33 @@ export const GATE_PRIORITY = {
 };
 
 export function initGates() {
-    // ── Intermission dismiss — SP only.
+    // ── Intermission dismiss — SP only. L4.9 cutover: prefer
+    // Game.advance (pushes hideIntermission via orchestrator,
+    // advances mapCursor, awaits beginPlay → Level reload). Falls
+    // back to legacy dismissIntermission for any boot path that
+    // didn't construct a Game (shouldn't happen post-cutover but
+    // kept as a safety net).
     on(A.FIRE_DOWN, () => {
         if (!isIntermissionActive()) return;
-        dismissIntermission();
+        if (window.app?.game?.advance) {
+            window.app.game.advance();
+        } else {
+            dismissIntermission();
+        }
         return true;
     }, { priority: GATE_PRIORITY.INTERMISSION });
 
-    // ── Match-end restart — DM only.
+    // ── Match-end restart — DM only. L4.9 cutover: prefer
+    // Game.restartMatch (pushes hideResults, advances mapCursor via
+    // getNextMap, transitions LOBBY, pushes showLobby). Falls back
+    // to legacy restartMatch for safety.
     on(A.FIRE_DOWN, () => {
         if (!isMatchEnded()) return;
-        restartMatch();
+        if (window.app?.game?.restartMatch) {
+            window.app.game.restartMatch();
+        } else {
+            restartMatch();
+        }
         return true;
     }, { priority: GATE_PRIORITY.MATCH_END });
 
