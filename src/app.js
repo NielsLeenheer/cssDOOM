@@ -74,6 +74,8 @@ function readLastUsedMode() {
     }
 }
 
+import { Game } from './game/game.js';
+
 export class App {
     constructor() {
         this._state = 'BOOT';
@@ -138,9 +140,58 @@ export class App {
     }
     destroy()                        { /* dev hot-reload teardown */ }
     transitionTo(state)              { /* L3.4 */ }
-    async startLocalGame(modeConfig) { /* L3.3 */ }
+    /**
+     * Tear down any existing held Game, construct a fresh one with
+     * `modeConfig`, persist it for next reload (non-kiosk only per
+     * Q12), start it, and transition App into IN_GAME.
+     *
+     * Note: `Game.stop()` is still a stub from L2.1 — so a switch
+     * between Games doesn't yet fully tear the first one down. Fine
+     * for L3.3 because startLocalGame is unreachable until L3.7
+     * cuts master.js over; Game.stop gets fleshed out before then.
+     *
+     * `transitionTo('IN_GAME')` is also a stub (lands in L3.4) — no
+     * observable body-class write until then.
+     */
+    async startLocalGame(modeConfig) {
+        if (this.game) await this.endGame();
+
+        this.game = new Game(modeConfig);
+        this.lastModeConfig = modeConfig;
+
+        // Q12: kiosk does NOT persist — every kiosk reload is a fresh
+        // attendee, defaults always win. Non-kiosk persists to
+        // sessionStorage so dev iteration / single-tab reload lands
+        // back in the same mode.
+        const isKiosk = new URLSearchParams(location.search).has('kiosk');
+        if (!isKiosk) {
+            try {
+                sessionStorage.setItem(
+                    LAST_USED_MODE_STORAGE_KEY,
+                    JSON.stringify(modeConfig),
+                );
+            } catch {
+                // Quota / private-mode block — non-fatal.
+            }
+        }
+
+        await this.game.start();
+        this.transitionTo('IN_GAME');
+    }
+
     async joinRemoteGame(roomCode)   { /* L6 */ }
-    async endGame()                  { /* L3.3 */ }
+
+    /**
+     * Clean teardown of the held Game (or RemoteGame). Safe to call
+     * when no game is held — no-op. Used by startLocalGame's
+     * "switch games" path and by App's external "End game" affordance
+     * once that lands.
+     */
+    async endGame() {
+        if (!this.game) return;
+        await this.game.stop();
+        this.game = null;
+    }
 
     on(event, handler) {
         if (!this._listeners.has(event)) this._listeners.set(event, new Set());
