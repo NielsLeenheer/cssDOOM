@@ -300,15 +300,24 @@ export class Game {
     }
 
     /**
-     * Internal state transition. Updates `_state`, writes the body
-     * attribute that CSS reads, and emits `state-changed`. Callers
-     * (Game's own methods) use this rather than assigning `_state`
-     * directly so subscribers and the DOM stay in sync.
+     * Internal state transition. Updates `_state` and emits
+     * `state-changed`. Callers (Game's own methods) use this rather
+     * than assigning `_state` directly so subscribers stay in sync.
+     *
+     * Intentionally does NOT write `body.dataset.gameState`. Legacy
+     * `src/game/game-state.js` still owns that attribute and its
+     * own vocabulary (ACTIVE / LOBBY / INTERMISSION / ENDED /
+     * ATTRACT) — which CSS keys on across the codebase. If Game
+     * also wrote here with the new vocab (LOBBY / LOADING / PLAYING /
+     * INTERMISSION / RESULTS / ENDED), the two writers would race
+     * and CSS rules keyed on `="active"` would stop matching once
+     * Game fired PLAYING. L7 deletes game-state.js, audits CSS,
+     * and migrates rules onto the new vocab — at which point this
+     * method gets its body write back.
      */
     _transitionTo(newState) {
         const from = this._state;
         this._state = newState;
-        document.body.dataset.gameState = newState;
         this._emit('state-changed', { from, to: newState });
     }
 
