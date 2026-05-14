@@ -120,6 +120,19 @@ export class Game {
             // level.start() — skipping the LOADING phase per the
             // §3b happy path.
             await this._preloadLevel();
+
+            // Kick the auto-start check ONCE after preload. Claims
+            // persist across sessions in sessionStorage (kiosk
+            // pattern — controllers stay bound to monitors), so a
+            // ?kiosk boot can find both slots already claimed
+            // without any user press. onClaimChange only fires on
+            // CHANGE events, not on restored claims, so without
+            // this synchronous check the kiosk would sit in LOBBY
+            // indefinitely: no prompts visible (carriedOverClaims
+            // marks both panes 'active') but state.gameState still
+            // 'lobby', so input handlers that gate on ACTIVE
+            // suppress everything.
+            this._checkAutoStart();
             return;
         }
 
