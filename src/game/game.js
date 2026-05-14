@@ -28,6 +28,7 @@ import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
+import { resetMatch } from './match.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
 export class Game {
@@ -261,12 +262,32 @@ export class Game {
         const next = getNextMap();
         if (next) this.mapCursor = next;
         orchestrator.hideResults();
+
+        // Reset legacy match state (kill matrix, scores, frag clock,
+        // body.dataset.gameState → LOBBY via game-state.js). Until L7
+        // moves match-state ownership onto Game, this remains
+        // authoritative; calling it here also fires match.js's
+        // onMatch('reset') event that lobby.js + master broadcast
+        // both subscribe to. Without this, restarting a DM match
+        // would carry the previous match's kill matrix + scores into
+        // the next.
+        resetMatch();
+
         this._transitionTo('LOBBY');
         orchestrator.showLobby({
             slots: this.roster,
             mapCursor: this.mapCursor,
         });
         this._emit('match-restarted', { mapCursor: this.mapCursor });
+
+        // On kiosk where claims persist across matches, all slots are
+        // typically still claimed when the new lobby opens. The
+        // onClaimChange subscription wouldn't fire without an actual
+        // change, so explicitly run the auto-start check here. For
+        // Local DM non-kiosk this is a no-op unless both slots happen
+        // to still be claimed; for kiosk it fires immediately and
+        // beginPlay constructs the next match's Level.
+        this._checkAutoStart();
     }
 
     /**
