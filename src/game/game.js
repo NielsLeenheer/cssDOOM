@@ -29,6 +29,7 @@ import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
 import { resetMatch, startMatch } from './match.js';
+import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
 export class Game {
@@ -127,11 +128,24 @@ export class Game {
     }
 
     /**
-     * Construct + load this.mapCursor's Level and leave it paused.
-     * Used by start()'s Local DM branch and (if added later) by
-     * post-restart preload so the next match's lobby also sits on
-     * top of a loaded world. Idempotent — calling when this.level
-     * already exists is a no-op.
+     * Construct + load this.mapCursor's Level and start it ticking.
+     * Used by start()'s Local DM branch so the lobby UI sits on top
+     * of a live (but pre-match) world — players can walk around in
+     * warmup, AI animates, doors work, etc. Matches the pre-cutover
+     * behavior where loadMap → world ticking during lobby was what
+     * corrected player floor heights via updateMovement →
+     * updateHeight.
+     *
+     * Idempotent — no-op when this.level already exists.
+     *
+     * The §3b spec describes Level as "paused" during the lobby
+     * phase, but in practice the legacy world ran (gated by
+     * isMatchLobby checks inside updateGame for scoring etc.).
+     * Pausing the Level here regressed kiosk DM: players spawned
+     * at the fallback floor height from applyDeathmatchStarts and
+     * never got corrected. Starting the Level restores legacy
+     * behavior; the scoring/match-clock gating inside match.js
+     * (legacy) keeps the match "not active" until startMatch.
      */
     async _preloadLevel() {
         if (this.level) return;
@@ -143,6 +157,7 @@ export class Game {
         });
         this._subscribeLevel(this.level);
         await this.level.load();
+        this.level.start();
         _setCurrentLevel(this.level);
     }
 
@@ -312,35 +327,6 @@ export class Game {
      * over.
      */
     restartMatch() {
-        // Tear down the old Level so the next beginPlay constructs a
-        // fresh one. Level.load → clearSceneState (inside
-        // resetGameState/transitionToLevel) clears every player's
-        // isDead flag — the ONLY path that respawns a player who died
-        // before the match ended (e.g. dead at time-limit expiry).
-        //
-        // Time-limit + frag-limit match-ends DON'T go through Game's
-        // _onLevelComplete (those fire only for exit-trigger via
-        // Level events) — legacy match.js::endMatch handles them and
-        // leaves Game.level untouched. So restartMatch must do the
-        // teardown defensively.
-        //
-        // Guard: only tear down when this.level matches the L1.7
-        // registry's current Level. In the DM exit-trigger path the
-        // legacy switches.js setTimeout(loadMap, 1000) may have
-        // already loaded the next map; the registry now points at a
-        // NEW Level instance whose state lives in state.things etc.
-        // Tearing down this.level (the orphaned previous instance)
-        // would clobber that live state via destroy(). Nulling
-        // this.level orphans the stale reference safely.
-        if (this.level) {
-            if (getCurrentLevel() === this.level) {
-                this.level.stop();
-                this.level.destroy();
-                _setCurrentLevel(null);
-            }
-            this.level = null;
-        }
-
         const next = getNextMap();
         if (next) this.mapCursor = next;
         orchestrator.hideResults();
@@ -354,6 +340,16 @@ export class Game {
         // would carry the previous match's kill matrix + scores into
         // the next.
         resetMatch();
+
+        // Respawn any player who was dead at match end. Pre-cutover,
+        // the restart's loadMap → clearSceneState path cleared
+        // player.isDead for every player. Post-cutover the next
+        // match reuses the same Level (no reload) so clearSceneState
+        // doesn't fire — without an explicit respawn here, a player
+        // dead at time-limit stays dead through the next match.
+        for (const player of this.roster) {
+            if (player?.isDead) spawnPlayer(player);
+        }
 
         this._transitionTo('LOBBY');
         orchestrator.showLobby({
