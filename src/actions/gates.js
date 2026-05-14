@@ -52,7 +52,14 @@ export function initGates() {
     // back to legacy dismissIntermission for any boot path that
     // didn't construct a Game (shouldn't happen post-cutover but
     // kept as a safety net).
-    on(A.FIRE_DOWN, () => {
+    //
+    // §15 input table: FIRE_DOWN / USE / weapon during INTERMISSION
+    // all advance to the next level. The USE handler in particular
+    // matters because without consuming USE here, pressing space
+    // (USE) during the intermission would re-trigger switches.js's
+    // exit-switch detection — re-firing level-complete and
+    // restarting the intermission count-up.
+    const intermissionAdvance = () => {
         if (!isIntermissionActive()) return;
         if (window.app?.game?.advance) {
             window.app.game.advance();
@@ -60,7 +67,12 @@ export function initGates() {
             dismissIntermission();
         }
         return true;
-    }, { priority: GATE_PRIORITY.INTERMISSION });
+    };
+    on(A.FIRE_DOWN,     intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
+    on(A.USE,           intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
+    on(A.WEAPON_PREV,   intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
+    on(A.WEAPON_NEXT,   intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
+    on(A.WEAPON_SELECT, intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
 
     // ── Match-end restart — DM only. L4.9 cutover: prefer
     // Game.restartMatch (pushes hideResults, advances mapCursor via

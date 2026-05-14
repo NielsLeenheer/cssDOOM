@@ -412,6 +412,21 @@ export class Game {
             this.mapCursor = this._pendingNextMap;
             this._pendingNextMap = null;
         }
+
+        // Drop the stopped Level so beginPlay constructs a fresh
+        // one for the advanced mapCursor. Without this, beginPlay's
+        // "level exists → just call level.start()" idempotent path
+        // would resume the OLD Level (same map) — but we want to
+        // load the next map. Also clear the registry so master.js's
+        // gameLoop doesn't briefly tick the stale Level between
+        // here and beginPlay's new _setCurrentLevel call.
+        if (this.level) {
+            if (getCurrentLevel() === this.level) {
+                _setCurrentLevel(null);
+            }
+            this.level = null;
+        }
+
         await this.beginPlay();
     }
 
@@ -476,9 +491,19 @@ export class Game {
     _onLevelComplete(payload) {
         if (this.gameMode === 'singleplayer') {
             // Stash the next map so advance() can pick it up when the
-            // user dismisses the intermission overlay. switches.js
-            // still owns the actual dismiss-and-loadMap path until L4.
+            // user dismisses the intermission overlay.
             this._pendingNextMap = payload?.nextMap ?? null;
+            // Freeze the world. Without this, Level.tick keeps
+            // running behind the intermission overlay — the player
+            // can walk away from the exit switch and back, and
+            // re-press USE which re-triggers level-complete and
+            // restarts the intermission count-up. With stop(),
+            // Level.tick becomes a no-op (state = 'loaded-paused');
+            // movement freezes. The intermission gate in actions/
+            // gates.js consumes USE / weapon presses too so the
+            // switch logic itself can't re-fire even though it's
+            // event-bus-driven.
+            if (this.level) this.level.stop();
             this._transitionTo('INTERMISSION');
             orchestrator.showIntermission(payload);
         } else {
