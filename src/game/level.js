@@ -21,6 +21,7 @@
 
 import { EYE_HEIGHT } from './constants.js';
 import { state } from './state.js';
+import { updateGame } from './index.js';
 import { transitionToLevel, resetGameState } from './player/damage.js';
 import { domRenderers } from '../renderer/dom.js';
 import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
@@ -148,7 +149,26 @@ export class Level {
         this._state = 'loaded-paused';
     }
 
-    start()   { /* L1.3 */ }
+    /**
+     * Transitions to the running state. From here on, the RAF caller's
+     * per-frame `tick()` will run the world step. Safe to call multiple
+     * times (idempotent).
+     */
+    start() {
+        this._state = 'loaded-running';
+    }
+
+    /**
+     * Per-frame entry point. Invoked from the RAF caller (currently
+     * `master.js::gameLoop`; moves onto App in L3). No-op unless the
+     * Level is loaded-running — `loaded-paused` and `unloaded` swallow
+     * the call so a paused match does not advance state.
+     */
+    tick(timestamp) {
+        if (this._state !== 'loaded-running') return;
+        updateGame(timestamp);
+    }
+
     pause()   { /* L1.4 */ }
     resume()  { /* L1.4 */ }
     stop()    { /* L1.5 */ }

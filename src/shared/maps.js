@@ -94,6 +94,11 @@ export async function loadMap(name) {
         orchestrator,
     });
     await lvl.load();
+    // Preserve today's "load → immediately playing" behavior: every
+    // caller of loadMap expected the world to be live after it
+    // resolved. L2's Game will own the load-then-start sequencing
+    // explicitly; for now the shim does it inline.
+    lvl.start();
     // L1.7 will hand this Level to a real owner; for now stash globally
     // so callers that need to reach the current Level instance can.
     window.__currentLevel = lvl;
