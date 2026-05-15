@@ -125,11 +125,18 @@ export class RemoteGame {
             transport: this._transport, // null for Local DM → BroadcastChannel default
             onLobbyState: (msg) => {
                 // L6.5 deletes LOBBY_STATE; until then, mirror master's
-                // lobby state into the client's two lobby UIs (Local
-                // DM per-pane claims + Network DM 4-slot list). Each
-                // consumer ignores the field it doesn't use.
-                applyLobbyState(msg);
-                if (msg.slotOccupants) applyNetworkLobbyState(msg.slotOccupants);
+                // lobby state into the appropriate client UI. The Local
+                // DM per-pane press-to-claim UI (applyLobbyState ->
+                // pane[data-claim-state]) only applies to Local DM
+                // secondaries — for a Network DM remote it would set
+                // data-claim-state="waiting" on the joiner's own pane
+                // and dim the lobby with brightness(0.3). Network DM
+                // joiners only need the 4-slot occupants list.
+                if (this.roomCode) {
+                    if (msg.slotOccupants) applyNetworkLobbyState(msg.slotOccupants);
+                } else {
+                    applyLobbyState(msg);
+                }
             },
             onMatchEnd: (msg) => {
                 // L6.5 deletes MATCH_END; until then, paint the
