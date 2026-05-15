@@ -26,8 +26,12 @@
     justify-content: center;
 }
 
-/* Show one copy per pane while we're in the network lobby. */
-body[data-network-mode="host"][data-game-state="lobby"] .pane-network-lobby {
+/* Show one copy per pane while we're in the network lobby — both on the
+   host (master) and on every connected client. The client's networkMode
+   is "client" rather than "host"; without the second selector below the
+   joiner's HUD shows through the lobby. */
+body[data-network-mode="host"][data-game-state="lobby"] .pane-network-lobby,
+body[data-network-mode="client"][data-game-state="lobby"] .pane-network-lobby {
     display: flex;
 }
 
