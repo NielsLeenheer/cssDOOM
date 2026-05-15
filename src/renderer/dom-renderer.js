@@ -43,6 +43,11 @@ export class DomRenderer {
         this.paneEl = document.createElement('div');
         this.paneEl.className = 'pane';
         this.paneEl.dataset.player = String(playerIndex);
+        // `data-active="true"` marks this pane as locally-rendered. Flipped
+        // to "false" by the orchestrator when a remote takes over this slot
+        // (sceneEl is cleared, paneEl stays in the DOM for fast restore on
+        // disconnect). CSS uses this for visibility — see viewport.css.
+        this.paneEl.dataset.active = 'true';
         this.paneEl.appendChild(paneTemplate.content.cloneNode(true));
         gameContainer.appendChild(this.paneEl);
 

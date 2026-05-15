@@ -20,8 +20,10 @@
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
  *      `unbindRemoteSlot`. A joining client triggers bind: target
- *      swaps for a RenderSink, the master-side pane DOM is torn down,
- *      `body.client-active` hides the empty pane, perspective is
+ *      swaps for a RenderSink, the master-side pane's sceneEl is
+ *      cleared, the paneEl's `data-active` flips to "false" so CSS
+ *      hides it, `#game[data-active-renderers]` updates so the
+ *      remaining locals reflow to fill the screen, perspective is
  *      refreshed. Unbind is the reverse with a grace-period deferred
  *      unhide so a quickly-reloading client doesn't flash.
  *
@@ -153,11 +155,35 @@ class Orchestrator {
      * Swap the target at a given slot. Low-level — `bindRemoteSlot` is
      * the higher-level entrypoint that also handles pane teardown and
      * the visibility toggle. Returned: the previous target (may be null).
+     *
+     * Keeps `#game[data-active-renderers]` in sync with the number of
+     * slots currently holding a DomRenderer (vs. a RenderSink or null).
+     * CSS uses this for pane sizing — 1 active renderer = full-width,
+     * 2 = split, etc. Detection uses `typeof t.clear === 'function'`
+     * which is DomRenderer's interface and not RenderSink's (matching
+     * the existing pattern around line 269).
      */
     replaceTarget(slot, target) {
         const previous = this.targets[slot];
         this.targets[slot] = target;
+        this._publishActiveRendererCount();
         return previous;
+    }
+
+    /** Recompute and write `#game[data-active-renderers]` based on the
+     *  count of panes currently marked active (`data-active="true"`).
+     *  Reads from the DOM rather than `this.targets` because during the
+     *  unbindRemoteSlot grace window a DomRenderer is back in targets
+     *  but its paneEl is still hidden (data-active="false") until
+     *  loadMap rebuilds the scene; CSS sizing should treat it as 1
+     *  pane visible, not 2. */
+    _publishActiveRendererCount() {
+        const gameEl = typeof document !== 'undefined'
+            ? document.getElementById('game')
+            : null;
+        if (!gameEl) return;
+        const count = gameEl.querySelectorAll('.pane[data-active="true"]').length;
+        gameEl.dataset.activeRenderers = String(count);
     }
 
     /** All sink targets currently registered (used to fan out sounds). */
@@ -218,8 +244,8 @@ class Orchestrator {
      * Bind a connected peer to the given slot. Installs a RenderSink in
      * place of the DomRenderer, tears down master's local DOM for that
      * pane (since the client now renders it), hides the pane via
-     * `body.client-active`, and refreshes perspectives because the
-     * remaining pane just grew from 50% → 100% width. Cancels any
+     * `paneEl[data-active="false"]`, and refreshes perspectives because
+     * the remaining pane just grew from 50% → 100% width. Cancels any
      * pending unbind grace timer in case this join is a reconnect (same
      * peerKey) that landed mid-grace, OR another peer's grace that's
      * still pending on the same slot.
@@ -275,8 +301,15 @@ class Orchestrator {
         // sceneState arrays after clear(). No clear needed if the slot
         // didn't have a local renderer (e.g. Network DM slot 2 or 3 bound
         // from empty state straight to a remote).
-        if (wasLocalRenderer) previousRenderer.clear();
-        document.body.classList.add('client-active');
+        if (wasLocalRenderer) {
+            previousRenderer.clear();
+            // Mark the pane inactive so CSS hides it (the DomRenderer's
+            // sceneEl is empty now). data-active flips back to "true"
+            // on the unbindRemoteSlot grace-expiry path when loadMap
+            // rebuilds the scene.
+            previousRenderer.paneEl.dataset.active = 'false';
+            this._publishActiveRendererCount();
+        }
         if (suppressAudio) setSlotAudioSuppressed(slot, true);
         updatePerspective();
 
@@ -289,9 +322,9 @@ class Orchestrator {
      * in sync, but defers the visual unhide for RECONNECT_GRACE_MS so a
      * reloading client's reconnect doesn't flash the pane visible. After
      * the grace expires, the pane DOM is rebuilt from pane 0's current
-     * state before unhiding (otherwise the user sees an empty .scene for
-     * a frame). The `body.client-active` class is only cleared when no
-     * remote peer remains.
+     * state, paneEl's `data-active` flips back to "true" so CSS reveals
+     * it again, and `#game[data-active-renderers]` updates so the
+     * remaining locals reflow to share the screen.
      */
     unbindRemoteSlot(peerKey) {
         const binding = this._remoteBindings.get(peerKey);
@@ -321,8 +354,14 @@ class Orchestrator {
             // cancelled this timer and we never reach this body.
             this._remoteBindings.delete(peerKey);
             rendererToRebuild?.loadMap();
-            if (this._remoteBindings.size === 0) {
-                document.body.classList.remove('client-active');
+            // Re-mark the pane as active so CSS reveals it (the
+            // sceneEl is repopulated by loadMap above). Done after
+            // loadMap so the pane doesn't flash empty during the
+            // rebuild — but loadMap is fast enough on master that
+            // the gap is imperceptible.
+            if (rendererToRebuild) {
+                rendererToRebuild.paneEl.dataset.active = 'true';
+                this._publishActiveRendererCount();
             }
             updatePerspective();
         }, RECONNECT_GRACE_MS);

@@ -105,16 +105,25 @@ body.client-window .pane {
     flex: 1;
 }
 
-/* Master with a client bound to a slot — hide the local copy of the pane
-   the client is rendering (player 1's pane on master), so the master
-   only shows player 0 full-screen. The world DOM for pane 1 still
-   exists and still receives world updates internally (we don't tear it
-   down so we can swap back instantly on disconnect), it's just hidden. */
-body.client-active[data-game-mode="deathmatch"] .pane[data-player="1"] {
+/* Pane visibility + sizing driven by data attributes instead of a
+   body.client-active marker. The orchestrator sets two attributes:
+     - `.pane[data-active="true|false"]` per pane. "false" marks a pane
+       whose local DomRenderer was taken over by a remote client — its
+       paneEl stays in the DOM (the renderer instance is reused on
+       disconnect via Level.load) but should not be visible.
+     - `#game[data-active-renderers="N"]` reflects how many panes
+       currently have data-active="true". CSS uses this to size the
+       remaining active panes (one pane = fill; two panes = split 50/50;
+       future >2-pane layouts can extend this without new body classes).
+   Replaces the L6-era body.client-active hack (L7 cleanup). */
+.pane[data-active="false"] {
     display: none;
 }
-body.client-active[data-game-mode="deathmatch"] .pane[data-player="0"] {
+#game[data-active-renderers="1"] .pane[data-active="true"] {
     flex: 1;
+}
+#game[data-active-renderers="2"] .pane[data-active="true"] {
+    flex: 1 1 50%;
 }
 
 /* The .renderer fills its pane; .viewport and .hud both inset:0 it.

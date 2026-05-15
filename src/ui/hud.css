@@ -828,9 +828,11 @@ body[data-game-state="attract"] #menu-button {
    Outside of kiosk mode, both panes are visible in the same window and
    would otherwise render their fullscreen position:fixed overlays
    stacked identically. Hide pane 1's copy so only pane 0's renders.
-   Carved out for client-active (master with a client bound) and
-   client-window (a joined client) since they already hide one pane via
-   viewport.css.
+   client-window (a joined client) is carved out since it renders
+   exactly one pane via viewport.css; an inactive (taken-over) pane is
+   carved out implicitly by the data-active="false" → display: none
+   rule, which collapses the whole pane subtree including these
+   overlay copies.
    ======================================================================== */
 
 body.kiosk .pane-attract,
@@ -841,11 +843,11 @@ body.kiosk .pane-network-lobby {
     position: absolute;
 }
 
-body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
-body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-win,
-body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
-body[data-game-mode="deathmatch"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-timer,
-body[data-network-mode="host"]:not(.client-active):not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-network-lobby {
+body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
+body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-win,
+body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
+body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-timer,
+body[data-network-mode="host"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-network-lobby {
     display: none;
 }
 
