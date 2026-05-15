@@ -141,6 +141,15 @@ body.client-window .pane {
     container-name: pane;
 }
 
+/* `.renderer.paused` toggled by Game.pause / RemoteGame.pause (and
+   cleared by their resume counterparts). Subtle desaturation +
+   slight darken signals "host or local menu opened, world isn't
+   advancing." The class lives on .renderer so HUD overlays on top of
+   the pane (menu, lobby prompts, scoreboard) stay full-color. */
+.renderer.paused {
+    filter: saturate(0.4) brightness(0.7);
+}
+
 /* ==========================================================================
    Scene viewport — owns CSS perspective for the 3D scene transform
    ========================================================================== */

@@ -300,18 +300,21 @@ export class RemoteGame {
 
     /**
      * Gate the local input forwarder so ACTION / ANALOG envelopes
-     * stop shipping. Per §7b, RemoteGame.pause does NOT pause the
-     * master's world — master keeps simulating and the visual scene
-     * keeps updating. The local menu overlay handles "paused" UX on
-     * the client side. (Master-initiated pause arrives as a
-     * paused-state renderer command via showPaused, hooked separately.)
+     * stop shipping, and tint the local pane via the paused renderer
+     * command. Per §7b, RemoteGame.pause does NOT pause the master's
+     * world — master keeps simulating and the visual scene keeps
+     * updating. Master-initiated pause arrives as the same showPaused
+     * command over the wire (from Game.pause) so the visual is
+     * symmetric whether the joiner or the host opened the menu.
      */
     pause() {
         this._paused = true;
+        if (this._mySlot != null) this.orchestrator.showPaused(this._mySlot);
     }
 
     resume() {
         this._paused = false;
+        if (this._mySlot != null) this.orchestrator.hidePaused(this._mySlot);
     }
 
     /**

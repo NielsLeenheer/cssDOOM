@@ -154,6 +154,15 @@ export const COMMANDS = {
     clearKeys: { kind: 'per-pane', impl: playerVisuals.clearKeys },
     collectKey: { kind: 'per-pane', impl: playerVisuals.collectKey },
 
+    // ── Per-player: pause tint ────────────────────────────────────────────
+    // Host pushes showPaused/hidePaused per slot when Game.pause/resume
+    // fires (i.e., when App.openMenu / closeMenu runs). Master applies a
+    // class to its own pane's renderer element; the same command fans
+    // over the wire to each connected client's RenderClient so a joiner
+    // sees the same tint without needing to know host's App state.
+    showPaused: { kind: 'per-pane', impl: (renderer) => renderer.rendererEl.classList.add('paused') },
+    hidePaused: { kind: 'per-pane', impl: (renderer) => renderer.rendererEl.classList.remove('paused') },
+
     // ── World: enemies / things / projectiles / effects ───────────────────
     setEnemyState: { kind: 'world', impl: sprites.setEnemyState },
     resetEnemy: { kind: 'world', impl: sprites.resetEnemy },

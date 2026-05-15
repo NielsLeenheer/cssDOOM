@@ -216,30 +216,37 @@ export class Game {
         this.beginPlay();
     }
     /**
-     * Pause the held Level. Per §7: pause is only meaningful while
-     * PLAYING (no point pausing LOBBY / LOADING / RESULTS / etc.) —
-     * Level.pause already guards against being called on a non-running
-     * Level, so a redundant call here is also a no-op.
+     * Pause the held Level and fan a 'paused' tint to every pane.
      *
-     * Renderer-command fan-out (push 'showPaused' so connected clients
-     * also see the paused state) is deferred to L6 when RemoteGame
-     * exists. For SP / Local DM there are no remote clients today; the
-     * local Level.pause is the only side effect.
+     * Level tick freezes only while PLAYING — pausing during LOADING /
+     * LOBBY / INTERMISSION / RESULTS has no Level to freeze (LOADING
+     * has a Level instance but its tick is still gated by load
+     * completion; the §15 contract says Game.pause is a no-op on
+     * Level during LOADING). The renderer-command fan-out fires
+     * regardless so the menu visually paints every pane (including
+     * joiner panes whose own App.state is IN_GAME, not MENU).
      */
     pause() {
-        if (this._state !== 'PLAYING') return;
-        this.level?.pause();
+        if (this._state === 'PLAYING') {
+            this.level?.pause();
+        }
+        for (let i = 0; i < this.roster.length; i++) {
+            orchestrator.showPaused(i);
+        }
     }
 
     /**
-     * Resume the held Level. Counterpart to pause(); also state-gated.
-     * If something happened to the Level state while paused (unlikely
-     * — pause() only flips the Level's tick flag), the next tick after
-     * resume picks up where it left off.
+     * Resume the held Level and clear the paused tint. Counterpart to
+     * pause() — same state-gating on Level, same unconditional
+     * renderer-command fan-out.
      */
     resume() {
-        if (this._state !== 'PLAYING') return;
-        this.level?.resume();
+        if (this._state === 'PLAYING') {
+            this.level?.resume();
+        }
+        for (let i = 0; i < this.roster.length; i++) {
+            orchestrator.hidePaused(i);
+        }
     }
     /**
      * Clean teardown. Stops the held Level (if any), destroys it
