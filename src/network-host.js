@@ -44,6 +44,25 @@ export function getActiveRoomCode() {
 }
 
 /**
+ * Preset the room code that the next `openRoom()` will use. Without
+ * this the room code is randomly generated. Used by the `?server=CODE`
+ * dev shortcut so master + joiner can agree on a fixed code without
+ * round-tripping the auto-generated one through the lobby UI.
+ *
+ * Must be called before openRoom — once a room is open the code is
+ * locked in. Re-call after closeRoom to use a different code.
+ *
+ * Validated against the same regex the Worker enforces; an invalid
+ * code is silently ignored (caller can check getActiveRoomCode to
+ * confirm).
+ */
+export function setActiveRoomCode(code) {
+    if (typeof code !== 'string') return;
+    if (!/^[A-Z0-9]{4,8}$/.test(code)) return;
+    activeRoomCode = code;
+}
+
+/**
  * Open a Network DM signaling room. Idempotent — calling while a room
  * is already open is a no-op (the existing code stays in use). The
  * generated code is pushed into the network-lobby UI here; per-peer

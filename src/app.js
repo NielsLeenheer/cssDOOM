@@ -78,6 +78,8 @@ import { Game } from './game/game.js';
 import { RemoteGame } from './game/remote-game.js';
 import { state } from './game/state.js';
 import { orchestrator } from './orchestrator.js';
+import { setActiveRoomCode } from './network-host.js';
+import { applyMode } from './mode.js';
 
 export class App {
     constructor() {
@@ -121,10 +123,40 @@ export class App {
 
         const params = new URLSearchParams(location.search);
         const joinParam = params.get('join');
+        const serverParam = params.get('server');
         const isKiosk = params.has('kiosk');
 
         if (joinParam !== null) {
             await this.joinRemoteGame(joinParam || null);
+            return;
+        }
+
+        // `?server=CODE` — symmetric dev shortcut to `?join=CODE`. Boots
+        // directly into Network DM host with the supplied room code
+        // (instead of a randomly generated one), so two browsers can
+        // agree on a code without scanning the lobby QR / typing the
+        // auto-generated value. setActiveRoomCode validates the format
+        // and silently ignores malformed input.
+        //
+        // applyMode does the cross-cutting "enter Network DM host"
+        // work — body data attrs, roster sizing, resetMatch,
+        // setLocallyClaimableSlots, AND openRoom() — and it MUST run
+        // before startLocalGame because openRoom is what reads the
+        // pre-set activeRoomCode. Without this, startLocalGame would
+        // construct a Game whose Game.start network-DM branch is a
+        // no-op (per L6, host-fire-start owns level load), so no
+        // signaling room would ever open. Skill / start map mirror
+        // the kiosk default.
+        if (serverParam) {
+            setActiveRoomCode(serverParam.toUpperCase());
+            applyMode('deathmatch', 'host');
+            await this.startLocalGame({
+                gameMode: 'deathmatch',
+                networkMode: 'host',
+                skillLevel: 1,
+                rules: null,
+                startMap: 'E1M1',
+            });
             return;
         }
 
@@ -210,9 +242,12 @@ export class App {
         // Q12: kiosk does NOT persist — every kiosk reload is a fresh
         // attendee, defaults always win. Non-kiosk persists to
         // sessionStorage so dev iteration / single-tab reload lands
-        // back in the same mode.
-        const isKiosk = new URLSearchParams(location.search).has('kiosk');
-        if (!isKiosk) {
+        // back in the same mode. ?server=CODE also opts out: it's a
+        // URL-only dev signal, and reloading without ?server should
+        // revert to whatever was set before, not Network DM host.
+        const params = new URLSearchParams(location.search);
+        const skipPersist = params.has('kiosk') || params.has('server');
+        if (!skipPersist) {
             try {
                 sessionStorage.setItem(
                     LAST_USED_MODE_STORAGE_KEY,
