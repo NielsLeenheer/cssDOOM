@@ -54,7 +54,7 @@ import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
 import { isMatchLobby, setMatchEndBroadcaster, onMatch } from './game/match.js';
-import { setGameStateBroadcaster, getGameState } from './game/game-state.js';
+import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
 // ── Debug toggle ───────────────────────────────────────────────────────
@@ -223,12 +223,19 @@ function setupMasterBroadcast() {
             const slot = orchestrator.currentRemoteSlot(peerKey);
             if (slot == null) return;
             ensurePlayerCount(slot + 1);
-            const player = state.players[slot];
-            spawnPlayer(player);
-            addPlayerThing(player);
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
             configureAudio(state.players.length);
+            // Don't spawn into the world during the lobby phase — there's
+            // no level loaded yet, and the spawn would fire a teleport
+            // sound + add a stray player thing the joiner can hear/see
+            // through the lobby overlay. The match-start path (L6.6) is
+            // responsible for spawning every roster slot, including remotes
+            // that connected during the lobby.
+            if (getGameState() !== GAME_STATE.ACTIVE) return;
+            const player = state.players[slot];
+            spawnPlayer(player);
+            addPlayerThing(player);
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator
