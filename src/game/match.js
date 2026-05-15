@@ -240,12 +240,17 @@ export function endMatch() {
     // mapName mirrors Game._buildResultsPayload so the payload shape
     // is identical regardless of which path triggers the results
     // (frag/time-limit here vs DM exit-switch in Game._onLevelComplete).
-    orchestrator.showResults({
+    const payload = {
         scores: state.players.map(p => p.score),
         kills: state.match.kills.map(row => row.slice()),
         winnerIndex: state.match.winner ? state.match.winner.index : -1,
         mapName: currentMap,
-    });
+    };
+    orchestrator.showResults(payload);
+    // Notify subscribers (Game re-emits as 'match-ended'). Symmetric
+    // with level.js's onLevel emitter: match.js owns the channel,
+    // Game subscribes.
+    _emitMatchEvent('ended', payload);
 }
 
 /** True when DM is active and the match has ended. */

@@ -116,8 +116,9 @@ export class RemoteGame {
             }
             if (!this._transport) {
                 console.error('[remote-game] giving up after retries:', lastErr);
-                this._state = 'FAILED';
+                this._setState('FAILED');
                 this._emit('connection-failed', { error: lastErr });
+                this._emit('game-ended', { reason: 'connect-failed' });
                 return;
             }
         }
@@ -197,7 +198,7 @@ export class RemoteGame {
 
         this._wireUp();
 
-        this._state = 'CONNECTED';
+        this._setState('CONNECTED');
         this._emit('connected', { slot: slotIndex });
     }
 
@@ -284,8 +285,9 @@ export class RemoteGame {
     _onLeave() {
         console.log('[remote-game] master went silent — showing DISCONNECTED');
         this._overlay?.classList.add('visible');
-        this._state = 'DISCONNECTED';
+        this._setState('DISCONNECTED');
         this._emit('disconnected');
+        this._emit('game-ended', { reason: 'master-silent' });
         if (this.roomCode) {
             setTimeout(() => location.reload(), 2000);
         }
@@ -321,13 +323,25 @@ export class RemoteGame {
             this._analogTimer = null;
         }
         this._connection?.close?.();
-        this._state = 'DISCONNECTED';
+        this._setState('DISCONNECTED');
         this._emit('disconnected');
+        this._emit('game-ended', { reason: 'stop' });
     }
 
     on(event, handler) {
         if (!this._listeners.has(event)) this._listeners.set(event, new Set());
         this._listeners.get(event).add(handler);
+    }
+
+    /**
+     * State transition with state-changed emit. Use instead of writing
+     * `this._state = …` directly so subscribers stay in sync.
+     */
+    _setState(next) {
+        const from = this._state;
+        if (from === next) return;
+        this._state = next;
+        this._emit('state-changed', { from, to: next });
     }
 
     _emit(event, payload) {

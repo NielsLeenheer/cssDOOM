@@ -201,6 +201,7 @@ export class App {
         if (this.game) await this.endGame();
 
         this.game = new Game(modeConfig);
+        this._wireGameSubscriptions(this.game);
         this.lastModeConfig = modeConfig;
 
         // Persist the picked mode for dev iteration — a single-tab
@@ -239,8 +240,27 @@ export class App {
     async joinRemoteGame(roomCode) {
         if (this.game) await this.endGame();
         this.game = new RemoteGame({ roomCode, orchestrator });
+        this._wireGameSubscriptions(this.game);
         await this.game.start();
         this.transitionTo('IN_GAME');
+    }
+
+    /**
+     * Subscribe App to its held game's lifecycle events. Per the
+     * outward = events architecture, App reacts to Game / RemoteGame
+     * lifecycle through subscriptions rather than reaching inward to
+     * inspect their state.
+     *
+     * `game-ended` fires from Game.stop / RemoteGame.stop when teardown
+     * completes. The only path that triggers a stop today is the
+     * "switch to new game" sequence in startLocalGame / joinRemoteGame
+     * — and that path is entered from the menu, so App._state is
+     * already MENU and the transitionTo below is a no-op. A future
+     * "quit to menu" feature (no replacement game queued) would make
+     * this subscription do real work.
+     */
+    _wireGameSubscriptions(game) {
+        game.on('game-ended', () => this.transitionTo('MENU'));
     }
 
     /**

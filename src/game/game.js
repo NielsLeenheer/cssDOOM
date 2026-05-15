@@ -18,7 +18,7 @@ import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
-import { resetMatch, startMatch } from './match.js';
+import { resetMatch, startMatch, onMatch } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
@@ -92,10 +92,9 @@ export class Game {
      */
     async start() {
         this._transitionTo('LOBBY');
-        orchestrator.showLobby({
-            slots: this.roster,
-            mapCursor: this.mapCursor,
-        });
+        const lobbyPayload = { slots: this.roster, mapCursor: this.mapCursor };
+        orchestrator.showLobby(lobbyPayload);
+        this._emit('lobby-updated', lobbyPayload);
 
         // Subscribe to device→slot claim changes so Local DM
         // auto-starts when both slots are claimed AND the lobby UI
@@ -113,11 +112,19 @@ export class Game {
         // NETWORK_START gate, not all-claimed auto-start.
         onClaimChange(() => {
             if (this._state !== 'LOBBY') return;
-            orchestrator.updateLobbyState({
-                slots: this.roster,
-                mapCursor: this.mapCursor,
-            });
+            const payload = { slots: this.roster, mapCursor: this.mapCursor };
+            orchestrator.updateLobbyState(payload);
+            this._emit('lobby-updated', payload);
             this._checkAutoStart();
+        });
+
+        // Bridge match.js's 'ended' channel (fires from frag/time-limit
+        // path inside match.js::endMatch) onto Game's own emit pattern.
+        // The DM exit-switch path goes through Game._onLevelComplete
+        // and emits match-ended from there directly.
+        onMatch('ended', (payload) => {
+            if (this._state === 'ENDED') return;
+            this._emit('match-ended', payload);
         });
 
         if (this.gameMode === 'singleplayer') {
@@ -400,10 +407,9 @@ export class Game {
         // here (no claim change), so we have to push the re-render
         // explicitly. Otherwise the READY! overlay lingers over the
         // running match.
-        orchestrator.updateLobbyState({
-            slots: this.roster,
-            mapCursor: this.mapCursor,
-        });
+        const lobbyPayload = { slots: this.roster, mapCursor: this.mapCursor };
+        orchestrator.updateLobbyState(lobbyPayload);
+        this._emit('lobby-updated', lobbyPayload);
     }
 
     /**
@@ -427,10 +433,9 @@ export class Game {
         resetMatch();
 
         this._transitionTo('LOBBY');
-        orchestrator.showLobby({
-            slots: this.roster,
-            mapCursor: this.mapCursor,
-        });
+        const lobbyPayload = { slots: this.roster, mapCursor: this.mapCursor };
+        orchestrator.showLobby(lobbyPayload);
+        this._emit('lobby-updated', lobbyPayload);
         this._emit('match-restarted', { mapCursor: this.mapCursor });
 
         // Reload the Level so state.things / state.projectiles /
@@ -575,7 +580,9 @@ export class Game {
             // drives the next-map load via setTimeout(loadMap, 1000)
             // — see the docstring above.
             this._transitionTo('RESULTS');
-            orchestrator.showResults(this._buildResultsPayload());
+            const resultsPayload = this._buildResultsPayload();
+            orchestrator.showResults(resultsPayload);
+            this._emit('match-ended', resultsPayload);
         }
         this._emit('level-complete', payload);
     }
