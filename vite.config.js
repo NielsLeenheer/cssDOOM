@@ -25,7 +25,10 @@ export default defineConfig({
     server: {
         proxy: {
             '/signaling': {
-                target: 'https://doomcss-staging.niels-leenheer.workers.dev',
+                // wss:// (not https://) — Vite/http-proxy with ws:true
+                // expects a WebSocket-scheme target when the proxied
+                // route is itself a WebSocket upgrade.
+                target: 'wss://doomcss-staging.niels-leenheer.workers.dev',
                 ws: true,
                 changeOrigin: true,
                 secure: true,
