@@ -75,7 +75,9 @@ function readLastUsedMode() {
 }
 
 import { Game } from './game/game.js';
+import { RemoteGame } from './game/remote-game.js';
 import { state } from './game/state.js';
+import { orchestrator } from './orchestrator.js';
 
 export class App {
     constructor() {
@@ -225,7 +227,22 @@ export class App {
         this.transitionTo('IN_GAME');
     }
 
-    async joinRemoteGame(roomCode)   { /* L6 */ }
+    /**
+     * Construct a RemoteGame for joining a remote master and enter
+     * IN_GAME with it. Mirrors startLocalGame's shape (tear down any
+     * existing game first, await game.start, transition state) but
+     * holds a RemoteGame instance rather than a Game.
+     *
+     * roomCode null → Local DM secondary (BroadcastChannel transport
+     * inside ClientConnection); non-null string → Network DM remote
+     * (WebRTC transport via connectToNetworkRoom).
+     */
+    async joinRemoteGame(roomCode) {
+        if (this.game) await this.endGame();
+        this.game = new RemoteGame({ roomCode, orchestrator });
+        await this.game.start();
+        this.transitionTo('IN_GAME');
+    }
 
     /**
      * Clean teardown of the held Game (or RemoteGame). Safe to call
