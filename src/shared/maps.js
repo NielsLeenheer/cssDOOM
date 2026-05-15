@@ -5,13 +5,12 @@
  * etc.) loaded from `maps/E*M*.json`. Both the game layer and renderer
  * import this directly — it is not owned by either layer.
  *
- * Map *loading* (fetch → decorate → state init → scene rebuild) used to
- * live in this module's `loadMap()`. As of L1.2 the body has moved into
- * `Level.load()` in `src/game/level.js`. `loadMap()` here is now a thin
- * transitional shim that constructs a `Level` and awaits its load; it
- * exists so existing callers don't have to change yet. L1.7 introduces
- * the Level registry helpers and L2 hands ownership to Game, at which
- * point this shim disappears entirely.
+ * Map *loading* (fetch → decorate → state init → scene rebuild) lives
+ * in `Level.load()` in `src/game/level.js`. `loadMap()` here is a shim
+ * that constructs a Level, awaits its load, and registers it via
+ * `_setCurrentLevel` — for callers that don't hold a Level instance
+ * (menu, debug, switches, RemoteGame, attract). Game holds its own
+ * Level reference and calls Level.load directly.
  *
  * This module still owns:
  *   - the `mapData` / `currentMap` singletons (and their underscored
@@ -46,8 +45,7 @@ export function getCurrentMap() {
 /**
  * Internal setters used by `Level.load` to update the module-level
  * singletons. Underscored to flag that callers outside Level (and
- * `clearMap()` below) shouldn't touch them. Once Level owns the
- * lifecycle end-to-end (L7), these become private to this module.
+ * `clearMap()` below) shouldn't touch them.
  */
 export function _setMapData(data) { mapData = data; }
 export function _setCurrentMap(name) { currentMap = name; }
@@ -64,27 +62,23 @@ export async function fetchMapJson(name) {
 }
 
 /**
- * Pure decoration pass on a freshly-fetched mapData.
- *
- * As of L1.2 this is a stub. Today the per-map decoration that
- * `Level.load` relies on (annotating `mapData.thingRenderSpecs`,
- * `door.trackWalls`, etc.) happens inside `initThings()` /
- * `initDoors()` — which also write to `state.*`. Splitting decoration
- * out from those `init*` functions is a follow-up; until then this
- * call exists so Level's load sequence has the right shape and
- * `decorateMapData` is callable from attract / RemoteGame paths once
- * they need pure decoration (see LIFECYCLE_REFACTOR.md §16).
+ * Pure decoration pass on a freshly-fetched mapData. Currently a stub:
+ * per-map decoration (`mapData.thingRenderSpecs`, `door.trackWalls`,
+ * etc.) happens inside `initThings()` / `initDoors()`, which also
+ * write to `state.*`. Splitting the pure-decoration pass out of those
+ * `init*` functions would let attract / RemoteGame paths decorate
+ * without touching simulation state.
  */
 export function decorateMapData(_mapData) {
     // Intentionally empty for now — see comment above.
 }
 
 /**
- * Backward-compat shim. Constructs a Level, awaits its load, starts
- * it ticking, and registers it as the current Level for this window
- * via `_setCurrentLevel` (from `game/level.js`). L2 hands ownership
- * to Game which constructs Levels directly and holds its own
- * reference, at which point this shim disappears.
+ * Backward-compat shim for callers that don't hold a Game instance
+ * (menu, debug, switches, RemoteGame, attract). Constructs a Level,
+ * loads it, starts it ticking, and registers it as the current Level
+ * for this window via `_setCurrentLevel`. Callers that own a Game
+ * (master.js boot) construct Levels directly via Game.beginPlay.
  */
 export async function loadMap(name) {
     const lvl = new Level({
@@ -94,15 +88,12 @@ export async function loadMap(name) {
         orchestrator,
     });
     await lvl.load();
-    // Preserve today's "load → immediately playing" behavior: every
-    // caller of loadMap expected the world to be live after it
-    // resolved. L2's Game will own the load-then-start sequencing
-    // explicitly; for now the shim does it inline.
+    // Every caller of loadMap expects the world to be live after it
+    // resolves — start ticking before returning.
     lvl.start();
     // Register as "the current Level for this window." Callers
     // (master.js's RAF, the level-event emit sites in switches.js /
-    // damage.js / spawn.js) read this via `getCurrentLevel()`. L2
-    // replaces the registry with Game-owned reference.
+    // damage.js / spawn.js) read this via `getCurrentLevel()`.
     _setCurrentLevel(lvl);
     return lvl;
 }

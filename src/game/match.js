@@ -233,15 +233,13 @@ export function endMatch() {
     for (const p of state.players) clearMovingState(p);
 
     transitionTo(GAME_STATE.ENDED);
-    // L6.5 — fire the scoreboard via the renderer-command pipeline.
+    // Fire the scoreboard via the renderer-command pipeline.
     // orchestrator.showResults fans to master's own DomRenderer (whose
     // renderResults impl calls showScoreboard) and to every connected
-    // peer (whose renderResults impl does the same on the client side).
-    // Replaces the legacy direct showScoreboard call + MSG.MATCH_END
-    // wire envelope. mapName mirrors Game._buildResultsPayload so the
-    // payload shape is identical regardless of which path triggers the
-    // results (frag/time-limit here vs DM exit-switch in
-    // Game._onLevelComplete).
+    // peer (whose renderResults impl does the same on the client).
+    // mapName mirrors Game._buildResultsPayload so the payload shape
+    // is identical regardless of which path triggers the results
+    // (frag/time-limit here vs DM exit-switch in Game._onLevelComplete).
     orchestrator.showResults({
         scores: state.players.map(p => p.score),
         kills: state.match.kills.map(row => row.slice()),

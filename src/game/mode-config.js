@@ -1,24 +1,15 @@
 /**
- * modeConfig builder.
+ * modeConfig builder for master.js's boot path. Packages the current
+ * window's mode choice (gameMode + networkMode + rules + skill +
+ * start map) into a plain object for `new Game(...)`. Game doesn't
+ * look at URL params / localStorage / kiosk class itself.
  *
- * Packages the current window's mode choice (gameMode + networkMode +
- * rules + skill + start map) into a plain object suitable for passing
- * to `new Game(...)`. Game (and later App in L3.2) take this struct
- * and never look at URL params / localStorage / kiosk class themselves.
+ *   - `?kiosk`  → Local DM standalone (forces deathmatch).
+ *   - otherwise → `loadSavedGameMode()` + standalone.
  *
- * L2.2 only mirrors today's boot-time resolution from
- * `master.js::initMaster`:
- *
- *   - `?kiosk` URL param  → Local DM standalone (forces deathmatch,
- *                            ignores localStorage).
- *   - otherwise           → `loadSavedGameMode()` + standalone.
- *
- * The Q12 boot-resolution tree from LIFECYCLE_REFACTOR.md (sessionStorage
- * lastUsedMode, ?join routing to a RemoteGame, kiosk default DM, etc.)
- * lands in App.start() in L3.2. Until then, this helper covers only the
- * subset master needs.
- *
- * No caller wired yet — L2.9 hands the returned config to `new Game(...)`.
+ * App.start handles the richer boot tree (`?join`, `?server`,
+ * sessionStorage, etc.); this helper only covers the subset master
+ * needs to construct the boot-time Game placeholder.
  */
 
 import { loadSavedGameMode } from '../mode.js';
@@ -34,14 +25,12 @@ export function buildModeConfigFromUrl() {
         gameMode,
         networkMode,
         // skillLevel isn't currently read from URL or storage — it
-        // defaults on `state.js` to 1 and is changed only via the
-        // (not-yet-wired) skill picker. Mirror that here so today's
-        // behavior is preserved.
+        // defaults to 1 on state.js and is changed only via the skill
+        // picker. Mirror that here.
         skillLevel: 1,
-        // DM rules (fragLimit / timeLimit) are populated by `resetMatch`
-        // in `game/match.js` today. L2.5 hands that responsibility to
-        // Game.beginPlay; until then `rules` stays null and DM behavior
-        // is unchanged.
+        // DM rules (fragLimit / timeLimit) live in `game/match.js`'s
+        // resetMatch defaults; this struct carries them as null so
+        // Game stays mode-agnostic.
         rules: null,
         startMap: 'E1M1',
     };

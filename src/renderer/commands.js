@@ -55,20 +55,23 @@ import {
     applyThingPositionUpdate,
     applyThingCollected,
 } from './renderer-state.js';
-// L2.6 / L2.7 / L2.8 overlay commands (showLobby / updateLobbyState /
-// hideLobby / showIntermission / hideIntermission / showResults /
-// hideResults) dispatch through a late-binding registry rather than
-// importing the ui/* modules directly. Importing them would re-create
-// the cycle that crashed Firefox after L2.6
-// (`commands.js → ui/lobby.js → orchestrator.js → commands.js` —
-// renderer/index.js hit TDZ on COMMANDS).
+// Overlay commands (showLobby / updateLobbyState / hideLobby /
+// showIntermission / hideIntermission / showResults / hideResults /
+// setGameState) dispatch through a late-binding registry rather than
+// importing the ui/* modules directly. The direct-import shape
+// (`commands.js → ui/lobby.js → orchestrator.js → commands.js`) is a
+// cycle that crashed Firefox via TDZ on the COMMANDS export.
 //
-// The registry pattern: ui/* modules import `registerOverlayImpl` from
-// here at their own module load time and push their render-only
+// Registry pattern: ui/* modules import `registerOverlayImpl` from
+// here at their own module-load time and push their render-only
 // handlers in. commands.js never imports ui/*, so the cycle is broken.
-// Multiple handlers per command are supported (e.g. showLobby has
-// handlers from both lobby.js and network-lobby.js; each gates on
-// state.networkMode internally so only the right one paints).
+// Multiple handlers per command are supported — showLobby has handlers
+// from both lobby.js and network-lobby.js; each gates on
+// state.networkMode internally so only the right one paints.
+//
+// Side-effect anchor for the ui/* modules lives at src/ui/overlays.js;
+// without it a UI module whose named exports are unused elsewhere can
+// fall out of the bundle entirely and silently un-register its impls.
 
 const overlayImpls = new Map();
 
@@ -208,21 +211,25 @@ export const COMMANDS = {
     // ── World: surfaces ───────────────────────────────────────────────────
     lowerTaggedFloor: { kind: 'world', impl: lowerTaggedFloor },
 
-    // ── World: lobby overlay (L2.6) ───────────────────────────────────────
-    // Driven by Game.start (showLobby), Game.claimSlot (updateLobbyState),
-    // and Game.beginPlay (hideLobby). World-kind so master fans the same
-    // command to every client's RenderClient and the lobby visual stays
-    // in sync across master + remote panes without a side-channel
-    // envelope. Each impl calls both lobby modules; the modules gate
-    // internally on state.networkMode so only the right one paints.
+    // ── World: lobby / intermission / results overlays ───────────────────
+    // Driven by Game.start (showLobby), Game's onClaimChange handler
+    // (updateLobbyState), Game.beginPlay (hideLobby), Game._onLevelComplete
+    // (showIntermission / showResults), and match.js::endMatch
+    // (showResults). World-kind so master fans the same command to
+    // every client's RenderClient and the visual stays in sync across
+    // master + remote panes without a side-channel envelope. Each
+    // impl calls into multiple UI modules; each module gates
+    // internally on state.networkMode / body classes so only the
+    // right one paints.
+    //
     // World-command impls are invoked by DomRenderer as
     // `impl(this, ...args)` — renderer first, then the orchestrator
     // caller's args. The overlay impls don't use the renderer (they
-    // route through the registry which targets DOM globally per
-    // pane), so the first slot is named `_renderer` and ignored.
-    // Without this convention the renderer was being captured as
-    // `payload` and showResults crashed in scoreboard.js (DomRenderer
-    // has no `scores` field).
+    // route through the registry which targets DOM globally), so the
+    // first slot is named `_renderer` and ignored. Without this
+    // convention the renderer was captured as `payload` and
+    // showResults crashed in scoreboard.js with a DomRenderer object
+    // where it expected `{scores, kills, winnerIndex, mapName}`.
     showLobby:        { kind: 'world', impl: (_renderer, payload) => fireOverlay('showLobby', payload) },
     updateLobbyState: { kind: 'world', impl: (_renderer, payload) => fireOverlay('updateLobbyState', payload) },
     hideLobby:        { kind: 'world', impl: (_renderer) => fireOverlay('hideLobby') },
@@ -231,12 +238,11 @@ export const COMMANDS = {
     showResults:      { kind: 'world', impl: (_renderer, payload) => fireOverlay('showResults', payload) },
     hideResults:      { kind: 'world', impl: (_renderer) => fireOverlay('hideResults') },
 
-    // L6.5 — game-state transitions. Master's game-state.js calls
+    // game-state transitions. Master's game-state.js calls
     // `broadcastGameState(next)` on every transitionTo; this fans out
-    // through the renderer-command pipeline instead of the legacy
-    // MSG.GAME_STATE wire envelope. The impl is idempotent on master
-    // (applyRemoteGameState early-returns when state hasn't changed)
-    // and writes body[data-game-state] on the client so CSS gates
+    // through the renderer-command pipeline. The impl is idempotent on
+    // master (applyRemoteGameState early-returns when state hasn't
+    // changed) and writes body[data-game-state] on the client so CSS gates
     // (`body[data-game-state="lobby"] ...`) stay aligned with master.
     setGameState:     { kind: 'world', impl: (_renderer, payload) => fireOverlay('setGameState', payload) },
 };

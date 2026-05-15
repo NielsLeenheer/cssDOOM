@@ -252,13 +252,12 @@ onClaimChange(() => {
     renderAllLabels();
 });
 
-// ── L2.6 renderer-command entry points ─────────────────────────────────
+// ── Renderer-command entry points ──────────────────────────────────────
 // Symmetric with src/ui/lobby.js: Game pushes lobby commands and the
 // world-command impls call into both modules. This module gates on
 // `state.networkMode === 'host'` because the network lobby view only
 // renders for the host configuration; non-network DM is handled by
-// lobby.js. See lobby.js's renderLobbyState comment for the broader
-// strangler-fig context.
+// lobby.js.
 
 /** Renderer-command impl for showLobby + updateLobbyState in network
  *  mode. On master, re-derive from claim-registry like syncFromClaims
@@ -285,9 +284,9 @@ export function clearLobby() {
     // No-op; CSS-driven for now.
 }
 
-// L4.2 — register render-only handlers. Parallel with lobby.js;
-// renderLobbyState() above already gates on state.networkMode='host'
-// so only the network branch paints when networkMode matches.
+// Register render-only handlers. Parallel with lobby.js;
+// renderLobbyState() above gates on state.networkMode='host' so only
+// the network branch paints when networkMode matches.
 registerOverlayImpl('showLobby',        renderLobbyState);
 registerOverlayImpl('updateLobbyState', renderLobbyState);
 registerOverlayImpl('hideLobby',        clearLobby);

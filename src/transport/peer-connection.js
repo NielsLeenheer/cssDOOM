@@ -161,7 +161,7 @@ export class MasterConnection {
             peerKey,
             alive: false,
             ready: false,
-            // L6.6 — set by MSG.READY_TO_PLAY; reset to false on each
+            // Set by MSG.READY_TO_PLAY; reset to false on each
             // broadcastLoadMap so awaitAllReadyToPlay tracks the latest
             // load round.
             readyToPlay: false,
@@ -233,7 +233,7 @@ export class MasterConnection {
         } else if (msg.type === MSG.LEAVING) {
             this._handlePeerGone(session);
         } else if (msg.type === MSG.READY_TO_PLAY) {
-            // L6.6 — peer finished its loadMap; the awaitAllReadyToPlay
+            // Peer finished its loadMap; the awaitAllReadyToPlay
             // promise watches this flag.
             session.readyToPlay = true;
         } else if (msg.type === MSG.ACTION || msg.type === MSG.ANALOG) {
@@ -242,19 +242,17 @@ export class MasterConnection {
     }
 
     /**
-     * Unpause LOOKING after a non-coordinated loadMap (legacy
-     * switches.js DM exit-switch path). The coordinated handshake
-     * uses broadcastPlay() to unpause; this is the fallback for
-     * uncoordinated callers that fire loadMap directly. L4 / L6.7
-     * routes the remaining uncoordinated paths through Game.beginPlay
-     * and deletes this method.
+     * Unpause LOOKING after a non-coordinated loadMap (switches.js's
+     * DM exit-switch path). The coordinated handshake uses
+     * broadcastPlay() to unpause; this is the fallback for callers
+     * that fire loadMap directly without the handshake.
      */
     resumeAfterLevelLoad() {
         this.paused = false;
     }
 
     /**
-     * L6.6 — broadcast a coordinated loadMap to every alive peer. Resets
+     * Broadcast a coordinated loadMap to every alive peer. Resets
      * per-session readyToPlay flags so awaitAllReadyToPlay can detect
      * "every peer has acknowledged the NEW load." Pauses LOOKING for the
      * duration of the handshake so a fresh peer can't ACK against the
@@ -282,7 +280,7 @@ export class MasterConnection {
     }
 
     /**
-     * L6.6 — broadcast PLAY to every alive peer, signalling that every
+     * Broadcast PLAY to every alive peer, signalling that every
      * joiner has confirmed loadMap and master is about to flip the world
      * into PLAYING. Unpauses LOOKING — late joiners after this point go
      * through the standard ACK path with the now-PLAYING snapshot.
@@ -296,7 +294,7 @@ export class MasterConnection {
     }
 
     /**
-     * L6.6 — Promise that resolves when every alive peer has sent
+     * Promise that resolves when every alive peer has sent
      * MSG.READY_TO_PLAY since the most recent broadcastLoadMap (or
      * immediately, when no peer is alive).
      *
@@ -419,13 +417,13 @@ export class MasterConnection {
  *   been connected (covering the master-restart case).
  * @param {() => void} [options.onLeave]      Master went silent.
  * @param {(msg: object) => void} [options.onLoadMap]
- *   L6.6 — master broadcast a coordinated loadMap. Carries `{ name }`.
+ *   Master broadcast a coordinated loadMap. Carries `{ name }`.
  *   Handler should call loadMap(name) locally and then `sendReadyToPlay()`
  *   so master can proceed to PLAY.
  * @param {() => void} [options.onPlay]
- *   L6.6 — master signalled that every joiner has confirmed loadMap.
- *   Visual state is already driven by renderer commands; this is mostly
- *   a synchronization point.
+ *   Master signalled that every joiner has confirmed loadMap. Visual
+ *   state is already driven by renderer commands; this is mostly a
+ *   synchronization point.
  */
 export class ClientConnection extends PeerConnectionBase {
     constructor({ transport = null, onAck, onLeave, onLoadMap, onPlay } = {}) {
@@ -442,8 +440,8 @@ export class ClientConnection extends PeerConnectionBase {
     }
 
     /**
-     * L6.6 — send MSG.READY_TO_PLAY to master. Called from the
-     * onLoadMap handler after the local loadMap finishes.
+     * Send MSG.READY_TO_PLAY to master. Called from the onLoadMap
+     * handler after the local loadMap finishes.
      */
     sendReadyToPlay() {
         this._post({ type: MSG.READY_TO_PLAY });
@@ -471,8 +469,8 @@ export class ClientConnection extends PeerConnectionBase {
         } else if (msg.type === MSG.LEAVING) {
             this._handlePeerGone();
         } else if (msg.type === MSG.LOAD_MAP) {
-            // L6.6 — coordinated in-place load. Handler is responsible
-            // for calling sendReadyToPlay() once the local scene is
+            // Coordinated in-place load. Handler is responsible for
+            // calling sendReadyToPlay() once the local scene is
             // rebuilt; without that, master's awaitAllReadyToPlay
             // never resolves and the match-start times out.
             this.onLoadMap?.(msg);

@@ -38,13 +38,11 @@ let activeRoomCode = null;
 
 /**
  * Construct the master-side MasterConnection with the supplied
- * game-specific callbacks. Replaces the L6-era setMasterConnection
- * side-door setter (L7.1): callers no longer hand-roll the
- * MasterConnection in master.js and then plug it in here — this
- * module owns the construction outright.
+ * game-specific callbacks. This module owns construction; callers
+ * (master.js's setupMasterBroadcast) pass the callbacks rather than
+ * building the MasterConnection themselves.
  *
- * Idempotent — a second call warns and returns the existing
- * instance.
+ * Idempotent — a second call warns and returns the existing instance.
  */
 export function initMasterConnection(callbacks) {
     if (masterConnection) {
@@ -57,7 +55,7 @@ export function initMasterConnection(callbacks) {
 
 /**
  * Read-only accessor for the held MasterConnection. Used by
- * Game.beginPlay (L6.6) so it can drive the coordinated handshake
+ * Game.beginPlay so it can drive the coordinated handshake
  * (broadcastLoadMap / awaitAllReadyToPlay / broadcastPlay) without
  * needing the connection in its constructor — preserves Game's
  * modeConfig-only API while letting it talk to the wire when it has

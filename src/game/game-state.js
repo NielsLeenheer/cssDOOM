@@ -84,7 +84,7 @@ function applyTransition(next) {
     }
 }
 
-// L6.5 — render-only impl for the setGameState renderer command. Master's
+// Render-only impl for the setGameState renderer command. Master's
 // transitionTo calls broadcastGameState(next) which fans through the
 // renderer-command pipeline; the impl runs on every receiver (master's
 // own DomRenderer + each RenderSink → client's DomRenderer). master's

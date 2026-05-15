@@ -1,23 +1,15 @@
 /**
  * Level — one loaded map being simulated.
  *
- * L1.2 fills in `load()`. Other methods stay stubs:
- *   L1.3 — start() + tick()
- *   L1.4 — pause() / resume()
- *   L1.5 — stop() / destroy()
- *   L1.6 — wires level-complete / player-died / player-spawned emits
- *           from existing callers
- *   L1.7 — _setCurrentLevel / getCurrentLevel registry helpers
- *
- * See LIFECYCLE_REFACTOR.md §5 (Level state machine) and §8 (Level API)
- * for the target contract.
- *
- * `load()` mirrors the body of today's `loadMap()` in `shared/maps.js`
- * — same calls, same order, same side effects on `state.*`. Game owns
- * Level construction; `loadMap` survives as a shim for the callers
- * that don't own a Level instance (menu, debug, mechanics/switches,
- * RemoteGame, attract). Level's own event emitter replaced the
- * earlier `cssdoom:*` window-event channel.
+ * `load()` mirrors the body of `loadMap()` in `shared/maps.js` — same
+ * calls, same order, same side effects on `state.*`. Game owns Level
+ * construction; `loadMap` survives as a shim for the callers that
+ * don't hold a Level instance (menu, debug, mechanics/switches,
+ * RemoteGame, attract). Level emits `changing` / `loaded` /
+ * `level-complete` / `player-died` / `player-spawned`; the
+ * module-level emitter handles `changing` / `loaded` (cross-instance
+ * subscribers) and per-instance events go through each Level's own
+ * `on`.
  */
 
 import { EYE_HEIGHT } from './constants.js';
@@ -47,15 +39,13 @@ import {
 
 /**
  * Module-level registry for "the Level currently being simulated by
- * this window." Set by `loadMap()` (the L1.2 shim) and read by the
- * RAF tick + the level-event call sites. Transitional — L2 hands
- * Level ownership to Game (each Game holds its own Level reference),
- * at which point this registry goes away.
+ * this window." Set by `loadMap()` (the shim) and by Game.beginPlay;
+ * read by the RAF tick and the level-event call sites in switches /
+ * damage / spawn.
  *
- * Two accessors are intentional: `getCurrentLevel` is the
- * stable read API used by callers (tick, emit-call-sites). The
- * underscored `_setCurrentLevel` is for the shim only — by convention,
- * no caller outside `shared/maps.js::loadMap` should mutate it.
+ * Two accessors are intentional: `getCurrentLevel` is the stable read
+ * API used by callers. The underscored `_setCurrentLevel` is for the
+ * writers — by convention only `loadMap` and Game touch it.
  */
 let _currentLevel = null;
 export function getCurrentLevel() { return _currentLevel; }
@@ -105,13 +95,12 @@ export class Level {
         // via onLevel('changing', ...) at boot and turn the event into
         // MSG.LOAD_MAP for every alive peer.
         //
-        // Fires unconditionally — including on the "initial" load.
-        // The pre-L6.6 code skipped it on isInitialLoad with the
-        // rationale "no client could be connected yet," but Network
-        // DM host doesn't preload (Game.start's network branch is a
-        // no-op); the FIRST Level.load happens at host-fire-start,
-        // after joiners are connected and waiting in the lobby. They
-        // need this LOAD_MAP to know when to start their own load.
+        // Fires unconditionally — including on the initial load. A
+        // tempting shortcut would be to skip this when isInitialLoad
+        // is true (rationale: "no client connected yet"), but Network
+        // DM host doesn't preload — the FIRST Level.load happens at
+        // host-fire-start, with joiners already waiting in the lobby.
+        // They need this event to start their own load.
         //
         // The showLevelTransition fade is still gated on
         // !isInitialLoad — there's no scene to fade FROM on the very
@@ -252,12 +241,12 @@ export class Level {
      * `stop()` before `destroy()` so the world stops advancing while
      * destruction happens. Idempotent.
      *
-     * Why stop() exists alongside pause() despite identical body: §5
-     * of LIFECYCLE_REFACTOR.md distinguishes them semantically. pause()
-     * is a transient interruption with an expected `resume()` on the
-     * same Level instance (e.g. App menu open/close). stop() is the
-     * pre-destruction halt — no `resume()` will ever follow, so naming
-     * it `stop()` at the call site makes intent obvious.
+     * Why stop() exists alongside pause() despite identical body:
+     * intent at the call site. pause() is a transient interruption
+     * with an expected `resume()` on the same Level instance (e.g.
+     * menu open / close). stop() is the pre-destruction halt — no
+     * `resume()` will ever follow, so naming it `stop()` makes the
+     * teardown sequence read straight.
      */
     stop() {
         if (this._state === 'loaded-running') {
@@ -270,13 +259,13 @@ export class Level {
      * and mark the instance as unloaded. After destroy(), tick() is
      * a no-op even if start()/resume() were somehow called again.
      *
-     * Touches ONLY `state.*` fields owned by Level per
-     * LIFECYCLE_REFACTOR.md §5 / §7 (things, projectiles, doors,
-     * lifts, crushers). Does NOT touch Game-owned fields (players,
-     * match, gameMode, etc.) or renderer DOM — the latter is
-     * deliberate: kiosk warm attract (IN_GAME → ATTRACT, §13b) relies
-     * on the scene surviving Level teardown so attract can fade the
-     * HUD and rotate the captured camera over the same geometry.
+     * Touches ONLY the Level-owned `state.*` fields (things,
+     * projectiles, doors, lifts, crushers). Does NOT touch Game-owned
+     * fields (players, match, gameMode, etc.) or renderer DOM. The
+     * renderer DOM exclusion is deliberate: kiosk warm attract
+     * (IN_GAME → ATTRACT) relies on the scene surviving Level
+     * teardown so attract can fade the HUD and rotate the captured
+     * camera over the same geometry.
      *
      * Called by `Game.stop()` when tearing down a Level instance.
      * `loadMap` for callers without a Game instance still does its

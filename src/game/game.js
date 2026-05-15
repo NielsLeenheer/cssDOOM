@@ -1,27 +1,16 @@
 /**
- * Game — one match / session.
+ * Game — one match / session on the host side.
  *
- * Skeleton only. Bodies land in subsequent L2 steps:
- *   L2.3 — claimSlot() + roster ownership
- *   L2.4 — Level event subscriptions (level-complete / player-died /
- *          player-spawned)
- *   L2.5 — match.js logic absorption (beginPlay / restartMatch / endMatch)
- *   L2.6 — lobby UI ownership (showLobby / updateLobbyState / hideLobby
- *          renderer commands)
- *   L2.7 — intermission UI ownership (advance())
- *   L2.8 — results / scoreboard UI ownership
- *   L2.9 — master.js boots a Game; Game constructs Levels
- *   L5   — pause() / resume()
- *
- * See LIFECYCLE_REFACTOR.md §4 (Game state machine) and §7 (Game API)
- * for the target contract.
+ * Owns the LOBBY → LOADING → PLAYING → INTERMISSION → RESULTS → ENDED
+ * state machine, constructs and tears down `Level` instances, holds
+ * the roster, and pushes lobby / intermission / results / paused
+ * renderer commands so master's local panes and any connected
+ * clients stay in sync.
  *
  * Game._transitionTo intentionally does NOT write `body.dataset.gameState`
- * — that attribute is owned by `src/game/game-state.js`'s legacy
- * machine, which has a different vocabulary (LOBBY/ACTIVE/ENDED/...).
- * Both machines coexist deliberately: re-homing the legacy machine to
- * Game/RemoteGame is an L8-scope follow-up. See
- * project_lifecycle_refactor_l7_deferred.md.
+ * — that attribute is owned by `src/game/game-state.js`'s parallel
+ * machine, which has a different vocabulary (LOBBY/ACTIVE/ENDED/...)
+ * and is what most of the CSS keys on. Both machines coexist.
  */
 
 import { state } from './state.js';
@@ -35,9 +24,8 @@ import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
 // How long to keep the just-claimed pane's READY indicator visible
-// before auto-starting the match — same UX touch as the pre-cutover
-// lobby.js had. If a slot un-claims during the delay, the pending
-// timer cancels.
+// before auto-starting the match. If a slot un-claims during the
+// delay, the pending timer cancels.
 const READY_FLASH_MS = 1000;
 
 export class Game {
@@ -64,30 +52,22 @@ export class Game {
         this.rules = modeConfig.rules ?? null;
         this.skillLevel = modeConfig.skillLevel ?? 3;
 
-        // Authoritative roster. Aliased to `state.players` so legacy code
+        // Authoritative roster. Aliased to `state.players` so code
         // reading state.players (movement, damage, AI, renderer) sees
         // Game-driven updates with no copy step. `state.players` is
         // mutated in place (ensurePlayerCount pushes; never reassigns),
         // so the alias stays stable across the Game's lifetime.
-        //
-        // Per LIFECYCLE_REFACTOR.md §10 the eventual richer shape is
-        // `{ slot, kind, deviceId, ready, player }` per entry. For L2.3
-        // the simpler alias matches the spec's `this.roster = state.players`
-        // sketch and avoids inventing a parallel structure ahead of
-        // L2.6's lobby UI ownership move, when the richer shape will
-        // actually be needed.
         this.roster = state.players;
 
         // The currently-loaded Level (or null between LOBBY and the
         // first PLAYING entry, and between RESULTS and the next LOBBY).
-        // Game constructs and tears down Levels in L2.5 / L2.6.
         this.level = null;
 
         // Map for the next match start. SP advances through the cycle on
-        // INTERMISSION → LOADING; DM advances on RESULTS → LOBBY per §4b.
+        // INTERMISSION → LOADING; DM advances on RESULTS → LOBBY.
         this.mapCursor = modeConfig.startMap ?? 'E1M1';
 
-        this._state = 'LOBBY'; // §4: new Game() → LOBBY always
+        this._state = 'LOBBY'; // new Game() always boots into LOBBY
         this._listeners = new Map();
         this._autoStartTimer = null;
     }
@@ -98,9 +78,9 @@ export class Game {
 
     /**
      * Boot the Game. Enters LOBBY state, pushes the showLobby renderer
-     * command so panes (local + sinks) paint the lobby overlay, and for
-     * SP auto-finalizes immediately into beginPlay (per §3b — SP roster
-     * is fixed at [Player 0], no claim wait needed).
+     * command so panes (local + sinks) paint the lobby overlay, and
+     * for SP auto-finalizes immediately into beginPlay — SP roster is
+     * fixed at [Player 0] so there's no claim wait.
      *
      * Local DM and Network DM stay in LOBBY here; the caller is
      * responsible for triggering beginPlay later (Local DM: auto-start
@@ -146,11 +126,10 @@ export class Game {
         }
 
         if (this.gameMode === 'deathmatch' && this.networkMode === 'standalone') {
-            // §3b Local DM: construct + load Level immediately so the
+            // Local DM: construct + load Level immediately so the
             // lobby UI sits on top of a loaded paused scene rather
             // than on an empty pane. beginPlay later just calls
-            // level.start() — skipping the LOADING phase per the
-            // §3b happy path.
+            // level.start() — skipping the LOADING phase.
             await this._preloadLevel();
 
             // Kick the auto-start check ONCE after preload. Claims
@@ -183,14 +162,14 @@ export class Game {
      *
      * Idempotent — no-op when this.level already exists.
      *
-     * The §3b spec describes Level as "paused" during the lobby
-     * phase, but in practice the legacy world ran (gated by
-     * isMatchLobby checks inside updateGame for scoring etc.).
-     * Pausing the Level here regressed kiosk DM: players spawned
-     * at the fallback floor height from applyDeathmatchStarts and
-     * never got corrected. Starting the Level restores legacy
-     * behavior; the scoring/match-clock gating inside match.js
-     * (legacy) keeps the match "not active" until startMatch.
+     * The lobby intuitively wants Level "paused" during warmup, but
+     * in practice the world has to be ticking: pausing the Level
+     * regressed kiosk DM because players spawned at the fallback
+     * floor height from applyDeathmatchStarts and the updateHeight
+     * pass that corrects it never ran. Starting the Level here means
+     * the world is live during warmup; scoring is gated separately
+     * by isMatchLobby checks inside updateGame so the match clock
+     * doesn't start until startMatch.
      */
     async _preloadLevel() {
         if (this.level) return;
@@ -256,12 +235,12 @@ export class Game {
      * Pause the held Level and fan a 'paused' tint to every pane.
      *
      * Level tick freezes only while PLAYING — pausing during LOADING /
-     * LOBBY / INTERMISSION / RESULTS has no Level to freeze (LOADING
-     * has a Level instance but its tick is still gated by load
-     * completion; the §15 contract says Game.pause is a no-op on
-     * Level during LOADING). The renderer-command fan-out fires
-     * regardless so the menu visually paints every pane (including
-     * joiner panes whose own App.state is IN_GAME, not MENU).
+     * LOBBY / INTERMISSION / RESULTS has no live Level to freeze
+     * (LOADING holds a Level instance but its tick is still gated by
+     * load completion). The renderer-command fan-out fires regardless
+     * so the menu visually paints every pane, including joiner panes
+     * whose own App.state is IN_GAME (the joiner sees host's pause
+     * via the wire, not via its own state).
      */
     pause() {
         if (this._state === 'PLAYING') {
@@ -288,8 +267,8 @@ export class Game {
     /**
      * Clean teardown. Stops the held Level (if any), destroys it
      * (clears state.things / doorState / liftState / crusherState /
-     * projectiles), nulls `this.level`, clears the L1.7 registry,
-     * hides any open overlays, and transitions to ENDED.
+     * projectiles), nulls `this.level`, clears the level singleton
+     * registry, hides any open overlays, and transitions to ENDED.
      *
      * Idempotent — stop() on an already-ENDED Game is a no-op.
      *
@@ -330,11 +309,10 @@ export class Game {
      * `state.players[slot]` Player exists (extending the roster if
      * needed) and emits `roster-updated` for subscribers.
      *
-     * L2.3 is intentionally minimal: today's claim flow still runs
-     * through `input/claim-registry.js` (each input module calls
-     * `tryClaimSlot(deviceId)` directly and lobby UI subscribes to
-     * `onClaimChange`). Game.claimSlot is the parallel future entry
-     * point; L2.6 cuts over once lobby UI moves into Game.
+     * Currently a parallel entry point — the live claim flow still
+     * runs through `input/claim-registry.js` (input modules call
+     * `tryClaimSlot(deviceId)` directly; Game subscribes to
+     * `onClaimChange` and pushes updateLobbyState from there).
      */
     claimSlot(slot, deviceId) {
         ensurePlayerCount(slot + 1);
@@ -352,21 +330,15 @@ export class Game {
     /**
      * Roster is finalized — construct the Level for `this.mapCursor`,
      * load it, start it, and transition through LOBBY → LOADING →
-     * PLAYING. Today's match.js still owns the actual match-start
-     * trigger (`startMatch`); L2.5b cuts match.js over to call this.
-     *
-     * SP and Local DM use the same monolithic load-then-start path
-     * for L2.5a. The Local DM "background load during claim UI" /
-     * direct LOBBY → PLAYING optimization from §3b lands when lobby
-     * UI moves into Game (L2.6). Network DM extension (LOAD_MAP
-     * broadcast + ready-to-play handshake per §12) is L6.
+     * PLAYING. For Local DM the Level is preloaded by start() so this
+     * skips the LOADING phase. For Network DM, Level construction is
+     * deferred to here so beginPlay can drive the LOAD_MAP /
+     * READY_TO_PLAY / PLAY handshake with connected joiners.
      *
      * `_setCurrentLevel(this.level)` keeps the legacy `getCurrentLevel`
-     * registry in sync so the existing per-frame tick caller in
-     * master.js and the level-event emit sites in switches.js /
-     * damage.js / spawn.js continue to find the right Level
-     * instance. L7 retires the registry once master.js routes through
-     * `app.game.level` directly.
+     * singleton in sync so master.js's per-frame tick and the
+     * level-event emit sites in switches.js / damage.js / spawn.js
+     * continue to find the right Level instance.
      */
     async beginPlay() {
         orchestrator.hideLobby();
@@ -392,16 +364,15 @@ export class Game {
         }
         // Local DM happy path lands here with this.level already
         // preloaded by start() — direct LOBBY → PLAYING, no LOADING
-        // splash, per §3b.
+        // splash.
 
-        // L6.6 — coordinated start: when running as Network DM host,
-        // wait for every connected peer to send MSG.READY_TO_PLAY
-        // (signalling its local loadMap finished), then broadcast
-        // MSG.PLAY so the joiners' UI knows the match is starting.
-        // No-op when no MasterConnection is held (client window) or no
-        // peer is alive (solo master). Times out at 10 s with a warn
-        // and proceeds anyway — a crashed joiner shouldn't hang the
-        // host's match-start.
+        // Network DM host: wait for every connected peer to send
+        // MSG.READY_TO_PLAY (signalling its local loadMap finished),
+        // then broadcast MSG.PLAY so the joiners' UI knows the match
+        // is starting. No-op when no MasterConnection is held (client
+        // window) or no peer is alive (solo master). Times out at 10 s
+        // with a warn and proceeds anyway — a crashed joiner shouldn't
+        // hang the host's match-start.
         if (this.networkMode === 'host') {
             const mc = getMasterConnection();
             if (mc) {
@@ -413,12 +384,11 @@ export class Game {
         this.level.start();
         this._transitionTo('PLAYING');
 
-        // Sync legacy game-state.js → ACTIVE so the body's
-        // `data-game-state="lobby"` flips to "active" and CSS-driven
-        // overlays (lobby press-to-claim prompts, etc.) hide. Until
-        // L7 retires game-state.js, Game must drive both state
-        // machines. startMatch is a no-op for SP (early-returns when
-        // state.match is null).
+        // Drive the parallel game-state.js machine → ACTIVE too so
+        // `body.dataset.gameState` flips from "lobby" to "active" and
+        // CSS-driven overlays (press-to-claim prompts, etc.) hide.
+        // Game owns its own state machine but doesn't write the body
+        // attribute itself — see the file-level docstring.
         if (this.gameMode === 'deathmatch') {
             startMatch();
         }
@@ -437,26 +407,23 @@ export class Game {
     }
 
     /**
-     * RESULTS → LOBBY transition for DM. Uses `getNextMap` from
-     * shared/maps.js to advance the map cycle (secret-exit handling
-     * per §4b is not yet implemented).
+     * RESULTS → LOBBY transition for DM. Does NOT tear down
+     * `this.level` — that already happened at PLAYING → RESULTS on
+     * match end. RESULTS → LOBBY is the pure state transition; the
+     * next match's Level reload happens below. Called from
+     * `actions/gates.js` on FIRE_DOWN during the match-end gate.
      *
-     * Does NOT tear down `this.level` — that already happened at
-     * PLAYING → RESULTS per §12 (Match end). RESULTS → LOBBY is the
-     * pure state transition; the next match's Level is constructed
-     * lazily by the next `beginPlay()`. Called from `actions/gates.js`
-     * on FIRE_DOWN during MATCH_END.
+     * Secret-exit map cycling isn't implemented yet — DM exit always
+     * cycles via getNextMap, regardless of which exit fired.
      */
     async restartMatch() {
         orchestrator.hideResults();
 
         // Reset match state in match.js (kill matrix, scores, frag
         // clock, body.dataset.gameState → LOBBY via game-state.js).
-        // match.js still owns DM-match mechanics — re-homing match
-        // state onto Game is deferred (see
-        // project_lifecycle_refactor_l7_deferred.md). Calling
-        // resetMatch here also fires match.js's onMatch('reset') event
-        // that lobby.js + master broadcast both subscribe to.
+        // match.js owns DM-match mechanics; calling resetMatch here
+        // also fires match.js's onMatch('reset') event that lobby.js
+        // + master broadcast both subscribe to.
         resetMatch();
 
         this._transitionTo('LOBBY');
@@ -472,14 +439,14 @@ export class Game {
         // mapData. Without this, beginPlay's "level exists → just
         // start()" idempotent path would keep the previous match's
         // mid-match world (corpses, picked-up items, opened doors,
-        // half-killed enemies) live into the next match. Mirrors the
-        // pre-cutover `resetMatch + loadMap(currentMap)` flow from
-        // legacy match.js::restartMatch.
+        // half-killed enemies) live into the next match.
         //
         // Calling Level.load on the existing instance re-runs the
         // full load body (fade-in → fetch → init → scene rebuild
-        // → fade-out). Map cycling per §4b is deferred — restart
-        // reloads the SAME map, matching legacy behavior.
+        // → fade-out). DM map cycling between matches isn't done
+        // here — restart reloads the SAME map. Map advancement on
+        // DM exit is still driven by switches.js's setTimeout
+        // loadMap; consolidating that onto Game is a follow-up.
         if (this.level) {
             await this.level.load();
         }
@@ -509,11 +476,7 @@ export class Game {
      * Game pushes hideIntermission via orchestrator, advances mapCursor
      * to the pending next map (captured by _onLevelComplete), then
      * delegates to beginPlay() for the construct-load-start sequence.
-     *
-     * Today's gates.js still calls intermission.js::dismissIntermission
-     * which invokes switches.js's loadMap callback; advance() is the
-     * parallel future path that gates.js will call once L4 cuts over.
-     * Dead code until a caller wires it.
+     * Called from `actions/gates.js` on FIRE_DOWN during INTERMISSION.
      */
     async advance() {
         orchestrator.hideIntermission();
@@ -554,16 +517,14 @@ export class Game {
      * `state-changed`. Callers (Game's own methods) use this rather
      * than assigning `_state` directly so subscribers stay in sync.
      *
-     * Intentionally does NOT write `body.dataset.gameState`. Legacy
-     * `src/game/game-state.js` still owns that attribute and its own
-     * vocabulary (ACTIVE / LOBBY / INTERMISSION / ENDED / ATTRACT) —
-     * which CSS keys on across the codebase. If Game also wrote here
-     * with the new vocab (LOBBY / LOADING / PLAYING / INTERMISSION /
+     * Intentionally does NOT write `body.dataset.gameState`.
+     * `src/game/game-state.js` owns that attribute with its own
+     * vocabulary (ACTIVE / LOBBY / INTERMISSION / ENDED / ATTRACT),
+     * which CSS keys on across the codebase. If Game also wrote
+     * here with its vocab (LOBBY / LOADING / PLAYING / INTERMISSION /
      * RESULTS / ENDED), the two writers would race and CSS rules
      * keyed on `="active"` would stop matching once Game fired
-     * PLAYING. Re-homing the legacy state machine onto Game/RemoteGame
-     * is an L8-scope follow-up — see
-     * project_lifecycle_refactor_l7_deferred.md.
+     * PLAYING.
      */
     _transitionTo(newState) {
         const from = this._state;
@@ -573,10 +534,7 @@ export class Game {
 
     /**
      * Wire this Game's handlers onto a Level's event emitter. Called
-     * by `beginPlay()` (L2.5 / L2.9) immediately after constructing
-     * `this.level`. Not invoked automatically in L2.4 — Game doesn't
-     * own a Level yet — so the handlers below are reachable only via
-     * a manual `g._subscribeLevel(lvl)` from the dev console for now.
+     * by `beginPlay()` immediately after constructing `this.level`.
      */
     _subscribeLevel(level) {
         level.on('level-complete', (p) => this._onLevelComplete(p));
@@ -587,12 +545,12 @@ export class Game {
     /**
      * Reacts to Level emitting `level-complete`. SP: PLAYING →
      * INTERMISSION, pushes showIntermission via orchestrator (sole
-     * driver — switches.js no longer fires showIntermission itself).
-     * DM: PLAYING → RESULTS (vanilla DOOM exit-ends-match per §4b),
-     * pushes showResults. switches.js still fires
+     * driver — switches.js no longer fires showIntermission directly).
+     * DM: PLAYING → RESULTS (vanilla DOOM exit-ends-match) and
+     * pushes showResults. switches.js still fires the actual
      * setTimeout(loadMap, 1000) for the DM map advance because
-     * Game.restartMatch reloads the current map rather than
-     * cycling; re-homing DM map cycling is a follow-up.
+     * Game.restartMatch reloads the current map; consolidating
+     * the DM cycle onto Game is a follow-up.
      */
     _onLevelComplete(payload) {
         if (this.gameMode === 'singleplayer') {
@@ -613,10 +571,9 @@ export class Game {
             this._transitionTo('INTERMISSION');
             orchestrator.showIntermission(payload);
         } else {
-            // DM: vanilla DOOM exit ends the match (§4b). switches.js
-            // still drives the actual next-map load via
-            // setTimeout(loadMap, 1000) — see the note in
-            // _onLevelComplete's docstring above.
+            // DM: vanilla DOOM exit ends the match. switches.js still
+            // drives the next-map load via setTimeout(loadMap, 1000)
+            // — see the docstring above.
             this._transitionTo('RESULTS');
             orchestrator.showResults(this._buildResultsPayload());
         }
@@ -625,11 +582,11 @@ export class Game {
 
     /**
      * Build the payload for `showResults`. Reads `state.match` (when
-     * present) for the kill matrix and players' `score` field. Until
-     * L4 wires match-end determination into Game, winnerIndex falls
-     * back to -1 (which the scoreboard renders as "TIE") because the
-     * `state.match.winner` field is only set by `match.js::endMatch`,
-     * which doesn't run on a DM exit.
+     * present) for the kill matrix and players' `score` field.
+     * `winnerIndex` falls back to -1 (which the scoreboard renders
+     * as "TIE") when `state.match.winner` is unset — that field is
+     * only set by `match.js::endMatch`, which doesn't run on a DM
+     * exit-switch.
      */
     _buildResultsPayload() {
         const m = state.match;
@@ -645,10 +602,9 @@ export class Game {
 
     /**
      * Reacts to Level emitting `player-died`. DM scoring + frag-limit
-     * detection still lives in damage.js / match.js for L2.5a; Game's
-     * handler is a pure re-emit so App-side observers can subscribe
-     * without duplicating side effects. L4 cleans up the legacy
-     * inline handling once Game owns the response end-to-end.
+     * detection lives in damage.js / match.js; Game's handler is a
+     * pure re-emit so App-side observers can subscribe without
+     * duplicating side effects.
      */
     _onPlayerDied(payload) {
         this._emit('player-died', payload);

@@ -10,13 +10,12 @@
  * The client still needs to *show* the lobby prompt for its slot, so
  * the player sitting at the client's screen knows when to press their
  * button. Master pushes the lobby state via the `updateLobbyState`
- * renderer command on every lobby-relevant change (L6.5 replaced the
- * legacy MSG.LOBBY_STATE wire envelope), and this module reflects it
- * onto the client's DOM via the pane's `data-claim-state` attribute.
- * `body[data-game-state]` is mirrored separately by the `setGameState`
- * renderer command (impl in game-state.js). The same CSS that drives
- * master's split-screen lobby prompts (`.join-prompt` / `.join-ready`)
- * then renders correctly.
+ * renderer command on every lobby-relevant change, and this module
+ * reflects it onto the client's DOM via the pane's `data-claim-state`
+ * attribute. `body[data-game-state]` is mirrored separately by the
+ * `setGameState` renderer command (impl in game-state.js). The same
+ * CSS that drives master's split-screen lobby prompts (`.join-prompt`
+ * / `.join-ready`) then renders correctly.
  *
  * `setClientSlot` is called from RemoteGame._onAck once master has
  * assigned a slot. Until then, any incoming lobby state is buffered
@@ -78,9 +77,8 @@ export function applyLobbyState(msg) {
     if (paneEl) paneEl.dataset.claimState = claimState;
 }
 
-// L6.5 — register applyLobbyState as a renderer-command impl. Replaces
-// the legacy MSG.LOBBY_STATE envelope handler in remote-game.js. Gates
-// on .client-window so master's own pane[data-claim-state] (which
+// Register applyLobbyState as a renderer-command impl. Gates on
+// .client-window so master's own pane[data-claim-state] (which
 // lobby.js's updateLobbyUI derives locally from claim-registry) isn't
 // double-written here. Also gates against .network-client because
 // Network DM remotes don't use the per-pane press-to-claim overlay —

@@ -102,9 +102,9 @@ export function spawnPlayer(player) {
     renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
     orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
 
-    // Informational. Game (subscribed in L2.4) uses this to confirm
-    // a slot is live again so it can hide a respawn overlay or
-    // update lobby state.
+    // Informational. Game subscribes via _subscribeLevel and uses this
+    // to confirm a slot is live again so it can hide a respawn overlay
+    // or update lobby state.
     getCurrentLevel()?._emit('player-spawned', {
         slot: player.index,
     });

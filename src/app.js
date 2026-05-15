@@ -1,37 +1,20 @@
 /**
  * App — the outermost layer in the lifecycle hierarchy.
  *
- * Skeleton only. Bodies land in subsequent L3 steps:
- *   L3.2 — start() reads URL / sessionStorage / kiosk default and
- *          resolves the boot destination per §3 + Q12.
- *   L3.3 — startLocalGame() + endGame() construct + tear down a
- *          held Game.
- *   L3.4 — transitionTo() implements the App state machine and
- *          writes body.dataset.appState. game-state.js gets deleted
- *          at the same step.
- *   L3.5 — menu open/close integration; previousState resolution
- *          per §3c.
- *   L3.6 — attract integration (warm path only; cold attract is
- *          documented but unreached in the current flow).
- *   L3.7 — master.js shrinks to `new App().start()`.
- *   L6   — joinRemoteGame() constructs a RemoteGame for the client
- *          window.
+ * Holds a polymorphic `game`: a `Game` (host-side simulation) or a
+ * `RemoteGame` (joining client). Owns the BOOT / IN_GAME / MENU /
+ * ATTRACT state machine, writes `body.dataset.appState`, and resolves
+ * the URL / sessionStorage / kiosk-default boot destination on start().
  *
- * See LIFECYCLE_REFACTOR.md §3 (App state machine), §3b (when does the
- * Level load), §3c (menu close behavior), §6 (App API), and §16
- * (attract mode) for the target contract.
- *
- * Same on/_emit pattern as Game / Level. App will be the top-level
- * subscriber: every Game and Level event eventually surfaces through
- * App for any cross-cutting concerns (analytics, recording, etc.).
+ * Same on/_emit pattern as Game / Level — App is the top-level
+ * subscriber for cross-cutting concerns (analytics, recording, etc.).
  */
 
 /**
- * Kiosk default modeConfig per Q12 — Local DM. DM is the installation's
- * headline feature, so kiosk boots straight into a DM lobby rather
- * than asking the attendee to pick a mode. Skill / startMap defaults
- * match what `mode-config.js::buildModeConfigFromUrl` already returns
- * for the kiosk branch.
+ * Kiosk boot lands directly in a Local DM lobby — DM is the
+ * installation's headline feature, so attendees aren't asked to pick a
+ * mode. Skill / startMap match what `mode-config.js::buildModeConfigFromUrl`
+ * returns for the kiosk branch.
  */
 const KIOSK_DEFAULT_MODE_CONFIG = {
     gameMode: 'deathmatch',
@@ -42,22 +25,21 @@ const KIOSK_DEFAULT_MODE_CONFIG = {
 };
 
 /**
- * sessionStorage key the App uses for the non-kiosk "last picked mode"
- * autostart hint per Q12. Session-scoped (cleared on tab close,
- * restored on reload-in-same-tab) so dev iteration lands back in
- * whatever was running, but a fresh tab opens to MENU.
+ * sessionStorage key for the non-kiosk "last picked mode" autostart
+ * hint. Session-scoped (cleared on tab close, restored on
+ * reload-in-same-tab) so dev iteration lands back in whatever was
+ * running, but a fresh tab opens to MENU.
  *
- * Distinct from `mode.js`'s legacy `cssdoom-game-mode` localStorage
- * key — the legacy stores only gameMode and persists across page
- * reloads. Both keys coexist: legacy is the kiosk-default fallback,
- * this one is the dev-iteration "stay in the same mode on reload."
+ * Distinct from `mode.js`'s `cssdoom-game-mode` localStorage key,
+ * which stores only gameMode and persists across page reloads. Both
+ * coexist: localStorage is the cross-reload default, sessionStorage
+ * is the dev-iteration "stay in the same mode on reload."
  */
 const LAST_USED_MODE_STORAGE_KEY = 'cssdoom:lastUsedMode';
 
 /**
  * Read the saved modeConfig from sessionStorage. Returns null when
- * absent or malformed (defensive — never throws). The shape is the
- * full Q12 modeConfig as written by startLocalGame.
+ * absent or malformed (defensive — never throws).
  */
 function readLastUsedMode() {
     try {
@@ -90,28 +72,30 @@ export class App {
         // startLocalGame() / joinRemoteGame().
         this.game = null;
 
-        // The last modeConfig handed to startLocalGame. Reserved
-        // for the attract → menu → close fall-through (§3c) — that
-        // path would start a fresh Game with whatever was most
-        // recently picked. Attract isn't routed through App today
-        // (legacy ui/attract.js owns the kiosk attract flow); see
-        // closeMenu's ATTRACT branch.
+        // The last modeConfig handed to startLocalGame. Read by
+        // closeMenu's ATTRACT branch (menu opened during attract → close
+        // starts a fresh Game with whatever was most recently picked).
+        // Currently unreachable since attract isn't routed through App;
+        // kept so the attract-on-App rewire has the data it needs.
         this.lastModeConfig = null;
 
         this._listeners = new Map();
     }
 
     /**
-     * Boot resolution per LIFECYCLE_REFACTOR.md §3 + Q12:
+     * Boot resolution:
      *
      *   ?join=ROOM      → joinRemoteGame(roomCode). Any platform.
-     *   ?kiosk          → startLocalGame(kiosk default = Local DM).
-     *                     Q12 kiosk default is
-     *                     { gameMode: 'deathmatch', networkMode: 'standalone' }.
-     *   sessionStorage  → startLocalGame(stored). Non-kiosk only —
-     *                     kiosk does NOT write sessionStorage (every
-     *                     kiosk reload is a fresh attendee).
-     *   else            → transitionTo('MENU'). Non-kiosk first boot.
+     *   ?kiosk          → startLocalGame(KIOSK_DEFAULT_MODE_CONFIG).
+     *                     Kiosk does NOT consult sessionStorage — every
+     *                     kiosk reload is a fresh attendee.
+     *   sessionStorage  → startLocalGame(stored). Non-kiosk only.
+     *   state.gameMode  → startLocalGame seeded from current state.
+     *                     This is the live non-kiosk first-boot path
+     *                     (master.js's applyMode always seeds it).
+     *   else            → transitionTo('MENU'). Unreachable today;
+     *                     the cut-point for a future "first boot opens
+     *                     MENU" UX.
      *
      * Called from master.js's initMaster and client.js's initClientWindow.
      */
@@ -128,22 +112,20 @@ export class App {
             return;
         }
 
-        // `?server=CODE` — symmetric dev shortcut to `?join=CODE`. Boots
-        // directly into Network DM host with the supplied room code
-        // (instead of a randomly generated one), so two browsers can
-        // agree on a code without scanning the lobby QR / typing the
-        // auto-generated value. setActiveRoomCode validates the format
-        // and silently ignores malformed input.
+        // `?server=CODE` boots directly into Network DM host with the
+        // supplied room code. At the CSS Day installation this is the
+        // production URL (combined with `?kiosk`) — picking a stable
+        // code like `CSSD` means the room name on the lobby QR stays
+        // memorable and survives kiosk reboots, instead of changing to
+        // a random code each restart. Also works standalone for dev:
+        // two browsers can agree on a code without scanning the QR.
+        // setActiveRoomCode validates format and silently ignores
+        // malformed input.
         //
-        // applyMode does the cross-cutting "enter Network DM host"
-        // work — body data attrs, roster sizing, resetMatch,
-        // setLocallyClaimableSlots, AND openRoom() — and it MUST run
-        // before startLocalGame because openRoom is what reads the
-        // pre-set activeRoomCode. Without this, startLocalGame would
-        // construct a Game whose Game.start network-DM branch is a
-        // no-op (per L6, host-fire-start owns level load), so no
-        // signaling room would ever open. Skill / start map mirror
-        // the kiosk default.
+        // applyMode MUST run before startLocalGame because applyMode is
+        // what calls openRoom(), and openRoom reads the pre-set
+        // activeRoomCode. Without this ordering, startLocalGame would
+        // construct a host Game but no signaling room would ever open.
         if (serverParam) {
             setActiveRoomCode(serverParam.toUpperCase());
             applyMode('deathmatch', 'host');
@@ -168,19 +150,15 @@ export class App {
             return;
         }
 
-        // Live non-kiosk first-boot path. master.js calls
-        // applyMode(loadSavedGameMode(), 'standalone') before App.start,
-        // so state.gameMode is always set here (defaults to
-        // 'singleplayer' on first ever boot). We seed startLocalGame
-        // with that mode so the user lands in a playable game rather
-        // than an empty menu.
+        // master.js seeds state.gameMode via applyMode before App.start
+        // runs, so this branch always wins on non-kiosk first boot
+        // (defaulting to 'singleplayer' the very first time). Seeding
+        // startLocalGame here means the user lands in a playable game
+        // rather than an empty menu.
         //
-        // Q12 specifies a different UX — non-kiosk first boot should
-        // land in MENU, not a default Game. Wiring that requires
-        // dropping master.js's applyMode pre-seed (so state.gameMode
-        // would be falsy here) and reworking menu.js's mode-switch
-        // to take the boot path. Deferred; the transitionTo('MENU')
-        // line below is the cut-point.
+        // A future UX where non-kiosk first boot opens MENU would drop
+        // master.js's applyMode pre-seed so state.gameMode is falsy
+        // here; the transitionTo('MENU') line below is the cut-point.
         if (state.gameMode) {
             await this.startLocalGame({
                 gameMode: state.gameMode,
@@ -196,21 +174,15 @@ export class App {
     }
     destroy()                        { /* dev hot-reload teardown */ }
     /**
-     * Force a state transition. Used by start(), startLocalGame(),
-     * the menu open/close handlers, and the attract idle timeout / wake.
-     *
-     * Writes `body.dataset.appState = state` — separate from the
-     * `body.dataset.gameState` attribute that the legacy `game-state.js`
-     * machine writes. Both coexist: legacy CSS keys on the gameState
-     * attribute and stays correct; new CSS that wants App-level state
-     * has its own attribute. game-state.js is kept alive on purpose
-     * (re-homing the state machine to Game/RemoteGame is an L8-scope
-     * follow-up — see project_lifecycle_refactor_l7_deferred.md).
+     * Force a state transition. Writes `body.dataset.appState` so CSS
+     * can key off App state. This is a separate attribute from
+     * `body.dataset.gameState`, which the parallel `game-state.js`
+     * machine still owns with its own vocabulary; both coexist.
      *
      * Idempotent — a redundant transition to the current state is a
-     * no-op (does NOT overwrite _previousState, which would break the
-     * §3c menu close fall-through that reads _previousState to decide
-     * whether to resume or start fresh).
+     * no-op and does NOT overwrite `_previousState`, since closeMenu
+     * reads that to decide whether to resume the held Game or start
+     * a fresh one.
      */
     transitionTo(state) {
         const from = this._state;
@@ -222,8 +194,8 @@ export class App {
     }
     /**
      * Tear down any existing held Game, construct a fresh one with
-     * `modeConfig`, persist it for next reload (non-kiosk only per
-     * Q12), start it, and transition App into IN_GAME.
+     * `modeConfig`, persist it for next reload (non-kiosk only),
+     * start it, and transition App into IN_GAME.
      */
     async startLocalGame(modeConfig) {
         if (this.game) await this.endGame();
@@ -231,12 +203,12 @@ export class App {
         this.game = new Game(modeConfig);
         this.lastModeConfig = modeConfig;
 
-        // Q12: kiosk does NOT persist — every kiosk reload is a fresh
-        // attendee, defaults always win. Non-kiosk persists to
-        // sessionStorage so dev iteration / single-tab reload lands
-        // back in the same mode. ?server=CODE also opts out: it's a
-        // URL-only dev signal, and reloading without ?server should
-        // revert to whatever was set before, not Network DM host.
+        // Persist the picked mode for dev iteration — a single-tab
+        // reload should land back in the same mode. Kiosk skips so
+        // every reload is a fresh attendee on the default. `?server`
+        // skips because the URL itself carries the mode: reloading
+        // without the param should revert to whatever was previously
+        // running, not re-enter Network DM host.
         const params = new URLSearchParams(location.search);
         const skipPersist = params.has('kiosk') || params.has('server');
         if (!skipPersist) {
@@ -274,8 +246,7 @@ export class App {
     /**
      * Clean teardown of the held Game (or RemoteGame). Safe to call
      * when no game is held — no-op. Used by startLocalGame's
-     * "switch games" path and by App's external "End game" affordance
-     * once that lands.
+     * "switch games" path.
      */
     async endGame() {
         if (!this.game) return;
@@ -284,31 +255,27 @@ export class App {
     }
 
     /**
-     * Open the menu overlay. Captures the current state as
-     * _previousState (so closeMenu can resolve per §3c) and pauses
-     * the held Game. Idempotent — calling openMenu while already in
-     * MENU is a no-op. Called from `ui/menu.js::toggleMenu`.
+     * Open the menu overlay. Records the current state as
+     * `_previousState` (so closeMenu knows where to return to) and
+     * pauses the held Game. Idempotent. Called from
+     * `ui/menu.js::toggleMenu`.
      */
     openMenu() {
         if (this._state === 'MENU') return;
-        // transitionTo records _previousState automatically.
         this.transitionTo('MENU');
         this.game?.pause();
     }
 
     /**
-     * Close the menu overlay. Resolves the destination per §3c using
-     * the previously-recorded state:
+     * Close the menu overlay. Where to return to depends on what was
+     * happening when the menu opened:
      *
-     *   previousState='IN_GAME' → resume the held Game.
-     *   previousState='ATTRACT' → reserved (§3c "menu opened during
-     *                             attract is a signal to play"). Not
-     *                             reachable today because legacy
-     *                             ui/attract.js owns the attract
-     *                             lifecycle; if attract is ever
-     *                             rewired through App, this branch
-     *                             becomes live.
-     *   previousState='BOOT'    → unreachable per §3c. No-op.
+     *   IN_GAME → resume the held Game.
+     *   ATTRACT → start a fresh Game (menu opened during attract is a
+     *             signal that the user wants to play). Currently
+     *             unreachable since attract isn't routed through App;
+     *             ready for a future attract-on-App rewire.
+     *   BOOT    → no-op. Unreachable in practice.
      *
      * Idempotent against being called when not in MENU.
      */
@@ -325,7 +292,6 @@ export class App {
             await this.startLocalGame(cfg);
             return;
         }
-        // BOOT or other — see §3c. No-op fallback.
     }
 
     on(event, handler) {

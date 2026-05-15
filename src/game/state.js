@@ -5,11 +5,10 @@
  * Per-player state (position, health, ammo, weapons, keys, powerups) lives
  * on Player objects in `state.players`. SP has length 1; DM has length 2.
  *
- * ── Conceptual ownership (L7.2) ────────────────────────────────────────
- * The fields below live on this module-level singleton for migration
- * convenience — the lifecycle refactor doc keeps the storage here so
- * cross-module reads don't have to thread Game/Level references through
- * every callsite. Conceptually:
+ * ── Conceptual ownership ───────────────────────────────────────────────
+ * The fields below live on this module-level singleton for cross-module
+ * convenience — most consumers don't need to thread Game/Level
+ * references through their callsites. Conceptually:
  *
  *   App owns:  gameMode, networkMode, skillLevel.
  *              (App.start / applyMode write these; they outlive any Game.)
@@ -19,17 +18,14 @@
  *              match. Both persist across the held Game's lifetime —
  *              a new Game replaces the roster + match wholesale.)
  *
- *   Level owns: things, projectiles, doorState, liftState, crusherState
- *               (and Level.tick mutates them every frame).
- *               Level.load constructs them (via initThings / initDoors /
- *               initLifts / initCrushers + addPlayerThings). Level
- *               teardown / clearSceneState clears them.
+ *   Level owns: things, projectiles, doorState, liftState, crusherState.
+ *               Level.tick mutates them every frame; Level.load
+ *               constructs them; Level teardown / clearSceneState
+ *               clears them.
  *
- *  This ownership map is the target architecture per
- *  LIFECYCLE_REFACTOR.md §11. The literal field moves are deferred
- *  (cross-cutting reads make the singleton convenient for now); future
- *  phases may move them onto their owner instances if a clean migration
- *  path opens up.
+ *  The ownership map describes intent; storage stays on the singleton
+ *  for now. Moving fields onto their owner instances would be a
+ *  separate refactor.
  */
 
 import { Player } from './player/player.js';

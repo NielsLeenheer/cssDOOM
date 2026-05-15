@@ -138,12 +138,11 @@ function gameLoop(timestamp) {
 
     // The per-frame world step is driven through the current Level
     // instance, which internally no-ops if paused. Game owns the Level
-    // via `app.game.level`, but the gameLoop reads through the legacy
-    // singleton registry (`getCurrentLevel`) because the same registry
-    // is what `shared/maps.js::loadMap` writes on map change — and
-    // loadMap is still the entry point for several callers that don't
-    // own a Level instance (see project_lifecycle_refactor_l7_deferred
-    // on the deferred loadMap shim).
+    // via `app.game.level`, but the gameLoop reads through the
+    // singleton registry (`getCurrentLevel`) because that's what
+    // `shared/maps.js::loadMap` writes on map change — and loadMap is
+    // the entry point for the callers (menu, debug, switches, etc.)
+    // that don't hold a Level instance themselves.
     getCurrentLevel()?.tick(timestamp);
     renderAllActivePanes();
 
@@ -172,8 +171,8 @@ function setupMasterBroadcast() {
     let pendingLevel = null;
     onLevel('changing', ({ name }) => {
         pendingLevel = name ?? null;
-        // L6.6 — broadcast a coordinated loadMap to every alive peer.
-        // Peers stay alive across the load: they receive MSG.LOAD_MAP,
+        // Broadcast a coordinated loadMap to every alive peer. Peers
+        // stay alive across the load: they receive MSG.LOAD_MAP,
         // call loadMap locally without reloading the page, and reply
         // with MSG.READY_TO_PLAY. broadcastLoadMap also pauses LOOKING
         // for the duration of the handshake.
@@ -253,15 +252,14 @@ function setupMasterBroadcast() {
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
             configureAudio(state.players.length);
-            // L6.7 — late-join spawn workaround removed. Per §17, late
-            // join during PLAYING isn't supported; the coordinated
-            // match-start handshake (L6.6) guarantees every joiner is
-            // in state.players before Game.beginPlay runs Level.load,
-            // and Level.load's addPlayerThings + resetGameState seed
-            // each roster slot's player thing + DM defaults. A joiner
-            // that arrives mid-match has its slot tracked here but
-            // its player thing isn't streamed into the existing world;
-            // proper world-snapshot recovery lands in a future phase.
+            // Late join during PLAYING isn't supported. The coordinated
+            // match-start handshake guarantees every joiner is in
+            // state.players before Game.beginPlay runs Level.load, and
+            // Level.load's addPlayerThings + resetGameState seed each
+            // roster slot's player thing + DM defaults. A joiner that
+            // arrives mid-match has its slot tracked here but its
+            // player thing isn't streamed into the existing world;
+            // proper world-snapshot recovery would be its own feature.
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator
@@ -301,18 +299,15 @@ function setupMasterBroadcast() {
     onClaimChange(broadcastLobbyState);
     onMatch('reset', broadcastLobbyState);
 
-    // L6.5 — MSG.MATCH_END wire envelope deleted. match.js::endMatch
-    // now pushes via orchestrator.showResults; the renderer-command
-    // pipeline carries the scoreboard payload to master's own pane(s)
-    // AND every connected client (Game._onLevelComplete already uses
-    // the same renderer command for the DM exit-switch path, so both
-    // match-end paths converge on showResults).
+    // Scoreboard fan-out to clients is handled by the renderer-command
+    // pipeline: match.js::endMatch and Game._onLevelComplete (DM
+    // exit-switch path) both push orchestrator.showResults, which fans
+    // to master's own pane(s) AND every connected client.
 
     // Mirror every game-state transition onto the client. game-state.js
     // calls this on each transitionTo. Routes through the renderer-
-    // command pipeline (L6.5 — replaces the legacy MSG.GAME_STATE wire
-    // envelope) which fans the call to every target including each
-    // RenderSink → client's DomRenderer, where the registered impl
+    // command pipeline, which fans the call to every target including
+    // each RenderSink → client's DomRenderer, where the registered impl
     // calls applyRemoteGameState to flip body[data-game-state].
     setGameStateBroadcaster((s) => {
         orchestrator.setGameState(s);
@@ -328,10 +323,10 @@ function broadcastLobbyState() {
     const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
     const carried = getCarriedOverClaims();
     const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
-    // L6.5 — pushes via the renderer-command pipeline instead of the
-    // legacy MSG.LOBBY_STATE wire envelope. The payload carries
-    // everything the pane-claim UI (Local DM) and the network slot list
-    // (Network DM) need; each impl picks the fields relevant to its mode.
+    // Push via the renderer-command pipeline so the same payload
+    // reaches master's pane-claim UI (Local DM) and the network slot
+    // list (Network DM). Each impl picks the fields relevant to its
+    // mode.
     orchestrator.updateLobbyState({
         inLobby: isMatchLobby(),
         slotsClaimed,

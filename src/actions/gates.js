@@ -46,19 +46,18 @@ export const GATE_PRIORITY = {
 };
 
 export function initGates() {
-    // ── Intermission dismiss — SP only. L4.9 cutover: prefer
-    // Game.advance (pushes hideIntermission via orchestrator,
-    // advances mapCursor, awaits beginPlay → Level reload). Falls
-    // back to legacy dismissIntermission for any boot path that
-    // didn't construct a Game (shouldn't happen post-cutover but
-    // kept as a safety net).
+    // ── Intermission dismiss — SP only. Prefer Game.advance (pushes
+    // hideIntermission via orchestrator, advances mapCursor, awaits
+    // beginPlay → Level reload). Falls back to dismissIntermission if
+    // a boot path didn't construct a Game (defensive — shouldn't
+    // happen).
     //
-    // §15 input table: FIRE_DOWN / USE / weapon during INTERMISSION
-    // all advance to the next level. The USE handler in particular
-    // matters because without consuming USE here, pressing space
-    // (USE) during the intermission would re-trigger switches.js's
-    // exit-switch detection — re-firing level-complete and
-    // restarting the intermission count-up.
+    // FIRE_DOWN / USE / weapon-switch during INTERMISSION all advance
+    // to the next level. The USE handler in particular matters
+    // because without consuming USE here, pressing space (USE) during
+    // the intermission would re-trigger switches.js's exit-switch
+    // detection — re-firing level-complete and restarting the
+    // intermission count-up.
     const intermissionAdvance = () => {
         if (!isIntermissionActive()) return;
         if (window.app?.game?.advance) {
@@ -74,10 +73,9 @@ export function initGates() {
     on(A.WEAPON_NEXT,   intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
     on(A.WEAPON_SELECT, intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
 
-    // ── Match-end restart — DM only. L4.9 cutover: prefer
-    // Game.restartMatch (pushes hideResults, advances mapCursor via
-    // getNextMap, transitions LOBBY, pushes showLobby). Falls back
-    // to legacy restartMatch for safety.
+    // ── Match-end restart — DM only. Prefer Game.restartMatch (pushes
+    // hideResults, transitions LOBBY, pushes showLobby). Falls back
+    // to legacy restartMatch for defensive safety.
     on(A.FIRE_DOWN, () => {
         if (!isMatchEnded()) return;
         if (window.app?.game?.restartMatch) {
@@ -107,21 +105,19 @@ export function initGates() {
     // 0 doesn't get a phantom claim attempt. Must also run after
     // MENU_OPEN so an open menu can't trigger the start.
     //
-    // Drives the actual match via Game.beginPlay (not just startMatch)
-    // because Network DM has no preloaded Level — Game.start's network
-    // branch deliberately defers Level construction to this point.
-    // beginPlay constructs + loads the Level, transitions Game._state
-    // to PLAYING, and calls startMatch internally to flip the legacy
-    // gameState LOBBY → ACTIVE. Falls back to legacy startMatch if
-    // app.game isn't held for some reason (defensive — boot path
-    // always assigns it).
+    // Drives the match via Game.beginPlay (not just startMatch)
+    // because Network DM has no preloaded Level — Game.start's
+    // network branch deliberately defers Level construction to this
+    // point. beginPlay constructs + loads the Level, transitions
+    // Game._state to PLAYING, and calls startMatch internally to flip
+    // the game-state.js machine LOBBY → ACTIVE.
     //
-    // Joiner-side level load rides the L6.6 coordinated handshake:
-    // Level.load fires the 'changing' event → master broadcasts
-    // MSG.LOAD_MAP → joiner does an in-place loadMap (no page reload,
-    // so inventory survives via Level.load's transitionToLevel path)
-    // → joiner replies MSG.READY_TO_PLAY → master awaits all readies
-    // → master broadcasts MSG.PLAY → both sides start ticking.
+    // Joiner-side level load rides the coordinated handshake:
+    // Level.load fires 'changing' → master broadcasts MSG.LOAD_MAP →
+    // joiner does an in-place loadMap (no page reload, so inventory
+    // survives via Level.load's transitionToLevel path) → joiner
+    // replies MSG.READY_TO_PLAY → master awaits all readies →
+    // master broadcasts MSG.PLAY → both sides start ticking.
     on(A.FIRE_DOWN, ({ slot }) => {
         if (window.app?.game?.networkMode !== 'host') return;
         if (!isMatchLobby()) return;

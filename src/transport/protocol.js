@@ -64,8 +64,7 @@ export const MSG = {
     // registered input provider.
     ANALOG: 'analog',
     PING: 'ping',
-    // L6.6 — coordinated level-load handshake.
-    //
+    // ── Coordinated level-load handshake ──────────────────────────────
     // Master → clients: "rebuild your scene to this map name." Clients
     // call loadMap locally (no page reload), then send READY_TO_PLAY
     // back so master knows when every joiner has the new scene up.

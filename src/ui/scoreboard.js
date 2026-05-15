@@ -68,10 +68,9 @@ export function hideScoreboard() {
 
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showResults / hideResults through the orchestrator (see
-// src/renderer/commands.js). The impls fan to the master's own
-// DomRenderer (which calls showScoreboard locally) and to every
-// connected client's RenderSink, replacing the legacy MSG.MATCH_END
-// wire envelope (deleted in L6.5).
+// src/renderer/commands.js). The impls fan to master's own DomRenderer
+// (which calls showScoreboard locally) and to every connected client's
+// RenderSink, carrying the full scoreboard payload over the wire.
 
 /** Renderer-command impl for showResults. DOM is fully rebuilt each
  *  call via replaceChildren — idempotent against repeated invocations. */

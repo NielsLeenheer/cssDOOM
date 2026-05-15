@@ -211,8 +211,8 @@ export async function switchMode(name) {
             startMap: currentMap ?? 'E1M1',
         });
     } else {
-        // Fallback if called before app boot (shouldn't happen
-        // post-L4.9 but kept for safety).
+        // Defensive fallback for callers that fire before app boot
+        // (shouldn't happen, but cheaper to guard than crash).
         loadMap(currentMap);
     }
 }

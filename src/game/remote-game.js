@@ -17,9 +17,6 @@
  *   - a match struct (state.match stays null);
  *   - the gameLoop's updateGame (no world step).
  *
- * See LIFECYCLE_REFACTOR.md §7b (RemoteGame API) and §12 (Network
- * coordination — the start sequence) for the target contract.
- *
  * Constructed by App.joinRemoteGame on the client window.
  */
 
@@ -127,19 +124,16 @@ export class RemoteGame {
 
         this._connection = new ClientConnection({
             transport: this._transport, // null for Local DM → BroadcastChannel default
-            // L6.5: LOBBY_STATE, MATCH_END, and GAME_STATE wire envelopes
-            // all deleted — their content rides the renderer-command
-            // pipeline (updateLobbyState, showResults, setGameState).
-            // The impls live in lobby.js, client-lobby.js,
+            // Lobby / match-end / game-state UI updates ride the
+            // renderer-command pipeline (updateLobbyState, showResults,
+            // setGameState). Impls live in lobby.js, client-lobby.js,
             // network-lobby.js, scoreboard.js, and game-state.js.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
             onLeave: () => this._onLeave(),
-            // L6.6 — coordinated in-place loadMap. Replaces the legacy
-            // MSG.LEVEL_CHANGE → location.reload() flow that wiped
-            // the joiner's inventory between levels. Now we rebuild
-            // the scene on the existing page (so transitionToLevel
-            // keeps weapons / ammo / armor) and reply with READY_TO_PLAY
-            // when finished so master can proceed to PLAY.
+            // Coordinated in-place loadMap. Rebuilds the scene on the
+            // existing page (so transitionToLevel keeps weapons / ammo
+            // / armor across maps) and replies with READY_TO_PLAY when
+            // finished so master can proceed to PLAY.
             onLoadMap: async (msg) => {
                 if (!msg?.name) return;
                 try {
@@ -149,10 +143,9 @@ export class RemoteGame {
                 }
                 this._connection.sendReadyToPlay();
             },
-            // L6.6 — master signalled every joiner is ready. Visual
-            // state continues to ride the renderer-command pipeline;
-            // this hook is a placeholder for any future local PLAYING
-            // flag (e.g. input gating).
+            // Master signalled every joiner is ready. Visual state
+            // continues to ride the renderer-command pipeline; this
+            // hook is a placeholder for a future local PLAYING flag.
             onPlay: () => {
                 // No-op for now.
             },
@@ -301,11 +294,11 @@ export class RemoteGame {
     /**
      * Gate the local input forwarder so ACTION / ANALOG envelopes
      * stop shipping, and tint the local pane via the paused renderer
-     * command. Per §7b, RemoteGame.pause does NOT pause the master's
-     * world — master keeps simulating and the visual scene keeps
-     * updating. Master-initiated pause arrives as the same showPaused
-     * command over the wire (from Game.pause) so the visual is
-     * symmetric whether the joiner or the host opened the menu.
+     * command. Does NOT pause the master's world — master keeps
+     * simulating and the visual scene keeps updating. Master-initiated
+     * pause arrives as the same showPaused command over the wire
+     * (from Game.pause) so the visual is symmetric whether the
+     * joiner or the host opened the menu.
      */
     pause() {
         this._paused = true;

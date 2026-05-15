@@ -174,7 +174,7 @@ export function toggleMenu(show) {
 
         // App.openMenu transitions App into MENU (which flips
         // isMenuOpen) and pauses the held Game. App.openMenu also
-        // records previousState for the §3c close fall-through.
+        // records previousState so closeMenu knows where to return to.
         window.app?.openMenu();
     } else {
         dom.menuOverlay.classList.add('hiding');
@@ -184,7 +184,7 @@ export function toggleMenu(show) {
             dom.menuOverlay.classList.remove('hiding');
         });
 
-        // App.closeMenu resolves per §3c:
+        // App.closeMenu resolves where to return to:
         //   previousState='IN_GAME' → resume the held Game.
         //   previousState='ATTRACT' → start a fresh Game (reserved;
         //                             not reachable today).
