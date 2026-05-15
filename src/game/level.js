@@ -13,10 +13,11 @@
  * for the target contract.
  *
  * `load()` mirrors the body of today's `loadMap()` in `shared/maps.js`
- * exactly (same calls, same order, same side effects on `state.*`,
- * same `cssdoom:*` window-event dispatches, same setTimeouts). Once
- * Game owns Level construction (L2), this body stays put — only the
- * caller changes. The `cssdoom:*` dispatches get torn out in L4.
+ * — same calls, same order, same side effects on `state.*`. Game owns
+ * Level construction; `loadMap` survives as a shim for the callers
+ * that don't own a Level instance (menu, debug, mechanics/switches,
+ * RemoteGame, attract). Level's own event emitter replaced the
+ * earlier `cssdoom:*` window-event channel.
  */
 
 import { EYE_HEIGHT } from './constants.js';
@@ -66,11 +67,11 @@ export function _setCurrentLevel(lvl) { _currentLevel = lvl; }
  * (level-complete / player-died / player-spawned) still flow through
  * each Level's own on / _emit pair — those are bound to a specific
  * Level. The events emitted here ('changing' / 'loaded') fire from
- * `Level.load()` and replace the pre-L4.3
- * `cssdoom:level-changing` / `cssdoom:level-loaded` window-event
- * side-channel. Subscribers (today: master.js's broadcast setup)
- * subscribe ONCE at boot and see events from every future Level
- * instance — no per-instance re-subscription needed.
+ * `Level.load()` and replace the earlier `cssdoom:level-changing` /
+ * `cssdoom:level-loaded` window-event side-channel. Subscribers
+ * (today: master.js's broadcast setup) subscribe ONCE at boot and
+ * see events from every future Level instance — no per-instance
+ * re-subscription needed.
  */
 const _levelListeners = new Map();
 
@@ -277,9 +278,9 @@ export class Level {
      * on the scene surviving Level teardown so attract can fade the
      * HUD and rotate the captured camera over the same geometry.
      *
-     * No caller yet — Game wires this in L2 (and the L4 cleanup of
-     * cssdoom:* events). Today's loadMap still does its own
-     * teardown-then-rebuild inline.
+     * Called by `Game.stop()` when tearing down a Level instance.
+     * `loadMap` for callers without a Game instance still does its
+     * own teardown-then-rebuild inline.
      */
     destroy() {
         state.things.length = 0;

@@ -130,10 +130,13 @@ function gameLoop(timestamp) {
     }
 
     // The per-frame world step is driven through the current Level
-    // instance, which internally no-ops if paused. The Level reference
-    // lives in `src/game/level.js`'s module-level registry, written
-    // by `shared/maps.js::loadMap` and read here via `getCurrentLevel`.
-    // L2 replaces this with `app.game.level` once Game owns Level.
+    // instance, which internally no-ops if paused. Game owns the Level
+    // via `app.game.level`, but the gameLoop reads through the legacy
+    // singleton registry (`getCurrentLevel`) because the same registry
+    // is what `shared/maps.js::loadMap` writes on map change — and
+    // loadMap is still the entry point for several callers that don't
+    // own a Level instance (see project_lifecycle_refactor_l7_deferred
+    // on the deferred loadMap shim).
     getCurrentLevel()?.tick(timestamp);
     renderAllActivePanes();
 
@@ -372,50 +375,35 @@ export async function initMaster({ isKiosk = false } = {}) {
     // returning remote-occupied slots.
     initLobby({ getExternallyClaimedSlots: () => new Set() });
 
-    // L2.2 — package the mode choice into a Game-consumable struct.
+    // Pre-seed an App with a Game so `window.app.game` is inspectable
+    // from the dev console before App.start runs. App.start will tear
+    // this Game down and construct a fresh one via startLocalGame; the
+    // pre-seed is purely for the dev-console handle's continuity.
     const modeConfig = buildModeConfigFromUrl();
-
-    // L2.9 + L3.7 (Path C) — construct a Game and an App so both
-    // instances are available throughout the page lifetime, but do
-    // NOT call App.start() or Game.start(). Game's state machine +
-    // Level ownership + lobby / intermission / results renderer-
-    // command pushes (added in L2.5a..L2.8) all stay dead; App's
-    // boot resolution + state machine + menu/attract methods (L3.1
-    // ..L3.6) stay dead too. Until L4 cuts over, today's applyMode +
-    // loadMap + legacy game-state.js + lobby.js / match.js /
-    // intermission.js drive every smoke path.
-    //
-    // App.game is assigned to the constructed Game so the dev console
-    // handle `window.app.game` continues to work for inspecting
-    // Game state. L3.3's startLocalGame would normally own this
-    // assignment, but it isn't reachable in Path C.
     const game = new Game(modeConfig);
     const app = new App();
     app.game = game;
     window.app = app;
 
-    // Restore the previously chosen mode (default singleplayer) before
-    // app.start runs. applyMode still owns state.gameMode/networkMode,
-    // body data attributes, player count, audio config, network
-    // signaling room, and DomRenderer reshaping — Game doesn't
-    // replicate those today. App.start sees a fully-configured world
-    // when it kicks off Game.start.
+    // applyMode owns the cross-cutting "enter a mode" work that Game
+    // doesn't replicate: state.gameMode/networkMode, body data
+    // attributes, player count, audio config, signaling room, and
+    // DomRenderer reshaping. Game reads from state.gameMode (via the
+    // getter on Game) so once applyMode runs, Game sees the right mode.
     applyMode(isKiosk ? 'deathmatch' : loadSavedGameMode(), 'standalone');
 
-    // L4.9 atomic cutover — App owns the boot. Replaces the legacy
-    // `await loadMap('E1M1')` direct call. For SP, app.start auto-
-    // finalizes via game.beginPlay → Level.load (functionally the
-    // same as loadMap('E1M1')). For Local DM, app.start enters LOBBY
-    // and waits for Game._checkAutoStart (L4.5) to trigger beginPlay
-    // when both slots are claimed. Kiosk-SP and Network-DM-host map
-    // to the same paths.
-    //
     // Master broadcast must be set up BEFORE app.start because the
-    // `?server=CODE` shortcut and (eventually) any Network-DM boot
-    // path that calls openRoom() during app.start requires
-    // masterConnection to exist — otherwise openRoom early-returns
-    // and the signaling room is never opened.
+    // `?server=CODE` shortcut (and any Network-DM boot path that
+    // calls openRoom during app.start) requires masterConnection to
+    // exist — otherwise openRoom early-returns and the signaling
+    // room is never opened.
     setupMasterBroadcast();
+
+    // App.start owns the boot from here. For SP, it auto-finalizes
+    // via game.beginPlay → Level.load. For Local DM, it enters LOBBY
+    // and waits for Game._checkAutoStart to trigger beginPlay when
+    // both slots are claimed. Kiosk-SP and Network-DM-host map to
+    // the same paths.
     await app.start();
     startCullingLoop({
         isAttract: isAttractActive,

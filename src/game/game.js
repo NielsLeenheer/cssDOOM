@@ -16,11 +16,12 @@
  * See LIFECYCLE_REFACTOR.md §4 (Game state machine) and §7 (Game API)
  * for the target contract.
  *
- * `_transitionTo` writes `body.dataset.gameState`. Today
- * `src/game/game-state.js`'s legacy machine also writes that attribute;
- * the two coexist until L3.4 deletes the old machine. Until something
- * actually calls Game._transitionTo (L2.5+), only the legacy writer
- * fires, so the two don't race.
+ * Game._transitionTo intentionally does NOT write `body.dataset.gameState`
+ * — that attribute is owned by `src/game/game-state.js`'s legacy
+ * machine, which has a different vocabulary (LOBBY/ACTIVE/ENDED/...).
+ * Both machines coexist deliberately: re-homing the legacy machine to
+ * Game/RemoteGame is an L8-scope follow-up. See
+ * project_lifecycle_refactor_l7_deferred.md.
  */
 
 import { state } from './state.js';
@@ -95,16 +96,12 @@ export class Game {
      * is fixed at [Player 0], no claim wait needed).
      *
      * Local DM and Network DM stay in LOBBY here; the caller is
-     * responsible for triggering beginPlay later (Local DM: when all
-     * slots claim, Network DM: when host fires start). Once L4 cuts
-     * over, that triggering also moves into Game; today the legacy
-     * lobby.js auto-start and the legacy NETWORK_START gate are still
-     * authoritative.
+     * responsible for triggering beginPlay later (Local DM: auto-start
+     * when all slots claim — driven by Game's own onClaimChange
+     * subscription; Network DM: host fires start via the NETWORK_START
+     * gate in actions/gates.js).
      *
-     * No caller yet (L2.9 wires master.js → Game.start). Until then
-     * the only effect of calling start() manually from the dev console
-     * is to push a redundant showLobby command into a UI that's already
-     * being driven by the legacy event subscriptions.
+     * Called from `App.startLocalGame`.
      */
     async start() {
         this._transitionTo('LOBBY');
@@ -257,16 +254,6 @@ export class Game {
      * Map. When `this.level = null` clears the Game's last reference
      * and `level.destroy()` runs, the Level becomes unreachable; the
      * handlers go with it. No explicit unsubscribe needed.
-     *
-     * Caveat for the L4 sequence: `_transitionTo('ENDED')` writes
-     * body.dataset.gameState = 'ENDED'. Legacy CSS keyed on the
-     * `body[data-game-state="ended"]` selector triggers the
-     * scoreboard overlay — but here we mean "Game lifecycle ended",
-     * not "DM match ended with scoreboard." L4.8 audits + resolves
-     * the body-class vocabulary collision. Until then Game.stop is
-     * only invoked from dead-code paths (App.endGame, which has no
-     * runtime caller until L4.9 cuts master.js over), so the bad
-     * write never fires at runtime.
      */
     async stop() {
         if (this._state === 'ENDED') return;
@@ -280,11 +267,8 @@ export class Game {
             this.level = null;
         }
 
-        // Hide any open overlays. Impls are no-ops until L4.2
-        // installs real ones via the late-binding registry; calling
-        // them keeps teardown semantics correct so future-us doesn't
-        // discover stale lobby/intermission/results visuals after a
-        // Game switch.
+        // Hide any open overlays so a Game switch doesn't leak stale
+        // lobby/intermission/results visuals into the next session.
         orchestrator.hideLobby();
         orchestrator.hideIntermission();
         orchestrator.hideResults();
@@ -405,28 +389,26 @@ export class Game {
     }
 
     /**
-     * RESULTS → LOBBY transition for DM. Advances `mapCursor` per
-     * the §4b cycle (currently uses `getNextMap` from shared/maps.js;
-     * secret-exit handling per §4b is deferred to L2.8 along with the
-     * results overlay).
+     * RESULTS → LOBBY transition for DM. Uses `getNextMap` from
+     * shared/maps.js to advance the map cycle (secret-exit handling
+     * per §4b is not yet implemented).
      *
      * Does NOT tear down `this.level` — that already happened at
      * PLAYING → RESULTS per §12 (Match end). RESULTS → LOBBY is the
      * pure state transition; the next match's Level is constructed
-     * lazily by the next `beginPlay()`.
-     *
-     * Today's match.js owns the actual restart trigger; L2.5b cuts
-     * over.
+     * lazily by the next `beginPlay()`. Called from `actions/gates.js`
+     * on FIRE_DOWN during MATCH_END.
      */
     async restartMatch() {
         orchestrator.hideResults();
 
-        // Reset legacy match state (kill matrix, scores, frag clock,
-        // body.dataset.gameState → LOBBY via game-state.js). Until L7
-        // moves match-state ownership onto Game, this remains
-        // authoritative; calling it here also fires match.js's
-        // onMatch('reset') event that lobby.js + master broadcast
-        // both subscribe to.
+        // Reset match state in match.js (kill matrix, scores, frag
+        // clock, body.dataset.gameState → LOBBY via game-state.js).
+        // match.js still owns DM-match mechanics — re-homing match
+        // state onto Game is deferred (see
+        // project_lifecycle_refactor_l7_deferred.md). Calling
+        // resetMatch here also fires match.js's onMatch('reset') event
+        // that lobby.js + master broadcast both subscribe to.
         resetMatch();
 
         this._transitionTo('LOBBY');
@@ -525,15 +507,15 @@ export class Game {
      * than assigning `_state` directly so subscribers stay in sync.
      *
      * Intentionally does NOT write `body.dataset.gameState`. Legacy
-     * `src/game/game-state.js` still owns that attribute and its
-     * own vocabulary (ACTIVE / LOBBY / INTERMISSION / ENDED /
-     * ATTRACT) — which CSS keys on across the codebase. If Game
-     * also wrote here with the new vocab (LOBBY / LOADING / PLAYING /
-     * INTERMISSION / RESULTS / ENDED), the two writers would race
-     * and CSS rules keyed on `="active"` would stop matching once
-     * Game fired PLAYING. L7 deletes game-state.js, audits CSS,
-     * and migrates rules onto the new vocab — at which point this
-     * method gets its body write back.
+     * `src/game/game-state.js` still owns that attribute and its own
+     * vocabulary (ACTIVE / LOBBY / INTERMISSION / ENDED / ATTRACT) —
+     * which CSS keys on across the codebase. If Game also wrote here
+     * with the new vocab (LOBBY / LOADING / PLAYING / INTERMISSION /
+     * RESULTS / ENDED), the two writers would race and CSS rules
+     * keyed on `="active"` would stop matching once Game fired
+     * PLAYING. Re-homing the legacy state machine onto Game/RemoteGame
+     * is an L8-scope follow-up — see
+     * project_lifecycle_refactor_l7_deferred.md.
      */
     _transitionTo(newState) {
         const from = this._state;
@@ -629,9 +611,9 @@ export class Game {
     }
 
     /**
-     * Reacts to Level emitting `player-spawned`. Informational — pure
-     * re-emit. The respawn-overlay-hide work is deferred to L2.8
-     * along with the rest of the per-slot overlay lifecycle.
+     * Reacts to Level emitting `player-spawned`. Informational —
+     * pure re-emit. Per-slot respawn-overlay management is not yet
+     * implemented.
      */
     _onPlayerSpawned(payload) {
         this._emit('player-spawned', payload);

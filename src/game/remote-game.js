@@ -20,8 +20,7 @@
  * See LIFECYCLE_REFACTOR.md §7b (RemoteGame API) and §12 (Network
  * coordination — the start sequence) for the target contract.
  *
- * No caller yet — pure dead code. L6.3 routes client.js through
- * App.joinRemoteGame which constructs RemoteGame.
+ * Constructed by App.joinRemoteGame on the client window.
  */
 
 import { RenderClient } from '../transport/render-client.js';

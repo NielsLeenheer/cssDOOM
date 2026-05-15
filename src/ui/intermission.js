@@ -250,32 +250,26 @@ function levelNameSpriteSrc(mapName) {
     return `${LABEL_BASE}/WILV0${idx}.png`;
 }
 
-// ── L2.7 renderer-command entry points ─────────────────────────────────
+// ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showIntermission / hideIntermission through the
 // orchestrator (see src/renderer/commands.js). renderIntermission is
-// a thin wrapper that delegates to the existing showIntermission with
-// a no-op advance callback — today's switches.js still calls the full
+// a thin wrapper that delegates to showIntermission with a no-op
+// advance callback — switches.js separately calls the full
 // showIntermission with a real loadMap callback, and switches.js's
 // call ran later in the synchronous emit/branch chain (the emit fires
 // before the SP/DM branching in switches.js), so its callback wins.
-// Game's path renders harmlessly-redundant DOM until L4 cuts over.
+// Game's path renders harmlessly-redundant DOM. The dual-write here
+// is a known loose end: switches.js should emit only and let Game's
+// renderer-command path drive the overlay, but that cleanup is
+// bundled with the lobby/match single-driver cutover.
 
-/** Renderer-command impl for showIntermission. Game pushes this after
- *  receiving Level's `level-complete` event in SP. The body re-uses the
- *  full overlay flow but installs no callback — switches.js still
- *  controls the dismiss-and-advance path until L4. Not exported —
- *  only the registry below ever calls it. */
 function renderIntermission(payload) {
     showIntermission(payload?.nextMap ?? null, () => {});
 }
 
-/** Renderer-command impl for hideIntermission. Mirrors the existing
- *  hideIntermission tear-down without depending on a particular
- *  caller. Not exported — only the registry below ever calls it. */
 function clearIntermission() {
     hideIntermission();
 }
 
-// L4.2 — register with the late-binding overlay registry.
 registerOverlayImpl('showIntermission', renderIntermission);
 registerOverlayImpl('hideIntermission', clearIntermission);

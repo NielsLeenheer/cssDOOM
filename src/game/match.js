@@ -26,11 +26,11 @@ const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
  * Module-level emitter for match-lifecycle events. Subscribed at boot
  * by master.js (re-broadcast LOBBY_STATE on reset) and lobby.js
  * (clear carried-over claims + reset transient inputs). Replaces the
- * pre-L4.4 `cssdoom:match-reset` window-event side-channel.
+ * earlier `cssdoom:match-reset` window-event side-channel.
  *
- * Symmetric with `game/level.js`'s onLevel emitter (L4.3): each
- * lifecycle module owns its own module-level event channel rather
- * than going through a generic event bus.
+ * Symmetric with `game/level.js`'s onLevel emitter: each lifecycle
+ * module owns its own module-level event channel rather than going
+ * through a generic event bus.
  */
 const _matchListeners = new Map();
 

@@ -14,7 +14,7 @@
  *     claims or releases a slot, or when external (remote) slot
  *     occupancy changes via setExternallyClaimedSlots.
  *   - match.js's `onMatch('reset', ...)` — fires when a fresh match
- *     begins so we can re-enter lobby state. Replaced the L4.4-era
+ *     begins so we can re-enter lobby state. Replaced the earlier
  *     `cssdoom:match-reset` window event.
  *
  * Network DM (future) will use the same claim mechanism but a different

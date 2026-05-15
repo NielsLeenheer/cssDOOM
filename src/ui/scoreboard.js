@@ -66,28 +66,23 @@ export function hideScoreboard() {
     }
 }
 
-// ── L2.8 renderer-command entry points ─────────────────────────────────
-// Game pushes showResults / hideResults through the orchestrator
-// (see src/renderer/commands.js). Same strangler-fig shape as L2.6 /
-// L2.7: legacy match.js::endMatch still calls showScoreboard directly;
-// Game's push runs in parallel once L2.9 wires it. L4 cuts over.
+// ── Renderer-command entry points ──────────────────────────────────────
+// Game pushes showResults / hideResults through the orchestrator (see
+// src/renderer/commands.js). The impls fan to the master's own
+// DomRenderer (which calls showScoreboard locally) and to every
+// connected client's RenderSink, replacing the legacy MSG.MATCH_END
+// wire envelope (deleted in L6.5).
 
-/** Renderer-command impl for showResults. Delegates to showScoreboard
- *  with whatever payload Game builds (typically scores, kills,
- *  winnerIndex, mapName). Idempotent against repeated calls — DOM is
- *  fully rebuilt each time via replaceChildren. Not exported — only
- *  the registry below ever calls it. */
+/** Renderer-command impl for showResults. DOM is fully rebuilt each
+ *  call via replaceChildren — idempotent against repeated invocations. */
 function renderResults(payload) {
     showScoreboard(payload);
 }
 
-/** Renderer-command impl for hideResults. Delegates to hideScoreboard.
- *  Not exported — only the registry below ever calls it. */
 function clearResults() {
     hideScoreboard();
 }
 
-// L4.2 — register with the late-binding overlay registry.
 registerOverlayImpl('showResults', renderResults);
 registerOverlayImpl('hideResults', clearResults);
 

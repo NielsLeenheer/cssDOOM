@@ -49,16 +49,15 @@ const KIOSK_DEFAULT_MODE_CONFIG = {
  *
  * Distinct from `mode.js`'s legacy `cssdoom-game-mode` localStorage
  * key — the legacy stores only gameMode and persists across page
- * reloads. Both keys will coexist until L3.7 cuts master.js over to
- * App.start; at that point the legacy key can be retired or migrated.
+ * reloads. Both keys coexist: legacy is the kiosk-default fallback,
+ * this one is the dev-iteration "stay in the same mode on reload."
  */
 const LAST_USED_MODE_STORAGE_KEY = 'cssdoom:lastUsedMode';
 
 /**
  * Read the saved modeConfig from sessionStorage. Returns null when
- * absent or malformed (defensive — never throws). The shape is
- * whatever startLocalGame writes back in L3.3; for now that's the
- * full Q12 modeConfig.
+ * absent or malformed (defensive — never throws). The shape is the
+ * full Q12 modeConfig as written by startLocalGame.
  */
 function readLastUsedMode() {
     try {
@@ -88,7 +87,7 @@ export class App {
 
         // Polymorphic: `Game` (local simulation — SP host or DM host)
         // or `RemoteGame` (wire receiver — client window). Set by
-        // startLocalGame() / joinRemoteGame() (L3.3 / L6).
+        // startLocalGame() / joinRemoteGame().
         this.game = null;
 
         // The last modeConfig handed to startLocalGame. Used by the
@@ -112,11 +111,7 @@ export class App {
      *                     kiosk reload is a fresh attendee).
      *   else            → transitionTo('MENU'). Non-kiosk first boot.
      *
-     * No caller wires this yet. L3.7 replaces master.js's procedural
-     * boot with `await new App().start()`. Until then, the only effect
-     * of running App.start() from the dev console is to no-op through
-     * the stubbed inner methods (startLocalGame / joinRemoteGame /
-     * transitionTo all land in L3.3+).
+     * Called from master.js's initMaster and client.js's initClientWindow.
      */
     async start() {
         if (this._state !== 'BOOT') return;
@@ -195,17 +190,15 @@ export class App {
     destroy()                        { /* dev hot-reload teardown */ }
     /**
      * Force a state transition. Used by start(), startLocalGame(),
-     * the menu open/close handlers (L3.5), and the attract idle
-     * timeout / wake (L3.6).
+     * the menu open/close handlers, and the attract idle timeout / wake.
      *
-     * Writes `body.dataset.appState = state`, which is a NEW attribute
-     * — separate from `body.dataset.gameState` that the legacy
-     * `game-state.js` machine writes. Both coexist for L3.4: CSS that
-     * keys on the legacy attribute stays correct, and any future CSS
-     * (or JS) that wants the App-level state has its own attribute.
-     * Per the L3.4 scoping decision, deleting `game-state.js` and the
-     * CSS audit are deferred to L7 (or a dedicated cleanup step) so
-     * L3 lands in a working state.
+     * Writes `body.dataset.appState = state` — separate from the
+     * `body.dataset.gameState` attribute that the legacy `game-state.js`
+     * machine writes. Both coexist: legacy CSS keys on the gameState
+     * attribute and stays correct; new CSS that wants App-level state
+     * has its own attribute. game-state.js is kept alive on purpose
+     * (re-homing the state machine to Game/RemoteGame is an L8-scope
+     * follow-up — see project_lifecycle_refactor_l7_deferred.md).
      *
      * Idempotent — a redundant transition to the current state is a
      * no-op (does NOT overwrite _previousState, which would break the
@@ -224,14 +217,6 @@ export class App {
      * Tear down any existing held Game, construct a fresh one with
      * `modeConfig`, persist it for next reload (non-kiosk only per
      * Q12), start it, and transition App into IN_GAME.
-     *
-     * Note: `Game.stop()` is still a stub from L2.1 — so a switch
-     * between Games doesn't yet fully tear the first one down. Fine
-     * for L3.3 because startLocalGame is unreachable until L3.7
-     * cuts master.js over; Game.stop gets fleshed out before then.
-     *
-     * `transitionTo('IN_GAME')` is also a stub (lands in L3.4) — no
-     * observable body-class write until then.
      */
     async startLocalGame(modeConfig) {
         if (this.game) await this.endGame();
@@ -295,14 +280,7 @@ export class App {
      * Open the menu overlay. Captures the current state as
      * _previousState (so closeMenu can resolve per §3c) and pauses
      * the held Game. Idempotent — calling openMenu while already in
-     * MENU is a no-op.
-     *
-     * Game.pause() is still a stub from L2.1 / L5; it'll grow real
-     * pause-broadcast semantics in L5. For L3.5 the call is plumbing.
-     *
-     * No caller yet — menu.js still owns its own open/close logic
-     * and talks to legacy game-state.js. L3.7 (or a later cutover
-     * step) wires the menu UI to call this.
+     * MENU is a no-op. Called from `ui/menu.js::toggleMenu`.
      */
     openMenu() {
         if (this._state === 'MENU') return;
