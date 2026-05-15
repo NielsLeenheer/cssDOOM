@@ -90,10 +90,12 @@ export class App {
         // startLocalGame() / joinRemoteGame().
         this.game = null;
 
-        // The last modeConfig handed to startLocalGame. Used by the
-        // attract → menu → close fall-through (§3c) — that path
-        // starts a fresh Game with whatever was most recently picked.
-        // Kiosk-only in practice (non-kiosk has no attract).
+        // The last modeConfig handed to startLocalGame. Reserved
+        // for the attract → menu → close fall-through (§3c) — that
+        // path would start a fresh Game with whatever was most
+        // recently picked. Attract isn't routed through App today
+        // (legacy ui/attract.js owns the kiosk attract flow); see
+        // closeMenu's ATTRACT branch.
         this.lastModeConfig = null;
 
         this._listeners = new Map();
@@ -295,69 +297,18 @@ export class App {
     }
 
     /**
-     * Enter ATTRACT state (warm path — IN_GAME → ATTRACT idle
-     * timeout per §16). Tears down the held Game so state.things /
-     * doorState / etc. clear, then transitions App into ATTRACT.
-     *
-     * **L3.6 scope** (Path-C friendly): this method only handles the
-     * App-level state change and Game teardown. The rotation RAF,
-     * HUD / weapon / player-billboard hide commands, and the
-     * captured-pose seeding from `state.players[0]` are all deferred
-     * to a later dedicated attract-cutover step (likely L4 or
-     * post-L4). Until then, ATTRACT is just a state label — no
-     * visible attract reel runs.
-     *
-     * Idempotent — no-op when already in ATTRACT.
-     */
-    async enterAttract() {
-        if (this._state === 'ATTRACT') return;
-        await this.endGame();
-        this.transitionTo('ATTRACT');
-        // TODO (dedicated attract step):
-        //   1. Capture pose from state.players[0] BEFORE endGame
-        //      (currently lost because endGame fires first).
-        //   2. orchestrator.hideHud / hideWeapon / hidePlayerBillboards
-        //      renderer commands.
-        //   3. Seed attract camera object with captured pose.
-        //   4. Start rotation RAF and call orchestrator.updateCamera(0, ...).
-    }
-
-    /**
-     * Exit ATTRACT state (wake → IN_GAME per §16). Per the uniform
-     * wake path locked in Q13, every ATTRACT exit lands in a Game in
-     * LOBBY — fire/use uses lastModeConfig directly; menu button
-     * routes through openMenu/closeMenu, which calls startLocalGame
-     * on close anyway. So both paths end here in startLocalGame.
-     *
-     * L3.6 scope: the rotation RAF stop is deferred (no RAF wired).
-     *
-     * Idempotent — no-op when not in ATTRACT.
-     */
-    async exitAttract() {
-        if (this._state !== 'ATTRACT') return;
-        const cfg = this.lastModeConfig ?? KIOSK_DEFAULT_MODE_CONFIG;
-        await this.startLocalGame(cfg);
-        // startLocalGame already transitions to IN_GAME.
-    }
-
-    /**
      * Close the menu overlay. Resolves the destination per §3c using
      * the previously-recorded state:
      *
      *   previousState='IN_GAME' → resume the held Game.
-     *   previousState='ATTRACT' → start a fresh Game with
-     *                             lastModeConfig (the §3c "menu
-     *                             opened during attract is a signal
-     *                             to play" rule). Falls back to the
-     *                             kiosk default when lastModeConfig
-     *                             is null (shouldn't happen in
-     *                             practice — attract is kiosk-only
-     *                             and kiosk seeded lastModeConfig
-     *                             on boot).
-     *   previousState='BOOT'    → unreachable per §3c (BOOT→MENU
-     *                             only happens when MENU has no
-     *                             close affordance). Fallback: do
-     *                             nothing.
+     *   previousState='ATTRACT' → reserved (§3c "menu opened during
+     *                             attract is a signal to play"). Not
+     *                             reachable today because legacy
+     *                             ui/attract.js owns the attract
+     *                             lifecycle; if attract is ever
+     *                             rewired through App, this branch
+     *                             becomes live.
+     *   previousState='BOOT'    → unreachable per §3c. No-op.
      *
      * Idempotent against being called when not in MENU.
      */
