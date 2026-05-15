@@ -210,14 +210,14 @@ function checkAutoStart() {
 // per-window render-only handlers — they re-derive from current globals
 // (state.players, claim-registry, isMatchLobby) rather than reading the
 // payload, matching today's updateLobbyUI behavior. The payload
-// argument exists for the future cutover (L4) when Game becomes the
+// argument exists for a future cutover when Game becomes the
 // authoritative source of lobby state and re-derivation moves off
 // global lookups.
 //
-// Until L4, the legacy onClaimChange / cssdoom:match-reset subscriptions
-// in initLobby() above still drive the same DOM mutations. These new
-// entry points fire in addition; both compute the same data-claim-state
-// from the same globals, so no DOM conflict.
+// The legacy onClaimChange / onMatch('reset') subscriptions in
+// initLobby() above also drive the same DOM mutations independently.
+// These renderer-command entry points fire in addition; both compute
+// the same data-claim-state from the same globals, so no DOM conflict.
 
 /** Renderer-command impl for showLobby + updateLobbyState (same body —
  *  the distinction is which Game lifecycle event triggered the push).
