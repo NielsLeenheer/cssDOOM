@@ -53,7 +53,7 @@ import { setMasterConnection } from './network-host.js';
 import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
-import { isMatchLobby, onMatch } from './game/match.js';
+import { isMatchLobby, onMatch, ensureMatchSize } from './game/match.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
@@ -223,6 +223,13 @@ function setupMasterBroadcast() {
             const slot = orchestrator.currentRemoteSlot(peerKey);
             if (slot == null) return;
             ensurePlayerCount(slot + 1);
+            // Keep state.match.kills sized to the roster so awardFrag
+            // can index kills[killer.index][victim.index] and the
+            // end-of-match scoreboard's buildGrid walk covers every
+            // player. resetMatch sized the matrix to the master's
+            // local-only roster; a Network DM remote joining later
+            // (post-resetMatch) needs the matrix grown to match.
+            ensureMatchSize(state.players.length);
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
             configureAudio(state.players.length);

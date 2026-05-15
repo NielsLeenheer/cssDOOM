@@ -64,6 +64,8 @@ export function resetMatch({
         // / environmental death increments kills[v][v]. Drives the
         // post-match scoreboard. Per-player .score stays the canonical
         // total (+1 PvP, -1 suicide); the matrix is purely for display.
+        // Sized to current roster; ensureMatchSize() grows it if the
+        // roster expands later (Network DM remote join after resetMatch).
         kills: Array.from({ length: n }, () => new Array(n).fill(0)),
     };
     for (const p of state.players) p.score = 0;
@@ -92,6 +94,29 @@ export function startMatch() {
 /** True if a DM match is in the lobby state — exists but not yet started. */
 export function isMatchLobby() {
     return getGameState() === GAME_STATE.LOBBY;
+}
+
+/**
+ * Grow `state.match.kills` to an n×n matrix when the roster expands
+ * after `resetMatch()`. Network DM joiners connect via master's
+ * `onReady` which calls `ensurePlayerCount(slot + 1)`; without growing
+ * the kills matrix in parallel, awardFrag() throws when the joiner
+ * later frags the host (kills[killer.index] is undefined) and the
+ * end-of-match scoreboard renders an empty grid (kills[k] is undefined
+ * for every k beyond the original matrix size).
+ *
+ * Idempotent — never shrinks. No-op when state.match is null (Local
+ * DM secondary in a non-match state, or before resetMatch has run).
+ */
+export function ensureMatchSize(n) {
+    if (!state.match) return;
+    const kills = state.match.kills;
+    while (kills.length < n) {
+        kills.push(new Array(n).fill(0));
+    }
+    for (let i = 0; i < kills.length; i++) {
+        while (kills[i].length < n) kills[i].push(0);
+    }
 }
 
 /** Clears any DM match state — called when leaving DM mode. */
