@@ -13,8 +13,13 @@
         pointer-events: none;
     }
 
-    /* Touch is single-player only — split-screen DM uses gamepads. */
-    body[data-game-mode="deathmatch"] #touch-controls {
+    /* Hide on Local DM only — split-screen DM uses gamepads.
+       Network DM (host or joiner) keeps touch visible: a phone can
+       host (`?server=CODE` from a phone in dev) or join (`?join=CODE`
+       via QR scan from a phone) and needs the touch UI to play. The
+       `data-network-mode` differentiates: standalone = Local DM;
+       host / client = Network DM. */
+    body[data-game-mode="deathmatch"][data-network-mode="standalone"] #touch-controls {
         display: none;
     }
 }
