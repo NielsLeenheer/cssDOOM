@@ -1,26 +1,29 @@
 /**
  * Network DM — master-side signaling-room lifecycle.
  *
- * Owns: room-code generation, the WebSocket connection to the
- * Cloudflare-Worker signaling endpoint, and the per-peer `addPeer` /
- * `removePeer` calls into `MasterConnection`. UI sync (network-lobby
- * slot rows, room-code display) is partly here (the code) and partly
- * in master.js (the slot rows fire from the same onJoin/onLeave path
- * Local DM uses, so this module doesn't need to duplicate that wiring).
+ * Owns: the MasterConnection instance itself (constructed via
+ * `initMasterConnection` during boot), room-code generation, the
+ * WebSocket connection to the Cloudflare-Worker signaling endpoint,
+ * and the per-peer `addPeer` / `removePeer` calls into the
+ * connection. UI sync (network-lobby slot rows, room-code display)
+ * is partly here (the room code) and partly in master.js (the slot
+ * rows fire from the same onJoin/onLeave path Local DM uses, so this
+ * module doesn't need to duplicate that wiring).
  *
  * Wiring order at boot:
- *   1. master.js constructs MasterConnection
- *   2. master.js calls setMasterConnection(masterConnection) here
+ *   1. master.js calls initMasterConnection(callbacks) here to
+ *      construct the connection and register the game-specific
+ *      callbacks (snapshotProvider, onJoin, onReady, onLeave,
+ *      onRemoteInput).
+ *   2. master.js (or any caller) gets the connection back from
+ *      initMasterConnection / via getMasterConnection().
  *   3. menu.js's applyMode('network') calls openRoom() to actually
  *      start signaling; applyMode for any other mode calls closeRoom().
- *
- * Phase 5d: master-side only. The remote-side connect helper lives in
- * src/transport/webrtc-transport.js (`connectToNetworkRoom`) and gets
- * wired up in Phase 6.
  */
 
 import { listenForNetworkClients } from './transport/webrtc-transport.js';
 import { setNetworkRoomCode } from './ui/network-lobby.js';
+import { MasterConnection } from './transport/peer-connection.js';
 
 // 32-char alphabet without visually-ambiguous glyphs (no 0/O, 1/I/L,
 // B/8 swap-prone shapes), 4 chars per code — that's ~1M unique codes,
@@ -33,9 +36,23 @@ let masterConnection = null;
 let roomController = null; // { close } from listenForNetworkClients
 let activeRoomCode = null;
 
-/** Called by master.js after the MasterConnection is created. */
-export function setMasterConnection(mc) {
-    masterConnection = mc;
+/**
+ * Construct the master-side MasterConnection with the supplied
+ * game-specific callbacks. Replaces the L6-era setMasterConnection
+ * side-door setter (L7.1): callers no longer hand-roll the
+ * MasterConnection in master.js and then plug it in here — this
+ * module owns the construction outright.
+ *
+ * Idempotent — a second call warns and returns the existing
+ * instance.
+ */
+export function initMasterConnection(callbacks) {
+    if (masterConnection) {
+        console.warn('[network-host] initMasterConnection: already initialized');
+        return masterConnection;
+    }
+    masterConnection = new MasterConnection(callbacks);
+    return masterConnection;
 }
 
 /**
@@ -44,8 +61,8 @@ export function setMasterConnection(mc) {
  * (broadcastLoadMap / awaitAllReadyToPlay / broadcastPlay) without
  * needing the connection in its constructor — preserves Game's
  * modeConfig-only API while letting it talk to the wire when it has
- * to. Returns null on a client window (setMasterConnection never ran)
- * and during the brief boot window before setupMasterBroadcast.
+ * to. Returns null on a client window (initMasterConnection never
+ * ran) and during the brief boot window before setupMasterBroadcast.
  */
 export function getMasterConnection() {
     return masterConnection;

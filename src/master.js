@@ -45,10 +45,9 @@ import { attractTick, isAttractActive } from './ui/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
 import { isSlotClaimedLocally, onClaimChange } from './input/claim-registry.js';
-import { MasterConnection } from './transport/peer-connection.js';
 import { BroadcastChannelTransport } from './transport/transport.js';
 import { BROADCAST_CHANNEL_NAME } from './transport/protocol.js';
-import { setMasterConnection } from './network-host.js';
+import { initMasterConnection } from './network-host.js';
 import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
@@ -182,7 +181,7 @@ function setupMasterBroadcast() {
         masterConnection?.resumeAfterLevelLoad();
     });
 
-    masterConnection = new MasterConnection({
+    masterConnection = initMasterConnection({
         snapshotProvider: (peerKey) => ({
             gameMode: state.gameMode,
             // Only advertise a level if one is actually loaded. Without
@@ -278,11 +277,6 @@ function setupMasterBroadcast() {
             }
         },
     });
-
-    // Hand the MasterConnection to the network-host module so its
-    // openRoom() / closeRoom() (driven by applyMode in menu.js) can
-    // wire signaling peers into it.
-    setMasterConnection(masterConnection);
 
     // Register the Local DM secondary as a peer. The BroadcastChannel
     // transport is constructed here (not inside MasterConnection) so the
