@@ -42,9 +42,13 @@ export const cullingStats = {
     afterSky: 0,
 };
 
-// Half-FOV derived from perspective: atan(viewportWidth/2 / perspective)
-// Plus a generous margin so elements at the edges aren't popped in/out visibly.
-const FRUSTUM_MARGIN = 0.15; // ~9° extra on each side
+// Slack added to the cull half-FOV. Compensates for the wallInFrustum
+// 3-point sampler (start / end / midpoint), which can miss long walls
+// whose visible portion falls between the sample points when both
+// endpoints lie outside the math frustum. A wider margin = more
+// over-cull-permissiveness = fewer edge pops at the cost of slightly
+// more compositor work. Tune up if walls still pop at pane edges.
+const FRUSTUM_MARGIN = 0.4; // ~23° extra on each side
 
 /**
  * Tests whether a point (relative to the player) is within the camera's

@@ -26,19 +26,62 @@ import { buildDoor } from './mechanics/doors.js';
 import { buildLift } from './mechanics/lifts.js';
 import { buildCrusher } from './mechanics/crushers.js';
 
+// Fixed perspective for kiosk panes. Kiosk hardware is known and the
+// pane's internal logical width is 1920px regardless of HD vs 4K
+// input (HD: 100vw=1920 + scale(0.5); 4K: 50vw=1920 native). 960 is
+// half that logical width, giving ~90° FOV per pane — the "feels
+// like a full HD window" look the kiosk design is built around.
+const KIOSK_PERSPECTIVE = 960;
+
+// Lower bound on perspective as a fraction of window width for the
+// non-kiosk path. With CSS perspective, smaller values give a wider
+// FOV. Pure paneWidth/2 (the "natural" per-pane perspective) over-
+// widens narrow split-screen panes — peripheral walls render past the
+// culler's frustum and pop in/out at the sides. This floor caps how
+// wide the FOV can get on narrow panes.
+//   0.5  → full single-window perspective; narrowest FOV on split-screen
+//   0.4  → moderate widening
+//   0.3  → close to the cull horizon
+//   0.25 → cull pops start to show at pane edges
+const MIN_PERSPECTIVE_RATIO = 0.3;
+
+// Absolute minimum perspective. Catches small physical screens
+// (phones in portrait) where even paneWidth * 0.5 produces an
+// uncomfortably wide FOV with too much foreshortening. Kicks in
+// independently of the window-ratio floor.
+const MIN_PERSPECTIVE_PX = 350;
+
 /**
- * Recompute each pane's `--perspective` from its current rendered
- * width. Perspective = half the pane's width gives a ~90° horizontal
- * FOV; reading `clientWidth` per pane means split-screen, kiosk,
- * mirror, single-pane SP, and master+client all just work without
- * mode branching. Call after any layout change that resizes the panes
- * — client join/leave, kiosk toggle, window resize.
+ * Recompute each pane's `--perspective`.
+ *
+ * Kiosk uses a fixed value tuned to the installation hardware (see
+ * KIOSK_PERSPECTIVE above). HD and 4K kiosk look identical because
+ * both render at the same internal logical width per pane.
+ *
+ * Non-kiosk panes use the larger of the per-pane natural value
+ * (`paneWidth / 2`, ~90° FOV per pane) and a window-width floor —
+ * so a full-window pane gets its full perspective, while narrow
+ * split-screen panes get a moderately widened FOV without the
+ * over-distortion that breaks culling. Phone in portrait has
+ * paneWidth ≈ window.innerWidth so the natural per-pane perspective
+ * applies (wide FOV, no special case).
+ *
+ * Call after any layout change — client join/leave, kiosk toggle,
+ * window resize.
  */
 export function updatePerspective() {
-    for (let i = 0; i < domRenderers.length; i++) {
-        const r = domRenderers[i];
+    if (document.body.classList.contains('kiosk')) {
+        for (const r of domRenderers) {
+            r.sceneState.perspectiveValue = KIOSK_PERSPECTIVE;
+            r.viewportEl.style.setProperty('--perspective', `${KIOSK_PERSPECTIVE}px`);
+        }
+        return;
+    }
+
+    const floor = Math.max(window.innerWidth * MIN_PERSPECTIVE_RATIO, MIN_PERSPECTIVE_PX);
+    for (const r of domRenderers) {
         const paneWidth = r.viewportEl.clientWidth || window.innerWidth;
-        const perspectiveValue = paneWidth / 2;
+        const perspectiveValue = Math.max(paneWidth / 2, floor);
         r.sceneState.perspectiveValue = perspectiveValue;
         r.viewportEl.style.setProperty('--perspective', `${perspectiveValue}px`);
     }

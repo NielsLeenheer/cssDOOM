@@ -73,15 +73,49 @@ body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player
 }
 
 /* Kiosk mode (?kiosk URL param) — installation runs on a video-wall
-   controller that takes a single 3840×2160 input in 2x2 quadrant mode,
-   but only the top two quadrants are physical 1080p monitors. Constrain
-   the game to the top half so each pane lands 1:1 on one monitor; the
-   bottom half stays empty (body background) and is discarded by the
-   wall. Uses viewport units so the exact resolution can change without
-   touching CSS. */
-body.kiosk #game {
-    inset: 0 0 auto 0;
-    height: 50vh;
+   controller that takes a single HD input in 2×2 quadrant mode, with
+   the top two quadrants wired to physical monitors and the bottom two
+   unused.
+
+   Each pane renders internally as if it were a full-window SP game
+   (100vw × 100vh) so the perspective and FOV match what a single-window
+   game would look like. A `transform: scale(0.5)` shrinks the visual
+   output to 50% × 50%, fitting one physical monitor (top quadrant).
+   `top` / `left` position pane 0 in the top-left monitor and pane 1
+   in the top-right. The bottom half of the capture is discarded by
+   the wall. Uses viewport units so a future move to 4K input doesn't
+   touch CSS. */
+body.kiosk .pane {
+    position: absolute;
+    /* HD path: pane internal = 100vw × 100vh = 1920×1080. Scale to
+       50% × 50% visual so each pane fits one physical monitor (top
+       quadrant of the 2×2 split). */
+    width: 100vw;
+    height: 100vh;
+    flex: none;
+    transform-origin: top left;
+    transform: scale(0.5);
+}
+@media (min-width: 2880px) {
+    /* 4K path: native 50vw × 50vh per pane (= 1920×1080), no
+       transform needed — each pane already lands 1:1 on its
+       physical monitor. Same internal logical size as the HD path
+       so HUD scaling, perspective, and overall composition are
+       identical between HD and 4K kiosk. The extra pixels just go
+       toward sharper output. */
+    body.kiosk .pane {
+        width: 50vw;
+        height: 50vh;
+        transform: none;
+    }
+}
+body.kiosk .pane[data-player="0"] {
+    top: 0;
+    left: 0;
+}
+body.kiosk .pane[data-player="1"] {
+    top: 0;
+    left: 50vw;
 }
 
 /* Kiosk SP — the kiosk has two physical monitors; we don't want the SP
@@ -89,13 +123,9 @@ body.kiosk #game {
    left monitor and mirror pane 0's scene onto the right pane (the
    mirror state is set by menu.applyMode → setMirrorMode based on
    body.kiosk + singleplayer). Override SP's default "hide pane 1" so
-   both panes split the top-half capture 50/50, matching DM layout. */
+   both monitors show the SP scene side by side. */
 body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"] {
     display: block;
-}
-body.kiosk[data-game-mode="singleplayer"] .pane[data-player="0"],
-body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"] {
-    flex: 1 1 50%;
 }
 
 /* Client window mode (?join URL param) — the client constructs exactly
