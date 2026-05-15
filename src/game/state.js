@@ -4,6 +4,32 @@
  * Shared world state (things, projectiles, doors, lifts) lives here directly.
  * Per-player state (position, health, ammo, weapons, keys, powerups) lives
  * on Player objects in `state.players`. SP has length 1; DM has length 2.
+ *
+ * ── Conceptual ownership (L7.2) ────────────────────────────────────────
+ * The fields below live on this module-level singleton for migration
+ * convenience — the lifecycle refactor doc keeps the storage here so
+ * cross-module reads don't have to thread Game/Level references through
+ * every callsite. Conceptually:
+ *
+ *   App owns:  gameMode, networkMode, skillLevel.
+ *              (App.start / applyMode write these; they outlive any Game.)
+ *
+ *   Game owns: players (roster), match.
+ *              (Game.start sizes the roster; resetMatch/endMatch manage
+ *              match. Both persist across the held Game's lifetime —
+ *              a new Game replaces the roster + match wholesale.)
+ *
+ *   Level owns: things, projectiles, doorState, liftState, crusherState
+ *               (and Level.tick mutates them every frame).
+ *               Level.load constructs them (via initThings / initDoors /
+ *               initLifts / initCrushers + addPlayerThings). Level
+ *               teardown / clearSceneState clears them.
+ *
+ *  This ownership map is the target architecture per
+ *  LIFECYCLE_REFACTOR.md §11. The literal field moves are deferred
+ *  (cross-cutting reads make the singleton convenient for now); future
+ *  phases may move them onto their owner instances if a clean migration
+ *  path opens up.
  */
 
 import { Player } from './player/player.js';
