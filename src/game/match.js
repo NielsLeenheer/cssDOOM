@@ -14,7 +14,6 @@
 import { state } from './state.js';
 import { Player } from './player/player.js';
 import { loadMap, currentMap } from '../shared/maps.js';
-import { hideScoreboard } from '../ui/scoreboard.js';
 import { clearMovingState } from './movement.js';
 import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
 import { orchestrator } from '../orchestrator.js';
@@ -69,7 +68,7 @@ export function resetMatch({
         kills: Array.from({ length: n }, () => new Array(n).fill(0)),
     };
     for (const p of state.players) p.score = 0;
-    hideScoreboard();
+    orchestrator.hideResults();
     setTimerActive(false);
     lastTimerSeconds = -1;
     transitionTo(GAME_STATE.LOBBY);
@@ -122,7 +121,7 @@ export function ensureMatchSize(n) {
 /** Clears any DM match state — called when leaving DM mode. */
 export function clearMatch() {
     state.match = null;
-    hideScoreboard();
+    orchestrator.hideResults();
     setTimerActive(false);
     lastTimerSeconds = -1;
     transitionTo(GAME_STATE.ACTIVE);
