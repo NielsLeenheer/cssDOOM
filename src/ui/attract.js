@@ -99,6 +99,10 @@ export function attractTick(timestamp) {
         lastActivityAt = timestamp;
         return;
     }
+    if (!document.body.classList.contains('kiosk')) {
+        lastActivityAt = timestamp;
+        return;
+    }
 
     const gs = getGameState();
 
