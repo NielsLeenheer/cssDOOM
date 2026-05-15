@@ -253,12 +253,6 @@ export class MasterConnection {
         this.paused = false;
     }
 
-    /** Broadcast the end-of-match scoreboard to every alive peer. */
-    broadcastMatchEnd(payload) {
-        const env = { type: MSG.MATCH_END, ...payload };
-        this._broadcast(env);
-    }
-
     _broadcast(envelope) {
         for (const session of this._peers.values()) {
             if (session.alive) this._postTo(session, envelope);
@@ -331,14 +325,12 @@ export class MasterConnection {
  *   Fires when master accepts. `isReconnect` is true if we'd previously
  *   been connected (covering the master-restart case).
  * @param {() => void} [options.onLeave]      Master went silent.
- * @param {(msg: object) => void} [options.onMatchEnd]    MATCH_END envelope arrived.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onMatchEnd } = {}) {
+    constructor({ transport = null, onAck, onLeave } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
-        this.onMatchEnd = onMatchEnd;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -371,8 +363,6 @@ export class ClientConnection extends PeerConnectionBase {
             // Master is about to rebuild its scene. Reload so the next
             // reconnect happens against the master's settled new state.
             location.reload();
-        } else if (msg.type === MSG.MATCH_END) {
-            this.onMatchEnd?.(msg);
         }
     }
 

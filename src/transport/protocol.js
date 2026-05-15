@@ -69,11 +69,6 @@ export const MSG = {
     // the next reconnect arrives after master's loadMap has settled on
     // a fresh state.
     LEVEL_CHANGE: 'level-change',
-    // Master → client: match has ended. Carries the kill matrix,
-    // per-player scores, map name, and winner so the client renders the
-    // same scoreboard. resetMatch / restartMatch implicitly clear by
-    // re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
-    MATCH_END: 'match-end',
     // Master → client: world sound trigger. Carries `name` (sound asset)
     // and `opts` ({x, y} only — UI sounds are local and never broadcast).
     // The client's orchestrator re-plays it through its own AudioRenderers.

@@ -53,7 +53,7 @@ import { setMasterConnection } from './network-host.js';
 import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
-import { isMatchLobby, setMatchEndBroadcaster, onMatch } from './game/match.js';
+import { isMatchLobby, onMatch } from './game/match.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
@@ -280,12 +280,12 @@ function setupMasterBroadcast() {
     onClaimChange(broadcastLobbyState);
     onMatch('reset', broadcastLobbyState);
 
-    // Mirror match-end scoreboard onto any connected client. match.js
-    // calls this from endMatch(); we just hand the payload to the
-    // connection, which gates on peerAlive.
-    setMatchEndBroadcaster((payload) => {
-        masterConnection?.broadcastMatchEnd(payload);
-    });
+    // L6.5 — MSG.MATCH_END wire envelope deleted. match.js::endMatch
+    // now pushes via orchestrator.showResults; the renderer-command
+    // pipeline carries the scoreboard payload to master's own pane(s)
+    // AND every connected client (Game._onLevelComplete already uses
+    // the same renderer command for the DM exit-switch path, so both
+    // match-end paths converge on showResults).
 
     // Mirror every game-state transition onto the client. game-state.js
     // calls this on each transitionTo. Routes through the renderer-

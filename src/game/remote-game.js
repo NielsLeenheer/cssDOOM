@@ -45,7 +45,6 @@ import { hideInitialOverlay } from '../ui/overlay.js';
 import { setAudioEnabled } from '../audio/audio.js';
 import { loadMap } from '../shared/maps.js';
 import { setClientSlot } from '../ui/client-lobby.js';
-import { showScoreboard } from '../ui/scoreboard.js';
 import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyRemoteGameState } from '../game/game-state.js';
 
@@ -129,16 +128,11 @@ export class RemoteGame {
 
         this._connection = new ClientConnection({
             transport: this._transport, // null for Local DM → BroadcastChannel default
-            // L6.5: LOBBY_STATE and GAME_STATE envelopes deleted —
-            // lobby-state updates ride the updateLobbyState renderer
-            // command (impls in lobby.js/network-lobby.js/client-lobby.js)
-            // and game-state transitions ride the setGameState renderer
-            // command (impl in game-state.js). MATCH_END is still
-            // wire-bound; the showResults renderer command also fires
-            // in parallel today — Phase C deletes the duplication.
-            onMatchEnd: (msg) => {
-                showScoreboard(msg);
-            },
+            // L6.5: LOBBY_STATE, MATCH_END, and GAME_STATE wire envelopes
+            // all deleted — their content rides the renderer-command
+            // pipeline (updateLobbyState, showResults, setGameState).
+            // The impls live in lobby.js, client-lobby.js,
+            // network-lobby.js, scoreboard.js, and game-state.js.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
             onLeave: () => this._onLeave(),
         });

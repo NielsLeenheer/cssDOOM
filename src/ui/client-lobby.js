@@ -9,18 +9,20 @@
  *
  * The client still needs to *show* the lobby prompt for its slot, so
  * the player sitting at the client's screen knows when to press their
- * button. Master broadcasts a `LOBBY_STATE` envelope on every
- * lobby-relevant change, and this module reflects it onto the client's
- * DOM via the pane's `data-claim-state` attribute. (`body[data-game-state]`
- * is mirrored separately by the GAME_STATE envelope — see index.js's
- * initClient onGameState handler.) The same CSS that drives master's
- * split-screen lobby prompts (`.join-prompt` / `.join-ready`) then
- * renders correctly.
+ * button. Master pushes the lobby state via the `updateLobbyState`
+ * renderer command on every lobby-relevant change (L6.5 replaced the
+ * legacy MSG.LOBBY_STATE wire envelope), and this module reflects it
+ * onto the client's DOM via the pane's `data-claim-state` attribute.
+ * `body[data-game-state]` is mirrored separately by the `setGameState`
+ * renderer command (impl in game-state.js). The same CSS that drives
+ * master's split-screen lobby prompts (`.join-prompt` / `.join-ready`)
+ * then renders correctly.
  *
- * `setClientSlot` is called from `initClient`'s onAck once master has
- * assigned a slot. Until then, any incoming `LOBBY_STATE` is buffered
- * and replayed when the slot becomes known — necessary because onAck
- * has an `await loadMap` and `LOBBY_STATE` may arrive in the meantime.
+ * `setClientSlot` is called from RemoteGame._onAck once master has
+ * assigned a slot. Until then, any incoming lobby state is buffered
+ * and replayed when the slot becomes known — necessary because _onAck
+ * has an `await loadMap` and the renderer-command lobby push may
+ * arrive in the meantime.
  */
 
 let mySlot = null;
@@ -52,9 +54,9 @@ export function applyLobbyState(msg) {
         return;
     }
 
-    // body[data-game-state] is mirrored by the GAME_STATE envelope (see
-    // index.js initClient's onGameState handler). This module only
-    // updates the per-pane data-claim-state attribute.
+    // body[data-game-state] is mirrored by the setGameState renderer
+    // command (impl in game-state.js). This module only updates the
+    // per-pane data-claim-state attribute.
 
     // Same algorithm as lobby.js's updateLobbyUI: lowest unclaimed slot
     // is the one currently 'prompting'; freshly-claimed slots get

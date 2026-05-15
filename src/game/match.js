@@ -14,19 +14,13 @@
 import { state } from './state.js';
 import { Player } from './player/player.js';
 import { loadMap, currentMap } from '../shared/maps.js';
-import { showScoreboard, hideScoreboard } from '../ui/scoreboard.js';
+import { hideScoreboard } from '../ui/scoreboard.js';
 import { clearMovingState } from './movement.js';
 import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
+import { orchestrator } from '../orchestrator.js';
 
 const DEFAULT_FRAG_LIMIT = 20;
 const DEFAULT_TIME_LIMIT_MS = 6 * 60 * 1000;
-
-// Master-side hook for broadcasting the kill matrix + scores to any
-// connected client on endMatch. Set by index.js once the master's
-// MasterConnection is up; null on clients or before init. Decoupling
-// via a setter keeps match.js free of transport / connection imports.
-let broadcastMatchEnd = null;
-export function setMatchEndBroadcaster(fn) { broadcastMatchEnd = fn; }
 
 /**
  * Module-level emitter for match-lifecycle events. Subscribed at boot
@@ -214,23 +208,22 @@ export function endMatch() {
     // scoreboard → attract. Clear it explicitly here.
     for (const p of state.players) clearMovingState(p);
 
-    const data = buildScoreboardData();
     transitionTo(GAME_STATE.ENDED);
-    showScoreboard(data);
-    broadcastMatchEnd?.(data);
-}
-
-/**
- * Snapshot of the post-match scoreboard. Shipped verbatim to any client
- * via MSG.MATCH_END so it can render the same grid without needing the
- * authoritative state.match.
- */
-function buildScoreboardData() {
-    return {
+    // L6.5 — fire the scoreboard via the renderer-command pipeline.
+    // orchestrator.showResults fans to master's own DomRenderer (whose
+    // renderResults impl calls showScoreboard) and to every connected
+    // peer (whose renderResults impl does the same on the client side).
+    // Replaces the legacy direct showScoreboard call + MSG.MATCH_END
+    // wire envelope. mapName mirrors Game._buildResultsPayload so the
+    // payload shape is identical regardless of which path triggers the
+    // results (frag/time-limit here vs DM exit-switch in
+    // Game._onLevelComplete).
+    orchestrator.showResults({
         scores: state.players.map(p => p.score),
         kills: state.match.kills.map(row => row.slice()),
         winnerIndex: state.match.winner ? state.match.winner.index : -1,
-    };
+        mapName: currentMap,
+    });
 }
 
 /** True when DM is active and the match has ended. */
