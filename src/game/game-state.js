@@ -31,7 +31,6 @@ export const GAME_STATE = Object.freeze({
 });
 
 let current = GAME_STATE.ACTIVE;
-const listeners = new Set();
 
 // Optional master-side broadcaster — set by index.js when the
 // MasterConnection is up so every transition mirrors to clients.
@@ -79,12 +78,10 @@ export function applyRemoteGameState(next) {
 
 function applyTransition(next) {
     if (next === current) return;
-    const prev = current;
     current = next;
     if (typeof document !== 'undefined') {
         document.body.dataset.gameState = next;
     }
-    for (const cb of listeners) cb(next, prev);
 }
 
 // L6.5 — render-only impl for the setGameState renderer command. Master's
@@ -97,11 +94,3 @@ function applyTransition(next) {
 import { registerOverlayImpl } from '../renderer/commands.js';
 registerOverlayImpl('setGameState', applyRemoteGameState);
 
-/**
- * Subscribe to state-change events. Returns an unsubscribe function.
- * The callback receives `(next, prev)`.
- */
-export function onStateChange(callback) {
-    listeners.add(callback);
-    return () => listeners.delete(callback);
-}

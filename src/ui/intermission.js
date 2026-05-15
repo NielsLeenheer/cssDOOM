@@ -263,15 +263,16 @@ function levelNameSpriteSrc(mapName) {
 /** Renderer-command impl for showIntermission. Game pushes this after
  *  receiving Level's `level-complete` event in SP. The body re-uses the
  *  full overlay flow but installs no callback — switches.js still
- *  controls the dismiss-and-advance path until L4. */
-export function renderIntermission(payload) {
+ *  controls the dismiss-and-advance path until L4. Not exported —
+ *  only the registry below ever calls it. */
+function renderIntermission(payload) {
     showIntermission(payload?.nextMap ?? null, () => {});
 }
 
 /** Renderer-command impl for hideIntermission. Mirrors the existing
  *  hideIntermission tear-down without depending on a particular
- *  caller. */
-export function clearIntermission() {
+ *  caller. Not exported — only the registry below ever calls it. */
+function clearIntermission() {
     hideIntermission();
 }
 

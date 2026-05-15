@@ -26,7 +26,7 @@
 import { state } from '../game/state.js';
 import { orchestrator } from '../orchestrator.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
-import { startMatch, isMatchLobby, resetMatch, onMatch } from '../game/match.js';
+import { startMatch, isMatchLobby, onMatch } from '../game/match.js';
 import { registerOverlayImpl } from '../renderer/commands.js';
 
 let externalSlotsRef = () => new Set();
@@ -202,19 +202,6 @@ function checkAutoStart() {
         startMatch();
         updateLobbyUI();
     }, READY_FLASH_MS);
-}
-
-/**
- * Enter lobby state — called when DM mode is entered or the previous
- * match ended and we're cycling back to a new one. The match clock,
- * scoring, and frag-tracking are all gated by the game-state machine
- * (`getGameState() === ACTIVE`), which resetMatch() leaves at LOBBY.
- * This function just refreshes the lobby UI.
- */
-export function enterLobby() {
-    if (state.gameMode !== 'deathmatch') return;
-    if (!state.match) resetMatch();
-    updateLobbyUI();
 }
 
 // ── L2.6 renderer-command entry points ─────────────────────────────────

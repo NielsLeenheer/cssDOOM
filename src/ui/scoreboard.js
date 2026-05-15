@@ -75,13 +75,15 @@ export function hideScoreboard() {
 /** Renderer-command impl for showResults. Delegates to showScoreboard
  *  with whatever payload Game builds (typically scores, kills,
  *  winnerIndex, mapName). Idempotent against repeated calls — DOM is
- *  fully rebuilt each time via replaceChildren. */
-export function renderResults(payload) {
+ *  fully rebuilt each time via replaceChildren. Not exported — only
+ *  the registry below ever calls it. */
+function renderResults(payload) {
     showScoreboard(payload);
 }
 
-/** Renderer-command impl for hideResults. Delegates to hideScoreboard. */
-export function clearResults() {
+/** Renderer-command impl for hideResults. Delegates to hideScoreboard.
+ *  Not exported — only the registry below ever calls it. */
+function clearResults() {
     hideScoreboard();
 }
 
