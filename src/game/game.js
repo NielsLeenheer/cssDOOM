@@ -34,6 +34,12 @@ import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
+// How long to keep the just-claimed pane's READY indicator visible
+// before auto-starting the match — same UX touch as the pre-cutover
+// lobby.js had. If a slot un-claims during the delay, the pending
+// timer cancels.
+const READY_FLASH_MS = 1000;
+
 export class Game {
     constructor(modeConfig) {
         this.modeConfig = modeConfig;
@@ -83,6 +89,7 @@ export class Game {
 
         this._state = 'LOBBY'; // §4: new Game() → LOBBY always
         this._listeners = new Map();
+        this._autoStartTimer = null;
     }
 
     /** Reads from state directly — see constructor for rationale. */
@@ -111,20 +118,27 @@ export class Game {
         });
 
         // Subscribe to device→slot claim changes so Local DM
-        // auto-starts when both slots are claimed. _checkAutoStart
-        // is mode-gated (Local DM only) and state-gated (LOBBY
-        // only — so the subscription is harmless after Game.stop
-        // marks _state ENDED).
+        // auto-starts when both slots are claimed AND the lobby UI
+        // repaints with the new claim set. Both effects are
+        // state-gated to LOBBY (a stale subscription on a stopped
+        // Game bails before doing anything).
         //
         // claim-registry's onClaimChange currently has no
         // unsubscribe API; multiple Games over a session each
         // accumulate a subscription. The state-gate keeps stale
-        // subscriptions inert (they bail before doing anything).
+        // subscriptions inert.
         //
-        // SP doesn't need this — start() drops straight into
+        // SP doesn't need auto-start — start() drops straight into
         // beginPlay below. Network DM uses host-fire-start via the
         // NETWORK_START gate, not all-claimed auto-start.
-        onClaimChange(() => this._checkAutoStart());
+        onClaimChange(() => {
+            if (this._state !== 'LOBBY') return;
+            orchestrator.updateLobbyState({
+                slots: this.roster,
+                mapCursor: this.mapCursor,
+            });
+            this._checkAutoStart();
+        });
 
         if (this.gameMode === 'singleplayer') {
             await this.beginPlay();
@@ -199,21 +213,44 @@ export class Game {
      *     beginPlay has fired).
      *   - mode must be Local DM (SP starts via start()'s SP branch;
      *     Network DM uses host-fire).
-     *   - All slots in the roster must be claimed (local OR remote
-     *     — the registry tracks both via isSlotClaimedLocally and
-     *     external slot sets owned by network code, but Local DM
-     *     only has local claims).
+     *   - All slots in the roster must be claimed.
+     *
+     * beginPlay is deferred by READY_FLASH_MS after the last claim so
+     * the just-claimed pane's `data-claim-state="ready"` indicator is
+     * visible for a beat before the lobby vanishes into PLAYING. If
+     * someone un-claims during the delay, the pending timer is
+     * cancelled.
      */
     _checkAutoStart() {
         if (this._state !== 'LOBBY') return;
         if (this.gameMode !== 'deathmatch') return;
         if (this.networkMode !== 'standalone') return;
 
-        for (let i = 0; i < this.roster.length; i++) {
-            if (!isSlotClaimedLocally(i)) return;
+        if (!this._allSlotsClaimed()) {
+            if (this._autoStartTimer) {
+                clearTimeout(this._autoStartTimer);
+                this._autoStartTimer = null;
+            }
+            return;
         }
 
-        this.beginPlay();
+        if (this._autoStartTimer) return;  // already pending
+        this._autoStartTimer = setTimeout(() => {
+            this._autoStartTimer = null;
+            // Re-verify at fire time: state could have moved out of
+            // LOBBY (someone called beginPlay externally) or a slot
+            // could have un-claimed during the delay.
+            if (this._state !== 'LOBBY') return;
+            if (!this._allSlotsClaimed()) return;
+            this.beginPlay();
+        }, READY_FLASH_MS);
+    }
+
+    _allSlotsClaimed() {
+        for (let i = 0; i < this.roster.length; i++) {
+            if (!isSlotClaimedLocally(i)) return false;
+        }
+        return true;
     }
     /**
      * Pause the held Level and fan a 'paused' tint to every pane.
@@ -264,6 +301,11 @@ export class Game {
      */
     async stop() {
         if (this._state === 'ENDED') return;
+
+        if (this._autoStartTimer) {
+            clearTimeout(this._autoStartTimer);
+            this._autoStartTimer = null;
+        }
 
         if (this.level) {
             this.level.stop();
@@ -384,11 +426,10 @@ export class Game {
         // Re-render the lobby UI so per-pane `data-claim-state`
         // flips from 'ready' (post-claim, pre-match) to 'active'
         // (match running) — which is what CSS reads to hide the
-        // READY! overlay. updateLobbyUI only re-evaluates on
-        // onClaimChange / onMatch('reset') events; neither fires
-        // when beginPlay starts the match, so we have to push the
-        // re-render explicitly. Otherwise the READY! overlay
-        // lingers over the running match.
+        // READY! overlay. Game's onClaimChange handler doesn't fire
+        // here (no claim change), so we have to push the re-render
+        // explicitly. Otherwise the READY! overlay lingers over the
+        // running match.
         orchestrator.updateLobbyState({
             slots: this.roster,
             mapCursor: this.mapCursor,
