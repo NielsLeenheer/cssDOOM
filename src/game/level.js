@@ -100,11 +100,23 @@ export class Level {
         const isInitialLoad = !getCurrentMap();
 
         // Tell any connected client that the scene is about to be
-        // rebuilt. Skipped on the very first load (no client could be
-        // connected yet). Subscribers (master.js's broadcast setup)
-        // subscribe via onLevel('changing', ...) at boot.
+        // rebuilt. Subscribers (master.js's broadcast setup) subscribe
+        // via onLevel('changing', ...) at boot and turn the event into
+        // MSG.LOAD_MAP for every alive peer.
+        //
+        // Fires unconditionally — including on the "initial" load.
+        // The pre-L6.6 code skipped it on isInitialLoad with the
+        // rationale "no client could be connected yet," but Network
+        // DM host doesn't preload (Game.start's network branch is a
+        // no-op); the FIRST Level.load happens at host-fire-start,
+        // after joiners are connected and waiting in the lobby. They
+        // need this LOAD_MAP to know when to start their own load.
+        //
+        // The showLevelTransition fade is still gated on
+        // !isInitialLoad — there's no scene to fade FROM on the very
+        // first load.
+        _emitLevelEvent('changing', { name });
         if (!isInitialLoad) {
-            _emitLevelEvent('changing', { name });
             await showLevelTransition();
         }
 

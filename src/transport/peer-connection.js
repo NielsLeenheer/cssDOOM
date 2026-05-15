@@ -259,12 +259,24 @@ export class MasterConnection {
      * "every peer has acknowledged the NEW load." Pauses LOOKING for the
      * duration of the handshake so a fresh peer can't ACK against the
      * pre-load snapshot mid-flight; broadcastPlay() unpauses.
+     *
+     * Snapshots `_loadInFlight` (Set of peerKeys) at call time so
+     * `awaitAllReadyToPlay` only waits on the peers that actually
+     * received this LOAD_MAP. Peers that join LATER (e.g. a peer that
+     * disconnected mid-handshake and reconnects, or a brand-new joiner
+     * that arrives after broadcastLoadMap) get the new level through
+     * the regular ACK path (snapshotProvider's `level` field) instead;
+     * blocking the handshake on their never-coming READY_TO_PLAY would
+     * just stall master for `timeoutMs` and hide the user's
+     * level-start input behind that delay.
      */
     broadcastLoadMap(name) {
         this.paused = true;
+        this._loadInFlight = new Set();
         for (const session of this._peers.values()) {
             if (!session.alive) continue;
             session.readyToPlay = false;
+            this._loadInFlight.add(session.peerKey);
             this._postTo(session, { type: MSG.LOAD_MAP, name });
         }
     }
@@ -294,9 +306,17 @@ export class MasterConnection {
      * caller diagnostics.
      */
     awaitAllReadyToPlay({ timeoutMs = 10_000 } = {}) {
+        // Only wait on peers that actually received the current
+        // broadcastLoadMap — see `_loadInFlight` in broadcastLoadMap.
+        // Peers that disconnected since (alive=false) are skipped;
+        // peers that joined later aren't in the set so they don't
+        // block either.
+        const targets = this._loadInFlight;
         const allReady = () => {
-            for (const s of this._peers.values()) {
-                if (s.alive && !s.readyToPlay) return false;
+            if (!targets || targets.size === 0) return true;
+            for (const peerKey of targets) {
+                const s = this._peers.get(peerKey);
+                if (s && s.alive && !s.readyToPlay) return false;
             }
             return true;
         };
@@ -313,8 +333,11 @@ export class MasterConnection {
                 if (performance.now() - start >= timeoutMs) {
                     clearInterval(tick);
                     const missing = [];
-                    for (const s of this._peers.values()) {
-                        if (s.alive && !s.readyToPlay) missing.push(s.peerKey);
+                    if (targets) {
+                        for (const peerKey of targets) {
+                            const s = this._peers.get(peerKey);
+                            if (s && s.alive && !s.readyToPlay) missing.push(peerKey);
+                        }
                     }
                     console.warn('[master] awaitAllReadyToPlay: timed out, proceeding without', missing);
                     resolve({ timedOut: true, missing });
