@@ -102,16 +102,38 @@ export function initGates() {
     on(A.WEAPON_SELECT, menuBlock, { priority: GATE_PRIORITY.MENU_OPEN });
 
     // ── Network DM host-fire-to-start — when ≥ 2 slots are filled in
-    // the network lobby and slot 0's input fires, transition LOBBY →
-    // ACTIVE. Must run BEFORE the CLAIM gate so a host who already
-    // owns slot 0 doesn't get a phantom claim attempt. Must also run
-    // after MENU_OPEN so an open menu can't trigger the start.
+    // the network lobby and slot 0's input fires, kick the match off.
+    // Must run BEFORE the CLAIM gate so a host who already owns slot
+    // 0 doesn't get a phantom claim attempt. Must also run after
+    // MENU_OPEN so an open menu can't trigger the start.
+    //
+    // Drives the actual match via Game.beginPlay (not just startMatch)
+    // because Network DM has no preloaded Level — Game.start's network
+    // branch deliberately defers Level construction to this point.
+    // beginPlay constructs + loads the Level, transitions Game._state
+    // to PLAYING, and calls startMatch internally to flip the legacy
+    // gameState LOBBY → ACTIVE. Falls back to legacy startMatch if
+    // app.game isn't held for some reason (defensive — boot path
+    // always assigns it).
+    //
+    // Joiner-side level load is currently a gap: the level-load fires
+    // the 'changing' event which masterConnection.signalLevelChange
+    // broadcasts as MSG.LEVEL_CHANGE — joiners are supposed to reload
+    // and re-ACK against master's now-loaded level. In practice this
+    // doesn't always fire / settle cleanly, so the joiner's HUD shows
+    // but no scene. L6.6 (MSG.LOAD_MAP + READY_TO_PLAY handshake)
+    // replaces the reload-and-re-ACK dance with an in-place loadMap
+    // and is the proper fix.
     on(A.FIRE_DOWN, ({ slot }) => {
         if (state.networkMode !== 'host') return;
         if (!isMatchLobby()) return;
         if (slot !== 0) return;
         if (countNetworkLobbyOccupied() < 2) return;
-        startMatch();
+        if (window.app?.game?.beginPlay) {
+            window.app.game.beginPlay();
+        } else {
+            startMatch();
+        }
         return true;
     }, { priority: GATE_PRIORITY.NETWORK_START });
 
