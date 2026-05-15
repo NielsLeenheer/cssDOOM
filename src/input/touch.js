@@ -15,9 +15,9 @@
  * Slot routing: touch follows the standard claim-registry resolution via
  * `getDriverSlot('touch')`. SP sets `defaultSlot=0` so touch drives
  * player 0; a Network DM phone-remote sets `defaultSlot=mySlot` (in
- * client.js's `initClient`) so touch drives that
- * remote's slot. Local DM sets `defaultSlot=null`, so touch contributes
- * nothing — split-screen DM assumes physical controllers, not touch.
+ * RemoteGame's input forwarder) so touch drives that remote's slot.
+ * Local DM sets `defaultSlot=null`, so touch contributes nothing —
+ * split-screen DM assumes physical controllers, not touch.
  */
 
 import { registerInputProvider } from '../orchestrator.js';
