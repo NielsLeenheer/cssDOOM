@@ -31,7 +31,26 @@ for (const name of MAPS) {
     btn.appendChild(label);
 
     btn.addEventListener('click', () => {
-        loadMap(name);
+        // Route through app.startLocalGame so the held Game gets
+        // properly torn down (Game.stop clears the intermission
+        // overlay + onAdvance callback, hides results, etc.) and a
+        // fresh Game is constructed with the picked map as
+        // mapCursor. The legacy `loadMap(name)` direct call
+        // bypassed all that — leaving stale intermission DOM up
+        // and a dangling onAdvance callback that, when fired,
+        // loaded the PREVIOUS level's next-map instead of the
+        // user's pick.
+        if (window.app) {
+            window.app.startLocalGame({
+                gameMode: state.gameMode,
+                networkMode: state.networkMode,
+                skillLevel: state.skillLevel ?? 1,
+                rules: null,
+                startMap: name,
+            });
+        } else {
+            loadMap(name);
+        }
         updateMenuSelection();
         toggleMenu(false);
     });
@@ -39,11 +58,23 @@ for (const name of MAPS) {
     menuLevelList.appendChild(btn);
 }
 
-// Skill buttons
+// Skill buttons. Like the level picker, route through
+// app.startLocalGame so the held Game is reconstructed cleanly
+// rather than leaving stale state around.
 document.querySelectorAll('.menu-skill').forEach(btn => {
     btn.addEventListener('click', () => {
         state.skillLevel = parseInt(btn.dataset.skill);
-        loadMap(currentMap);
+        if (window.app) {
+            window.app.startLocalGame({
+                gameMode: state.gameMode,
+                networkMode: state.networkMode,
+                skillLevel: state.skillLevel,
+                rules: null,
+                startMap: currentMap ?? 'E1M1',
+            });
+        } else {
+            loadMap(currentMap);
+        }
         updateMenuSelection();
         toggleMenu(false);
     });
