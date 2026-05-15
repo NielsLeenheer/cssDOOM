@@ -545,16 +545,13 @@ export class Game {
 
     /**
      * Reacts to Level emitting `level-complete`. SP: PLAYING →
-     * INTERMISSION. DM: PLAYING → RESULTS (vanilla DOOM exit-ends-
-     * match per §4b). Re-emits at the Game layer so App-side
-     * listeners can react.
-     *
-     * Does NOT trigger UI side effects yet — today's switches.js
-     * still owns the SP `showIntermission` call and the DM
-     * `setTimeout(loadMap, 1000)` path. UI ownership migrates in
-     * L2.7 (intermission) / L2.8 (results), at which point the
-     * inline switches.js paths get torn out and Game becomes the
-     * single trigger.
+     * INTERMISSION, pushes showIntermission via orchestrator (sole
+     * driver — switches.js no longer fires showIntermission itself).
+     * DM: PLAYING → RESULTS (vanilla DOOM exit-ends-match per §4b),
+     * pushes showResults. switches.js still fires
+     * setTimeout(loadMap, 1000) for the DM map advance because
+     * Game.restartMatch reloads the current map rather than
+     * cycling; re-homing DM map cycling is a follow-up.
      */
     _onLevelComplete(payload) {
         if (this.gameMode === 'singleplayer') {
@@ -575,11 +572,10 @@ export class Game {
             this._transitionTo('INTERMISSION');
             orchestrator.showIntermission(payload);
         } else {
-            // DM: vanilla DOOM exit ends the match (§4b). Today's
-            // switches.js DM branch still does setTimeout(loadMap,
-            // 1000), so the scoreboard pushed here will briefly
-            // appear before that auto-load fires. L4 removes the
-            // switches.js DM branch once Game owns the response.
+            // DM: vanilla DOOM exit ends the match (§4b). switches.js
+            // still drives the actual next-map load via
+            // setTimeout(loadMap, 1000) — see the note in
+            // _onLevelComplete's docstring above.
             this._transitionTo('RESULTS');
             orchestrator.showResults(this._buildResultsPayload());
         }

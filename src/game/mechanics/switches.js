@@ -31,7 +31,6 @@ import { activateCrusher } from './crushers.js';
 import { loadMap, getNextMap, getSecretExitMap } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
-import { showIntermission } from '../../ui/intermission.js';
 import { getCurrentLevel } from '../level.js';
 
 export function tryUseSwitch(player) {
@@ -86,21 +85,28 @@ export function tryUseSwitch(player) {
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();
-                    // Announce the level-complete event for Game
-                    // (subscribed in L2.4) to interpret per mode. The
-                    // existing SP/DM branching below still runs; once
-                    // Game owns the response, that branch goes away
-                    // in L4.
+                    // Emit level-complete; Game subscribes to this event
+                    // and owns the response per mode:
+                    //   SP — Game._onLevelComplete stops the Level,
+                    //        transitions INTERMISSION, pushes
+                    //        showIntermission via orchestrator. The
+                    //        actual map advance happens via Game.advance
+                    //        when the player dismisses the overlay (the
+                    //        intermission gate in actions/gates.js calls
+                    //        it on FIRE_DOWN).
+                    //   DM — Game._onLevelComplete transitions RESULTS
+                    //        and pushes showResults; the setTimeout
+                    //        loadMap below still drives the DM map
+                    //        advance because Game.restartMatch reloads
+                    //        the current map rather than constructing a
+                    //        new Level for the next one. Re-homing DM
+                    //        map cycling onto Game is a follow-up.
                     getCurrentLevel()?._emit('level-complete', {
                         nextMap,
                         secret: linedef.specialType === SECRET_EXIT_SPECIAL,
                         slot: player.index,
                     });
-                    if (state.gameMode === 'singleplayer') {
-                        showIntermission(nextMap, (next) => {
-                            if (next) loadMap(next);
-                        });
-                    } else if (nextMap) {
+                    if (state.gameMode === 'deathmatch' && nextMap) {
                         setTimeout(() => loadMap(nextMap), 1000);
                     }
                 } else if (linedef.sectorTag > 0) {

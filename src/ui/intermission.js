@@ -252,16 +252,13 @@ function levelNameSpriteSrc(mapName) {
 
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showIntermission / hideIntermission through the
-// orchestrator (see src/renderer/commands.js). renderIntermission is
-// a thin wrapper that delegates to showIntermission with a no-op
-// advance callback — switches.js separately calls the full
-// showIntermission with a real loadMap callback, and switches.js's
-// call ran later in the synchronous emit/branch chain (the emit fires
-// before the SP/DM branching in switches.js), so its callback wins.
-// Game's path renders harmlessly-redundant DOM. The dual-write here
-// is a known loose end: switches.js should emit only and let Game's
-// renderer-command path drive the overlay, but that cleanup is
-// bundled with the lobby/match single-driver cutover.
+// orchestrator (see src/renderer/commands.js); switches.js no longer
+// calls showIntermission directly. The advance callback is a no-op
+// because Game.advance is the sole dismiss path: actions/gates.js's
+// intermissionAdvance fires Game.advance on FIRE_DOWN, which pushes
+// hideIntermission via orchestrator. dismissIntermission's onAdvance
+// invocation is dead code on master (gates routes to Game.advance
+// first) and on the joiner (gates aren't initialized client-side).
 
 function renderIntermission(payload) {
     showIntermission(payload?.nextMap ?? null, () => {});
