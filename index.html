@@ -335,7 +335,11 @@
         });
         document.getElementById('detach-button').addEventListener('click', () => {
             const url = new URL(location.href);
-            url.searchParams.set('join', '1');
+            // Empty `join` value → index.js's joinParam=='' → roomCode=null,
+            // which is the Local DM secondary path (BroadcastChannel, no
+            // signaling room). `?join=1` would be interpreted as a Network
+            // DM remote with room code '1'.
+            url.searchParams.set('join', '');
             // popup=true forces a chrome-stripped popup window (no tab
             // strip, no address bar) — feels like a dedicated game display
             // and stays out of the master window's tab bar. Named target
