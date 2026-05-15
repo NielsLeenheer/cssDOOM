@@ -374,6 +374,12 @@ export function listenForNetworkClients({
         });
 
         pc.addEventListener('connectionstatechange', () => {
+            // Only treat as terminal once the data channel resolved. Before
+            // that, an early 'failed' is usually just Firefox impatience
+            // while it waits for setRemoteDescription(answer) and remote
+            // ICE candidates — killing the peer here drops the answer +
+            // candidates that arrive a few ms later and prevents recovery.
+            if (!peer.resolved) return;
             if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
                 if (peers.delete(peerId)) onPeerLeft(peerId);
             }
