@@ -206,13 +206,21 @@ export const COMMANDS = {
     // in sync across master + remote panes without a side-channel
     // envelope. Each impl calls both lobby modules; the modules gate
     // internally on state.networkMode so only the right one paints.
-    showLobby:        { kind: 'world', impl: (payload) => fireOverlay('showLobby', payload) },
-    updateLobbyState: { kind: 'world', impl: (payload) => fireOverlay('updateLobbyState', payload) },
-    hideLobby:        { kind: 'world', impl: () => fireOverlay('hideLobby') },
-    showIntermission: { kind: 'world', impl: (payload) => fireOverlay('showIntermission', payload) },
-    hideIntermission: { kind: 'world', impl: () => fireOverlay('hideIntermission') },
-    showResults:      { kind: 'world', impl: (payload) => fireOverlay('showResults', payload) },
-    hideResults:      { kind: 'world', impl: () => fireOverlay('hideResults') },
+    // World-command impls are invoked by DomRenderer as
+    // `impl(this, ...args)` — renderer first, then the orchestrator
+    // caller's args. The overlay impls don't use the renderer (they
+    // route through the registry which targets DOM globally per
+    // pane), so the first slot is named `_renderer` and ignored.
+    // Without this convention the renderer was being captured as
+    // `payload` and showResults crashed in scoreboard.js (DomRenderer
+    // has no `scores` field).
+    showLobby:        { kind: 'world', impl: (_renderer, payload) => fireOverlay('showLobby', payload) },
+    updateLobbyState: { kind: 'world', impl: (_renderer, payload) => fireOverlay('updateLobbyState', payload) },
+    hideLobby:        { kind: 'world', impl: (_renderer) => fireOverlay('hideLobby') },
+    showIntermission: { kind: 'world', impl: (_renderer, payload) => fireOverlay('showIntermission', payload) },
+    hideIntermission: { kind: 'world', impl: (_renderer) => fireOverlay('hideIntermission') },
+    showResults:      { kind: 'world', impl: (_renderer, payload) => fireOverlay('showResults', payload) },
+    hideResults:      { kind: 'world', impl: (_renderer) => fireOverlay('hideResults') },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(
