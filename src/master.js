@@ -23,7 +23,7 @@
  */
 
 import { state } from './game/state.js';
-import { mapData, currentMap, addPlayerThing } from './shared/maps.js';
+import { mapData, currentMap } from './shared/maps.js';
 import { loadMap } from './shared/maps.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
@@ -34,7 +34,6 @@ import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { buildModeConfigFromUrl } from './game/mode-config.js';
 import { Game } from './game/game.js';
 import { App } from './app.js';
-import { spawnPlayer } from './game/player/spawn.js';
 import { configureAudio } from './audio/audio.js';
 import { hideInitialOverlay } from './ui/overlay.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
@@ -245,16 +244,15 @@ function setupMasterBroadcast() {
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
             configureAudio(state.players.length);
-            // Don't spawn into the world during the lobby phase — there's
-            // no level loaded yet, and the spawn would fire a teleport
-            // sound + add a stray player thing the joiner can hear/see
-            // through the lobby overlay. The match-start path (L6.6) is
-            // responsible for spawning every roster slot, including remotes
-            // that connected during the lobby.
-            if (getGameState() !== GAME_STATE.ACTIVE) return;
-            const player = state.players[slot];
-            spawnPlayer(player);
-            addPlayerThing(player);
+            // L6.7 — late-join spawn workaround removed. Per §17, late
+            // join during PLAYING isn't supported; the coordinated
+            // match-start handshake (L6.6) guarantees every joiner is
+            // in state.players before Game.beginPlay runs Level.load,
+            // and Level.load's addPlayerThings + resetGameState seed
+            // each roster slot's player thing + DM defaults. A joiner
+            // that arrives mid-match has its slot tracked here but
+            // its player thing isn't streamed into the existing world;
+            // proper world-snapshot recovery lands in a future phase.
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator
