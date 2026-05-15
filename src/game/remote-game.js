@@ -135,6 +135,28 @@ export class RemoteGame {
             // network-lobby.js, scoreboard.js, and game-state.js.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
             onLeave: () => this._onLeave(),
+            // L6.6 — coordinated in-place loadMap. Replaces the legacy
+            // MSG.LEVEL_CHANGE → location.reload() flow that wiped
+            // the joiner's inventory between levels. Now we rebuild
+            // the scene on the existing page (so transitionToLevel
+            // keeps weapons / ammo / armor) and reply with READY_TO_PLAY
+            // when finished so master can proceed to PLAY.
+            onLoadMap: async (msg) => {
+                if (!msg?.name) return;
+                try {
+                    await loadMap(msg.name);
+                } catch (err) {
+                    console.warn('[remote-game] loadMap failed:', err);
+                }
+                this._connection.sendReadyToPlay();
+            },
+            // L6.6 — master signalled every joiner is ready. Visual
+            // state continues to ride the renderer-command pipeline;
+            // this hook is a placeholder for any future local PLAYING
+            // flag (e.g. input gating).
+            onPlay: () => {
+                // No-op for now.
+            },
         });
 
         startCullingLoop({

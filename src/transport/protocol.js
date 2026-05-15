@@ -68,7 +68,30 @@ export const MSG = {
     // level transition, attract entry). Client should reload itself so
     // the next reconnect arrives after master's loadMap has settled on
     // a fresh state.
+    //
+    // L6.6 introduced LOAD_MAP + READY_TO_PLAY + PLAY as the coordinated
+    // replacement; LEVEL_CHANGE stays in Phase 1 of L6.6 as a fallback
+    // for any code paths not yet routed through the coordinated handshake
+    // (notably the legacy switches.js DM exit-switch path that bypasses
+    // Game.beginPlay). Phase 2 deletes it.
     LEVEL_CHANGE: 'level-change',
+    // L6.6 — coordinated level-load handshake.
+    //
+    // Master → clients: "rebuild your scene to this map name." Clients
+    // call loadMap locally (no page reload), then send READY_TO_PLAY
+    // back so master knows when every joiner has the new scene up.
+    LOAD_MAP: 'load-map',
+    // Client → master: "I've finished loadMap; the new scene is built
+    // and I'm ready to receive renderer commands." Master gates the
+    // match-start (PLAY broadcast + level.start) on receiving this from
+    // every alive peer.
+    READY_TO_PLAY: 'ready-to-play',
+    // Master → clients: "every peer is ready; start ticking." Today
+    // it's a synchronization signal; clients don't act on it directly
+    // beyond logging (renderer commands continue to drive the visual
+    // state). Future expansion may flip a local PLAYING flag for input
+    // gating on the joiner.
+    PLAY: 'play',
     // Master → client: world sound trigger. Carries `name` (sound asset)
     // and `opts` ({x, y} only — UI sounds are local and never broadcast).
     // The client's orchestrator re-plays it through its own AudioRenderers.

@@ -38,6 +38,19 @@ export function setMasterConnection(mc) {
     masterConnection = mc;
 }
 
+/**
+ * Read-only accessor for the held MasterConnection. Used by
+ * Game.beginPlay (L6.6) so it can drive the coordinated handshake
+ * (broadcastLoadMap / awaitAllReadyToPlay / broadcastPlay) without
+ * needing the connection in its constructor — preserves Game's
+ * modeConfig-only API while letting it talk to the wire when it has
+ * to. Returns null on a client window (setMasterConnection never ran)
+ * and during the brief boot window before setupMasterBroadcast.
+ */
+export function getMasterConnection() {
+    return masterConnection;
+}
+
 /** Currently-open room code, or null if no room is open. */
 export function getActiveRoomCode() {
     return activeRoomCode;

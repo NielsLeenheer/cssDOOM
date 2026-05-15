@@ -164,7 +164,21 @@ function setupMasterBroadcast() {
     let pendingLevel = null;
     onLevel('changing', ({ name }) => {
         pendingLevel = name ?? null;
-        masterConnection?.signalLevelChange();
+        // L6.6 — broadcast a coordinated loadMap to every alive peer
+        // (replaces signalLevelChange, which fired MSG.LEVEL_CHANGE and
+        // tore down each peer-session so they had to reconnect). Peers
+        // now stay alive across the load: they receive MSG.LOAD_MAP,
+        // call loadMap locally without reloading the page, and reply
+        // with MSG.READY_TO_PLAY. broadcastLoadMap also pauses LOOKING
+        // for the duration of the handshake.
+        //
+        // For the coordinated host-fire-start path, Game.beginPlay
+        // calls awaitAllReadyToPlay → broadcastPlay after this fires.
+        // For uncoordinated paths (legacy switches.js DM exit-switch
+        // setTimeout(loadMap)), there's no awaitAllReadyToPlay step —
+        // master proceeds and clients catch up via the renderer-command
+        // pipeline. onLevel('loaded') unpauses below regardless.
+        masterConnection?.broadcastLoadMap(name);
     });
     onLevel('loaded', () => {
         pendingLevel = null;

@@ -29,6 +29,7 @@ import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
 import { resetMatch, startMatch } from './match.js';
+import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 
@@ -348,12 +349,33 @@ export class Game {
                 orchestrator,
             });
             this._subscribeLevel(this.level);
+            // The level-load fires onLevel('changing', { name }) which
+            // master.js subscribes to and turns into broadcastLoadMap
+            // on the MasterConnection — so every connected client begins
+            // its own loadMap in parallel with master's. No explicit
+            // broadcast call needed here.
             await this.level.load();
             _setCurrentLevel(this.level);
         }
         // Local DM happy path lands here with this.level already
         // preloaded by start() — direct LOBBY → PLAYING, no LOADING
         // splash, per §3b.
+
+        // L6.6 — coordinated start: when running as Network DM host,
+        // wait for every connected peer to send MSG.READY_TO_PLAY
+        // (signalling its local loadMap finished), then broadcast
+        // MSG.PLAY so the joiners' UI knows the match is starting.
+        // No-op when no MasterConnection is held (client window) or no
+        // peer is alive (solo master). Times out at 10 s with a warn
+        // and proceeds anyway — a crashed joiner shouldn't hang the
+        // host's match-start.
+        if (this.networkMode === 'host') {
+            const mc = getMasterConnection();
+            if (mc) {
+                await mc.awaitAllReadyToPlay({ timeoutMs: 10_000 });
+                mc.broadcastPlay();
+            }
+        }
 
         this.level.start();
         this._transitionTo('PLAYING');
