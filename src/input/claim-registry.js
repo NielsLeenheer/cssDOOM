@@ -118,6 +118,32 @@ export function unclaim(deviceId) {
 }
 
 /**
+ * Release every claim whose slot is NOT in the allowed set. Used by
+ * mode switches (network-lobby.js::setLocallyClaimableSlots) to drop
+ * stale sessionStorage-persisted bindings when entering a mode where
+ * those slots are no longer locally claimable.
+ *
+ * Example: a kiosk DM session binds kbm-A → slot 0 and gamepad-1 →
+ * slot 1, persisted to sessionStorage. User switches to non-kiosk
+ * Network DM via menu — only slot 0 is locally controlled (the host),
+ * remote slots 1..3 are claimed by joining peers. Without this call,
+ * the persisted gamepad-1 → slot 1 binding would still flag slot 1
+ * as 'local' in the network lobby UI even though no remote has
+ * joined and the gamepad shouldn't be driving a player at all.
+ */
+export function unclaimSlotsNotIn(allowedSlots) {
+    const allowed = new Set(allowedSlots);
+    let changed = false;
+    for (const [deviceId, slot] of [...claims]) {
+        if (!allowed.has(slot)) {
+            claims.delete(deviceId);
+            changed = true;
+        }
+    }
+    if (changed) notifyClaimChange();
+}
+
+/**
  * Subscribe to claim-state changes. Fires on add, remove, and
  * default-slot updates. Returns an unsubscribe function.
  */

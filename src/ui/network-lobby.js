@@ -35,7 +35,7 @@
 
 import qrcode from 'qrcode-generator';
 import { state } from '../game/state.js';
-import { isSlotClaimedLocally, onClaimChange } from '../input/claim-registry.js';
+import { isSlotClaimedLocally, onClaimChange, unclaimSlotsNotIn } from '../input/claim-registry.js';
 import { registerOverlayImpl } from '../renderer/commands.js';
 
 const MAX_SLOTS = 4;
@@ -89,6 +89,13 @@ function refreshDom() {
  */
 export function setLocallyClaimableSlots(slots) {
     locallyClaimableSlots = new Set(slots);
+    // Drop any persistent sessionStorage claim bound to a slot
+    // outside this set. Without this, a kiosk-DM session that
+    // claimed gamepad-1 → slot 1 would leak that binding into a
+    // subsequent non-kiosk Network DM where slot 1 is remote-only —
+    // the lobby would render slot 1 as 'local' before any remote
+    // joins, confusing the join-flow.
+    unclaimSlotsNotIn(slots);
     syncFromClaims();
     renderAllLabels();
 }
