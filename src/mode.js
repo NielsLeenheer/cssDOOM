@@ -42,6 +42,7 @@ import { setDefaultSlot } from './input/claim-registry.js';
 import { configureAudio } from './audio/audio.js';
 import { resetNetworkLobby, setNetworkSlotState, setLocallyClaimableSlots } from './ui/network-lobby.js';
 import { openRoom, closeRoom } from './network-host.js';
+import { orchestrator } from './orchestrator.js';
 
 const MODE_STORAGE_KEY = 'cssdoom-game-mode';
 
@@ -124,6 +125,11 @@ export function applyMode(gameMode, networkMode = 'standalone') {
         setDefaultSlot(isKiosk ? null : 0);
         resetNetworkLobby();
         setLocallyClaimableSlots(isKiosk ? [0, 1] : []);
+        // Tell the orchestrator which slot is the FIRST a joining
+        // remote may take — without this it defaults to 1, which on
+        // kiosk Network DM (locals at 0+1) would steal slot 1 from
+        // the second local pane the first time a joiner connects.
+        orchestrator.setMinRemoteSlot(localCount);
         if (!isKiosk) setNetworkSlotState(0, { occupant: 'host' });
         openRoom();
     } else if (gameMode === 'deathmatch' && networkMode === 'client') {

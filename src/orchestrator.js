@@ -121,6 +121,27 @@ class Orchestrator {
         // had a local pane), and the deferred-unhide grace timer.
         this._occupiedRemoteSlots = new Set();
         this._remoteBindings = new Map(); // peerKey → { slot, savedTarget, unbindGraceTimer }
+
+        // Lowest slot index a joining remote can be allocated to. Held
+        // local slots (master's host, kiosk's second local) must be
+        // above this. Default 1 keeps slot 0 reserved for master's local
+        // pane (non-kiosk Network DM, all SP / Local DM modes). Kiosk
+        // Network DM bumps to 2 because both slot 0 and slot 1 are
+        // locals; without this, the first joiner would steal slot 1
+        // from kiosk's second local pane, collapsing the split-screen.
+        // Set by `mode.js::applyMode` when entering Network DM host.
+        this._minRemoteSlot = 1;
+    }
+
+    /**
+     * Configure the lowest slot index that may be allocated to a
+     * joining remote. Used by mode.js when entering Network DM host
+     * mode — kiosk reserves [0, 1] for locals so the first remote
+     * starts at slot 2; non-kiosk reserves [0] so the first remote
+     * starts at slot 1.
+     */
+    setMinRemoteSlot(slot) {
+        this._minRemoteSlot = slot;
     }
 
     /** Returns the target for a given slot, or null. */
@@ -182,7 +203,7 @@ class Orchestrator {
     nextOrCurrentRemoteSlot(peerKey) {
         const existing = this._remoteBindings.get(peerKey);
         if (existing) return existing.slot;
-        for (let i = 1; i < MAX_SLOTS; i++) {
+        for (let i = this._minRemoteSlot; i < MAX_SLOTS; i++) {
             if (!this._occupiedRemoteSlots.has(i)) return i;
         }
         return null;
