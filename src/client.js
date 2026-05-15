@@ -15,6 +15,12 @@
 
 import { App } from './app.js';
 
+// Side-effect anchor for renderer-command overlay impls. See
+// src/ui/overlays.js — without this import, joiner-side overlays that
+// arrive over the wire (the scoreboard fan-out from master, etc.) have
+// no registered handler and render empty.
+import './ui/overlays.js';
+
 export async function initClientWindow({ roomCode = null } = {}) {
     const app = new App();
     window.app = app;

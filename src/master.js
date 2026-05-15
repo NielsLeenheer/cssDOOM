@@ -55,6 +55,13 @@ import { isMatchLobby, onMatch, ensureMatchSize } from './game/match.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
+// Side-effect anchor for renderer-command overlay impls. See
+// src/ui/overlays.js — without this import, modules whose only public
+// surface is `registerOverlayImpl(...)` (today: scoreboard.js) can fall
+// out of the bundle when their named imports get cleaned up elsewhere,
+// silently breaking the corresponding renderer command.
+import './ui/overlays.js';
+
 // ── Debug toggle ───────────────────────────────────────────────────────
 
 let debugEnabled = false;
