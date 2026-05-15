@@ -27,13 +27,56 @@
 
 // ── Defaults ───────────────────────────────────────────────────────────
 
-// Free public STUN servers. Cone-NAT clients (most home networks)
-// traverse with STUN alone. Symmetric-NAT clients need a TURN fallback;
-// add Cloudflare Calls or another provider via `iceServers` override.
-const DEFAULT_ICE_SERVERS = [
+// STUN-only fallback. Cone-NAT clients (most home networks) traverse
+// with STUN alone. Symmetric-NAT clients (some carrier-grade NAT, some
+// corporate firewalls, LTE) need a TURN relay — fetched dynamically
+// from `/signaling/turn-credentials` below.
+const STUN_ONLY_ICE_SERVERS = [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun.cloudflare.com:3478' },
 ];
+
+// Cached ICE servers (with TURN credentials) — populated by the first
+// successful fetchIceServers() call and reused for the page's
+// lifetime. Cloudflare's mint API issues credentials with a 24h TTL;
+// kiosk session is shorter than that, so one fetch per page load is
+// enough.
+let _cachedIceServers = null;
+let _cachedIceServersAt = 0;
+// Refresh when the cache is older than this. Less than the 24h TTL so
+// a long-running kiosk doesn't keep using a credential that's about
+// to expire mid-connection.
+const ICE_CACHE_TTL_MS = 20 * 60 * 60 * 1000; // 20 hours
+
+/**
+ * Fetch ICE servers (STUN + TURN) from the Worker. The Worker holds
+ * the Cloudflare API token and proxies the credential mint; the
+ * browser only ever sees short-lived `username` + `credential` pairs.
+ *
+ * Cached per page load. Falls back to STUN-only on any error — the
+ * conference WiFi happy path doesn't need TURN, and a degraded
+ * Network DM is better than a hard failure on the join screen.
+ */
+async function fetchIceServers() {
+    if (_cachedIceServers && performance.now() - _cachedIceServersAt < ICE_CACHE_TTL_MS) {
+        return _cachedIceServers;
+    }
+    try {
+        const protocol = location.protocol === 'https:' ? 'https:' : 'http:';
+        const res = await fetch(`${protocol}//${location.host}/signaling/turn-credentials`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = await res.json();
+        if (!payload?.iceServers || !Array.isArray(payload.iceServers)) {
+            throw new Error('malformed iceServers payload');
+        }
+        _cachedIceServers = payload.iceServers;
+        _cachedIceServersAt = performance.now();
+        return _cachedIceServers;
+    } catch (err) {
+        console.warn('[webrtc-transport] turn-credentials fetch failed, falling back to STUN-only:', err);
+        return STUN_ONLY_ICE_SERVERS;
+    }
+}
 
 // How long to wait for the data channel to open before treating the
 // connection as failed. Includes signaling handshake + ICE gathering +
@@ -120,19 +163,20 @@ export class WebRTCDataChannelTransport {
  * @param {object} options
  * @param {string} options.roomCode                — alphanumeric room code (typed or from QR)
  * @param {string} [options.signalingUrl]          — defaults to same-origin
- * @param {RTCIceServer[]} [options.iceServers]    — defaults to free STUN
+ * @param {RTCIceServer[]} [options.iceServers]    — defaults to STUN + TURN fetched from /signaling/turn-credentials
  * @returns {Promise<WebRTCDataChannelTransport>}
  */
 export async function connectToNetworkRoom({
     roomCode,
     signalingUrl = defaultSignalingUrl(),
-    iceServers = DEFAULT_ICE_SERVERS,
+    iceServers = null,
 } = {}) {
+    const resolvedIceServers = iceServers ?? await fetchIceServers();
     const wsUrl = `${signalingUrl}?room=${encodeURIComponent(roomCode)}&role=join`;
     const ws = new WebSocket(wsUrl);
 
     return new Promise((resolve, reject) => {
-        const pc = new RTCPeerConnection({ iceServers });
+        const pc = new RTCPeerConnection({ iceServers: resolvedIceServers });
         let dataChannel = null;
         const pendingIce = []; // candidates that arrive before setRemoteDescription
         let remoteDescriptionSet = false;
@@ -274,8 +318,15 @@ export function listenForNetworkClients({
     onPeerLeft = () => {},
     onError = () => {},
     signalingUrl = defaultSignalingUrl(),
-    iceServers = DEFAULT_ICE_SERVERS,
+    iceServers = null,
 }) {
+    // ICE servers may be a fixed array (legacy callers) OR a Promise
+    // resolving to one (default — fetched from /signaling/turn-credentials
+    // so master gets TURN relay candidates too). Resolve once at room
+    // open time; reused across every joiner's RTCPeerConnection below.
+    const iceServersPromise = iceServers != null
+        ? Promise.resolve(iceServers)
+        : fetchIceServers();
     const wsUrl = `${signalingUrl}?room=${encodeURIComponent(roomCode)}&role=master`;
 
     // peerId → { pc, dc, pendingIce, transportResolved }
@@ -342,7 +393,7 @@ export function listenForNetworkClients({
     openSignaling();
 
     async function startPeer(peerId) {
-        const pc = new RTCPeerConnection({ iceServers });
+        const pc = new RTCPeerConnection({ iceServers: await iceServersPromise });
         const peer = { pc, dc: null, pendingIce: [], remoteDescriptionSet: false, resolved: false };
         peers.set(peerId, peer);
 

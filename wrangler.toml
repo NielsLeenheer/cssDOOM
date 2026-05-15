@@ -23,6 +23,25 @@ class_name = "RoomDO"
 tag = "v1"
 new_sqlite_classes = ["RoomDO"]
 
+# ── Cloudflare Realtime TURN credentials ─────────────────────────────
+# CLOUDFLARE_TURN_TOKEN_ID identifies the TURN key project on our
+# Cloudflare account. Public — pairs with the API token to mint ICE
+# servers; useless on its own.
+#
+# CLOUDFLARE_TURN_API_TOKEN is the bearer token Cloudflare's mint API
+# requires. SECRET — anyone holding it can mint credentials against
+# our account. Configured in two places:
+#   - Local dev (`wrangler dev`): `.dev.vars` file, KEY=value format,
+#     gitignored.
+#   - Deployed environments: per-environment Wrangler secret —
+#       wrangler secret put CLOUDFLARE_TURN_API_TOKEN
+#       wrangler secret put CLOUDFLARE_TURN_API_TOKEN --env staging
+# The Worker reads it via env and never echoes it to clients; the
+# short-lived username + password it mints are what the browser sees.
+
+[vars]
+CLOUDFLARE_TURN_TOKEN_ID = "3c7f46486f19ef0b60f1118a56aabe50"
+
 # ── Staging environment ──────────────────────────────────────────────
 # Deployed as a separate Worker named `doomcss-staging`. Inherits the
 # top-level `main`, `compatibility_date`, `build`, and `migrations`.
@@ -52,6 +71,9 @@ binding = "ASSETS"
 [[env.staging.durable_objects.bindings]]
 name = "ROOMS"
 class_name = "RoomDO"
+
+[env.staging.vars]
+CLOUDFLARE_TURN_TOKEN_ID = "3c7f46486f19ef0b60f1118a56aabe50"
 
 [[env.staging.routes]]
 pattern = "dm.cssdoom.wtf"
