@@ -164,10 +164,8 @@ function setupMasterBroadcast() {
     let pendingLevel = null;
     onLevel('changing', ({ name }) => {
         pendingLevel = name ?? null;
-        // L6.6 — broadcast a coordinated loadMap to every alive peer
-        // (replaces signalLevelChange, which fired MSG.LEVEL_CHANGE and
-        // tore down each peer-session so they had to reconnect). Peers
-        // now stay alive across the load: they receive MSG.LOAD_MAP,
+        // L6.6 — broadcast a coordinated loadMap to every alive peer.
+        // Peers stay alive across the load: they receive MSG.LOAD_MAP,
         // call loadMap locally without reloading the page, and reply
         // with MSG.READY_TO_PLAY. broadcastLoadMap also pauses LOOKING
         // for the duration of the handshake.

@@ -116,14 +116,12 @@ export function initGates() {
     // app.game isn't held for some reason (defensive — boot path
     // always assigns it).
     //
-    // Joiner-side level load is currently a gap: the level-load fires
-    // the 'changing' event which masterConnection.signalLevelChange
-    // broadcasts as MSG.LEVEL_CHANGE — joiners are supposed to reload
-    // and re-ACK against master's now-loaded level. In practice this
-    // doesn't always fire / settle cleanly, so the joiner's HUD shows
-    // but no scene. L6.6 (MSG.LOAD_MAP + READY_TO_PLAY handshake)
-    // replaces the reload-and-re-ACK dance with an in-place loadMap
-    // and is the proper fix.
+    // Joiner-side level load rides the L6.6 coordinated handshake:
+    // Level.load fires the 'changing' event → master broadcasts
+    // MSG.LOAD_MAP → joiner does an in-place loadMap (no page reload,
+    // so inventory survives via Level.load's transitionToLevel path)
+    // → joiner replies MSG.READY_TO_PLAY → master awaits all readies
+    // → master broadcasts MSG.PLAY → both sides start ticking.
     on(A.FIRE_DOWN, ({ slot }) => {
         if (state.networkMode !== 'host') return;
         if (!isMatchLobby()) return;

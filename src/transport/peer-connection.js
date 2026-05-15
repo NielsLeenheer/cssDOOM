@@ -242,21 +242,13 @@ export class MasterConnection {
     }
 
     /**
-     * Tell every alive peer the scene is about to rebuild, and pause
-     * LOOKING acceptance so a reconnecting peer doesn't ACK against a
-     * half-built scene. resumeAfterLevelLoad() unpauses. We pause
-     * unconditionally — the next loadMap might attract a fresh client
-     * mid-load even with no current peer.
+     * Unpause LOOKING after a non-coordinated loadMap (legacy
+     * switches.js DM exit-switch path). The coordinated handshake
+     * uses broadcastPlay() to unpause; this is the fallback for
+     * uncoordinated callers that fire loadMap directly. L4 / L6.7
+     * routes the remaining uncoordinated paths through Game.beginPlay
+     * and deletes this method.
      */
-    signalLevelChange() {
-        this.paused = true;
-        for (const session of this._peers.values()) {
-            if (!session.alive) continue;
-            this._postTo(session, { type: MSG.LEVEL_CHANGE });
-            this._handlePeerGone(session);
-        }
-    }
-
     resumeAfterLevelLoad() {
         this.paused = false;
     }
@@ -455,14 +447,6 @@ export class ClientConnection extends PeerConnectionBase {
             if (!this._timeoutCheck) this._startWatchdog();
         } else if (msg.type === MSG.LEAVING) {
             this._handlePeerGone();
-        } else if (msg.type === MSG.LEVEL_CHANGE) {
-            // Master is about to rebuild its scene. Reload so the next
-            // reconnect happens against the master's settled new state.
-            // L6.6 Phase 1 keeps this as a fallback for code paths that
-            // bypass the coordinated handshake (legacy switches.js DM
-            // exit-switch). Phase 2 deletes it once every path routes
-            // through Game.beginPlay's LOAD_MAP broadcast.
-            location.reload();
         } else if (msg.type === MSG.LOAD_MAP) {
             // L6.6 — coordinated in-place load. Handler is responsible
             // for calling sendReadyToPlay() once the local scene is

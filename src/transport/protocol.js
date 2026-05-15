@@ -64,17 +64,6 @@ export const MSG = {
     // registered input provider.
     ANALOG: 'analog',
     PING: 'ping',
-    // Master is about to teardown + rebuild the scene (initial load,
-    // level transition, attract entry). Client should reload itself so
-    // the next reconnect arrives after master's loadMap has settled on
-    // a fresh state.
-    //
-    // L6.6 introduced LOAD_MAP + READY_TO_PLAY + PLAY as the coordinated
-    // replacement; LEVEL_CHANGE stays in Phase 1 of L6.6 as a fallback
-    // for any code paths not yet routed through the coordinated handshake
-    // (notably the legacy switches.js DM exit-switch path that bypasses
-    // Game.beginPlay). Phase 2 deletes it.
-    LEVEL_CHANGE: 'level-change',
     // L6.6 — coordinated level-load handshake.
     //
     // Master → clients: "rebuild your scene to this map name." Clients
