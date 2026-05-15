@@ -38,6 +38,12 @@ new_sqlite_classes = ["RoomDO"]
 
 [env.staging]
 name = "doomcss-staging"
+# Keep the auto-assigned `doomcss-staging.<account>.workers.dev`
+# URL alive alongside the custom domain — without this, wrangler
+# disables workers.dev on every deploy. Useful as an ad-hoc
+# debugging URL when the custom domain DNS / cert provisioning is
+# delayed or misbehaving.
+workers_dev = true
 
 [env.staging.assets]
 directory = "./dist"
