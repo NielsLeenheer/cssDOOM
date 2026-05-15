@@ -233,8 +233,14 @@ export function enterLobby() {
 // from the same globals, so no DOM conflict.
 
 /** Renderer-command impl for showLobby + updateLobbyState (same body —
- *  the distinction is which Game lifecycle event triggered the push). */
+ *  the distinction is which Game lifecycle event triggered the push).
+ *  Master-only: this impl derives data-claim-state from local
+ *  claim-registry which doesn't exist on a client. Local DM secondaries
+ *  get their data-claim-state from client-lobby.js's impl (payload-driven);
+ *  Network DM clients use network-lobby.js's impl (slot list, not
+ *  per-pane press-to-claim). */
 export function renderLobbyState(_payload) {
+    if (document.body.classList.contains('client-window')) return;
     updateLobbyUI();
 }
 

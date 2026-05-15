@@ -304,17 +304,17 @@ function setupMasterBroadcast() {
  * `peerAlive`).
  */
 function broadcastLobbyState() {
-    if (!masterConnection) return;
     const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
     const carried = getCarriedOverClaims();
     const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
-    masterConnection.broadcastLobbyState({
+    // L6.5 — pushes via the renderer-command pipeline instead of the
+    // legacy MSG.LOBBY_STATE wire envelope. The payload carries
+    // everything the pane-claim UI (Local DM) and the network slot list
+    // (Network DM) need; each impl picks the fields relevant to its mode.
+    orchestrator.updateLobbyState({
         inLobby: isMatchLobby(),
         slotsClaimed,
         slotsCarriedOver,
-        // Network DM joiners mirror the 4-slot list from this; Local
-        // DM clients ignore the field (their lobby uses the per-pane
-        // data-claim-state attribute fed from slotsClaimed).
         slotOccupants: getNetworkSlotOccupants(),
     });
 }

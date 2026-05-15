@@ -69,16 +69,6 @@ export const MSG = {
     // the next reconnect arrives after master's loadMap has settled on
     // a fresh state.
     LEVEL_CHANGE: 'level-change',
-    // Master → client: current lobby state. Carries enough info for
-    // both lobbies:
-    //   - Local DM: `slotsClaimed` / `slotsCarriedOver` drive per-pane
-    //     data-claim-state CSS (PRESS BUTTON TO JOIN / READY / waiting).
-    //   - Network DM: `slotOccupants` (an array of
-    //     'empty'|'host'|'local'|'remote' tags by slot) drives the
-    //     4-row slot list in the per-pane network-lobby overlay.
-    // The same envelope is broadcast on every claim/join/leave/match
-    // -reset; clients pick the field they need based on their mode.
-    LOBBY_STATE: 'lobby-state',
     // Master → client: match has ended. Carries the kill matrix,
     // per-player scores, map name, and winner so the client renders the
     // same scoreboard. resetMatch / restartMatch implicitly clear by

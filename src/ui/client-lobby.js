@@ -75,3 +75,20 @@ export function applyLobbyState(msg) {
     const paneEl = document.querySelector(`.pane[data-player="${mySlot}"]`);
     if (paneEl) paneEl.dataset.claimState = claimState;
 }
+
+// L6.5 — register applyLobbyState as a renderer-command impl. Replaces
+// the legacy MSG.LOBBY_STATE envelope handler in remote-game.js. Gates
+// on .client-window so master's own pane[data-claim-state] (which
+// lobby.js's updateLobbyUI derives locally from claim-registry) isn't
+// double-written here. Also gates against .network-client because
+// Network DM remotes don't use the per-pane press-to-claim overlay —
+// network-lobby.js's renderLobbyState handles their slot list instead.
+import { registerOverlayImpl } from '../renderer/commands.js';
+function applyLobbyStatePayload(payload) {
+    if (!document.body.classList.contains('client-window')) return;
+    if (document.body.classList.contains('network-client')) return;
+    if (!payload || !Array.isArray(payload.slotsClaimed)) return;
+    applyLobbyState(payload);
+}
+registerOverlayImpl('showLobby',        applyLobbyStatePayload);
+registerOverlayImpl('updateLobbyState', applyLobbyStatePayload);

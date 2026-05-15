@@ -261,11 +261,22 @@ onClaimChange(() => {
 // strangler-fig context.
 
 /** Renderer-command impl for showLobby + updateLobbyState in network
- *  mode. Re-derives from claim-registry like syncFromClaims does. */
-export function renderLobbyState(_payload) {
-    if (state.networkMode !== 'host') return;
-    syncFromClaims();
-    renderAllLabels();
+ *  mode. On master, re-derive from claim-registry like syncFromClaims
+ *  does. On a Network DM remote (.network-client body class), paint the
+ *  slot list from the payload's slotOccupants array — the remote has no
+ *  claim-registry of its own, so master is the authoritative source.
+ *  Local DM secondaries don't have .network-client and stay out — their
+ *  per-pane data-claim-state is set by client-lobby.js's impl. */
+export function renderLobbyState(payload) {
+    if (state.networkMode === 'host') {
+        syncFromClaims();
+        renderAllLabels();
+        return;
+    }
+    if (document.body.classList.contains('network-client')
+        && payload && Array.isArray(payload.slotOccupants)) {
+        applyNetworkLobbyState(payload.slotOccupants);
+    }
 }
 
 /** Renderer-command impl for hideLobby — no-op for now (CSS dismisses

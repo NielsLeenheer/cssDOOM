@@ -253,15 +253,6 @@ export class MasterConnection {
         this.paused = false;
     }
 
-    /**
-     * Broadcast a lobby-state envelope to every alive peer. Caller passes
-     * `{ inLobby, slotsClaimed, slotsCarriedOver }`.
-     */
-    broadcastLobbyState(state) {
-        const env = { type: MSG.LOBBY_STATE, ...state };
-        this._broadcast(env);
-    }
-
     /** Broadcast the end-of-match scoreboard to every alive peer. */
     broadcastMatchEnd(payload) {
         const env = { type: MSG.MATCH_END, ...payload };
@@ -340,15 +331,13 @@ export class MasterConnection {
  *   Fires when master accepts. `isReconnect` is true if we'd previously
  *   been connected (covering the master-restart case).
  * @param {() => void} [options.onLeave]      Master went silent.
- * @param {(msg: object) => void} [options.onLobbyState]  LOBBY_STATE envelope arrived.
  * @param {(msg: object) => void} [options.onMatchEnd]    MATCH_END envelope arrived.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onLobbyState, onMatchEnd } = {}) {
+    constructor({ transport = null, onAck, onLeave, onMatchEnd } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
-        this.onLobbyState = onLobbyState;
         this.onMatchEnd = onMatchEnd;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
@@ -382,8 +371,6 @@ export class ClientConnection extends PeerConnectionBase {
             // Master is about to rebuild its scene. Reload so the next
             // reconnect happens against the master's settled new state.
             location.reload();
-        } else if (msg.type === MSG.LOBBY_STATE) {
-            this.onLobbyState?.(msg);
         } else if (msg.type === MSG.MATCH_END) {
             this.onMatchEnd?.(msg);
         }
