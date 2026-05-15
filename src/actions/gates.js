@@ -123,7 +123,7 @@ export function initGates() {
     // → joiner replies MSG.READY_TO_PLAY → master awaits all readies
     // → master broadcasts MSG.PLAY → both sides start ticking.
     on(A.FIRE_DOWN, ({ slot }) => {
-        if (state.networkMode !== 'host') return;
+        if (window.app?.game?.networkMode !== 'host') return;
         if (!isMatchLobby()) return;
         if (slot !== 0) return;
         if (countNetworkLobbyOccupied() < 2) return;
@@ -143,7 +143,7 @@ export function initGates() {
     // immediately fire or use.
     const tryClaim = (event) => {
         if (event.slot != null) return;             // already claimed → pass through
-        if (state.gameMode !== 'deathmatch') return;
+        if (window.app?.game?.gameMode !== 'deathmatch') return;
         if (event.deviceId == null) return;
         if (isMatchEnded()) return;                  // match-end gate handles its own
         const claimed = tryClaimSlot(event.deviceId);
@@ -164,11 +164,12 @@ export function initGates() {
         if (slot == null) return;
         const player = state.players[slot];
         if (!player?.isDead) return;
-        const cooldown = state.gameMode === 'deathmatch'
+        const gameMode = window.app?.game?.gameMode;
+        const cooldown = gameMode === 'deathmatch'
             ? DM_RESPAWN_COOLDOWN_MS
             : SP_RESTART_COOLDOWN_MS;
         if (performance.now() - player.deathTime <= cooldown) return true;
-        if (state.gameMode === 'deathmatch') {
+        if (gameMode === 'deathmatch') {
             spawnPlayer(player);
         } else {
             loadMap(currentMap);
