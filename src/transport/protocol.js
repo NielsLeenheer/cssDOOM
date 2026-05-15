@@ -84,11 +84,6 @@ export const MSG = {
     // same scoreboard. resetMatch / restartMatch implicitly clear by
     // re-broadcasting LOBBY_STATE on the cssdoom:match-reset event.
     MATCH_END: 'match-end',
-    // Master → client: game-state transition. Client mirrors master's
-    // game-state machine so its body[data-game-state] attribute stays
-    // in sync — keeping all the attract/match-end/lobby/intermission
-    // CSS gates unified under a single namespaced attribute.
-    GAME_STATE: 'game-state',
     // Master → client: world sound trigger. Carries `name` (sound asset)
     // and `opts` ({x, y} only — UI sounds are local and never broadcast).
     // The client's orchestrator re-plays it through its own AudioRenderers.

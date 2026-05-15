@@ -268,11 +268,6 @@ export class MasterConnection {
         this._broadcast(env);
     }
 
-    /** Broadcast a game-state transition to every alive peer. */
-    broadcastGameState(state) {
-        this._broadcast({ type: MSG.GAME_STATE, state });
-    }
-
     _broadcast(envelope) {
         for (const session of this._peers.values()) {
             if (session.alive) this._postTo(session, envelope);
@@ -347,16 +342,14 @@ export class MasterConnection {
  * @param {() => void} [options.onLeave]      Master went silent.
  * @param {(msg: object) => void} [options.onLobbyState]  LOBBY_STATE envelope arrived.
  * @param {(msg: object) => void} [options.onMatchEnd]    MATCH_END envelope arrived.
- * @param {(msg: object) => void} [options.onGameState]   GAME_STATE envelope arrived.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onLobbyState, onMatchEnd, onGameState } = {}) {
+    constructor({ transport = null, onAck, onLeave, onLobbyState, onMatchEnd } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
         this.onLobbyState = onLobbyState;
         this.onMatchEnd = onMatchEnd;
-        this.onGameState = onGameState;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -393,8 +386,6 @@ export class ClientConnection extends PeerConnectionBase {
             this.onLobbyState?.(msg);
         } else if (msg.type === MSG.MATCH_END) {
             this.onMatchEnd?.(msg);
-        } else if (msg.type === MSG.GAME_STATE) {
-            this.onGameState?.(msg);
         }
     }
 

@@ -288,10 +288,13 @@ function setupMasterBroadcast() {
     });
 
     // Mirror every game-state transition onto the client. game-state.js
-    // calls this on each transitionTo. The connection gates on
-    // peerAlive — no broadcast when nobody's listening.
+    // calls this on each transitionTo. Routes through the renderer-
+    // command pipeline (L6.5 — replaces the legacy MSG.GAME_STATE wire
+    // envelope) which fans the call to every target including each
+    // RenderSink → client's DomRenderer, where the registered impl
+    // calls applyRemoteGameState to flip body[data-game-state].
     setGameStateBroadcaster((s) => {
-        masterConnection?.broadcastGameState(s);
+        orchestrator.setGameState(s);
     });
 }
 

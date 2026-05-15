@@ -87,6 +87,16 @@ function applyTransition(next) {
     for (const cb of listeners) cb(next, prev);
 }
 
+// L6.5 — render-only impl for the setGameState renderer command. Master's
+// transitionTo calls broadcastGameState(next) which fans through the
+// renderer-command pipeline; the impl runs on every receiver (master's
+// own DomRenderer + each RenderSink → client's DomRenderer). master's
+// applyTransition already ran from the original transitionTo so it's a
+// no-op there (current === next); on the client this is what writes
+// body[data-game-state] so CSS gates stay synced.
+import { registerOverlayImpl } from '../renderer/commands.js';
+registerOverlayImpl('setGameState', applyRemoteGameState);
+
 /**
  * Subscribe to state-change events. Returns an unsubscribe function.
  * The callback receives `(next, prev)`.

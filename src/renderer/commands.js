@@ -221,6 +221,15 @@ export const COMMANDS = {
     hideIntermission: { kind: 'world', impl: (_renderer) => fireOverlay('hideIntermission') },
     showResults:      { kind: 'world', impl: (_renderer, payload) => fireOverlay('showResults', payload) },
     hideResults:      { kind: 'world', impl: (_renderer) => fireOverlay('hideResults') },
+
+    // L6.5 — game-state transitions. Master's game-state.js calls
+    // `broadcastGameState(next)` on every transitionTo; this fans out
+    // through the renderer-command pipeline instead of the legacy
+    // MSG.GAME_STATE wire envelope. The impl is idempotent on master
+    // (applyRemoteGameState early-returns when state hasn't changed)
+    // and writes body[data-game-state] on the client so CSS gates
+    // (`body[data-game-state="lobby"] ...`) stay aligned with master.
+    setGameState:     { kind: 'world', impl: (_renderer, payload) => fireOverlay('setGameState', payload) },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(

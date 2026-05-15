@@ -46,7 +46,7 @@ import { setAudioEnabled } from '../audio/audio.js';
 import { loadMap } from '../shared/maps.js';
 import { setClientSlot, applyLobbyState } from '../ui/client-lobby.js';
 import { applyNetworkLobbyState } from '../ui/network-lobby.js';
-import { showScoreboard, hideScoreboard } from '../ui/scoreboard.js';
+import { showScoreboard } from '../ui/scoreboard.js';
 import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyRemoteGameState } from '../game/game-state.js';
 
@@ -143,14 +143,9 @@ export class RemoteGame {
                 // scoreboard from the broadcast snapshot.
                 showScoreboard(msg);
             },
-            onGameState: ({ state }) => {
-                // L6.5 deletes GAME_STATE; until then, mirror master's
-                // game-state machine. Clear scoreboard when leaving
-                // ENDED so a rematch doesn't keep stale DOM.
-                const wasEnded = document.body.dataset.gameState === 'ended';
-                applyRemoteGameState(state);
-                if (wasEnded && state !== 'ended') hideScoreboard();
-            },
+            // L6.5: GAME_STATE envelope deleted — game-state transitions
+            // now ride the renderer-command pipeline (setGameState command).
+            // The impl in game-state.js applies them on this client.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
             onLeave: () => this._onLeave(),
         });
