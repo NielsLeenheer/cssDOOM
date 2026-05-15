@@ -31,7 +31,10 @@ new_sqlite_classes = ["RoomDO"]
 # staging does NOT exist in production, and vice versa.
 #
 # Deploy: `wrangler deploy --env staging`
-# URL:    `doomcss-staging.<account>.workers.dev`
+# URL:    `dm.cssdoom.wtf` (custom domain — Cloudflare auto-provisions
+#         DNS + cert on first deploy as long as cssdoom.wtf is on the
+#         same Cloudflare account). Also reachable via
+#         `doomcss-staging.<account>.workers.dev` for ad-hoc debugging.
 
 [env.staging]
 name = "doomcss-staging"
@@ -43,3 +46,7 @@ binding = "ASSETS"
 [[env.staging.durable_objects.bindings]]
 name = "ROOMS"
 class_name = "RoomDO"
+
+[[env.staging.routes]]
+pattern = "dm.cssdoom.wtf"
+custom_domain = true

@@ -28,7 +28,14 @@ export default defineConfig({
                 // wss:// (not https://) — Vite/http-proxy with ws:true
                 // expects a WebSocket-scheme target when the proxied
                 // route is itself a WebSocket upgrade.
-                target: 'wss://doomcss-staging.niels-leenheer.workers.dev',
+                //
+                // `dm.cssdoom.wtf` is the custom-domain alias of the
+                // doomcss-staging worker (see wrangler.toml's
+                // [env.staging.routes]). The original
+                // `doomcss-staging.<account>.workers.dev` URL still
+                // works as a fallback if the custom domain ever fails
+                // to provision.
+                target: 'wss://dm.cssdoom.wtf',
                 ws: true,
                 changeOrigin: true,
                 secure: true,

@@ -191,14 +191,16 @@ function isTabSwapEnabled() {
     const host = location.hostname;
     if (host === 'localhost' || host === '127.0.0.1') return true;
     if (host.includes('-staging.')) return true;
+    if (host === 'dm.cssdoom.wtf') return true;
     return false;
 }
 
 /**
  * Tab pressed — debug affordance for driving two players from one
- * keyboard. Enabled on dev (`localhost`) and staging
- * (`*-staging.*workers.dev`) for smoke-testing two-player Local DM
- * from one keyboard; disabled on production / the kiosk URL.
+ * keyboard. Enabled on dev (`localhost`), the `*-staging.*workers.dev`
+ * URL, and the `dm.cssdoom.wtf` subdomain (network-DM staging) for
+ * smoke-testing two-player Local DM from one keyboard; disabled on
+ * production / the kiosk URL.
  */
 function handleTab() {
     if (!isTabSwapEnabled()) return;
