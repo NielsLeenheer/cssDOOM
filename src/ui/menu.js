@@ -151,16 +151,17 @@ export function updateMenuSelection() {
 // Menu state & toggle
 // ============================================================================
 
-let menuOpen = false;
-
-/** Returns true if the menu overlay is currently open. */
+/**
+ * Single source of truth: App.MENU. Menu open/close state is owned by
+ * the App state machine; this module only renders the overlay DOM in
+ * response to toggleMenu and reads back from App when asked.
+ */
 export function isMenuOpen() {
-    return menuOpen;
+    return window.app?._state === 'MENU';
 }
 
 export function toggleMenu(show) {
-    if (show === menuOpen) return;
-    menuOpen = show;
+    if (show === isMenuOpen()) return;
 
     if (show) {
         dom.menuOverlay.hidden = false;
@@ -171,10 +172,9 @@ export function toggleMenu(show) {
         dom.menuOverlay.classList.remove('showing');
         updateMenuSelection();
 
-        // L5 — notify App so it can pause the held Game (Level
-        // freezes; per §7 the renderer-command fan-out to clients
-        // lands in L6). App.openMenu also records previousState for
-        // §3c fall-through on close.
+        // App.openMenu transitions App into MENU (which flips
+        // isMenuOpen) and pauses the held Game. App.openMenu also
+        // records previousState for the §3c close fall-through.
         window.app?.openMenu();
     } else {
         dom.menuOverlay.classList.add('hiding');
@@ -184,10 +184,10 @@ export function toggleMenu(show) {
             dom.menuOverlay.classList.remove('hiding');
         });
 
-        // L5 — App.closeMenu resolves per §3c:
+        // App.closeMenu resolves per §3c:
         //   previousState='IN_GAME' → resume the held Game.
-        //   previousState='ATTRACT' → start a fresh Game with
-        //                             lastModeConfig (kiosk only).
+        //   previousState='ATTRACT' → start a fresh Game (reserved;
+        //                             not reachable today).
         //   previousState='BOOT'    → no-op.
         // Fire-and-forget; closeMenu is async only for the ATTRACT
         // branch's startLocalGame.
@@ -196,7 +196,7 @@ export function toggleMenu(show) {
 }
 
 dom.menuButton.addEventListener('click', () => {
-    toggleMenu(!menuOpen);
+    toggleMenu(!isMenuOpen());
 });
 
 dom.menuOverlay.addEventListener('click', (e) => {
