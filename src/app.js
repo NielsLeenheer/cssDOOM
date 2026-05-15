@@ -166,14 +166,19 @@ export class App {
             return;
         }
 
-        // L4.9 fallback: applyMode (in master.js) already initialized
-        // state.gameMode / state.networkMode from the legacy
-        // localStorage cssdoom-game-mode (or default 'singleplayer').
-        // Use that as the boot config so we land in a Game rather
-        // than routing to MENU. Q12's first-boot-MENU behavior is a
-        // future UX choice deferred until menu mode-switching also
-        // routes through app.startLocalGame; until then, legacy
-        // localStorage acts as the source of truth.
+        // Live non-kiosk first-boot path. master.js calls
+        // applyMode(loadSavedGameMode(), 'standalone') before App.start,
+        // so state.gameMode is always set here (defaults to
+        // 'singleplayer' on first ever boot). We seed startLocalGame
+        // with that mode so the user lands in a playable game rather
+        // than an empty menu.
+        //
+        // Q12 specifies a different UX — non-kiosk first boot should
+        // land in MENU, not a default Game. Wiring that requires
+        // dropping master.js's applyMode pre-seed (so state.gameMode
+        // would be falsy here) and reworking menu.js's mode-switch
+        // to take the boot path. Deferred; the transitionTo('MENU')
+        // line below is the cut-point.
         if (state.gameMode) {
             await this.startLocalGame({
                 gameMode: state.gameMode,
