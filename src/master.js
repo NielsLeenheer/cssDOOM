@@ -174,7 +174,14 @@ function setupMasterBroadcast() {
     masterConnection = new MasterConnection({
         snapshotProvider: (peerKey) => ({
             gameMode: state.gameMode,
-            level: pendingLevel ?? currentMap,
+            // Only advertise a level if one is actually loaded. Without
+            // this gate, a master that entered Network DM via menu from
+            // another mode keeps `currentMap` set to the old level and
+            // joiners would loadMap on it during the lobby phase (and
+            // render the stale world instead of the lobby UI). Once the
+            // host fires the match start, the Level registry populates
+            // and joiners then arrive into the live level.
+            level: getCurrentLevel() ? (pendingLevel ?? currentMap) : null,
             gameState: getGameState(),
             slotIndex: orchestrator.nextOrCurrentRemoteSlot(peerKey),
         }),
