@@ -395,6 +395,13 @@ export async function initMaster({ isKiosk = false } = {}) {
     // and waits for Game._checkAutoStart (L4.5) to trigger beginPlay
     // when both slots are claimed. Kiosk-SP and Network-DM-host map
     // to the same paths.
+    //
+    // Master broadcast must be set up BEFORE app.start because the
+    // `?server=CODE` shortcut and (eventually) any Network-DM boot
+    // path that calls openRoom() during app.start requires
+    // masterConnection to exist — otherwise openRoom early-returns
+    // and the signaling room is never opened.
+    setupMasterBroadcast();
     await app.start();
     startCullingLoop({
         isAttract: isAttractActive,
@@ -407,8 +414,6 @@ export async function initMaster({ isKiosk = false } = {}) {
     await new Promise(resolve => setTimeout(resolve, 600));
 
     hideInitialOverlay();
-
-    setupMasterBroadcast();
 
     // Resize: pane widths change → recompute perspective so FOV tracks
     // the new layout. Covers dev-window resizing and the kiosk's
