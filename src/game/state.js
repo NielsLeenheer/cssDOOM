@@ -77,6 +77,15 @@ export const state = {
     // used to reference the corresponding visual element in the renderer.
     projectiles: [],
     nextProjectileId: 0,
+
+    // ── Player corpses ────────────────────────────────────────────────
+    // Renderer-only decorations spawned by createCorpse when a player
+    // dies — they aren't in state.things, so they don't drive collision
+    // / AI / scoring. Tracked here so the world snapshot sent to a
+    // reconnecting joiner can re-emit createCorpse for each one and
+    // the joiner sees the bodies that piled up before it joined.
+    // Cleared in clearSceneState (a fresh map drops every corpse).
+    deathCorpses: [],
 };
 
 // ── Debug flags ──────────────────────────────────────────────────────

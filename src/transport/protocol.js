@@ -84,6 +84,18 @@ export const MSG = {
     // and `opts` ({x, y} only — UI sounds are local and never broadcast).
     // The client's orchestrator re-plays it through its own AudioRenderers.
     SOUND: 'sound',
+    // Master → client: one-shot world-state snapshot for new / reconnecting
+    // joiners. Sent right after the joiner's RenderClient is confirmed
+    // subscribed (master's onReady hook). Lets the joiner reconcile its
+    // freshly-rebuilt scene (initThings produces every entity in its
+    // alive/uncollected default state) against master's authoritative
+    // state — dead enemies stay dead, collected pickups stay collected,
+    // doors stay at their current open/closed position, corpses appear
+    // at their original death points, etc. Joiner applies via existing
+    // renderer commands with animations temporarily suppressed so the
+    // catch-up doesn't visibly re-play every death and door open since
+    // match start.
+    WORLD_SNAPSHOT: 'world-snapshot',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

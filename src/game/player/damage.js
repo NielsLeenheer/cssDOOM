@@ -103,6 +103,12 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             setTimeout(() => {
                 renderer.collectItem(thingIndex);
                 renderer.createCorpse(deathX, deathY, deathFloor, deathSectorIndex, playerIndex);
+                // Remember the corpse so the world snapshot sent to a
+                // reconnecting / late-joining client can re-emit it.
+                state.deathCorpses.push({
+                    x: deathX, y: deathY, floorHeight: deathFloor,
+                    sectorIndex: deathSectorIndex, playerIndex,
+                });
             }, 1400);
         }
 
@@ -237,6 +243,8 @@ function clearSceneState() {
     for (let index = 0; index < state.projectiles.length; index++) renderer.removeProjectile(state.projectiles[index].id);
     state.projectiles = [];
     state.nextProjectileId = 0;
+    // Drop tracked corpses; the next map starts fresh.
+    state.deathCorpses.length = 0;
     for (const player of state.players) renderer.setPlayerDead(player.viewportIndex, false);
 }
 

@@ -350,6 +350,19 @@ export class MasterConnection {
         }
     }
 
+    /**
+     * Send the world-state snapshot to a single peer. Used by master
+     * right after that peer's `onReady` fires — the freshly-built
+     * remote scene gets reconciled against master's authoritative
+     * state (dead enemies stay dead, collected pickups stay collected,
+     * doors/lifts at their current position, etc.).
+     */
+    sendSnapshot(peerKey, snapshot) {
+        const session = this._peers.get(peerKey);
+        if (!session?.alive) return;
+        this._postTo(session, { type: MSG.WORLD_SNAPSHOT, snapshot });
+    }
+
     _postTo(session, envelope) {
         try {
             session.transport.send(envelope);
@@ -424,14 +437,19 @@ export class MasterConnection {
  *   Master signalled that every joiner has confirmed loadMap. Visual
  *   state is already driven by renderer commands; this is mostly a
  *   synchronization point.
+ * @param {(snapshot: object) => void} [options.onSnapshot]
+ *   Master sent a world-state snapshot (after our READY). Handler
+ *   should reconcile our freshly-built scene against master's
+ *   authoritative state.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onLoadMap, onPlay } = {}) {
+    constructor({ transport = null, onAck, onLeave, onLoadMap, onPlay, onSnapshot } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
         this.onLoadMap = onLoadMap;
         this.onPlay = onPlay;
+        this.onSnapshot = onSnapshot;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -476,6 +494,8 @@ export class ClientConnection extends PeerConnectionBase {
             this.onLoadMap?.(msg);
         } else if (msg.type === MSG.PLAY) {
             this.onPlay?.();
+        } else if (msg.type === MSG.WORLD_SNAPSHOT) {
+            this.onSnapshot?.(msg.snapshot);
         }
     }
 

@@ -52,6 +52,7 @@ import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
 import { isMatchLobby, onMatch, ensureMatchSize } from './game/match.js';
+import { getWorldSnapshot } from './game/snapshot.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
@@ -252,14 +253,15 @@ function setupMasterBroadcast() {
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
             configureAudio(state.players.length);
-            // Late join during PLAYING isn't supported. The coordinated
-            // match-start handshake guarantees every joiner is in
-            // state.players before Game.beginPlay runs Level.load, and
-            // Level.load's addPlayerThings + resetGameState seed each
-            // roster slot's player thing + DM defaults. A joiner that
-            // arrives mid-match has its slot tracked here but its
-            // player thing isn't streamed into the existing world;
-            // proper world-snapshot recovery would be its own feature.
+            // World-state snapshot. The joiner's fresh-built scene has
+            // every pickup uncollected, every enemy alive, every door
+            // at its map-default state, and no corpses. Send master's
+            // authoritative state so the joiner reconciles. Skip if
+            // no map is loaded yet (still in lobby) — the joiner's
+            // upcoming loadMap will build a fresh scene anyway.
+            if (getCurrentLevel()) {
+                masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
+            }
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator
