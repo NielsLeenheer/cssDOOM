@@ -259,7 +259,7 @@ onClaimChange(() => {
 // renders for the host configuration; non-network DM is handled by
 // lobby.js.
 
-/** Renderer-command impl for showLobby + updateLobbyState in network
+/** Renderer-command impl for showLobby in network
  *  mode. On master, re-derive from claim-registry like syncFromClaims
  *  does. On a Network DM remote (.network-client body class), paint the
  *  slot list from the payload's slotOccupants array — the remote has no
@@ -287,6 +287,5 @@ export function clearLobby() {
 // Register render-only handlers. Parallel with lobby.js;
 // renderLobbyState() above gates on state.networkMode='host' so only
 // the network branch paints when networkMode matches.
-registerOverlayImpl('showLobby',        renderLobbyState);
-registerOverlayImpl('updateLobbyState', renderLobbyState);
-registerOverlayImpl('hideLobby',        clearLobby);
+registerOverlayImpl('showLobby', renderLobbyState);
+registerOverlayImpl('hideLobby', clearLobby);

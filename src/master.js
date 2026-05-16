@@ -44,14 +44,14 @@ import { initDebugMenu, updateDebugStats } from './ui/debug.js';
 import { attractTick, isAttractActive } from './ui/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
-import { isSlotClaimedLocally, onClaimChange } from './input/claim-registry.js';
+import { onClaimChange } from './input/claim-registry.js';
 import { BroadcastChannelTransport } from './transport/transport.js';
 import { BROADCAST_CHANNEL_NAME } from './transport/protocol.js';
 import { initMasterConnection } from './network-host.js';
-import { setNetworkSlotState, getNetworkSlotOccupants } from './ui/network-lobby.js';
+import { setNetworkSlotState } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
-import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
-import { isMatchLobby, onMatch, ensureMatchSize } from './game/match.js';
+import { initLobby } from './ui/lobby.js';
+import { onMatch, ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
@@ -240,7 +240,7 @@ function setupMasterBroadcast() {
             // Send current lobby state right away so the freshly-
             // connected client's pane shows the correct prompt
             // immediately (instead of waiting for the next claim event).
-            broadcastLobbyState();
+            orchestrator.showLobby();
         },
         onReady: (peerKey) => {
             // Client has confirmed its RenderClient is subscribed. NOW
@@ -288,6 +288,13 @@ function setupMasterBroadcast() {
             // the joiner would stare at blank HUD digits until the
             // player's next damage / ammo / kill event.
             if (state.players[slot]) state.players[slot]._hudDirty = true;
+            // If a results / intermission / lobby overlay is currently
+            // visible, replay it onto just this joiner's sink. The
+            // orchestrator asks the provider (Game) what's visible and
+            // pulls fresh payload via the same getter as the live fire
+            // path, so the joiner sees current data — not whatever was
+            // stashed at the original fire time.
+            orchestrator.replayCurrentOverlayTo(orchestrator.target(slot));
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator
@@ -309,7 +316,7 @@ function setupMasterBroadcast() {
                 setNetworkSlotState(slot, { occupant: 'empty' });
                 // Re-broadcast so any still-connected joiners drop
                 // the departed peer's row to "WAITING FOR PLAYER".
-                broadcastLobbyState();
+                orchestrator.showLobby();
             }
         },
     });
@@ -323,9 +330,11 @@ function setupMasterBroadcast() {
 
     // Mirror master's lobby state onto any connected client. Fires on
     // every local claim add/remove (via the orchestrator's claim notify)
-    // and on match-reset so the client's overlay tracks live.
-    onClaimChange(broadcastLobbyState);
-    onMatch('reset', broadcastLobbyState);
+    // and on match-reset. orchestrator.showLobby pulls the current
+    // payload from Game (see Game.getLobbyPayload) and fans to every
+    // target — master's own panes + each connected sink.
+    onClaimChange(() => orchestrator.showLobby());
+    onMatch('reset',  () => orchestrator.showLobby());
 
     // Scoreboard fan-out to clients is handled by the renderer-command
     // pipeline: match.js::endMatch and Game._onLevelComplete (DM
@@ -342,26 +351,12 @@ function setupMasterBroadcast() {
     });
 }
 
-/**
- * Build current lobby state and send it to all connected sinks. No-op
- * when no client is alive (the underlying broadcast is gated on
- * `peerAlive`).
- */
-function broadcastLobbyState() {
-    const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
-    const carried = getCarriedOverClaims();
-    const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
-    // Push via the renderer-command pipeline so the same payload
-    // reaches master's pane-claim UI (Local DM) and the network slot
-    // list (Network DM). Each impl picks the fields relevant to its
-    // mode.
-    orchestrator.updateLobbyState({
-        inLobby: isMatchLobby(),
-        slotsClaimed,
-        slotsCarriedOver,
-        slotOccupants: getNetworkSlotOccupants(),
-    });
-}
+// broadcastLobbyState used to build a lobby payload from master-side
+// state and push it through orchestrator.updateLobbyState. Both the
+// payload-build and the updateLobbyState command have been folded
+// away: Game owns the unified payload via getLobbyPayload, and
+// orchestrator.showLobby pulls it on every signal. Call sites now
+// just signal `orchestrator.showLobby()`.
 
 // ── Boot ───────────────────────────────────────────────────────────────
 

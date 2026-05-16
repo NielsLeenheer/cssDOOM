@@ -55,9 +55,9 @@ import {
     applyThingPositionUpdate,
     applyThingCollected,
 } from './renderer-state.js';
-// Overlay commands (showLobby / updateLobbyState / hideLobby /
-// showIntermission / hideIntermission / showResults / hideResults /
-// setGameState) dispatch through a late-binding registry rather than
+// Overlay commands (showLobby / hideLobby / showIntermission /
+// hideIntermission / showResults / hideResults / setGameState)
+// dispatch through a late-binding registry rather than
 // importing the ui/* modules directly. The direct-import shape
 // (`commands.js → ui/lobby.js → orchestrator.js → commands.js`) is a
 // cycle that crashed Firefox via TDZ on the COMMANDS export.
@@ -212,15 +212,18 @@ export const COMMANDS = {
     lowerTaggedFloor: { kind: 'world', impl: lowerTaggedFloor },
 
     // ── World: lobby / intermission / results overlays ───────────────────
-    // Driven by Game.start (showLobby), Game's onClaimChange handler
-    // (updateLobbyState), Game.beginPlay (hideLobby), Game._onLevelComplete
-    // (showIntermission / showResults), and match.js::endMatch
-    // (showResults). World-kind so master fans the same command to
-    // every client's RenderClient and the visual stays in sync across
-    // master + remote panes without a side-channel envelope. Each
-    // impl calls into multiple UI modules; each module gates
-    // internally on state.networkMode / body classes so only the
-    // right one paints.
+    // Stateful overlays — the show* variants are signals; the
+    // orchestrator pulls the actual payload from Game (the registered
+    // payload provider) at dispatch time via its show* overrides (see
+    // orchestrator.js OVERLAY_PULLERS). Callers (match.js::endMatch,
+    // Game.{start, beginPlay, restartMatch, _onLevelComplete},
+    // master.js's onJoin/onLeave/onClaimChange/onMatch.reset) just
+    // signal — they don't carry data. World-kind so master fans the
+    // same command to every client's RenderClient and the visual
+    // stays in sync across master + remote panes without a
+    // side-channel envelope. Each impl calls into multiple UI
+    // modules; each module gates internally on state.networkMode /
+    // body classes so only the right one paints.
     //
     // World-command impls are invoked by DomRenderer as
     // `impl(this, ...args)` — renderer first, then the orchestrator
@@ -231,7 +234,6 @@ export const COMMANDS = {
     // showResults crashed in scoreboard.js with a DomRenderer object
     // where it expected `{scores, kills, winnerIndex, mapName}`.
     showLobby:        { kind: 'world', impl: (_renderer, payload) => fireOverlay('showLobby', payload) },
-    updateLobbyState: { kind: 'world', impl: (_renderer, payload) => fireOverlay('updateLobbyState', payload) },
     hideLobby:        { kind: 'world', impl: (_renderer) => fireOverlay('hideLobby') },
     showIntermission: { kind: 'world', impl: (_renderer, payload) => fireOverlay('showIntermission', payload) },
     hideIntermission: { kind: 'world', impl: (_renderer) => fireOverlay('hideIntermission') },

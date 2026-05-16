@@ -18,10 +18,12 @@ import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap } from '../shared/maps.js';
-import { resetMatch, startMatch, onMatch } from './match.js';
+import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
+import { getCarriedOverClaims } from '../ui/lobby.js';
+import { getNetworkSlotOccupants } from '../ui/network-lobby.js';
 
 // How long to keep the just-claimed pane's READY indicator visible
 // before auto-starting the match. If a slot un-claims during the
@@ -91,10 +93,16 @@ export class Game {
      * Called from `App.startLocalGame`.
      */
     async start() {
+        // Register as the orchestrator's payload provider so signals
+        // like `orchestrator.showResults()` pull current state from
+        // here rather than the caller carrying a payload. Cleared in
+        // stop() so a stale Game doesn't keep serving payloads after
+        // teardown.
+        orchestrator.setPayloadProvider(this);
+
         this._transitionTo('LOBBY');
-        const lobbyPayload = { slots: this.roster, mapCursor: this.mapCursor };
-        orchestrator.showLobby(lobbyPayload);
-        this._emit('lobby-updated', lobbyPayload);
+        orchestrator.showLobby();
+        this._emit('lobby-updated', this.getLobbyPayload());
 
         // Subscribe to device→slot claim changes so Local DM
         // auto-starts when both slots are claimed AND the lobby UI
@@ -112,19 +120,21 @@ export class Game {
         // NETWORK_START gate, not all-claimed auto-start.
         onClaimChange(() => {
             if (this._state !== 'LOBBY') return;
-            const payload = { slots: this.roster, mapCursor: this.mapCursor };
-            orchestrator.updateLobbyState(payload);
-            this._emit('lobby-updated', payload);
+            orchestrator.showLobby();
+            this._emit('lobby-updated', this.getLobbyPayload());
             this._checkAutoStart();
         });
 
-        // Bridge match.js's 'ended' channel (fires from frag/time-limit
-        // path inside match.js::endMatch) onto Game's own emit pattern.
-        // The DM exit-switch path goes through Game._onLevelComplete
-        // and emits match-ended from there directly.
-        onMatch('ended', (payload) => {
-            if (this._state === 'ENDED') return;
-            this._emit('match-ended', payload);
+        // Bridge match.js's 'ended' channel onto Game's own emit
+        // pattern + transition the local state machine. match.js::endMatch
+        // is now the single end-match entry point (the DM exit-switch
+        // path also funnels through it via Game._onLevelComplete) so
+        // this subscriber is the single converge point that flips
+        // Game._state to RESULTS.
+        onMatch('ended', () => {
+            if (this._state === 'ENDED' || this._state === 'RESULTS') return;
+            this._transitionTo('RESULTS');
+            this._emit('match-ended', this.getResultsPayload());
         });
 
         if (this.gameMode === 'singleplayer') {
@@ -308,6 +318,12 @@ export class Game {
         orchestrator.hideIntermission();
         orchestrator.hideResults();
 
+        // Surrender the provider slot so a stale Game doesn't keep
+        // serving payloads after teardown. App tears down the old
+        // Game (this stop) before constructing the next, so we never
+        // clobber a newer provider here.
+        orchestrator.setPayloadProvider(null);
+
         this._transitionTo('ENDED');
         this._emit('game-ended', {});
     }
@@ -319,15 +335,11 @@ export class Game {
      * Currently a parallel entry point — the live claim flow still
      * runs through `input/claim-registry.js` (input modules call
      * `tryClaimSlot(deviceId)` directly; Game subscribes to
-     * `onClaimChange` and pushes updateLobbyState from there).
+     * `onClaimChange` and signals showLobby from there).
      */
     claimSlot(slot, deviceId) {
         ensurePlayerCount(slot + 1);
-        orchestrator.updateLobbyState({
-            slots: this.roster,
-            slot,
-            deviceId,
-        });
+        orchestrator.showLobby();
         this._emit('roster-updated', {
             slot,
             deviceId,
@@ -407,54 +419,67 @@ export class Game {
         // here (no claim change), so we have to push the re-render
         // explicitly. Otherwise the READY! overlay lingers over the
         // running match.
-        const lobbyPayload = { slots: this.roster, mapCursor: this.mapCursor };
-        orchestrator.updateLobbyState(lobbyPayload);
-        this._emit('lobby-updated', lobbyPayload);
+        orchestrator.showLobby();
+        this._emit('lobby-updated', this.getLobbyPayload());
     }
 
     /**
-     * RESULTS → LOBBY transition for DM. Does NOT tear down
-     * `this.level` — that already happened at PLAYING → RESULTS on
-     * match end. RESULTS → LOBBY is the pure state transition; the
-     * next match's Level reload happens below. Called from
-     * `actions/gates.js` on FIRE_DOWN during the match-end gate.
+     * RESULTS → LOBBY transition for DM. Advances mapCursor to the
+     * next map (per vanilla DOOM: any end-of-match — exit-switch OR
+     * frag/time-limit — advances), then constructs a fresh Level for
+     * that map and lands in LOBBY ready for the next match's start
+     * trigger. Called from `actions/gates.js` on FIRE_DOWN during
+     * the match-end gate.
      *
-     * Secret-exit map cycling isn't implemented yet — DM exit always
-     * cycles via getNextMap, regardless of which exit fired.
+     * The Level construction here goes through Game's normal subscribe
+     * path (`_subscribeLevel`), which is what makes the NEXT exit-switch
+     * fire `_onLevelComplete` — switches.js used to do `setTimeout(
+     * shared/maps.js::loadMap)` which built a Level without that
+     * subscription, silently breaking results on match 2+.
      */
     async restartMatch() {
         orchestrator.hideResults();
 
+        // Advance mapCursor. _pendingNextMap is set by _onLevelComplete
+        // when an exit switch triggered the end (carries secret-exit
+        // routing too); frag/time-limit ends leave it null so we fall
+        // through to getNextMap. Final fallback to currentMap covers
+        // the end-of-cycle case (no next map defined).
+        this.mapCursor = this._pendingNextMap ?? getNextMap() ?? this.mapCursor;
+        this._pendingNextMap = null;
+
         // Reset match state in match.js (kill matrix, scores, frag
         // clock, body.dataset.gameState → LOBBY via game-state.js).
-        // match.js owns DM-match mechanics; calling resetMatch here
-        // also fires match.js's onMatch('reset') event that lobby.js
+        // Also fires match.js's onMatch('reset') event that lobby.js
         // + master broadcast both subscribe to.
         resetMatch();
 
         this._transitionTo('LOBBY');
-        const lobbyPayload = { slots: this.roster, mapCursor: this.mapCursor };
-        orchestrator.showLobby(lobbyPayload);
-        this._emit('lobby-updated', lobbyPayload);
+        orchestrator.showLobby();
+        this._emit('lobby-updated', this.getLobbyPayload());
         this._emit('match-restarted', { mapCursor: this.mapCursor });
 
-        // Reload the Level so state.things / state.projectiles /
-        // state.doorState / state.liftState / state.crusherState all
-        // reset, and the renderer rebuilds its scene from fresh
-        // mapData. Without this, beginPlay's "level exists → just
-        // start()" idempotent path would keep the previous match's
-        // mid-match world (corpses, picked-up items, opened doors,
-        // half-killed enemies) live into the next match.
-        //
-        // Calling Level.load on the existing instance re-runs the
-        // full load body (fade-in → fetch → init → scene rebuild
-        // → fade-out). DM map cycling between matches isn't done
-        // here — restart reloads the SAME map. Map advancement on
-        // DM exit is still driven by switches.js's setTimeout
-        // loadMap; consolidating that onto Game is a follow-up.
+        // Tear down the old Level (map-bound at construction) and
+        // build a fresh one for the new mapCursor. Same shape as
+        // Game.advance for SP — Level instances are map-bound so a
+        // map change is always a destroy+reconstruct, never a reload.
         if (this.level) {
-            await this.level.load();
+            this.level.stop();
+            this.level.destroy();
+            if (getCurrentLevel() === this.level) _setCurrentLevel(null);
+            this.level = null;
         }
+
+        this.level = new Level({
+            map: this.mapCursor,
+            players: this.roster,
+            rules: this.rules,
+            orchestrator,
+        });
+        this._subscribeLevel(this.level);
+        await this.level.load();
+        this.level.start();
+        _setCurrentLevel(this.level);
 
         // Level.load's clearSceneState clears isDead+powerups but
         // doesn't reset HP / weapons / ammo / keys. spawnPlayer
@@ -549,19 +574,31 @@ export class Game {
 
     /**
      * Reacts to Level emitting `level-complete`. SP: PLAYING →
-     * INTERMISSION, pushes showIntermission via orchestrator (sole
-     * driver — switches.js no longer fires showIntermission directly).
-     * DM: PLAYING → RESULTS (vanilla DOOM exit-ends-match) and
-     * pushes showResults. switches.js still fires the actual
-     * setTimeout(loadMap, 1000) for the DM map advance because
-     * Game.restartMatch reloads the current map; consolidating
-     * the DM cycle onto Game is a follow-up.
+     * INTERMISSION, signals showIntermission (orchestrator pulls the
+     * payload from this Game via the provider hookup). DM: funnels
+     * straight into match.js::endMatch — the single end-match entry
+     * point. endMatch computes the winner, transitions GAME_STATE to
+     * ENDED, signals showResults, and fires onMatch('ended'); Game's
+     * own onMatch subscriber then flips _state → RESULTS. In BOTH
+     * modes we stash payload.nextMap so the next advance (Game.advance
+     * for SP, Game.restartMatch for DM) loads the right map.
+     *
+     * switches.js used to also `setTimeout(loadMap(nextMap), 1000)`
+     * for DM, which constructed a Level via shared/maps.js::loadMap
+     * — bypassing Game's _subscribeLevel. After that, the new Level
+     * had no Game subscriber, so the NEXT exit-switch silently
+     * dropped its level-complete on the floor: no _onLevelComplete,
+     * no endMatch, no results. That's gone — Game.restartMatch
+     * owns DM map advancement now.
      */
     _onLevelComplete(payload) {
+        // Stash next-map so the post-overlay advance path (Game.advance
+        // for SP, Game.restartMatch for DM) knows where to go. Carries
+        // secret-exit info implicitly because switches.js already
+        // resolved it to the correct target map.
+        this._pendingNextMap = payload?.nextMap ?? null;
+
         if (this.gameMode === 'singleplayer') {
-            // Stash the next map so advance() can pick it up when the
-            // user dismisses the intermission overlay.
-            this._pendingNextMap = payload?.nextMap ?? null;
             // Freeze the world. Without this, Level.tick keeps
             // running behind the intermission overlay — the player
             // can walk away from the exit switch and back, and
@@ -574,28 +611,38 @@ export class Game {
             // event-bus-driven.
             if (this.level) this.level.stop();
             this._transitionTo('INTERMISSION');
-            orchestrator.showIntermission(payload);
+            orchestrator.showIntermission();
         } else {
-            // DM: vanilla DOOM exit ends the match. switches.js still
-            // drives the next-map load via setTimeout(loadMap, 1000)
-            // — see the docstring above.
-            this._transitionTo('RESULTS');
-            const resultsPayload = this._buildResultsPayload();
-            orchestrator.showResults(resultsPayload);
-            this._emit('match-ended', resultsPayload);
+            // DM: funnel into the same endMatch path as frag/time-limit.
+            // The onMatch('ended') subscriber in start() flips _state
+            // → RESULTS, and endMatch itself signals showResults.
+            endMatch();
         }
         this._emit('level-complete', payload);
     }
 
-    /**
-     * Build the payload for `showResults`. Reads `state.match` (when
-     * present) for the kill matrix and players' `score` field.
-     * `winnerIndex` falls back to -1 (which the scoreboard renders
-     * as "TIE") when `state.match.winner` is unset — that field is
-     * only set by `match.js::endMatch`, which doesn't run on a DM
-     * exit-switch.
-     */
-    _buildResultsPayload() {
+    // ── Overlay payload provider ─────────────────────────────────────────
+    // Implements the orchestrator's payload-provider contract. The
+    // orchestrator calls these synchronously from inside its dispatch
+    // when the corresponding signal fires, so what lands on every
+    // renderer is whatever Game says is true right now.
+
+    /** Which overlay command, if any, is currently visible. Drives
+     *  `orchestrator.replayCurrentOverlayTo` on joiner reconnect. */
+    getCurrentOverlay() {
+        switch (this._state) {
+            case 'RESULTS':      return 'showResults';
+            case 'INTERMISSION': return 'showIntermission';
+            case 'LOBBY':        return 'showLobby';
+            default:             return null;
+        }
+    }
+
+    /** Scoreboard payload for `showResults`. winnerIndex defaults to
+     *  -1 (which the scoreboard renders as "TIE") if state.match isn't
+     *  populated — endMatch is what sets winner, so a results pull
+     *  before endMatch has run will read TIE. */
+    getResultsPayload() {
         const m = state.match;
         return {
             scores: this.roster.map(p => p?.score ?? 0),
@@ -604,6 +651,33 @@ export class Game {
                 : this.roster.map(() => this.roster.map(() => 0)),
             winnerIndex: m?.winner?.index ?? -1,
             mapName: this.mapCursor,
+        };
+    }
+
+    /** Intermission payload — the next map the SP advance() will load. */
+    getIntermissionPayload() {
+        return { nextMap: this._pendingNextMap ?? null };
+    }
+
+    /** Unified lobby payload consumed by every lobby renderer
+     *  ([ui/lobby.js], [ui/network-lobby.js], [ui/client-lobby.js]).
+     *  Combines roster info (slots + mapCursor) with the master-side
+     *  per-slot bookkeeping (claims, carried-over claims, network
+     *  occupants) so every consumer can pick the fields it needs from
+     *  one canonical shape. Used to be split across two payload shapes
+     *  pushed from two places (Game vs master.js::broadcastLobbyState),
+     *  which forced handlers to gate on which fields were present. */
+    getLobbyPayload() {
+        const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
+        const carried = getCarriedOverClaims();
+        const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
+        return {
+            inLobby: isMatchLobby(),
+            slots: this.roster,
+            mapCursor: this.mapCursor,
+            slotsClaimed,
+            slotsCarriedOver,
+            slotOccupants: getNetworkSlotOccupants(),
         };
     }
 

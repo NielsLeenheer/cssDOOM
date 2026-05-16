@@ -8,16 +8,19 @@
  *     `body[data-game-state="lobby"]`, written by the legacy
  *     game-state.js machine when `resetMatch()` runs.)
  *
- * Repaint trigger: Game pushes `updateLobbyState` through the
+ * Repaint trigger: Game and master.js push `showLobby` through the
  * orchestrator on every claim change (and on lobby entry / exit). The
- * renderer-command impl below is the sole driver; the legacy direct
- * `onClaimChange(updateLobbyUI)` subscription is gone. Auto-start is
- * owned by Game._checkAutoStart (same READY_FLASH delay as before).
+ * orchestrator pulls the current payload from Game (the registered
+ * payload provider) so what lands on every renderer matches Game's
+ * truth at dispatch time. The renderer-command impl below is the
+ * sole driver; the legacy direct `onClaimChange(updateLobbyUI)`
+ * subscription is gone. Auto-start is owned by Game._checkAutoStart
+ * (same READY_FLASH delay as before).
  *
  * Network DM lobby UI lives in src/ui/network-lobby.js — a 4-slot
- * list rather than per-pane prompts. Both modules register
- * impls on the same showLobby / updateLobbyState commands and each
- * gates on state.networkMode internally so only one paints per call.
+ * list rather than per-pane prompts. Both modules register impls on
+ * the same showLobby command and each gates on state.networkMode
+ * internally so only one paints per call.
  */
 
 import { state } from '../game/state.js';
@@ -131,16 +134,16 @@ function updateLobbyUI() {
 }
 
 // ── Renderer-command entry points ──────────────────────────────────────
-// Game pushes showLobby / updateLobbyState / hideLobby through the
-// orchestrator (see src/renderer/commands.js). The impls below are the
-// per-window render-only handlers — they re-derive from current globals
+// Game / master.js push showLobby / hideLobby through the orchestrator
+// (see src/renderer/commands.js). The impls below are the per-window
+// render-only handlers — they re-derive from current globals
 // (state.players, claim-registry, isMatchLobby) rather than reading the
 // payload. Future work could move re-derivation off globals and onto
 // the payload so the carriedOverClaims state can also migrate into
 // Game; today the carriedOverClaims tracking still lives in the
 // onMatch('reset') handler above.
 
-/** Renderer-command impl for showLobby + updateLobbyState.
+/** Renderer-command impl for showLobby.
  *  Master-only — derives data-claim-state from local claim-registry,
  *  which doesn't exist on a client. Local DM secondaries get their
  *  data-claim-state from client-lobby.js's impl (payload-driven);
@@ -157,6 +160,5 @@ function clearLobby() {
     // No-op; CSS handles dismissal.
 }
 
-registerOverlayImpl('showLobby',        renderLobbyState);
-registerOverlayImpl('updateLobbyState', renderLobbyState);
-registerOverlayImpl('hideLobby',        clearLobby);
+registerOverlayImpl('showLobby', renderLobbyState);
+registerOverlayImpl('hideLobby', clearLobby);

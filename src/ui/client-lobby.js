@@ -9,8 +9,9 @@
  *
  * The client still needs to *show* the lobby prompt for its slot, so
  * the player sitting at the client's screen knows when to press their
- * button. Master pushes the lobby state via the `updateLobbyState`
- * renderer command on every lobby-relevant change, and this module
+ * button. Master pushes the lobby state via the `showLobby` renderer
+ * command on every lobby-relevant change (master / Game both signal
+ * it; the orchestrator pulls the payload from Game), and this module
  * reflects it onto the client's DOM via the pane's `data-claim-state`
  * attribute. `body[data-game-state]` is mirrored separately by the
  * `setGameState` renderer command (impl in game-state.js). The same
@@ -90,5 +91,4 @@ function applyLobbyStatePayload(payload) {
     if (!payload || !Array.isArray(payload.slotsClaimed)) return;
     applyLobbyState(payload);
 }
-registerOverlayImpl('showLobby',        applyLobbyStatePayload);
-registerOverlayImpl('updateLobbyState', applyLobbyStatePayload);
+registerOverlayImpl('showLobby', applyLobbyStatePayload);

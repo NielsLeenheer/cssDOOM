@@ -28,7 +28,7 @@ import { mapData } from '../../shared/maps.js';
 import { toggleDoor } from './doors.js';
 import { activateLift } from './lifts.js';
 import { activateCrusher } from './crushers.js';
-import { loadMap, getNextMap, getSecretExitMap } from '../../shared/maps.js';
+import { getNextMap, getSecretExitMap } from '../../shared/maps.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 import { getCurrentLevel } from '../level.js';
@@ -76,39 +76,36 @@ export function tryUseSwitch(player) {
             const linedef = mapData.linedefs[wall.linedefIndex];
             if (linedef) {
                 if (linedef.specialType === EXIT_SPECIAL || linedef.specialType === SECRET_EXIT_SPECIAL) {
-                    // Exit switches: in SP, show the intermission screen
-                    // (KILLS / ITEMS / SECRET / TIME) and let the player
-                    // press fire to advance to the next map. In DM there
-                    // are no exit switches in normal play, but if one
-                    // somehow triggers, skip the intermission and just
-                    // load.
+                    // Exit switches: emit level-complete and let Game
+                    // own the response per mode. Game subscribes via
+                    // _subscribeLevel, so the Level instance Game owns
+                    // is the one this event reaches — which is what
+                    // makes the response repeatable across matches
+                    // (any other Level-construction path would orphan
+                    // the subscription).
+                    //
+                    //   SP — Game._onLevelComplete stops the Level,
+                    //        transitions INTERMISSION, signals
+                    //        showIntermission. Game.advance handles
+                    //        the actual map load when the player
+                    //        dismisses the overlay.
+                    //   DM — Game._onLevelComplete funnels into
+                    //        match.js::endMatch which signals
+                    //        showResults; Game.restartMatch later
+                    //        advances mapCursor (to the nextMap stashed
+                    //        on _pendingNextMap below) and constructs
+                    //        the next Level. switches.js used to do an
+                    //        end-run via setTimeout(loadMap), which
+                    //        orphaned Game's subscription on the new
+                    //        Level and silently broke results on match 2+.
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();
-                    // Emit level-complete; Game subscribes to this event
-                    // and owns the response per mode:
-                    //   SP — Game._onLevelComplete stops the Level,
-                    //        transitions INTERMISSION, pushes
-                    //        showIntermission via orchestrator. The
-                    //        actual map advance happens via Game.advance
-                    //        when the player dismisses the overlay (the
-                    //        intermission gate in actions/gates.js calls
-                    //        it on FIRE_DOWN).
-                    //   DM — Game._onLevelComplete transitions RESULTS
-                    //        and pushes showResults; the setTimeout
-                    //        loadMap below still drives the DM map
-                    //        advance because Game.restartMatch reloads
-                    //        the current map rather than constructing a
-                    //        new Level for the next one. Re-homing DM
-                    //        map cycling onto Game is a follow-up.
                     getCurrentLevel()?._emit('level-complete', {
                         nextMap,
                         secret: linedef.specialType === SECRET_EXIT_SPECIAL,
                         slot: player.index,
                     });
-                    if (state.gameMode === 'deathmatch' && nextMap) {
-                        setTimeout(() => loadMap(nextMap), 1000);
-                    }
                 } else if (linedef.sectorTag > 0) {
                     // Sector-tagged switches: find all doors and lifts whose
                     // sector tag matches and activate them.

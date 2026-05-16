@@ -239,24 +239,17 @@ export function endMatch() {
     for (const p of state.players) clearMovingState(p);
 
     transitionTo(GAME_STATE.ENDED);
-    // Fire the scoreboard via the renderer-command pipeline.
-    // orchestrator.showResults fans to master's own DomRenderer (whose
-    // renderResults impl calls showScoreboard) and to every connected
-    // peer (whose renderResults impl does the same on the client).
-    // mapName mirrors Game._buildResultsPayload so the payload shape
-    // is identical regardless of which path triggers the results
-    // (frag/time-limit here vs DM exit-switch in Game._onLevelComplete).
-    const payload = {
-        scores: state.players.map(p => p.score),
-        kills: state.match.kills.map(row => row.slice()),
-        winnerIndex: state.match.winner ? state.match.winner.index : -1,
-        mapName: currentMap,
-    };
-    orchestrator.showResults(payload);
-    // Notify subscribers (Game re-emits as 'match-ended'). Symmetric
-    // with level.js's onLevel emitter: match.js owns the channel,
-    // Game subscribes.
-    _emitMatchEvent('ended', payload);
+    // Signal the scoreboard — orchestrator pulls the current payload
+    // from the registered provider (Game.getResultsPayload), so this
+    // call carries no data. The same signal fires from both the
+    // frag/time-limit path (this function) and the DM exit-switch
+    // path (Game._onLevelComplete now calls endMatch), so winner +
+    // payload are always computed by the same code.
+    orchestrator.showResults();
+    // Notify subscribers (Game re-emits as 'match-ended'). Subscriber
+    // pulls a fresh payload from Game.getResultsPayload if it needs
+    // one, matching the orchestrator pattern.
+    _emitMatchEvent('ended');
 }
 
 /** True when DM is active and the match has ended. */

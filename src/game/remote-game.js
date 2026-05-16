@@ -127,7 +127,7 @@ export class RemoteGame {
         this._connection = new ClientConnection({
             transport: this._transport, // null for Local DM → BroadcastChannel default
             // Lobby / match-end / game-state UI updates ride the
-            // renderer-command pipeline (updateLobbyState, showResults,
+            // renderer-command pipeline (showLobby, showResults,
             // setGameState). Impls live in lobby.js, client-lobby.js,
             // network-lobby.js, scoreboard.js, and game-state.js.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
