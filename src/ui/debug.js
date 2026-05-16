@@ -4,7 +4,7 @@
  * Also provides culling toggles with live stats.
  */
 
-import { culling, cullingStats, debugSkyTrace } from '../renderer/scene/culling.js';
+import { culling, cullingStats } from '../renderer/scene/culling.js';
 import { state, debug } from '../game/state.js';
 import { EYE_HEIGHT } from '../game/constants.js';
 import { THING_NAMES } from '../renderer/scene/constants.js';
@@ -69,11 +69,6 @@ window.load = async function (slot = 0) {
     player.z = player.floorHeight + EYE_HEIGHT;
     updateCamera(player);
     console.log(`Loaded slot ${slot}: ${data.map} (${Math.round(data.x)}, ${Math.round(data.y)})`);
-};
-
-window.traceSky = (wallId) => {
-    const p = state.players[0];
-    debugSkyTrace(wallId, p.x, p.y);
 };
 
 /** Dump player position, angle, sector, and current map */

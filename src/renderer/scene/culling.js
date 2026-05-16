@@ -18,7 +18,6 @@
  * overlay in DM.
  */
 
-import { domRendererManager } from '../dom-renderer-manager.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
 
 // Culling flags — toggled by the debug menu
@@ -246,62 +245,6 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
     return false;
 }
 
-/**
- * Debug: trace sky culling for a wall by ID. Caller passes the player position
- * to test against (typically state.players[0]). Bound to window.traceSky in
- * src/ui/debug.js with player[0] injected.
- */
-export function debugSkyTrace(wallId, playerX, playerY) {
-    // Debug helper — uses pane 0's scene state.
-    const sState = domRendererManager.all[0].sceneState;
-    const el = sState.wallElements.find(e => e.id === wallId);
-    if (!el) { console.log(`Wall ${wallId} not found in wallElements`); return; }
-
-    const x = el._midX, y = el._midY;
-    const z = el._wall ? el._wall.topHeight : 0;
-    const dx = x - playerX, dy = y - playerY;
-    const totalDist = Math.sqrt(dx * dx + dy * dy);
-    const skyPlanes = sState.skyWallPlanes;
-
-    console.log(`--- traceSky(${wallId}) ---`);
-    console.log(`Player: (${Math.round(playerX)}, ${Math.round(playerY)})`);
-    console.log(`Wall mid: (${Math.round(x)}, ${Math.round(y)}), topHeight: ${z}, sector: ${el._sectorIndex}`);
-    console.log(`Distance: ${Math.round(totalDist)}, sector: ${el._sectorIndex}`);
-    console.log(`Sky planes: ${skyPlanes.length}`);
-
-    let closest = null;
-    for (let i = 0; i < skyPlanes.length; i++) {
-        const plane = skyPlanes[i];
-        const sx = plane.bx - plane.ax, sy = plane.by - plane.ay;
-        const denom = dx * sy - dy * sx;
-        if (denom === 0) continue;
-        const t = ((plane.ax - playerX) * sy - (plane.ay - playerY) * sx) / denom;
-        const u = ((plane.ax - playerX) * dy - (plane.ay - playerY) * dx) / denom;
-
-        const info = {
-            i, t: +t.toFixed(4), u: +u.toFixed(4),
-            from: `${plane.ax},${plane.ay}`, to: `${plane.bx},${plane.by}`,
-            floorZ: plane.floorZ,
-        };
-
-        if (el._sectorIndex === plane.sectorIndex) { info.reason = `same sector ${plane.sectorIndex}`; }
-        else if (t <= 0 || t >= 1) { info.reason = `t out of range`; }
-        else if (u < 0 || u > 1) { info.reason = `u out of range`; }
-        else if (z < plane.floorZ) { info.reason = `z ${z} < floorZ ${plane.floorZ}`; }
-        else {
-            const pastWallDist = (1 - t) * totalDist;
-            info.pastWallDist = Math.round(pastWallDist);
-            if (pastWallDist < SKY_CULL_MARGIN) info.reason = `pastWallDist ${Math.round(pastWallDist)} < margin ${SKY_CULL_MARGIN}`;
-            else info.reason = 'WOULD CULL';
-        }
-
-        if (info.reason !== 't out of range' && info.reason !== 'u out of range') {
-            console.log(info);
-        }
-        if (!closest || Math.abs(t - 0.5) < Math.abs(closest.t - 0.5)) closest = info;
-    }
-    if (!closest) console.log('No sky wall intersections found at all');
-}
 
 /**
  * Run culling checks on the given player's pane. Called from the per-renderer
