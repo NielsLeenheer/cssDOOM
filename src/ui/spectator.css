@@ -178,7 +178,11 @@ body.spectator #player > .marker {
         scaleX(var(--mirror, 1));
 
     background-image: url('/assets/sprites/sheets/PLAY.png');
-    --w: 45; --h: 56; --frames: 4; --rows: 5;
+    /* PLAY.png cell layout (matches enemies.css's .sprite[data-type="player"]):
+       51 × 56 cells, 7 columns × 7 rows. Rows 0-4 are walk poses; rows 5-6
+       (attack / death) aren't used in spectator. Cell width is 51 not 45
+       because death gibs widen the cell across the whole sheet. */
+    --w: 51; --h: 56; --cols: 7; --frames: 4; --rows: 7;
     animation-play-state: paused;
     animation-duration: calc(var(--frames) * 150ms);
 }
