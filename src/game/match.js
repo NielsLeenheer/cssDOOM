@@ -69,8 +69,7 @@ export function resetMatch({
     };
     for (const p of state.players) p.score = 0;
     orchestrator.hideResults();
-    setTimerActive(false);
-    lastTimerSeconds = -1;
+    hideTimer();
     transitionTo(GAME_STATE.LOBBY);
     // Notify lobby UI + master broadcast that a new match cycle
     // started, so the lobby can clear stale claims and master can
@@ -122,8 +121,7 @@ export function ensureMatchSize(n) {
 export function clearMatch() {
     state.match = null;
     orchestrator.hideResults();
-    setTimerActive(false);
-    lastTimerSeconds = -1;
+    hideTimer();
     transitionTo(GAME_STATE.ACTIVE);
 }
 
@@ -156,41 +154,47 @@ export function matchTick() {
     const elapsed = performance.now() - state.match.startTime;
     if (elapsed >= state.match.timeLimit) {
         endMatch();
-        setTimerActive(false);
+        hideTimer();
         return;
     }
     updateCountdown(state.match.timeLimit - elapsed);
 }
 
-let lastTimerSeconds = -1;
+// Last value fanned out to clients. Tracked so we only push an envelope
+// when the displayed value actually changes (once per second during the
+// last 60 s, plus a single hide when the window opens/closes). Also
+// surfaces the current value to snapshot.js so a late-joining client
+// gets it right after their world snapshot applies.
+let _currentTimerText = null;
 
-/** Updates the m:ss display on every .pane-timer element when in the last
- *  60 s of a match; toggles body[data-timer-active] which the CSS uses
- *  to fade the readout in/out. */
+/** Pushes the m:ss display through the orchestrator in the last 60 s of
+ *  a match — fans to master's own DOM and to every connected client so
+ *  the readout stays in sync without each side running its own clock. */
 function updateCountdown(remainingMs) {
     if (remainingMs > 60_000) {
-        setTimerActive(false);
-        lastTimerSeconds = -1;
+        hideTimer();
         return;
     }
-    setTimerActive(true);
     const totalSeconds = Math.max(0, Math.ceil(remainingMs / 1000));
-    if (totalSeconds === lastTimerSeconds) return;
-    lastTimerSeconds = totalSeconds;
     const m = Math.floor(totalSeconds / 60);
     const s = totalSeconds % 60;
     const text = `${m}:${s.toString().padStart(2, '0')}`;
-    for (const el of document.querySelectorAll('.pane-timer')) el.textContent = text;
+    if (text === _currentTimerText) return;
+    _currentTimerText = text;
+    orchestrator.setMatchTimer(text);
 }
 
-function setTimerActive(active) {
-    if (active) {
-        if (document.body.dataset.timerActive !== 'true') {
-            document.body.dataset.timerActive = 'true';
-        }
-    } else if (document.body.dataset.timerActive === 'true') {
-        delete document.body.dataset.timerActive;
-    }
+function hideTimer() {
+    if (_currentTimerText === null) return;
+    _currentTimerText = null;
+    orchestrator.setMatchTimer(null);
+}
+
+/** Current m:ss text being broadcast, or null if the timer is hidden.
+ *  Used by snapshot.js so a late-joining client gets the current
+ *  readout immediately after their world snapshot applies. */
+export function getCurrentTimerText() {
+    return _currentTimerText;
 }
 
 function checkFragLimit() {

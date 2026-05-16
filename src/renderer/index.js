@@ -84,5 +84,13 @@ export const toggleSwitchState = exported.toggleSwitchState;
 // ── Surfaces ──────────────────────────────────────────────────────────────
 export const lowerTaggedFloor = exported.lowerTaggedFloor;
 
+// ── Overlay commands re-exported for snapshot apply paths ────────────────
+// Most overlay commands (showLobby/showResults/setGameState) are only
+// invoked from master game code via `orchestrator.X(...)` and don't need
+// a named export. setMatchTimer is the exception — the joiner's
+// snapshot apply path imports renderer as a namespace and fires it
+// alongside renderer.setDoorState etc., so we surface it explicitly.
+export const setMatchTimer = exported.setMatchTimer;
+
 // Direct access for code that benefits from instance-shaped API
 export { orchestrator };

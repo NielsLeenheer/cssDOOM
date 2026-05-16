@@ -33,4 +33,5 @@ import './network-lobby.js';
 import './client-lobby.js';
 import './intermission.js';
 import './scoreboard.js';
+import './match-timer.js';
 import '../game/game-state.js';

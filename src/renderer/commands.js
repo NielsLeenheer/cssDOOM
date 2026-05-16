@@ -237,6 +237,7 @@ export const COMMANDS = {
     hideIntermission: { kind: 'world', impl: (_renderer) => fireOverlay('hideIntermission') },
     showResults:      { kind: 'world', impl: (_renderer, payload) => fireOverlay('showResults', payload) },
     hideResults:      { kind: 'world', impl: (_renderer) => fireOverlay('hideResults') },
+    setMatchTimer:    { kind: 'world', impl: (_renderer, text) => fireOverlay('setMatchTimer', text) },
 
     // game-state transitions. Master's game-state.js calls
     // `broadcastGameState(next)` on every transitionTo; this fans out

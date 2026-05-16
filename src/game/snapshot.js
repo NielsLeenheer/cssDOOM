@@ -22,6 +22,7 @@ import { state } from './state.js';
 import { PICKUPS, ENEMIES } from './constants.js';
 import { currentMap } from '../shared/maps.js';
 import { getFloorHeightAt } from './physics.js';
+import { getCurrentTimerText } from './match.js';
 
 /**
  * Build a snapshot of master's current world state. Returns a
@@ -35,6 +36,7 @@ export function getWorldSnapshot() {
         lifts: snapshotLifts(),
         crushers: snapshotCrushers(),
         corpses: snapshotCorpses(),
+        timerText: getCurrentTimerText(),
     };
 }
 

@@ -300,6 +300,11 @@ export class RemoteGame {
                     corpse.sectorIndex, corpse.playerIndex,
                 );
             }
+            // If the joiner reconnects mid-countdown, master only fires
+            // setMatchTimer when the displayed second changes — they'd
+            // wait up to a second to see the readout otherwise. Apply
+            // the value carried in the snapshot so it lands immediately.
+            renderer.setMatchTimer(snapshot.timerText ?? null);
         } finally {
             // Wait two animation frames before removing the suppressor:
             // one for the style changes (data-state flips, class adds)
