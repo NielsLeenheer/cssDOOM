@@ -197,6 +197,7 @@ export class RemoteGame {
             this.orchestrator.targets[i] = null;
         }
         const renderer = createDomRenderer(slotIndex);
+        renderer.paneEl.dataset.slot = String(slotIndex);
         this.orchestrator.replaceTarget(slotIndex, renderer);
 
         if (payload.level) {

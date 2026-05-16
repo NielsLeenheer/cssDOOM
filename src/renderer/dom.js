@@ -100,9 +100,14 @@ export function reshapeMasterRenderers(gameMode, networkMode) {
     // toggled. Pane element's `data-player` follows the playerIndex so
     // CSS hide rules (`body[data-game-mode] .pane[data-player="0"]` …) and
     // the player-sprite "hide own billboard" selector key correctly.
+    // `data-slot` tracks the pane's physical position (0 = first/left,
+    // 1 = second/right) independent of which player it renders — kiosk
+    // SP mirror reuses player 0 in both panes, so `data-player` is the
+    // same on both and can't drive positioning.
     for (let slot = 0; slot < domRenderers.length; slot++) {
         const r = domRenderers[slot];
         r.playerIndex = mirror ? 0 : slot;
         r.paneEl.dataset.player = String(r.playerIndex);
+        r.paneEl.dataset.slot = String(slot);
     }
 }

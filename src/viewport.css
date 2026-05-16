@@ -109,11 +109,16 @@ body.kiosk .pane {
         transform: none;
     }
 }
-body.kiosk .pane[data-player="0"] {
+/* Position by `data-slot` (pane's physical index in the layout), not
+   `data-player`. Kiosk SP renders both panes for player 0 (mirror), so
+   `data-player` is "0" on both panes — keying off it would land them on
+   top of each other. `data-slot` is "0" / "1" regardless of which player
+   each pane displays. */
+body.kiosk .pane[data-slot="0"] {
     top: 0;
     left: 0;
 }
-body.kiosk .pane[data-player="1"] {
+body.kiosk .pane[data-slot="1"] {
     top: 0;
     left: 50vw;
 }
