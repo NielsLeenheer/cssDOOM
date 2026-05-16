@@ -53,6 +53,7 @@ import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby, getCarriedOverClaims } from './ui/lobby.js';
 import { isMatchLobby, onMatch, ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot } from './game/snapshot.js';
+import { spawnPlayer } from './game/player/spawn.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
@@ -253,6 +254,19 @@ function setupMasterBroadcast() {
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
             configureAudio(state.players.length);
+            // If this slot's player is currently marked dead (typically
+            // because the previous peer here disconnected — onLeave
+            // flags isDead so the abandoned slot drops out of the
+            // visible world), respawn them now. Without this, the
+            // gameLoop's "every player dead → freeze world" gate stays
+            // engaged whenever the host happens to also be dead, and
+            // the joiner sees nothing until the host fires-to-respawn.
+            // Only meaningful once a match is live (level loaded);
+            // pre-match the lobby still controls slot assignment.
+            const player = state.players[slot];
+            if (player && player.isDead && getCurrentLevel()) {
+                spawnPlayer(player);
+            }
             // World-state snapshot. The joiner's fresh-built scene has
             // every pickup uncollected, every enemy alive, every door
             // at its map-default state, and no corpses. Send master's
