@@ -67,7 +67,7 @@ export function resetMatch({
         // roster expands later (Network DM remote join after resetMatch).
         kills: Array.from({ length: n }, () => new Array(n).fill(0)),
     };
-    for (const p of state.players) p.score = 0;
+    for (const p of state.players) { p.score = 0; p._hudDirty = true; }
     orchestrator.hideResults();
     hideTimer();
     transitionTo(GAME_STATE.LOBBY);
@@ -139,9 +139,11 @@ export function awardFrag(victim, killer) {
     if (!state.match) return;
     if (killer instanceof Player && killer !== victim) {
         killer.score++;
+        killer._hudDirty = true;
         state.match.kills[killer.index][victim.index]++;
     } else {
         victim.score--;
+        victim._hudDirty = true;
         state.match.kills[victim.index][victim.index]++;
     }
     checkFragLimit();

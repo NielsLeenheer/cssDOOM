@@ -60,6 +60,7 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         damageAmount -= saved;
     }
     player.health -= damageAmount;
+    player._hudDirty = true;
 
     // Record attribution so awardFrag can credit the right killer when this
     // damage pushes health to zero.
@@ -284,6 +285,7 @@ export function resetGameState() {
         player.ownedWeapons = new Set([1, 2]);
         player.collectedKeys.clear();
         renderer.clearKeys(player.viewportIndex);
+        player._hudDirty = true;
     }
     clearWeaponSlots();
     // Each player's weapon DOM needs equipWeapon to set data-type so the

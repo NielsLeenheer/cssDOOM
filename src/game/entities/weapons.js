@@ -37,6 +37,7 @@ export function equipWeapon(player, slot) {
 
     player.isFiring = false;
     player.currentWeapon = slot;
+    player._hudDirty = true;
     if (isSwitching) {
         player.weaponSwitchUntil = performance.now() + WEAPON_SWITCH_MS;
     }
@@ -86,7 +87,10 @@ export function fireWeapon(player) {
     if (weapon.ammoType && player.ammo[weapon.ammoType] < weapon.ammoPerShot) return;
 
     // Deduct ammo cost for this shot
-    if (weapon.ammoType) player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
+    if (weapon.ammoType) {
+        player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
+        player._hudDirty = true;
+    }
     player.isFiring = true;
 
     orchestrator.playSound(weapon.sound, { x: player.x, y: player.y });
@@ -116,7 +120,10 @@ export function fireWeapon(player) {
                 stopAutoFire(player);
                 return;
             }
-            if (weapon.ammoType) player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
+            if (weapon.ammoType) {
+                player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
+                player._hudDirty = true;
+            }
             orchestrator.playSound(weapon.sound, { x: player.x, y: player.y });
             checkWeaponHit(player);
             alertNearbyEnemies(player);

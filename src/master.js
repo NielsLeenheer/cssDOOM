@@ -89,7 +89,14 @@ window.debug = function () {
  */
 function renderAllActivePanes() {
     for (const player of state.players) {
-        updateHud(player, player.viewportIndex);
+        // updateHud is event-driven — mutation sites set player._hudDirty,
+        // we fire + clear here. Skipping the call avoids the orchestrator
+        // fan-out (and on Network DM, the per-frame wire envelope per
+        // slot) when nothing changed.
+        if (player._hudDirty) {
+            updateHud(player, player.viewportIndex);
+            player._hudDirty = false;
+        }
         updateCamera(player, player.viewportIndex);
     }
 }
@@ -276,6 +283,11 @@ function setupMasterBroadcast() {
             if (getCurrentLevel()) {
                 masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
             }
+            // updateHud is event-driven (gated on player._hudDirty),
+            // so we force a flush for this slot's player — otherwise
+            // the joiner would stare at blank HUD digits until the
+            // player's next damage / ammo / kill event.
+            if (state.players[slot]) state.players[slot]._hudDirty = true;
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator

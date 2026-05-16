@@ -62,6 +62,7 @@ export function spawnPlayer(player) {
     player.collectedKeys.clear();
     player.isDead = false;
     player.deathTime = 0;
+    player._hudDirty = true;
 
     // Reactivate the player's thing entry: collisions / AI / hitscan see
     // them again; sprite is visible at the new position.

@@ -64,6 +64,7 @@ export function checkPickups(player) {
                     const healthCap = (thing.type === 2013 || thing.type === 2014) ? 200 : MAX_HEALTH;
                     if (player.health >= healthCap) continue;
                     player.health = Math.min(healthCap, player.health + effect.amount);
+                    player._hudDirty = true;
                 } else if (effect.statType === 'armor') {
                     if (effect.armorClass && effect.armorClass > 0) {
                         // Green/Blue Armor: P_GiveArmor — skip if current armor >= armorClass * 100
@@ -79,6 +80,7 @@ export function checkPickups(player) {
                         player.armor = Math.min(MAX_ARMOR, player.armor + effect.amount);
                         if (!player.armorType) player.armorType = 1;
                     }
+                    player._hudDirty = true;
                 } else if (effect.statType === 'ammo') {
                     const ammoType = effect.ammoType;
                     if (player.ammo[ammoType] >= player.maxAmmo[ammoType]) continue;
@@ -86,6 +88,7 @@ export function checkPickups(player) {
                     const amount = (state.skillLevel === 1 || state.skillLevel === 5)
                         ? effect.amount * 2 : effect.amount;
                     player.ammo[ammoType] = Math.min(player.maxAmmo[ammoType], player.ammo[ammoType] + amount);
+                    player._hudDirty = true;
                 } else if (effect.statType === 'powerup') {
                     activatePowerup(player, effect.powerup);
                 }
@@ -99,6 +102,8 @@ export function checkPickups(player) {
             const weaponPickup = WEAPON_PICKUPS[thing.type];
             if (weaponPickup) {
                 player.ownedWeapons.add(weaponPickup.slot);
+                // equipWeapon also sets _hudDirty (currentWeapon change),
+                // so we don't repeat the assignment here.
                 equipWeapon(player, weaponPickup.slot);
                 if (weaponPickup.ammoType) {
                     const amount = (state.skillLevel === 1 || state.skillLevel === 5)
@@ -123,6 +128,7 @@ export function checkPickups(player) {
                 player.ammo.bullets = Math.min(player.maxAmmo.bullets, player.ammo.bullets + (doubleAmmo ? 20 : 10));
                 player.ammo.shells  = Math.min(player.maxAmmo.shells,  player.ammo.shells  + (doubleAmmo ? 8 : 4));
                 player.ammo.rockets = Math.min(player.maxAmmo.rockets, player.ammo.rockets + (doubleAmmo ? 2 : 1));
+                player._hudDirty = true;
             }
 
             if (PICKUPS.has(thing.type)) {
@@ -176,6 +182,7 @@ function activatePowerup(player, name) {
     if (name === 'berserk') {
         // Berserk gives +100 health (capped at 100) and auto-switches to fist
         player.health = Math.max(player.health, 100);
+        player._hudDirty = true;
         equipWeapon(player, 1);
     }
 }

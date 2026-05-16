@@ -72,5 +72,14 @@ export class Player {
         // damagePlayer; meaningful only between damage and death.
         this.lastDamagedBy = null;
         this.lastDamagedTime = 0;
+
+        // HUD-dirty flag. master.js's render loop calls updateHud only
+        // when this is true, then clears it — so HUD values only flow
+        // through the orchestrator (and across the wire to clients)
+        // when something actually changed. Every mutation site for
+        // health / armor / ammo / maxAmmo / currentWeapon / ownedWeapons
+        // / score sets this to true. Starts true so the first frame
+        // after construction renders the initial HUD.
+        this._hudDirty = true;
     }
 }
