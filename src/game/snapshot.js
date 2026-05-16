@@ -21,6 +21,7 @@
 import { state } from './state.js';
 import { PICKUPS, ENEMIES } from './constants.js';
 import { currentMap } from '../shared/maps.js';
+import { getFloorHeightAt } from './physics.js';
 
 /**
  * Build a snapshot of master's current world state. Returns a
@@ -49,12 +50,17 @@ function snapshotThings() {
         // the match resumes.
         if (t.kind === 'player') continue;
 
+        // `t.floorHeight` is only updated at init / by lifts, NOT by the
+        // AI as enemies chase across sectors. Resolve live from coords so
+        // a wandered-then-killed enemy lands on the floor it's actually
+        // standing on, not the one it spawned over. Matches what ai.js
+        // ticks into the renderer via updateThingPosition.
         out.push({
             gameId,
             type: t.type,
             x: t.x,
             y: t.y,
-            floorHeight: t.floorHeight,
+            floorHeight: getFloorHeightAt(t.x, t.y),
             sectorIndex: t.sectorIndex,
             collected: !!t.collected,
             // Differentiates "dead enemy" (killEnemy path) from

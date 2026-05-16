@@ -72,15 +72,20 @@ export function setEnemyState(renderer, thingIndex, thingType, newState) {
 
 /**
  * Triggers the death animation on an enemy's sprite and marks its container
- * as dead in this renderer's pane.
+ * as dead in this renderer's pane. Pass `instant: true` to skip the animation
+ * and pin the sprite at the final frame — used by the world-snapshot apply
+ * path so enemies that died before a joiner connected don't re-play their
+ * death animation when culled in. Works because `forwards` fill + an
+ * animation-delay past the duration leaves the sprite on its end keyframe,
+ * surviving the cull system's display:none → block flips.
  */
-export function killEnemy(renderer, thingIndex, thingType) {
+export function killEnemy(renderer, thingIndex, thingType, instant = false) {
     const layout = SPRITE_LAYOUT[thingType];
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
     domData.element.classList.add('dead');
     if (!domData.sprite) return;
-    domData.sprite.style.animationDelay = '';
+    domData.sprite.style.animationDelay = instant ? '-10s' : '';
     setSpriteFrame(domData.sprite, layout.dieRow, layout.dieFrames, 1);
     setSpriteState(domData.sprite, 'dead');
 }

@@ -273,7 +273,7 @@ export class RemoteGame {
                         renderer.reparentThingToSector(t.gameId, t.sectorIndex);
                     }
                     if (t.category === 'enemy' || t.category === 'barrel') {
-                        renderer.killEnemy(t.gameId, t.type);
+                        renderer.killEnemy(t.gameId, t.type, true);
                     } else {
                         renderer.collectItem(t.gameId);
                     }
