@@ -72,7 +72,7 @@ body.kiosk #ui-buttons {
 
     & td {
         padding: 6px 0;
-        font-size: 13px;
+        font-size: 15px;
     }
 
     & td:first-child {
@@ -95,7 +95,7 @@ kbd {
     
     padding: 5px 10px;
     font-family: 'STCFN', monospace;
-    font-size: 12px;
+    font-size: 14px;
     color: #fff;
     min-width: 20px;
     text-align: center;

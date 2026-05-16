@@ -5,7 +5,8 @@
  * Firefox, Safari, Edge); non-COLR fallback renders the silhouette in
  * the CSS `color` value.
  *
- * Pixel-perfect at integer font-sizes that are multiples of 8 px.
+ * Pixel-perfect at integer font-sizes that are multiples of 9 px (em-square
+ * is 9 source rows: 8 above the baseline + 1 descender row for Q/$/@).
  * Rebuild with: generate/.venv/bin/python generate/build-stcfn-color-font.py
  */
 @font-face {

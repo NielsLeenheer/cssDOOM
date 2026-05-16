@@ -47,7 +47,7 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 }
 
 .network-lobby-title {
-    font-size: 28px;
+    font-size: 32px;
     color: #dc0000;
     text-transform: uppercase;
     letter-spacing: 4px;
@@ -70,7 +70,7 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
     align-items: center;
     gap: 12px;
     padding: 6px 12px;
-    font-size: 16px;
+    font-size: 18px;
     text-transform: uppercase;
 
     & .network-slot-label {
@@ -123,14 +123,14 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 }
 
 .network-invite-label {
-    font-size: 12px;
+    font-size: 14px;
     color: #888;
     text-transform: uppercase;
     letter-spacing: 1px;
 }
 
 .network-invite-code {
-    font-size: 28px;
+    font-size: 32px;
     color: #fff;
     letter-spacing: 6px;
 }
@@ -160,7 +160,7 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
    other pane shows the waiting message. */
 
 .network-action-prompt {
-    font-size: 16px;
+    font-size: 18px;
     color: #dc0000;
     text-transform: uppercase;
     letter-spacing: 2px;
