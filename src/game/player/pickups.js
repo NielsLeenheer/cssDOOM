@@ -48,7 +48,7 @@ export function checkPickups(player) {
                 // are left in the world but never picked up.
                 if (state.gameMode === 'deathmatch') continue;
                 player.collectedKeys.add(keyColor);
-                renderer.collectKey(player.viewportIndex, keyColor);
+                player._hudDirty = true;
                 thing.collected = true;
                 renderer.collectItem(index);
                 triggerPickupFlash(player);

@@ -25,7 +25,7 @@ import { MSG } from '../transport/protocol.js';
 import { ClientConnection } from '../transport/peer-connection.js';
 import { connectToNetworkRoom } from '../transport/webrtc-transport.js';
 import { inputs } from '../orchestrator.js';
-import { createDomRenderer, destroyDomRenderer, domRenderers } from '../renderer/dom.js';
+import { domRendererManager } from '../renderer/dom-renderer-manager.js';
 import { setDefaultSlot } from '../input/claim-registry.js';
 import { initKeyboardMouse } from '../input/keyboard-mouse.js';
 import { initGamepadInput } from '../input/gamepad.js';
@@ -33,7 +33,6 @@ import { initTouchInput } from '../input/touch.js';
 import { on } from '../input/event-bus.js';
 import * as A from '../input/actions.js';
 import { startCullingLoop } from '../renderer/scene/culling.js';
-import { updatePerspective } from '../renderer/scene/scene.js';
 import { isAttractActive } from '../ui/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
@@ -165,7 +164,6 @@ export class RemoteGame {
             isAttract: isAttractActive,
             getSpectatorActive: () => spectatorActive,
         });
-        window.addEventListener('resize', updatePerspective);
         hideInitialOverlay();
     }
 
@@ -192,11 +190,11 @@ export class RemoteGame {
 
         // Rebuild DomRenderer at this slot. Nuke any prior renderer
         // so reconnects start clean.
-        for (const r of [...domRenderers]) destroyDomRenderer(r);
+        for (const r of [...domRendererManager.all]) domRendererManager.destroy(r);
         for (let i = 0; i < this.orchestrator.targets.length; i++) {
             this.orchestrator.targets[i] = null;
         }
-        const renderer = createDomRenderer(slotIndex);
+        const renderer = domRendererManager.create(slotIndex);
         this.orchestrator.replaceTarget(slotIndex, renderer);
 
         if (payload.level) {

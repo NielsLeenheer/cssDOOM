@@ -15,7 +15,7 @@
  */
 
 import { state } from '../game/state.js';
-import { domRenderers } from '../renderer/dom.js';
+import { domRendererManager } from '../renderer/dom-renderer-manager.js';
 
 export let spectatorActive = false;
 let spectatorLoopRunning = false;
@@ -26,7 +26,7 @@ const spectatorControls = document.getElementById('spectator-controls');
  * Sets spectator custom properties on the viewport element for CSS to consume.
  */
 function updateSpectatorProperties() {
-    const s = domRenderers[0].viewportEl.style;
+    const s = domRendererManager.all[0].viewportEl.style;
     s.setProperty('--spectator-offset-x', spectator.offsetX);
     s.setProperty('--spectator-offset-y', spectator.offsetY);
     s.setProperty('--spectator-height', spectator.height);
@@ -57,7 +57,7 @@ function spectatorLoop() {
         if (spectator.keys.r) spectator.height = Math.max(100, spectator.height - spectator.height * 0.02);
         if (spectator.keys.f) spectator.height += spectator.height * 0.02;
 
-        domRenderers[0].viewportEl.style.setProperty('--follow-height', spectator.height);
+        domRendererManager.all[0].viewportEl.style.setProperty('--follow-height', spectator.height);
         updatePlayerSprite(-state.players[0].angle, true);
     }
     requestAnimationFrame(spectatorLoop);
@@ -105,7 +105,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
     }
 
     // Set spectator angle for CSS billboard — CSS handles the actual transform
-    domRenderers[0].viewportEl.style.setProperty('--spectator-angle', cameraAngle);
+    domRendererManager.all[0].viewportEl.style.setProperty('--spectator-angle', cameraAngle);
 }
 
 /**
@@ -115,13 +115,13 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
  * the browser captures the "before" state before applying the class change.
  */
 function transitionScene(duration, callback) {
-    domRenderers[0].sceneEl.style.transition = `translate ${duration}s ease-in-out, rotate ${duration}s ease-in-out, transform ${duration}s ease-in-out`;
+    domRendererManager.all[0].sceneEl.style.transition = `translate ${duration}s ease-in-out, rotate ${duration}s ease-in-out, transform ${duration}s ease-in-out`;
     requestAnimationFrame(() => {
         callback();
-        domRenderers[0].sceneEl.addEventListener('transitionend', function onEnd(e) {
-            if (e.target !== domRenderers[0].sceneEl || e.propertyName !== 'rotate') return;
-            domRenderers[0].sceneEl.removeEventListener('transitionend', onEnd);
-            domRenderers[0].sceneEl.style.transition = '';
+        domRendererManager.all[0].sceneEl.addEventListener('transitionend', function onEnd(e) {
+            if (e.target !== domRendererManager.all[0].sceneEl || e.propertyName !== 'rotate') return;
+            domRendererManager.all[0].sceneEl.removeEventListener('transitionend', onEnd);
+            domRendererManager.all[0].sceneEl.style.transition = '';
         });
     });
 }
@@ -131,7 +131,7 @@ function transitionScene(duration, callback) {
  * Avoids CSS @starting-style which re-triggers continuously in Safari.
  */
 function transitionCeilings(fadeIn, duration, delay = 0) {
-    for (const el of domRenderers[0].sceneEl.querySelectorAll('.ceiling')) {
+    for (const el of domRendererManager.all[0].sceneEl.querySelectorAll('.ceiling')) {
         if (fadeIn) {
             el.style.opacity = '0';
             el.style.transition = `opacity ${duration}s ease ${delay}s`;
@@ -174,7 +174,7 @@ window.spectate = function() {
         spectator.keys = {};
 
         updateSpectatorProperties();
-        domRenderers[0].viewportEl.style.setProperty('--follow-height', spectator.height);
+        domRendererManager.all[0].viewportEl.style.setProperty('--follow-height', spectator.height);
         if (spectatorControls) spectatorControls.classList.remove('hidden');
 
         // Fade out ceilings, then toggle spectator class which sets display:none
@@ -314,7 +314,7 @@ function switchSpectatorMode(newMode) {
 
     updateSpectatorProperties();
     if (spectator.mode === 'follow') {
-        domRenderers[0].viewportEl.style.setProperty('--follow-height', spectator.height);
+        domRendererManager.all[0].viewportEl.style.setProperty('--follow-height', spectator.height);
     }
 
     // Inline transition overrides CSS rule, then toggle class

@@ -13,7 +13,6 @@
  * for the migration story.
  */
 
-import { domRenderers } from '../dom.js';
 import { makeSceneState } from '../dom-renderer.js';
 import { mapData } from '../../shared/maps.js';
 import { buildSectorContainers } from './sectors.js';
@@ -52,7 +51,8 @@ const MIN_PERSPECTIVE_RATIO = 0.3;
 const MIN_PERSPECTIVE_PX = 350;
 
 /**
- * Recompute each pane's `--perspective`.
+ * Recompute one renderer's `--perspective` based on its own viewport
+ * size and the current window mode.
  *
  * Kiosk uses a fixed value tuned to the installation hardware (see
  * KIOSK_PERSPECTIVE above). HD and 4K kiosk look identical because
@@ -66,25 +66,20 @@ const MIN_PERSPECTIVE_PX = 350;
  * paneWidth ≈ window.innerWidth so the natural per-pane perspective
  * applies (wide FOV, no special case).
  *
- * Call after any layout change — client join/leave, kiosk toggle,
- * window resize.
+ * Called by the DomRenderer's own ResizeObserver — fires on initial
+ * observe, window resize, and any CSS layout change that resizes the
+ * viewport (e.g. a sibling pane appearing or disappearing when a
+ * remote client joins or leaves). No external trigger needed.
  */
-export function updatePerspective() {
-    if (document.body.classList.contains('kiosk')) {
-        for (const r of domRenderers) {
-            r.sceneState.perspectiveValue = KIOSK_PERSPECTIVE;
-            r.viewportEl.style.setProperty('--perspective', `${KIOSK_PERSPECTIVE}px`);
-        }
-        return;
-    }
-
-    const floor = Math.max(window.innerWidth * MIN_PERSPECTIVE_RATIO, MIN_PERSPECTIVE_PX);
-    for (const r of domRenderers) {
-        const paneWidth = r.viewportEl.clientWidth || window.innerWidth;
-        const perspectiveValue = Math.max(paneWidth / 2, floor);
-        r.sceneState.perspectiveValue = perspectiveValue;
-        r.viewportEl.style.setProperty('--perspective', `${perspectiveValue}px`);
-    }
+export function updatePerspective(renderer) {
+    const value = document.body.classList.contains('kiosk')
+        ? KIOSK_PERSPECTIVE
+        : Math.max(
+            (renderer.viewportEl.clientWidth || window.innerWidth) / 2,
+            Math.max(window.innerWidth * MIN_PERSPECTIVE_RATIO, MIN_PERSPECTIVE_PX),
+        );
+    renderer.sceneState.perspectiveValue = value;
+    renderer.viewportEl.style.setProperty('--perspective', `${value}px`);
 }
 
 /**
@@ -107,8 +102,6 @@ export function updatePerspective() {
  * Async because it preloads textures before returning.
  */
 export async function buildScene() {
-    updatePerspective();
-
     const ctx = {
         fragment: document.createDocumentFragment(),
         sceneState: makeSceneState(),

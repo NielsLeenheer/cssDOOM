@@ -28,7 +28,6 @@ import { loadMap } from './shared/maps.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
 import { startCullingLoop } from './renderer/scene/culling.js';
-import { updatePerspective } from './renderer/scene/scene.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { buildModeConfigFromUrl } from './game/mode-config.js';
@@ -441,11 +440,6 @@ export async function initMaster({ isKiosk = false } = {}) {
     await new Promise(resolve => setTimeout(resolve, 600));
 
     hideInitialOverlay();
-
-    // Resize: pane widths change → recompute perspective so FOV tracks
-    // the new layout. Covers dev-window resizing and the kiosk's
-    // single→split transitions as players join / drop.
-    window.addEventListener('resize', updatePerspective);
 
     /* Start game loop */
     requestAnimationFrame(gameLoop);

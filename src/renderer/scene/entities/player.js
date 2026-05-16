@@ -31,10 +31,3 @@ export function setPlayerMoving(renderer, moving) {
     renderer.rendererEl.classList.toggle('moving', moving);
 }
 
-export function collectKey(renderer, color) {
-    renderer.rendererEl.classList.add(`has-${color}-key`);
-}
-
-export function clearKeys(renderer) {
-    renderer.rendererEl.classList.remove('has-blue-key', 'has-yellow-key', 'has-red-key');
-}

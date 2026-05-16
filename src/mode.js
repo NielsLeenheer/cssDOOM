@@ -36,7 +36,7 @@
 import { state } from './game/state.js';
 import { Player } from './game/player/player.js';
 import { currentMap, loadMap } from './shared/maps.js';
-import { reshapeMasterRenderers } from './renderer/dom.js';
+import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
 import { setDefaultSlot } from './input/claim-registry.js';
 import { configureAudio } from './audio/audio.js';
@@ -146,7 +146,7 @@ export function applyMode(gameMode, networkMode = 'standalone') {
     // windows skip this — they manage exactly one renderer for their
     // own slot (see client.js).
     if (!document.body.classList.contains('client-window')) {
-        reshapeMasterRenderers(gameMode, networkMode);
+        domRendererManager.reshape(gameMode, networkMode);
     }
 
     // (Re)build per-listener AudioRenderers for the new roster. SP gets

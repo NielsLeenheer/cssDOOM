@@ -15,10 +15,11 @@
  * so unchanged values skip DOM touches.
  */
 
-import { domRenderers } from './dom.js';
 import { WEAPONS } from '../game/constants.js';
 
 const AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
+const KEY_COLORS = ['blue', 'yellow', 'red'];
+const KEY_CLASSES = { blue: 'has-blue-key', yellow: 'has-yellow-key', red: 'has-red-key' };
 
 function freshPrev() {
     return {
@@ -105,6 +106,15 @@ export function updateHud(renderer, player) {
         rendererEl.classList.toggle(WEAPON_CLASSES[weaponSlot], owned.has(weaponSlot));
     }
 
+    // Collected keys — same Set-or-Array normalization, then toggle
+    // the per-color CSS class so the status-bar key icons appear.
+    const keys = player.collectedKeys instanceof Set
+        ? player.collectedKeys
+        : new Set(player.collectedKeys ?? []);
+    for (const color of KEY_COLORS) {
+        rendererEl.classList.toggle(KEY_CLASSES[color], keys.has(color));
+    }
+
     // DM frags counter (only meaningful in deathmatch; cheap to update
     // unconditionally — display clamps to -9..99 even though player.score
     // is uncapped).
@@ -123,12 +133,3 @@ function updateFragsDisplay(statusEl, score) {
     fragsEl.textContent = String(display);
 }
 
-export function clearWeaponSlots() {
-    // Clear weapon ownership classes on every renderer.
-    for (const r of domRenderers) {
-        r.rendererEl.classList.remove(
-            'has-weapon-2', 'has-weapon-3', 'has-weapon-4',
-            'has-weapon-5', 'has-weapon-6', 'has-weapon-7'
-        );
-    }
-}

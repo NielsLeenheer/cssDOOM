@@ -16,7 +16,7 @@ import { EYE_HEIGHT } from './constants.js';
 import { state } from './state.js';
 import { updateGame } from './index.js';
 import { transitionToLevel, resetGameState } from './player/damage.js';
-import { domRenderers } from '../renderer/dom.js';
+import { domRendererManager } from '../renderer/dom-renderer-manager.js';
 import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
 import { buildSectorAdjacency } from './sound-propagation.js';
 import { clearSpatialGrid, buildSpatialGrid } from './spatial-grid.js';
@@ -130,7 +130,7 @@ export class Level {
             // Tear down every renderer's scene and yield to the browser
             // so iOS Safari can release GPU-backed texture memory
             // before the next loadMap allocates new elements.
-            for (const r of domRenderers) r.clear();
+            for (const r of domRendererManager.all) r.clear();
             clearSpatialGrid();
             await new Promise(r => setTimeout(r, 100));
         }
@@ -146,11 +146,11 @@ export class Level {
         initCrushers();
 
         // Build every local renderer's scene independently. The
-        // `domRenderers` registry already reflects what this window
-        // needs (1 in SP, 2 in mirror SP / DM, 1 on a non-kiosk client,
+        // manager's registry already reflects what this window needs
+        // (1 in SP, 2 in mirror SP / DM, 1 on a non-kiosk client,
         // etc.) — boot / mode-switch code constructs and destroys to
         // match.
-        await Promise.all(domRenderers.map(r => r.loadMap()));
+        await Promise.all(domRendererManager.all.map(r => r.loadMap()));
 
         // Game-side post-build: spatial grid (needs state.things),
         // player thing entries (creates player billboards via renderer
@@ -167,7 +167,7 @@ export class Level {
         for (const player of state.players) {
             renderer.updateCamera(player, player.viewportIndex);
         }
-        for (const r of domRenderers) {
+        for (const r of domRendererManager.all) {
             updateCulling(r, state.things, false);
         }
 

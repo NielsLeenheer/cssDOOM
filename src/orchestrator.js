@@ -47,12 +47,10 @@
  * is unchanged.
  */
 
-import { domRenderers } from './renderer/dom.js';
 import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import * as audio from './audio/audio.js';
 import { setSlotAudioSuppressed } from './audio/audio.js';
-import { updatePerspective } from './renderer/scene/scene.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -334,7 +332,6 @@ class Orchestrator {
             this._publishActiveRendererCount();
         }
         if (suppressAudio) setSlotAudioSuppressed(slot, true);
-        updatePerspective();
 
         console.log('[orchestrator] client bound at slot', slot, '- peer', peerKey);
     }
@@ -386,7 +383,6 @@ class Orchestrator {
                 rendererToRebuild.paneEl.dataset.active = 'true';
                 this._publishActiveRendererCount();
             }
-            updatePerspective();
         }, RECONNECT_GRACE_MS);
 
         console.log('[orchestrator] client unbound from slot', slot, '- peer', peerKey);

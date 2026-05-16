@@ -12,7 +12,6 @@ import { getSectorAt } from '../physics.js';
 import { awardFrag } from '../match.js';
 import { getCurrentLevel } from '../level.js';
 import * as renderer from '../../renderer/index.js';
-import { clearWeaponSlots } from '../../renderer/hud.js';
 import { clearMovingState } from '../movement.js';
 
 // ============================================================================
@@ -254,7 +253,6 @@ export function transitionToLevel() {
     clearSceneState();
     for (const player of state.players) {
         player.collectedKeys.clear();
-        renderer.clearKeys(player.viewportIndex);
         // Each player's weapon DOM needs equipWeapon to set data-type so
         // the right sprite renders in their pane.
         equipWeapon(player, player.currentWeapon);
@@ -265,9 +263,9 @@ export function transitionToLevel() {
         if (state.gameMode === 'deathmatch') {
             for (const color of ['blue', 'yellow', 'red']) {
                 player.collectedKeys.add(color);
-                renderer.collectKey(player.viewportIndex, color);
             }
         }
+        player._hudDirty = true;
     }
 }
 
@@ -284,10 +282,8 @@ export function resetGameState() {
         player.currentWeapon = 2;
         player.ownedWeapons = new Set([1, 2]);
         player.collectedKeys.clear();
-        renderer.clearKeys(player.viewportIndex);
         player._hudDirty = true;
     }
-    clearWeaponSlots();
     // Each player's weapon DOM needs equipWeapon to set data-type so the
     // right sprite renders in their pane. In DM, also grant every player
     // all three keys (DOOM-authentic — DM doesn't gate doors by keys).
@@ -296,7 +292,6 @@ export function resetGameState() {
         if (state.gameMode === 'deathmatch') {
             for (const color of ['blue', 'yellow', 'red']) {
                 player.collectedKeys.add(color);
-                renderer.collectKey(player.viewportIndex, color);
             }
         }
     }

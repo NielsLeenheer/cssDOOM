@@ -116,6 +116,7 @@ const stripHudData = (player) => [{
     health: player.health,
     armor: player.armor,
     ownedWeapons: [...player.ownedWeapons],
+    collectedKeys: [...player.collectedKeys],
     score: player.score,
 }];
 
@@ -154,8 +155,6 @@ export const COMMANDS = {
     // ── Per-player: player visuals ────────────────────────────────────────
     setPlayerDead: { kind: 'per-pane', impl: playerVisuals.setPlayerDead },
     setPlayerMoving: { kind: 'per-pane', impl: playerVisuals.setPlayerMoving },
-    clearKeys: { kind: 'per-pane', impl: playerVisuals.clearKeys },
-    collectKey: { kind: 'per-pane', impl: playerVisuals.collectKey },
 
     // ── Per-player: pause tint ────────────────────────────────────────────
     // Host pushes showPaused/hidePaused per slot when Game.pause/resume
@@ -257,3 +256,46 @@ export const PER_PANE_COMMANDS = Object.fromEntries(
 export const WORLD_COMMANDS = Object.fromEntries(
     Object.entries(COMMANDS).filter(([, c]) => c.kind === 'world'),
 );
+
+// ── Prototype binding ────────────────────────────────────────────────────
+// commands.js owns the registry, so it also owns wiring the registry
+// onto the renderer-side classes. Imports go at the bottom so the
+// classes are loaded after the registry is defined and after all impl
+// modules are fully evaluated — sidesteps the circular-import TDZ
+// hazard that otherwise hits when a renderer impl (hud.js, scene.js,
+// etc.) transitively pulls commands.js back through DomRenderer or
+// RenderSink.
+import { DomRenderer } from './dom-renderer.js';
+import { RenderSink } from '../transport/render-sink.js';
+
+// DomRenderer: each command method invokes its impl with `this`
+// (the renderer) as the first arg. The orchestrator's per-player
+// dispatch invokes per-pane methods on renderers whose playerIndex
+// matches; its world dispatch invokes world methods on every target.
+for (const [name, { impl }] of Object.entries(PER_PANE_COMMANDS)) {
+    DomRenderer.prototype[name] = function (...args) {
+        return impl(this, ...args);
+    };
+}
+for (const [name, { impl }] of Object.entries(WORLD_COMMANDS)) {
+    DomRenderer.prototype[name] = function (...args) {
+        return impl(this, ...args);
+    };
+}
+
+// RenderSink: each command method serializes its args (via the
+// optional `serialize` to strip non-cloneable refs like player
+// objects) and posts a wire envelope. Per-pane envelopes carry
+// `target: paneIndex`; world envelopes don't.
+for (const [name, { serialize }] of Object.entries(PER_PANE_COMMANDS)) {
+    RenderSink.prototype[name] = function (...args) {
+        const wireArgs = serialize ? serialize(...args) : args;
+        this._post(name, wireArgs);
+    };
+}
+for (const [name, { serialize }] of Object.entries(WORLD_COMMANDS)) {
+    RenderSink.prototype[name] = function (...args) {
+        const wireArgs = serialize ? serialize(...args) : args;
+        this.forwardWorld(name, wireArgs);
+    };
+}

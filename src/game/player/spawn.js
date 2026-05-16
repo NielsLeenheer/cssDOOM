@@ -85,16 +85,15 @@ export function spawnPlayer(player) {
         if (sector) renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
     }
 
-    // Drop the dead-cam class, restore key indicators, equip the default
-    // weapon (which sets the right sprite in this player's pane).
+    // Drop the dead-cam class and equip the default weapon (which
+    // sets the right sprite in this player's pane). Keys reflect
+    // automatically via updateHud reading player.collectedKeys.
     renderer.setPlayerDead(player.viewportIndex, false);
-    renderer.clearKeys(player.viewportIndex);
     equipWeapon(player, player.currentWeapon);
     // DM rule: every respawn comes back with all three keys.
     if (state.gameMode === 'deathmatch') {
         for (const color of ['blue', 'yellow', 'red']) {
             player.collectedKeys.add(color);
-            renderer.collectKey(player.viewportIndex, color);
         }
     }
 

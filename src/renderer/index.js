@@ -66,9 +66,7 @@ export const playPlayerAttack = exported.playPlayerAttack;
 
 // ── Player visuals ────────────────────────────────────────────────────────
 export const setPlayerDead = exported.setPlayerDead;
-export const clearKeys = exported.clearKeys;
 export const setPlayerMoving = exported.setPlayerMoving;
-export const collectKey = exported.collectKey;
 
 // ── Weapon visuals ────────────────────────────────────────────────────────
 export const switchWeapon = exported.switchWeapon;

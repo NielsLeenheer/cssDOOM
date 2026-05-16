@@ -18,7 +18,7 @@
  * overlay in DM.
  */
 
-import { domRenderers } from '../dom.js';
+import { domRendererManager } from '../dom-renderer-manager.js';
 import { rendererState } from '../renderer-state.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
 
@@ -254,7 +254,7 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
  */
 export function debugSkyTrace(wallId, playerX, playerY) {
     // Debug helper — uses pane 0's scene state.
-    const sState = domRenderers[0].sceneState;
+    const sState = domRendererManager.all[0].sceneState;
     const el = sState.wallElements.find(e => e.id === wallId);
     if (!el) { console.log(`Wall ${wallId} not found in wallElements`); return; }
 
@@ -524,7 +524,7 @@ export function startCullingLoop({ isAttract, getSpectatorActive }) {
         if (frame >= interval) {
             frame = 0;
             const spectator = getSpectatorActive();
-            for (const renderer of domRenderers) {
+            for (const renderer of domRendererManager.all) {
                 if (renderer.sceneState.wallElements.length === 0) continue;
                 if (!renderer.camera) continue;
                 updateCulling(renderer, rendererState.things, spectator);

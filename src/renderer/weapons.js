@@ -6,8 +6,6 @@
  * renderer whose `playerIndex` matches receives the call.
  */
 
-import { domRenderers } from './dom.js';
-
 /**
  * Switch to a new weapon. If the weapon is different from the current one
  * and no switch is already in progress, plays a lower-then-raise animation
@@ -56,14 +54,9 @@ export function stopFiring(renderer) {
     renderer.weaponEl.classList.remove('firing');
 }
 
-// Clean up the firing class when a CSS fire animation completes on any
+// Clean up the firing class when a CSS fire animation completes on a
 // pane's weapon element, so the weapon returns to its idle sprite frame.
 document.addEventListener('animationend', event => {
     if (event.animationName !== 'weapon-fire') return;
-    for (const r of domRenderers) {
-        if (r.weaponEl === event.target) {
-            r.weaponEl.classList.remove('firing');
-            return;
-        }
-    }
+    event.target.classList.remove('firing');
 });

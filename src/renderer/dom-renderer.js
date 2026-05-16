@@ -24,9 +24,17 @@
  * `playerIndex` matches; its world dispatch fans to every target.
  */
 
-import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './commands.js';
-import { buildScene } from './scene/scene.js';
+import { buildScene, updatePerspective } from './scene/scene.js';
 import { rendererState } from './renderer-state.js';
+
+// Per-player and world command methods are bound onto this prototype
+// at the bottom of `commands.js` — commands.js owns the registry and
+// runs the binding after both the registry and this class are loaded.
+// Doing it here used to be a circular-import TDZ hazard: any module
+// in the renderer impl chain (hud.js, scene.js, etc.) that wanted to
+// touch a DomRenderer would transitively pull commands.js, which in
+// turn pulls hud.js again — and dom-renderer.js's binding loop fired
+// before commands.js had finished defining its exports.
 
 export class DomRenderer {
     /**
@@ -62,6 +70,16 @@ export class DomRenderer {
         // crushers, sky planes, projectile DOM, perspective). Rebuilt
         // each map load.
         this.sceneState = makeSceneState();
+
+        // Watch this pane's viewport for size changes and recompute
+        // perspective whenever it shifts. The observer covers every
+        // trigger that used to need an external call — window resize
+        // (viewport tracks window size), bind/unbind layout reflow
+        // (sibling pane appearing/disappearing changes viewport
+        // clientWidth), and the initial observe call sets the
+        // perspective at construction time. No external trigger needed.
+        this._perspectiveObserver = new ResizeObserver(() => updatePerspective(this));
+        this._perspectiveObserver.observe(this.viewportEl);
     }
 
     /**
@@ -85,6 +103,7 @@ export class DomRenderer {
      * referenced DOM nodes are gone with the pane.
      */
     destroy() {
+        this._perspectiveObserver.disconnect();
         this.paneEl.remove();
     }
 
@@ -131,18 +150,3 @@ export function makeSceneState() {
     };
 }
 
-// Generate per-player and world prototype methods from the COMMANDS
-// registry. Each method calls its impl with `this` (the renderer) as the
-// first arg. The orchestrator's per-player dispatch invokes per-pane
-// methods on renderers whose playerIndex matches; its world dispatch
-// invokes world methods on every target.
-for (const [name, { impl }] of Object.entries(PER_PANE_COMMANDS)) {
-    DomRenderer.prototype[name] = function (...args) {
-        return impl(this, ...args);
-    };
-}
-for (const [name, { impl }] of Object.entries(WORLD_COMMANDS)) {
-    DomRenderer.prototype[name] = function (...args) {
-        return impl(this, ...args);
-    };
-}
