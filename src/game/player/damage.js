@@ -220,6 +220,16 @@ function clearSceneState() {
             renderer.hidePowerup(player.viewportIndex, name);
         }
         player.powerups = {};
+        // Clear the player's thing entry so addPlayerThing re-creates
+        // it (and re-fires createPlayerSprite) on the upcoming load.
+        // Without this, addPlayerThing's `if (player.thingRef) return`
+        // guard would skip the create, leaving thingDom[player.thingIndex]
+        // empty after r.clear() wipes it — so per-frame
+        // updateThingPosition either no-ops (no player visible) or
+        // hits whatever stale wire event happened to register an
+        // element at that index during the reload window (manifests
+        // as a different sprite moving around with the player).
+        player.thingRef = null;
     }
     // Clear in place so the rendererState alias (master:
     // rendererState.things === state.things) stays valid across map loads.
