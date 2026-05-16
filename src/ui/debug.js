@@ -10,7 +10,6 @@ import { EYE_HEIGHT } from '../game/constants.js';
 import { THING_NAMES } from '../renderer/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
 import { updateCamera } from '../renderer/index.js';
-import { domRendererManager } from '../renderer/dom-renderer-manager.js';
 import { mapData, currentMap, loadMap, getNextMap } from '../shared/maps.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { endMatch } from '../game/match.js';
@@ -358,13 +357,6 @@ export function initDebugMenu() {
 
         checkbox.addEventListener('change', () => {
             document.body.classList.toggle(toggle.name, checkbox.checked);
-            if (toggle.name === 'show-wall-ids') {
-                for (const r of domRendererManager.all) {
-                    for (const el of r.sceneState.wallElements) {
-                        el.textContent = checkbox.checked ? (el.id || '') : '';
-                    }
-                }
-            }
         });
 
         label.appendChild(checkbox);

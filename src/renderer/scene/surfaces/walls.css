@@ -27,12 +27,16 @@
     filter: brightness(var(--light, 1));
 }
 
-body.show-wall-ids .wall {
+body.show-wall-ids .wall::after {
+    content: attr(id);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    translate: -50% -50%;
     font-size: 12px;
     color: white;
     text-shadow: 0 0 2px black, 0 0 2px black;
-    overflow: hidden;
-    padding: 2px;
+    pointer-events: none;
 }
 
 button.wall {
