@@ -38,7 +38,10 @@
     justify-content: center;
     pointer-events: auto;
     image-rendering: pixelated;
-    transition: transform 0.3s ease-in 0.8s;
+    /* Drives the slide-down on hide and slide-up on show. Anchored
+       elements (.weapon, touch controls) follow because their
+       `bottom: anchor(top)` re-resolves as this layout box moves. */
+    transition: bottom 0.4s ease-in-out;
 }
 
 /* 320*2 = 640px — allow wrapping when the pane is narrower than that */
@@ -810,12 +813,33 @@ body[data-game-state="attract"] .pane-attract {
 
 /* Hide HUD chrome (and the cssDOOM logo button) behind the attract
    overlay. The big M_DOOM splash in .pane-attract carries the branding
-   now, so the tiny corner button would just clutter the idle screen. */
-body[data-game-state="attract"] .hud,
+   now, so the tiny corner button would just clutter the idle screen.
+   The status bar itself slides down (via the .status rule below)
+   instead of disappearing instantly — the weapon and touch controls
+   follow via their `--status` anchor. */
 body[data-game-state="attract"] #spectator,
 body[data-game-state="attract"] #ui-buttons,
 body[data-game-state="attract"] #menu-button {
     display: none;
+}
+
+body[data-game-state="attract"] .status {
+    bottom: calc(-32px * var(--scale));
+}
+
+/* Weapon's anchor only drops it by the HUD's height — not enough to
+   clear the screen. Pair the slide-down with translateY(110%) so the
+   weapon sits fully off-screen during attract. weapon-bob is suppressed
+   here because its keyframes set transform absolutely and would
+   override the hide translate. The transform's existing 0.8s delay +
+   0.3s ease-in (declared on .weapon) staggers it behind the bar — bar
+   slides first, weapon follows. */
+body[data-game-state="attract"] .weapon {
+    /* !important needed because the weapon-bob rule has higher
+       specificity (body:not(.spectator) .renderer .weapon:not(.firing):not(.switching))
+       and its animation keyframes set transform absolutely. */
+    animation: none !important;
+    transform: translateY(110%);
 }
 
 

@@ -5,7 +5,11 @@
     left: 50%;
     margin-bottom: -30px;
     margin-left: calc(var(--w) * var(--scale) * -0.5px);
-    transition: transform 0.3s ease-in 0.8s;
+    /* `bottom` transition lets the weapon ride down with the HUD bar
+       when it slides off-screen — `bottom: anchor(top)` (set below
+       under @supports) re-resolves as .status moves. transform
+       transition is retained for death/switch slides. */
+    transition: bottom 0.4s ease-in-out, transform 0.3s ease-in 0.8s;
     width: calc(var(--w) * var(--scale) * 1px);
     height: calc(var(--h) * var(--scale) * 1px);
     background-size: calc(var(--w) * var(--frames) * var(--scale) * 1px) calc(var(--h) * var(--scale) * 1px);
