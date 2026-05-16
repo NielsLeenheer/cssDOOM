@@ -1,37 +1,30 @@
 /**
  * Spectator Mode — top-down map view and follow-behind camera.
  *
- * Camera transforms are defined in CSS (spectator.css) and driven by custom
- * properties. JavaScript only manages interactive state (pan, zoom, rotate)
- * and sets custom properties — no transform string composition.
+ * Camera transforms are defined in CSS (spectator.css) and driven by
+ * custom properties. JavaScript only manages interactive state (pan,
+ * zoom, rotate, mode switching, controls visibility) and pushes the
+ * resulting values to the renderer via orchestrator calls.
  *
- * Follow mode needs NO JS animation loop — CSS computes the camera position
- * from --player-* properties using sin()/cos(). Only zoom (R/F keys) updates
- * --follow-height.
+ * Follow mode needs NO JS animation loop — CSS computes the camera
+ * position from --player-* properties using sin()/cos(). Only zoom
+ * (R/F keys, scroll, pinch) updates --follow-height.
  *
- * Top-down mode uses a JS loop for keyboard-driven pan/zoom/rotate, but only
- * sets --spectator-offset-x/y, --spectator-height, --spectator-angle as custom
- * properties. CSS composes the transform.
+ * Top-down mode uses a JS loop for keyboard-driven pan/zoom/rotate;
+ * it pushes --spectator-offset-x/y, --spectator-height, and
+ * --spectator-angle. CSS composes the transform.
+ *
+ * All renderer access goes through the orchestrator. This module
+ * never touches DomRenderer or DomRendererManager directly.
  */
 
 import { state } from '../game/state.js';
-import { domRendererManager } from '../renderer/dom-renderer-manager.js';
+import { orchestrator } from '../orchestrator.js';
 
 export let spectatorActive = false;
 let spectatorLoopRunning = false;
 const spectator = { offsetX: 0, offsetY: 0, height: 3000, angle: 0, keys: {}, mode: 'top' };
 const spectatorControls = document.getElementById('spectator-controls');
-
-/**
- * Sets spectator custom properties on the viewport element for CSS to consume.
- */
-function updateSpectatorProperties() {
-    const s = domRendererManager.all[0].viewportEl.style;
-    s.setProperty('--spectator-offset-x', spectator.offsetX);
-    s.setProperty('--spectator-offset-y', spectator.offsetY);
-    s.setProperty('--spectator-height', spectator.height);
-    s.setProperty('--spectator-angle', spectator.angle);
-}
 
 function spectatorLoop() {
     if (!spectatorActive || !spectatorLoopRunning) return;
@@ -49,7 +42,7 @@ function spectatorLoop() {
         if (spectator.keys.r) spectator.height = Math.max(200, spectator.height - speed);
         if (spectator.keys.f) spectator.height += speed;
 
-        updateSpectatorProperties();
+        orchestrator.setSpectatorCamera(spectator);
         updatePlayerSprite(spectator.angle);
     } else {
         // Follow mode: CSS handles the camera transform automatically.
@@ -57,7 +50,7 @@ function spectatorLoop() {
         if (spectator.keys.r) spectator.height = Math.max(100, spectator.height - spectator.height * 0.02);
         if (spectator.keys.f) spectator.height += spectator.height * 0.02;
 
-        domRendererManager.all[0].viewportEl.style.setProperty('--follow-height', spectator.height);
+        orchestrator.setSpectatorFollowHeight(spectator.height);
         updatePlayerSprite(-state.players[0].angle, true);
     }
     requestAnimationFrame(spectatorLoop);
@@ -104,56 +97,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
         sprite.style.setProperty('--mirror', mirrorScale);
     }
 
-    // Set spectator angle for CSS billboard — CSS handles the actual transform
-    domRendererManager.all[0].viewportEl.style.setProperty('--spectator-angle', cameraAngle);
-}
-
-/**
- * Animates the .scene transform by setting an inline transition, then toggling
- * the CSS class in the next frame. The inline transition overrides the
- * `transition: none` in spectator CSS rules. A requestAnimationFrame ensures
- * the browser captures the "before" state before applying the class change.
- */
-function transitionScene(duration, callback) {
-    domRendererManager.all[0].sceneEl.style.transition = `translate ${duration}s ease-in-out, rotate ${duration}s ease-in-out, transform ${duration}s ease-in-out`;
-    requestAnimationFrame(() => {
-        callback();
-        domRendererManager.all[0].sceneEl.addEventListener('transitionend', function onEnd(e) {
-            if (e.target !== domRendererManager.all[0].sceneEl || e.propertyName !== 'rotate') return;
-            domRendererManager.all[0].sceneEl.removeEventListener('transitionend', onEnd);
-            domRendererManager.all[0].sceneEl.style.transition = '';
-        });
-    });
-}
-
-/**
- * Fades ceiling elements in or out via inline transition+opacity.
- * Avoids CSS @starting-style which re-triggers continuously in Safari.
- */
-function transitionCeilings(fadeIn, duration, delay = 0) {
-    for (const el of domRendererManager.all[0].sceneEl.querySelectorAll('.ceiling')) {
-        if (fadeIn) {
-            el.style.opacity = '0';
-            el.style.transition = `opacity ${duration}s ease ${delay}s`;
-            requestAnimationFrame(() => {
-                el.style.opacity = '';
-                el.addEventListener('transitionend', function onEnd(e) {
-                    if (e.propertyName !== 'opacity') return;
-                    el.removeEventListener('transitionend', onEnd);
-                    el.style.transition = '';
-                }, { once: true });
-            });
-        } else {
-            el.style.transition = `opacity ${duration}s ease ${delay}s`;
-            el.style.opacity = '0';
-            el.addEventListener('transitionend', function onEnd(e) {
-                if (e.propertyName !== 'opacity') return;
-                el.removeEventListener('transitionend', onEnd);
-                el.style.transition = '';
-                el.style.opacity = '';
-            }, { once: true });
-        }
-    }
+    orchestrator.setSpectatorAngle(cameraAngle);
 }
 
 window.spectate = function() {
@@ -173,17 +117,11 @@ window.spectate = function() {
         spectator.mode = 'follow';
         spectator.keys = {};
 
-        updateSpectatorProperties();
-        domRendererManager.all[0].viewportEl.style.setProperty('--follow-height', spectator.height);
+        orchestrator.setSpectatorCamera(spectator);
+        orchestrator.setSpectatorFollowHeight(spectator.height);
         if (spectatorControls) spectatorControls.classList.remove('hidden');
 
-        // Fade out ceilings, then toggle spectator class which sets display:none
-        transitionCeilings(false, 1.5);
-
-        // Inline transition overrides CSS `transition: none`, then toggle class
-        transitionScene(1.5, () => {
-            document.body.classList.add('spectator', 'follow-mode');
-        });
+        orchestrator.startSpectatorMode('follow');
 
         // Update tab active state
         spectatorTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.mode === 'follow'));
@@ -202,12 +140,7 @@ window.spectate = function() {
         spectatorLoopRunning = false;
         if (spectatorControls) spectatorControls.classList.add('hidden');
 
-        // Inline transition overrides CSS rule, then remove class to return to FPS
-        transitionScene(1, () => {
-            document.body.classList.remove('spectator', 'follow-mode');
-            // Ceilings go from display:none → block; fade them in with delay
-            transitionCeilings(true, 1, 0.5);
-        });
+        orchestrator.endSpectatorMode();
 
         console.log('Spectator mode OFF');
     }
@@ -312,15 +245,12 @@ function switchSpectatorMode(newMode) {
         ? -Math.round(state.players[0].angle / fullTurn) * fullTurn
         : 0;
 
-    updateSpectatorProperties();
+    orchestrator.setSpectatorCamera(spectator);
     if (spectator.mode === 'follow') {
-        domRendererManager.all[0].viewportEl.style.setProperty('--follow-height', spectator.height);
+        orchestrator.setSpectatorFollowHeight(spectator.height);
     }
 
-    // Inline transition overrides CSS rule, then toggle class
-    transitionScene(1, () => {
-        document.body.classList.toggle('follow-mode', spectator.mode === 'follow');
-    });
+    orchestrator.switchSpectatorMode(spectator.mode);
 
     setTimeout(() => {
         spectatorLoopRunning = true;

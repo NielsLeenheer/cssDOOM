@@ -216,6 +216,17 @@ class Orchestrator {
         return out;
     }
 
+    // ── Spectator mode ───────────────────────────────────────────────────
+    // SP-only feature. All forwards target slot 0 (the master's local
+    // DomRenderer — always present in SP). UI calls these on the
+    // orchestrator and never holds a renderer reference directly.
+    setSpectatorCamera(camera)        { this.targets[0]?.setSpectatorCamera?.(camera); }
+    setSpectatorFollowHeight(height)  { this.targets[0]?.setSpectatorFollowHeight?.(height); }
+    setSpectatorAngle(angle)          { this.targets[0]?.setSpectatorAngle?.(angle); }
+    startSpectatorMode(mode)          { this.targets[0]?.startSpectatorMode?.(mode); }
+    switchSpectatorMode(mode)         { this.targets[0]?.switchSpectatorMode?.(mode); }
+    endSpectatorMode()                { this.targets[0]?.endSpectatorMode?.(); }
+
     // ── Audio dispatch ───────────────────────────────────────────────────
 
     /**

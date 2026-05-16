@@ -26,6 +26,7 @@
 
 import { buildScene, updatePerspective } from './scene/scene.js';
 import { updateCulling as runCulling } from './scene/culling.js';
+import * as spectator from './spectator.js';
 import { rendererState } from './renderer-state.js';
 
 // Per-player and world command methods are bound onto this prototype
@@ -144,6 +145,20 @@ export class DomRenderer {
         if (this.sceneState.wallElements.length === 0) return;
         runCulling(this, rendererState.things, spectatorActive, collectStats);
     }
+
+    // ── Spectator mode ───────────────────────────────────────────────────
+    // Thin delegates to `renderer/spectator.js`. Spectator is SP-only;
+    // these methods only meaningfully run on the primary renderer (slot
+    // 0). See `renderer/spectator.js` for the choreography details
+    // (body class toggles, scene transitions, ceiling fades) and
+    // `Orchestrator`'s `startSpectatorMode` / etc. for the public surface
+    // the UI calls through.
+    setSpectatorCamera(camera)         { spectator.setSpectatorCamera(this, camera); }
+    setSpectatorFollowHeight(height)   { spectator.setSpectatorFollowHeight(this, height); }
+    setSpectatorAngle(angle)           { spectator.setSpectatorAngle(this, angle); }
+    startSpectatorMode(mode)           { spectator.startSpectatorMode(this, mode); }
+    switchSpectatorMode(mode)          { spectator.switchSpectatorMode(this, mode); }
+    endSpectatorMode()                 { spectator.endSpectatorMode(this); }
 }
 
 export function makeSceneState() {
