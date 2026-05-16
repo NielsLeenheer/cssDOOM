@@ -27,7 +27,7 @@ import { mapData, currentMap } from './shared/maps.js';
 import { loadMap } from './shared/maps.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
-import { startCullingLoop } from './renderer/scene/culling.js';
+import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { buildModeConfigFromUrl } from './game/mode-config.js';
@@ -429,7 +429,7 @@ export async function initMaster({ isKiosk = false } = {}) {
     // both slots are claimed. Kiosk-SP and Network-DM-host map to
     // the same paths.
     await app.start();
-    startCullingLoop({
+    domRendererManager.startCullingLoop({
         isAttract: isAttractActive,
         getSpectatorActive: () => spectatorActive,
     });

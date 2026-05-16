@@ -32,7 +32,6 @@ import { initGamepadInput } from '../input/gamepad.js';
 import { initTouchInput } from '../input/touch.js';
 import { on } from '../input/event-bus.js';
 import * as A from '../input/actions.js';
-import { startCullingLoop } from '../renderer/scene/culling.js';
 import { isAttractActive } from '../ui/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
@@ -160,7 +159,7 @@ export class RemoteGame {
             onSnapshot: (snapshot) => this._applyWorldSnapshot(snapshot),
         });
 
-        startCullingLoop({
+        domRendererManager.startCullingLoop({
             isAttract: isAttractActive,
             getSpectatorActive: () => spectatorActive,
         });

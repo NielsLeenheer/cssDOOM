@@ -19,7 +19,6 @@
  */
 
 import { domRendererManager } from '../dom-renderer-manager.js';
-import { rendererState } from '../renderer-state.js';
 import { MAX_RENDER_DISTANCE } from '../../game/constants.js';
 
 // Culling flags — toggled by the debug menu
@@ -305,17 +304,22 @@ export function debugSkyTrace(wallId, playerX, playerY) {
 }
 
 /**
- * Run culling checks on the given player's pane. Called each frame from the
- * culling loop, once per player. Elements are hidden/shown by toggling the
- * `hidden` attribute which maps to `display: none` and fully removes them
- * from compositor work.
+ * Run culling checks on the given player's pane. Called from the per-renderer
+ * `DomRenderer.updateCulling()` method, scheduled by the manager's culling
+ * loop. Elements are hidden/shown by toggling the `hidden` attribute which
+ * maps to `display: none` and fully removes them from compositor work.
  *
- * Callers pass `worldThings` (typically state.things) so the culler can look
- * up live positions of dynamic things, and `spectatorActive` to skip ceiling
- * culling in spectator mode. Both are plain data — culling.js no longer
- * imports from src/game/ or src/ui/.
+ * Callers pass `worldThings` (typically state.things / rendererState.things)
+ * so the culler can look up live positions of dynamic things, and
+ * `spectatorActive` to skip ceiling culling in spectator mode. Both are
+ * plain data — culling.js no longer imports from src/game/ or src/ui/.
+ *
+ * `collectStats` gates the trailing writes to the module-global
+ * `cullingStats`. The manager passes `true` only for renderer 0 so the
+ * debug overlay reads consistent numbers instead of bouncing across
+ * frame-staggered renderers.
  */
-export function updateCulling(renderer, worldThings, spectatorActive) {
+export function updateCulling(renderer, worldThings, spectatorActive, collectStats = false) {
     const player = renderer.camera;
     if (!player) return;
     const anyCulling = culling.frustum || culling.distance || culling.backface || culling.sky;
@@ -479,58 +483,24 @@ export function updateCulling(renderer, worldThings, spectatorActive) {
         if (t.element.hidden !== hide) t.element.hidden = hide;
     }
 
-    cullingStats.total = total;
-    cullingStats.culled = culled;
-    cullingStats.afterDistance = total - distanceCulled;
-    cullingStats.afterBackface = cullingStats.afterDistance - backfaceCulled;
-    cullingStats.afterFrustum = cullingStats.afterBackface - frustumCulled;
-    cullingStats.afterSky = cullingStats.afterFrustum - skyCulled;
+    if (collectStats) {
+        cullingStats.total = total;
+        cullingStats.culled = culled;
+        cullingStats.afterDistance = total - distanceCulled;
+        cullingStats.afterBackface = cullingStats.afterDistance - backfaceCulled;
+        cullingStats.afterFrustum = cullingStats.afterBackface - frustumCulled;
+        cullingStats.afterSky = cullingStats.afterFrustum - skyCulled;
+    }
 }
-
-/** How often the culling loop runs, in frames. */
-const CULLING_INTERVAL = 3;
-/** Slower cadence used during attract — camera moves slowly, so we don't
- *  need to recompute visibility every few frames. ~10 Hz at 60 Hz RAF. */
-const CULLING_INTERVAL_ATTRACT = 6;
 
 /**
- * Start the self-running cull loop. Same code runs on master and client:
- * on master `rendererState` aliases the live game state, on a client it's
- * populated by inbound broadcast envelopes. The culler can't tell the
- * difference.
- *
- * Iterates every populated pane each tick, reading the camera from
- * `rendererState.cameras[i]` and the thing positions from
- * `rendererState.things`. Empty panes (no walls built) early-exit.
- *
- * During attract mode the camera rotates ~12°/sec — culling falls back
- * to ~10 Hz so the kiosk's GPU compositor isn't recomputing a
- * vanishingly different scene every few frames.
- *
- * UI dependencies (attract / spectator) are injected at call time
- * instead of imported directly — both ui modules import from
- * shared/maps.js which imports updateCulling from this file, so
- * importing them here would create a cycle.
- *
- * @param {object} hooks
- * @param {() => boolean} hooks.isAttract           true if attract is active.
- * @param {() => boolean} hooks.getSpectatorActive  current spectator flag.
+ * How often each renderer is culled, in frames. Each renderer ticks
+ * once per CULLING_INTERVAL frames; offsets are spread by renderer
+ * index so 2 panes don't cull on the same frame. Exported for the
+ * manager's culling loop to read.
  */
-export function startCullingLoop({ isAttract, getSpectatorActive }) {
-    let frame = 0;
-    function tick() {
-        frame++;
-        const interval = isAttract() ? CULLING_INTERVAL_ATTRACT : CULLING_INTERVAL;
-        if (frame >= interval) {
-            frame = 0;
-            const spectator = getSpectatorActive();
-            for (const renderer of domRendererManager.all) {
-                if (renderer.sceneState.wallElements.length === 0) continue;
-                if (!renderer.camera) continue;
-                updateCulling(renderer, rendererState.things, spectator);
-            }
-        }
-        requestAnimationFrame(tick);
-    }
-    requestAnimationFrame(tick);
-}
+export const CULLING_INTERVAL = 3;
+/** Slower cadence used during attract — camera moves slowly, so we
+ *  don't need to recompute visibility every few frames. ~10 Hz at 60 Hz
+ *  RAF. */
+export const CULLING_INTERVAL_ATTRACT = 6;

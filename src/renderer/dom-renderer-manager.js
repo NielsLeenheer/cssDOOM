@@ -23,6 +23,7 @@
 
 import { DomRenderer } from './dom-renderer.js';
 import { orchestrator } from '../orchestrator.js';
+import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './scene/culling.js';
 
 class DomRendererManager {
     constructor() {
@@ -32,6 +33,13 @@ class DomRendererManager {
         // construction doesn't have to re-query the DOM each time.
         this._gameContainer = document.getElementById('game');
         this._paneTemplate = document.querySelector('#pane-template');
+
+        // Culling-loop state. Set by startCullingLoop; null until then.
+        // `_cullingFrame` is a free-running counter the stagger keys on
+        // — each renderer ticks when `_cullingFrame % interval === index
+        // % interval`, so panes don't all cull on the same frame.
+        this._cullingHooks = null;
+        this._cullingFrame = 0;
     }
 
     /** Live `DomRenderer` instances, in registration order. Callers may
@@ -123,6 +131,50 @@ class DomRendererManager {
             r.playerIndex = mirror ? 0 : slot;
             r.paneEl.dataset.player = String(r.playerIndex);
         }
+    }
+
+    /**
+     * Start the per-frame culling loop. Single RAF; each tick the
+     * renderer at offset `frame % interval === i % interval` runs its
+     * culling pass — so 2 panes cull on alternating frames instead of
+     * spiking on the same frame.
+     *
+     * `interval` flips to the slower attract value when
+     * `hooks.isAttract()` returns true — the kiosk idle camera barely
+     * moves, so 10 Hz is plenty and saves GPU work.
+     *
+     * Only renderer 0 collects stats — `cullingStats` in culling.js is
+     * a module-global the debug overlay reads, and frame-spread would
+     * otherwise make it bounce across renderers per frame. Picking
+     * renderer 0 keeps the readout stable for the debug overlay's
+     * SP-aligned use today. A future per-renderer debug breakdown
+     * would replace this.
+     *
+     * Called once at boot from master.js / remote-game.js. The hooks
+     * (`isAttract` / `getSpectatorActive`) come from UI modules; they
+     * can't be imported from culling.js or the manager directly without
+     * creating an import cycle.
+     *
+     * @param {object} hooks
+     * @param {() => boolean} hooks.isAttract           true if attract is active.
+     * @param {() => boolean} hooks.getSpectatorActive  current spectator flag.
+     */
+    startCullingLoop(hooks) {
+        this._cullingHooks = hooks;
+        const tick = () => {
+            this._cullingFrame++;
+            const interval = this._cullingHooks.isAttract()
+                ? CULLING_INTERVAL_ATTRACT
+                : CULLING_INTERVAL;
+            const slot = this._cullingFrame % interval;
+            const spectator = this._cullingHooks.getSpectatorActive();
+            for (let i = 0; i < this._renderers.length; i++) {
+                if (i % interval !== slot) continue;
+                this._renderers[i].updateCulling(spectator, i === 0);
+            }
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
     }
 }
 

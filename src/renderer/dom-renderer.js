@@ -25,6 +25,7 @@
  */
 
 import { buildScene, updatePerspective } from './scene/scene.js';
+import { updateCulling as runCulling } from './scene/culling.js';
 import { rendererState } from './renderer-state.js';
 
 // Per-player and world command methods are bound onto this prototype
@@ -129,6 +130,19 @@ export class DomRenderer {
     clear() {
         this.sceneEl.replaceChildren();
         Object.assign(this.sceneState, makeSceneState());
+    }
+
+    /**
+     * Run one culling pass on this pane. Delegates to culling.js's
+     * algorithm with `this` as the renderer arg. Skips when the pane
+     * has no camera (e.g. an unbound slot) or no built geometry yet.
+     * Called by `DomRendererManager`'s culling loop, which schedules
+     * each renderer's pass at a staggered cadence.
+     */
+    updateCulling(spectatorActive, collectStats) {
+        if (!this.camera) return;
+        if (this.sceneState.wallElements.length === 0) return;
+        runCulling(this, rendererState.things, spectatorActive, collectStats);
     }
 }
 
