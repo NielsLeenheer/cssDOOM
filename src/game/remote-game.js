@@ -179,14 +179,12 @@ export class RemoteGame {
         const slotIndex = payload.slotIndex ?? 1;
         this._mySlot = slotIndex;
 
-        // Rebuild DomRenderer at this slot. Nuke any prior renderer
-        // so reconnects start clean.
-        for (const r of [...domRendererManager.all]) domRendererManager.destroy(r);
-        for (let i = 0; i < this.orchestrator.targets.length; i++) {
-            this.orchestrator.targets[i] = null;
-        }
-        const renderer = domRendererManager.create(slotIndex);
-        this.orchestrator.replaceTarget(slotIndex, renderer);
+        // Joiner has exactly one local renderer at the master-assigned
+        // slot. resetToJoinerSlot tears down any pre-existing renderers,
+        // clears every orchestrator target, then creates + installs a
+        // fresh one — all through the Manager + Orchestrator's clean
+        // APIs (no reaching past either's surface).
+        domRendererManager.resetToJoinerSlot(slotIndex);
 
         if (payload.level) {
             // Initial-bootstrap load — goes through the same per-window

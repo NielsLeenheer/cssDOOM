@@ -134,6 +134,43 @@ class DomRendererManager {
     }
 
     /**
+     * Joiner-side bootstrap: tear down any existing renderers, clear
+     * every orchestrator target slot, install one fresh renderer at the
+     * master-assigned slot. Returns the new renderer.
+     *
+     * Different from `reshape(gameMode, networkMode)`: reshape is
+     * master-side and computes desired count from game mode + kiosk
+     * flag. Here the slot is dictated by master's ACK payload and
+     * there's always exactly one local renderer afterward.
+     *
+     * Tear-down and target-clearing both go through the Manager + the
+     * Orchestrator's bookkeeping methods (no direct touch of
+     * `this._renderers` from outside, no direct write to
+     * `orchestrator.targets[i]` — `replaceTarget` keeps
+     * `#game[data-active-renderers]` in sync).
+     */
+    resetToJoinerSlot(slot) {
+        // Drop any existing renderers, unhooking each from its
+        // orchestrator slot through replaceTarget so the active-
+        // renderer-count dataset stays accurate.
+        for (const r of [...this._renderers]) {
+            const slotOfR = orchestrator.targets.indexOf(r);
+            if (slotOfR >= 0) orchestrator.replaceTarget(slotOfR, null);
+            this.destroy(r);
+        }
+        // Clear any non-renderer targets at other slots (a joiner
+        // shouldn't have sinks installed — that's a master-only
+        // concept — but a stray target gets cleared via the proper
+        // bookkeeping path rather than a direct null write).
+        for (let i = 0; i < orchestrator.targets.length; i++) {
+            if (orchestrator.targets[i] != null) orchestrator.replaceTarget(i, null);
+        }
+        const renderer = this.create(slot);
+        orchestrator.replaceTarget(slot, renderer);
+        return renderer;
+    }
+
+    /**
      * Start the per-frame culling loop. Single RAF; each tick the
      * renderer at offset `frame % interval === i % interval` runs its
      * culling pass — so 2 panes cull on alternating frames instead of
