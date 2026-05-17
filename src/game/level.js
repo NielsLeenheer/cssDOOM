@@ -16,7 +16,6 @@ import { EYE_HEIGHT } from './constants.js';
 import { state } from './state.js';
 import { updateGame } from './index.js';
 import { transitionToLevel, resetGameState } from './player/damage.js';
-import { domRendererManager } from '../renderer/dom-renderer-manager.js';
 import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
 import { buildSectorAdjacency } from './sound-propagation.js';
 import { clearSpatialGrid, buildSpatialGrid } from './spatial-grid.js';
@@ -117,14 +116,10 @@ export class Level {
             transitionToLevel();
         }
 
-        if (!isInitialLoad) {
-            // Tear down every renderer's scene and yield to the browser
-            // so iOS Safari can release GPU-backed texture memory
-            // before the next loadMap allocates new elements.
-            for (const r of domRendererManager.all) r.clear();
-            clearSpatialGrid();
-            await new Promise(r => setTimeout(r, 100));
-        }
+        // Game-side teardown — renderer-side teardown (DOM clear +
+        // iOS GPU-release yield) is owned by scene.loadMap and runs
+        // there per-renderer.
+        if (!isInitialLoad) clearSpatialGrid();
 
         // Game-side state init: populates state.things, state.doorState,
         // state.liftState, state.crusherState from the enriched mapData.
@@ -135,14 +130,13 @@ export class Level {
         initLiftsState();
         initCrushersState();
 
-        // Build every local renderer's scene independently. The
-        // manager's registry already reflects what this window needs
-        // (1 in SP, 2 in mirror SP / DM, 1 on a non-kiosk client,
-        // etc.) — boot / mode-switch code constructs and destroys to
-        // match. Each DomRenderer.loadMap also primes its own camera
-        // + culling pass before resolving, so the first composited
-        // frame is correct.
-        await Promise.all(domRendererManager.all.map(r => r.loadMap(name)));
+        // Fan the load to every render target. Each local DomRenderer
+        // runs scene.loadMap (clear-if-needed, yield-if-cleared, build,
+        // prime camera + culling). Each RenderSink forwards a
+        // `cmd-world loadMap` envelope to its remote. Promise.all of
+        // per-target results so we synchronize on every local renderer
+        // being built before proceeding to the game-side post-build.
+        await this.orchestrator.loadMap(name);
 
         // Game-side post-build: spatial grid (needs state.things),
         // player thing entries (creates player billboards via renderer

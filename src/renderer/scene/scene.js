@@ -53,6 +53,17 @@ const MIN_PERSPECTIVE_RATIO = 0.3;
 const MIN_PERSPECTIVE_PX = 350;
 
 /**
+ * iOS Safari holds GPU-backed texture memory across map loads
+ * unless given a yield window between teardown and re-allocation.
+ * 100ms is the empirical minimum that consistently lets the
+ * compositor release the prior scene's textures before the next
+ * scene's images allocate. Originally one yield in Level.load
+ * shared across all renderers; now per-renderer, but Promise.all
+ * makes them collapse to one wall-clock yield.
+ */
+const IOS_GPU_RELEASE_DELAY_MS = 100;
+
+/**
  * Recompute one renderer's `--perspective` based on its own viewport
  * size and the current window mode.
  *
@@ -177,10 +188,31 @@ export async function buildScene(mapData) {
  * renderer.
  */
 export async function loadMap(renderer, name) {
+    // Teardown phase — only if this renderer has a prior scene to
+    // tear down. Empty on first construction; non-empty after any
+    // prior load. Reuses DomRenderer.clear() — same operation the
+    // orchestrator triggers when a remote takes over master's pane
+    // (different lifecycle, same DOM/state reset).
+    //
+    // The yield gives iOS Safari a window to release the GPU-backed
+    // texture memory the cleared DOM held before the build below
+    // allocates new elements. With N renderers running in parallel
+    // via orchestrator.loadMap's Promise.all, all N yields fire at
+    // the same microtask — wall-clock cost stays ~one yield.
+    if (renderer.hasScene) {
+        renderer.clear();
+        await new Promise(resolve => setTimeout(resolve, IOS_GPU_RELEASE_DELAY_MS));
+    }
+
     await maps.load(name);
     const { fragment, sceneState } = await buildScene(maps.mapData);
     renderer.sceneEl.replaceChildren(fragment);
     Object.assign(renderer.sceneState, sceneState);
+
+    // Record the map this renderer is now showing so `reload()` can
+    // rebuild against it later without needing the orchestrator to
+    // know which map is current.
+    renderer._lastLoadedMap = name;
 
     // Warmup phase — primes camera transform + culling visibility so
     // the browser doesn't have to composite the entire level on the
@@ -192,7 +224,7 @@ export async function loadMap(renderer, name) {
     if (camera) {
         renderer.updateCamera(camera);
     }
-    if (renderer.sceneState.wallElements.length > 0) {
+    if (renderer.hasScene) {
         runCulling(renderer, rendererState.things, false);
     }
 }

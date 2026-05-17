@@ -51,7 +51,6 @@ import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import * as audio from './audio/audio.js';
 import { setSlotAudioSuppressed } from './audio/audio.js';
-import * as maps from './shared/maps/index.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -181,9 +180,9 @@ class Orchestrator {
      * Keeps `#game[data-active-renderers]` in sync with the number of
      * slots currently holding a DomRenderer (vs. a RenderSink or null).
      * CSS uses this for pane sizing — 1 active renderer = full-width,
-     * 2 = split, etc. Detection uses `typeof t.clear === 'function'`
-     * which is DomRenderer's interface and not RenderSink's (matching
-     * the existing pattern around line 269).
+     * 2 = split, etc. Detection reads the `kind` marker each target
+     * sets in its constructor (`'dom'` vs `'sink'`) — used in
+     * bindRemoteSlot / unbindRemoteSlot below.
      */
     replaceTarget(slot, target) {
         const previous = this.targets[slot];
@@ -318,7 +317,7 @@ class Orchestrator {
         // we replace the target — if one lived here, that's the renderer
         // we need to clear on master.
         const previousRenderer = this.targets[slot];
-        const wasLocalRenderer = previousRenderer && typeof previousRenderer.clear === 'function';
+        const wasLocalRenderer = previousRenderer?.kind === 'dom';
 
         const sink = new RenderSink(transport, slot);
         const swappedOut = this.replaceTarget(slot, sink);
@@ -376,23 +375,21 @@ class Orchestrator {
         // it reads the current mapData + state, so accumulated runtime
         // mutations (open doors, dead enemies, collected items) carry
         // over correctly via the underlying state.* the build reads from.
-        const rendererToRebuild = (savedTarget && typeof savedTarget.loadMap === 'function')
-            ? savedTarget
-            : null;
+        const rendererToRebuild = savedTarget?.kind === 'dom' ? savedTarget : null;
 
         if (binding.unbindGraceTimer) clearTimeout(binding.unbindGraceTimer);
         binding.unbindGraceTimer = setTimeout(() => {
             // If a reconnect arrived during grace, bindRemoteSlot
             // cancelled this timer and we never reach this body.
             this._remoteBindings.delete(peerKey);
-            // `maps.currentMap` resolves at call time via the live
-            // namespace binding — the saved DomRenderer is rebuilt
-            // against whatever map is loaded when grace expires.
-            rendererToRebuild?.loadMap(maps.currentMap);
+            // `reload()` rebuilds against the map this renderer last
+            // loaded — the renderer owns that memory so the
+            // orchestrator doesn't need to import the maps layer.
+            rendererToRebuild?.reload();
             // Re-mark the pane as active so CSS reveals it (the
-            // sceneEl is repopulated by loadMap above). Done after
-            // loadMap so the pane doesn't flash empty during the
-            // rebuild — but loadMap is fast enough on master that
+            // sceneEl is repopulated by reload above). Done after
+            // reload so the pane doesn't flash empty during the
+            // rebuild — but reload is fast enough on master that
             // the gap is imperceptible.
             if (rendererToRebuild) {
                 rendererToRebuild.paneEl.dataset.active = 'true';

@@ -34,6 +34,11 @@ export class RenderSink {
      * @param {number} paneIndex   master-side pane this sink represents.
      */
     constructor(channel, paneIndex) {
+        // Explicit type marker. Orchestrator uses `target.kind` to
+        // distinguish RenderSinks from local DomRenderers instead of
+        // duck-typing on method existence.
+        this.kind = 'sink';
+
         this.channel = channel;
         this.paneIndex = paneIndex;
         // A sink represents one slot, which is one player position.

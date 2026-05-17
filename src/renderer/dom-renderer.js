@@ -46,6 +46,12 @@ export class DomRenderer {
      * @param {HTMLTemplateElement} options.paneTemplate  `#pane-template`
      */
     constructor({ playerIndex, gameContainer, paneTemplate }) {
+        // Explicit type marker. Orchestrator uses `target.kind` to
+        // distinguish local DomRenderers from RenderSinks instead of
+        // duck-typing on method existence — see
+        // orchestrator.bindRemoteSlot / unbindRemoteSlot.
+        this.kind = 'dom';
+
         this.playerIndex = playerIndex;
 
         // Build the pane DOM. The template carries the full per-pane
@@ -73,6 +79,10 @@ export class DomRenderer {
         // each map load.
         this.sceneState = makeSceneState();
 
+        // Remembered for `reload()` — set inside scene.loadMap on
+        // each successful load. Null until the first load completes.
+        this._lastLoadedMap = null;
+
         // Watch this pane's viewport for size changes and recompute
         // perspective whenever it shifts. The observer covers every
         // trigger that used to need an external call — window resize
@@ -97,6 +107,34 @@ export class DomRenderer {
      */
     get camera() {
         return rendererState.cameras[this.playerIndex];
+    }
+
+    /**
+     * True once this renderer has built a scene at least once. Read
+     * by scene.loadMap to decide whether teardown (clear + iOS yield)
+     * is needed, and by updateCulling to skip a pass on an unbuilt
+     * pane. wallElements.length is the source of truth: empty until
+     * buildWalls populates it; cleared back to empty by clear().
+     */
+    get hasScene() {
+        return this.sceneState.wallElements.length > 0;
+    }
+
+    /**
+     * Rebuild this renderer's scene against whatever map it last
+     * loaded. No-op if no map has been loaded yet (renderer was
+     * constructed but never built — possible for a slot bound
+     * straight to a remote sink, then never serviced locally).
+     *
+     * Used by orchestrator.unbindRemoteSlot's grace-expiry to
+     * restore a pane after a remote leaves. Putting the "what map
+     * was I last on?" memory on the renderer itself means the
+     * orchestrator doesn't need to import the maps layer just to
+     * know what to reload.
+     */
+    async reload() {
+        if (this._lastLoadedMap == null) return;
+        await this.loadMap(this._lastLoadedMap);
     }
 
     /**
@@ -135,7 +173,7 @@ export class DomRenderer {
      */
     updateCulling(spectatorActive, collectStats) {
         if (!this.camera) return;
-        if (this.sceneState.wallElements.length === 0) return;
+        if (!this.hasScene) return;
         runCulling(this, rendererState.things, spectatorActive, collectStats);
     }
 
