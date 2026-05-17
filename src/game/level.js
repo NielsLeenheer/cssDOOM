@@ -27,6 +27,7 @@ import { initSpStats } from './sp-stats.js';
 import * as maps from '../shared/maps/index.js';
 import { applyPlayerStart, addPlayerThings } from './player/start.js';
 import { orchestrator } from '../orchestrator.js';
+import * as renderer from '../renderer/index.js';
 
 /**
  * Module-level registry for "the Level currently being simulated by
@@ -134,6 +135,22 @@ export class Level {
         initDoorsState();
         initLiftsState();
         initCrushersState();
+
+        // Prime rendererState.cameras BEFORE scene.loadMap's per-renderer
+        // warmup reads it. applyPlayerStart just wrote each player's
+        // new x/y/z/angle into state.players; this updateCamera dispatch
+        // runs the mirror (writing into rendererState.cameras) and
+        // fans to every render target. The fan-out also forwards over
+        // each RenderSink to its joiner, so the joiner's
+        // scene.loadMap warmup primes against fresh data instead of
+        // whatever was left in its rendererState from the previous map.
+        // The renderer (master + joiner alike) reads from rendererState
+        // — never from state.players directly — so this priming step
+        // is what makes the warmup work after the
+        // bindRendererStateToMaster alias was removed.
+        for (const player of state.players) {
+            renderer.updateCamera(player, player.viewportIndex);
+        }
 
         // Fan the load to every render target. Each local DomRenderer
         // runs scene.loadMap (clear-if-needed, yield-if-cleared, build,

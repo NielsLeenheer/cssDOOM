@@ -209,7 +209,22 @@ export const COMMANDS = {
     createTeleportFog: { kind: 'world', impl: sprites.createTeleportFog },
     createProjectile: { kind: 'world', impl: sprites.createProjectile },
     removeProjectile: { kind: 'world', impl: sprites.removeProjectile },
-    createPlayerSprite: { kind: 'world', impl: sprites.createPlayerSprite },
+    // Establishing a player thing in the world also creates its
+    // rendererState entry — same semantics as updateThingPosition,
+    // only at create-time. Without this mirror the culler's first
+    // read (between addPlayerThings and the first per-frame
+    // movement-update) sees `rendererState.things[i] === undefined`
+    // and falls back to the thingContainer's spawn x/y. Correct
+    // today, but reliance on the fallback path was a "works because
+    // of lazy allocation" subtlety; the mirror makes the contract
+    // explicit. `_playerIndex` and `_sectorIndex` are ignored here
+    // — neither is rendererState territory.
+    createPlayerSprite: {
+        kind: 'world',
+        impl: sprites.createPlayerSprite,
+        mirror: (thingIndex, _playerIndex, x, y, floorHeight) =>
+            applyThingPositionUpdate(thingIndex, x, y, floorHeight),
+    },
     createCorpse: { kind: 'world', impl: sprites.createCorpse },
     playPlayerAttack: { kind: 'world', impl: sprites.playPlayerAttack },
 

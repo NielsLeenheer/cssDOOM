@@ -176,11 +176,15 @@ export async function buildScene(mapData) {
  *      the first composited frame.
  *
  * Each DomRenderer in the orchestrator's target list runs this
- * independently — no cross-pane coupling. On master, the camera
- * prime reads `rendererState.cameras[playerIndex]` which aliases
- * `state.players[playerIndex]` (mutated by applyPlayerStart before
- * this runs). On a joiner, the same alias is the locally-mirrored
- * camera populated by `applyCameraUpdate`.
+ * independently — no cross-pane coupling. The camera prime reads
+ * `rendererState.cameras[playerIndex]`, populated on BOTH master
+ * and joiner by the `updateCamera` mirror declared in
+ * `renderer/commands.js`. Master's `Level.load` fires an explicit
+ * `renderer.updateCamera` for each player after `applyPlayerStart`
+ * and BEFORE this `orchestrator.loadMap(name)` call so the warmup
+ * sees fresh values on the first composited frame. The same
+ * fan-out forwards to joiners over each RenderSink, so the joiner's
+ * scene.loadMap warmup primes against fresh data too.
  *
  * Wired onto DomRenderer.prototype as the `loadMap` world-command
  * impl via commands.js's auto-binding loop. Returns a Promise so the

@@ -53,7 +53,6 @@ import { onMatch, ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
-import { bindRendererStateToMaster } from './renderer/renderer-state.js';
 
 // Side-effect anchor for renderer-command overlay impls. See
 // src/ui/overlays.js — without this import, modules whose only public
@@ -379,10 +378,6 @@ function setupMasterBroadcast() {
  */
 export async function initMaster({ isKiosk = false } = {}) {
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
-    // Alias the renderer-state arrays directly onto the live game state so
-    // master-side reads (culling, sprite billboard rotation) see the
-    // authoritative simulation values with no copy step.
-    bindRendererStateToMaster(state);
     // Wire action handlers BEFORE input modules emit anything. Inputs
     // produce events on the bus; handlers in src/actions/* subscribe to
     // them and dispatch into game functions.

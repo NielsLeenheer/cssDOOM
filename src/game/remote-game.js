@@ -228,7 +228,6 @@ export class RemoteGame {
         this._renderClient = new RenderClient(
             this._connection.channel,
             this._mySlot,
-            this.orchestrator.target(this._mySlot),
             this.orchestrator,
         );
 

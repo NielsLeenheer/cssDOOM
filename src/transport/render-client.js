@@ -1,18 +1,18 @@
 /**
  * RenderClient — the receiving end in a client window (Local DM
- * secondary or, in future, a Network DM remote).
+ * secondary or Network DM remote).
  *
- * Subscribes to a Transport and dispatches incoming envelopes to a
- * local DomRenderer (per-pane commands) and the local Orchestrator
- * (world commands).
+ * Subscribes to a Transport and delegates incoming envelopes through
+ * the local Orchestrator: per-pane commands via the orchestrator's
+ * per-pane prototype method (matched by playerIndex to the local
+ * DomRenderer), world commands via the world prototype method.
  *
- * Renderer-state mirroring (keeping `rendererState.cameras[i]` and
- * `rendererState.things[i]` in sync with the master so the local culling
- * loop sees current values) is driven by the command registry: each
- * affected entry in [../renderer/commands.js](../renderer/commands.js)
- * declares an optional `mirror` callback that runs here before the
- * renderer dispatch. Adding a new mirrored command is one entry in
- * COMMANDS — no edits here.
+ * Mirror invocation (writes to `rendererState.cameras[i]` /
+ * `rendererState.things[i]`) happens inside the orchestrator's
+ * dispatch — same code path master and joiner share, so the mirror
+ * declarations in [../renderer/commands.js](../renderer/commands.js)
+ * are the single source of truth for "what runs when a command
+ * dispatches." RenderClient never imports the COMMANDS registry.
  *
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, heartbeat, disconnect) is layered on top of
@@ -20,20 +20,18 @@
  */
 
 import { MSG } from './protocol.js';
-import { PER_PANE_COMMANDS, WORLD_COMMANDS } from '../renderer/commands.js';
 
 export class RenderClient {
     /**
      * @param {{onMessage: (cb: (msg: object) => void) => () => void}} channel
      *        Transport instance shared with the master-side connection.
-     * @param {number} slotIndex    master-side slot this client represents
-     * @param {object} domRenderer  the client's local DomRenderer
-     * @param {object} orchestrator the client's local Orchestrator (for world commands)
+     * @param {number} slotIndex     master-side slot this client represents
+     * @param {object} orchestrator  the client's local Orchestrator (handles
+     *                               mirror + fan-out for all commands)
      */
-    constructor(channel, slotIndex, domRenderer, orchestrator) {
+    constructor(channel, slotIndex, orchestrator) {
         this.channel = channel;
         this.slotIndex = slotIndex;
-        this.domRenderer = domRenderer;
         this.orchestrator = orchestrator;
         this._unsubscribe = this.channel.onMessage((msg) => this._handle(msg));
     }
@@ -65,21 +63,19 @@ export class RenderClient {
     }
 
     _dispatchPaneCommand({ target, method, args }) {
-        const cmd = PER_PANE_COMMANDS[method];
-        cmd?.mirror?.(target, ...args);
-
-        const fn = this.domRenderer[method];
+        // Delegate through the orchestrator so its per-pane prototype
+        // binding runs the mirror (writes rendererState) AND fans to
+        // the local DomRenderer in one place — same mechanism master
+        // uses when its own game code calls renderer.* commands.
+        const fn = this.orchestrator[method];
         if (typeof fn === 'function') {
-            fn.apply(this.domRenderer, args);
+            fn.call(this.orchestrator, target, ...args);
         } else {
             console.warn(`RenderClient: unknown pane method '${method}'`);
         }
     }
 
     _dispatchWorldCommand({ method, args }) {
-        const cmd = WORLD_COMMANDS[method];
-        cmd?.mirror?.(...args);
-
         const fn = this.orchestrator[method];
         if (typeof fn !== 'function') {
             console.warn(`RenderClient: unknown world method '${method}'`);

@@ -464,8 +464,30 @@ class Orchestrator {
 // mirror SP, two DomRenderers share playerIndex 0 and both receive the
 // call. In Network DM, a RenderSink at the player's slot forwards to the
 // wire.
+//
+// Mirror callbacks (declared on COMMANDS entries in renderer/commands.js)
+// fire BEFORE fan-out, in the orchestrator — one site, both windows.
+// Master: invoked when game code calls `renderer.updateCamera(player, slot)`,
+// the mirror writes the stripped fields into rendererState before the
+// local DomRenderer's CSS update + the wire forward to any RenderSinks.
+// Joiner: RenderClient delegates inbound envelopes through its local
+// orchestrator, which runs the same mirror at the same site.
+//
+// The same `serialize` that RenderSink uses to strip args for the wire
+// also normalizes the args before mirror invocation. Today's mirrors
+// expect the stripped shape (`(pane, transform)`, not `(pane,
+// livePlayer)`); running serialize at the orchestrator's mirror site
+// keeps the mirror contract uniform regardless of who fired the command.
+// Mirror fires exactly once per dispatch — independent of how many
+// local targets the command fans to (mirror SP has two DomRenderers
+// sharing playerIndex 0; the mirror still runs once).
 for (const name of Object.keys(PER_PANE_COMMANDS)) {
+    const { mirror, serialize } = PER_PANE_COMMANDS[name];
     Orchestrator.prototype[name] = function (playerIndex, ...args) {
+        if (mirror) {
+            const wireArgs = serialize ? serialize(...args) : args;
+            mirror(playerIndex, ...wireArgs);
+        }
         for (const t of this.targets) {
             if (!t) continue;
             if (t.playerIndex !== playerIndex) continue;
@@ -476,10 +498,15 @@ for (const name of Object.keys(PER_PANE_COMMANDS)) {
 
 // World commands: iterate every target. Each DomRenderer runs the impl
 // against itself; each RenderSink forwards to the wire (its client's
-// own orchestrator then iterates its own targets). Build commands are
-// no longer here — they were folded into buildScene in Phase B.
+// own orchestrator then iterates its own targets). Mirror semantics
+// match per-pane above.
 for (const name of Object.keys(WORLD_COMMANDS)) {
+    const { mirror, serialize } = WORLD_COMMANDS[name];
     Orchestrator.prototype[name] = function (...args) {
+        if (mirror) {
+            const wireArgs = serialize ? serialize(...args) : args;
+            mirror(...wireArgs);
+        }
         for (const t of this.targets) {
             if (!t) continue;
             t[name]?.(...args);

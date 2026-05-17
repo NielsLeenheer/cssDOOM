@@ -2,22 +2,28 @@
  * RendererState — the explicit contract for everything the renderer
  * reads from the game world.
  *
- * Two windows, two shapes of backing storage, one read-side API:
+ * `cameras[slot]` and `things[index]` are independently-allocated
+ * objects populated by the `mirror` callbacks declared on entries in
+ * [commands.js](commands.js). The orchestrator's per-pane / world
+ * dispatch loops fire the mirrors before fanning to render targets,
+ * so the population mechanism is identical on master and joiner:
  *
- *   Master: each entry in `cameras` / `things` aliases the same object
- *   in `state.players` / `state.things` so the renderer reads the
- *   authoritative simulation values directly. No copy step.
+ *   Master: game code calls `renderer.updateCamera(player, slot)`
+ *           → orchestrator runs the mirror (writes rendererState
+ *           here) → fans to local DomRenderers + RenderSinks.
  *
- *   Client: there is no `state.players` / `state.things` worth speaking
- *   of — only spawn-time defaults. `cameras` and `things` are
- *   independent objects populated by inbound broadcast envelopes
- *   (`updateCamera`, `updateThingPosition`, `killEnemy`, `collectItem`,
- *   `uncollectItem`) via the `mirror` callbacks declared in
- *   [commands.js](commands.js). The renderer can't tell the difference.
+ *   Joiner: wire envelope arrives → RenderClient delegates to local
+ *           orchestrator → orchestrator runs the mirror (writes
+ *           rendererState here) → fans to the local DomRenderer.
  *
- * Field set is the minimum the renderer + culler actually read. Adding
- * a new render-time read means adding a field here AND updating the
- * broadcast mirror in `applyCameraUpdate` / `applyThingUpdate` below.
+ * The renderer (culling, camera transforms, sprite billboards,
+ * scene.loadMap warmup) reads ONLY from this object. There is no
+ * `state.*` import anywhere in `src/renderer/`, `src/transport/`,
+ * or `src/orchestrator.js`.
+ *
+ * Field set is the minimum the renderer + culler actually read.
+ * Adding a new render-time read means adding a field here AND
+ * declaring it in the mirror callback for the relevant command(s).
  *
  *   cameras[slot]: { x, y, z, angle, floorHeight, isFiring }
  *   things[index]: { x, y, floorHeight, collected }
@@ -27,19 +33,6 @@ export const rendererState = {
     cameras: [],
     things: [],
 };
-
-/**
- * Master-side init: alias the live game state directly. No copy — the
- * renderer reads the same object the simulation mutates. Called once from
- * `initMaster`, before any rendering loop starts. The aliased arrays are
- * stable — `state.players` / `state.things` are mutated in place (push,
- * length=0) and never reassigned, so this binding stays valid for the
- * lifetime of the page.
- */
-export function bindRendererStateToMaster(state) {
-    rendererState.cameras = state.players;
-    rendererState.things = state.things;
-}
 
 function makeCamera() {
     return { x: 0, y: 0, z: 0, angle: 0, floorHeight: 0, isFiring: false };
