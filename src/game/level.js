@@ -28,7 +28,7 @@ import { initSpStats } from './sp-stats.js';
 import { updateCulling } from '../renderer/scene/culling.js';
 import * as renderer from '../renderer/index.js';
 import * as maps from '../shared/maps/index.js';
-import { applyPlayerStart, addPlayerThings } from '../shared/maps/index.js';
+import { applyPlayerStart, addPlayerThings } from './player/start.js';
 
 /**
  * Module-level registry for "the Level currently being simulated by
