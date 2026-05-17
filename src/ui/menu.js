@@ -8,10 +8,11 @@
 
 import { state } from '../game/state.js';
 import { currentMap, MAPS } from '../shared/maps/index.js';
-import { dom } from '../renderer/dom.js';
 import { switchMode } from '../mode.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
+const menuButton = document.getElementById('menu-button');
+const menuOverlay = document.getElementById('menu-overlay');
 
 // Build level buttons using the WILV0N intermission level-name sprites
 // (HANGAR, NUCLEAR PLANT, …) — the same white sprites the SP intermission
@@ -155,12 +156,12 @@ export function toggleMenu(show) {
     if (show === isMenuOpen()) return;
 
     if (show) {
-        dom.menuOverlay.hidden = false;
-        dom.menuOverlay.classList.add('showing');
+        menuOverlay.hidden = false;
+        menuOverlay.classList.add('showing');
 
         // Force layout so the browser captures the "before" state
-        dom.menuOverlay.offsetHeight;
-        dom.menuOverlay.classList.remove('showing');
+        menuOverlay.offsetHeight;
+        menuOverlay.classList.remove('showing');
         updateMenuSelection();
 
         // App.openMenu transitions App into MENU (which flips
@@ -168,11 +169,11 @@ export function toggleMenu(show) {
         // records previousState so closeMenu knows where to return to.
         window.app?.openMenu();
     } else {
-        dom.menuOverlay.classList.add('hiding');
-        dom.menuOverlay.addEventListener('transitionend', function onEnd() {
-            dom.menuOverlay.removeEventListener('transitionend', onEnd);
-            dom.menuOverlay.hidden = true;
-            dom.menuOverlay.classList.remove('hiding');
+        menuOverlay.classList.add('hiding');
+        menuOverlay.addEventListener('transitionend', function onEnd() {
+            menuOverlay.removeEventListener('transitionend', onEnd);
+            menuOverlay.hidden = true;
+            menuOverlay.classList.remove('hiding');
         });
 
         // App.closeMenu resolves where to return to:
@@ -186,10 +187,10 @@ export function toggleMenu(show) {
     }
 }
 
-dom.menuButton.addEventListener('click', () => {
+menuButton.addEventListener('click', () => {
     toggleMenu(!isMenuOpen());
 });
 
-dom.menuOverlay.addEventListener('click', (e) => {
-    if (e.target === dom.menuOverlay) toggleMenu(false);
+menuOverlay.addEventListener('click', (e) => {
+    if (e.target === menuOverlay) toggleMenu(false);
 });
