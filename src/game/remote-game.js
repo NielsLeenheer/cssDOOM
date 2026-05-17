@@ -86,14 +86,18 @@ export class RemoteGame {
      * BroadcastChannel default.
      */
     async start() {
-        document.body.classList.add('client-window');
-        // Both Local DM secondaries and Network DM remotes have
-        // data-network-mode="client" + .client-window; the
-        // `.network-client` class is the canonical signal for
-        // Network-DM-specific UI gates (network lobby visibility,
-        // applyNetworkLobbyState routing in the renderer-command
-        // impl) so Local DM secondaries don't pick them up.
-        if (this.roomCode) document.body.classList.add('network-client');
+        // Body classes (`client-window`, `network-client`) are set in
+        // initClientWindow before this runs — assert rather than write
+        // so a future caller that bypasses the entry script surfaces
+        // the mistake instead of silently breaking CSS layout.
+        console.assert(
+            document.body.classList.contains('client-window'),
+            '[remote-game] expected body.client-window — set in initClientWindow',
+        );
+        console.assert(
+            !this.roomCode || document.body.classList.contains('network-client'),
+            '[remote-game] expected body.network-client for Network DM joiner',
+        );
         this._overlay = ensureDisconnectedOverlay();
 
         if (this.roomCode) {

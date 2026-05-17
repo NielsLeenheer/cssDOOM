@@ -22,6 +22,19 @@ import { App } from './app.js';
 import './ui/overlays.js';
 
 export async function initClientWindow({ roomCode = null } = {}) {
+    // Boot-time window configuration. Both Local DM secondaries and
+    // Network DM remotes have data-network-mode="client" + .client-window;
+    // the `.network-client` class is the canonical signal for
+    // Network-DM-specific UI gates (network lobby visibility,
+    // applyNetworkLobbyState routing in the renderer-command impl) so
+    // Local DM secondaries don't pick them up. Set synchronously here —
+    // before any rendering or game-loop work begins — so CSS that gates
+    // on these classes (`body.client-window .pane { ... }`,
+    // `body.network-client .pane-network-lobby { ... }`) applies from
+    // first paint.
+    document.body.classList.add('client-window');
+    if (roomCode) document.body.classList.add('network-client');
+
     const app = new App();
     window.app = app;
     await app.joinRemoteGame(roomCode);
