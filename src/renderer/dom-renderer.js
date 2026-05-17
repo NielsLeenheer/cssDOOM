@@ -24,7 +24,7 @@
  * `playerIndex` matches; its world dispatch fans to every target.
  */
 
-import { buildScene, updatePerspective } from './scene/scene.js';
+import { updatePerspective } from './scene/scene.js';
 import { updateCulling as runCulling } from './scene/culling.js';
 import * as spectator from './spectator.js';
 import { rendererState } from './renderer-state.js';
@@ -110,23 +110,16 @@ export class DomRenderer {
     }
 
     /**
-     * Build this renderer's scene from the current mapData + state and
-     * absorb it. Each renderer calls this independently — no cloning,
-     * no cross-pane coupling. The Object.assign mutates the existing
-     * sceneState object in place so consumers caching references to it
-     * keep seeing the updated arrays/Maps.
-     */
-    async loadMap() {
-        const { fragment, sceneState } = await buildScene();
-        this.sceneEl.replaceChildren(fragment);
-        Object.assign(this.sceneState, sceneState);
-    }
-
-    /**
      * Drop this renderer's DOM and reset its scene-state. Used by the
      * orchestrator when a remote client takes over this slot — master
      * stops painting an invisible subtree until the client disconnects
      * (at which point loadMap() rebuilds it).
+     *
+     * `loadMap(name)` itself is bound onto this prototype by the
+     * COMMANDS auto-binding loop in `./commands.js` — it routes to
+     * `scene.loadMap(this, name)`, which fetches/enriches mapData,
+     * builds the scene fragment, absorbs it into this renderer, and
+     * primes camera + culling for the first composited frame.
      */
     clear() {
         this.sceneEl.replaceChildren();

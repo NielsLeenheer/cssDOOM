@@ -25,8 +25,6 @@ import { initLiftsState } from './mechanics/lifts.js';
 import { initCrushersState } from './mechanics/crushers.js';
 import { initThingsState } from './entities/things-init.js';
 import { initSpStats } from './sp-stats.js';
-import { updateCulling } from '../renderer/scene/culling.js';
-import * as renderer from '../renderer/index.js';
 import * as maps from '../shared/maps/index.js';
 import { applyPlayerStart, addPlayerThings } from './player/start.js';
 
@@ -141,8 +139,10 @@ export class Level {
         // manager's registry already reflects what this window needs
         // (1 in SP, 2 in mirror SP / DM, 1 on a non-kiosk client,
         // etc.) — boot / mode-switch code constructs and destroys to
-        // match.
-        await Promise.all(domRendererManager.all.map(r => r.loadMap()));
+        // match. Each DomRenderer.loadMap also primes its own camera
+        // + culling pass before resolving, so the first composited
+        // frame is correct.
+        await Promise.all(domRendererManager.all.map(r => r.loadMap(name)));
 
         // Game-side post-build: spatial grid (needs state.things),
         // player thing entries (creates player billboards via renderer
@@ -152,16 +152,6 @@ export class Level {
         buildSectorAdjacency();
         // Reset SP stats and start the per-level timer. No-op in DM.
         initSpStats();
-
-        // Initial render pass — primes camera transforms and runs
-        // culling once synchronously so the browser doesn't have to
-        // composite the entire level on the first frame.
-        for (const player of state.players) {
-            renderer.updateCamera(player, player.viewportIndex);
-        }
-        for (const r of domRendererManager.all) {
-            updateCulling(r, state.things, false);
-        }
 
         // Drop camera from intro height to eye level after scene is
         // ready — every active player's pane gets the drop animation

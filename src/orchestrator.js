@@ -51,6 +51,7 @@ import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import * as audio from './audio/audio.js';
 import { setSlotAudioSuppressed } from './audio/audio.js';
+import * as maps from './shared/maps/index.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -384,7 +385,10 @@ class Orchestrator {
             // If a reconnect arrived during grace, bindRemoteSlot
             // cancelled this timer and we never reach this body.
             this._remoteBindings.delete(peerKey);
-            rendererToRebuild?.loadMap();
+            // `maps.currentMap` resolves at call time via the live
+            // namespace binding — the saved DomRenderer is rebuilt
+            // against whatever map is loaded when grace expires.
+            rendererToRebuild?.loadMap(maps.currentMap);
             // Re-mark the pane as active so CSS reveals it (the
             // sceneEl is repopulated by loadMap above). Done after
             // loadMap so the pane doesn't flash empty during the
@@ -516,6 +520,30 @@ for (const [name, pull] of Object.entries(OVERLAY_PULLERS)) {
         }
     };
 }
+
+/**
+ * loadMap is a world command — every target receives it — but unlike
+ * the generic fan-out we need to AWAIT every local renderer's scene
+ * build so callers (Level.load in step 4) can synchronize on "all
+ * panes built." Each DomRenderer's loadMap returns a Promise
+ * (buildScene is async); each RenderSink's loadMap returns undefined
+ * (the wire envelope is fire-and-forget). Promise.all accepts
+ * non-Promise values transparently, so we await DomRenderers and
+ * ignore Sinks — joiner completion is signalled separately via
+ * MSG.READY_TO_PLAY (step 5 wires this on the joiner side).
+ *
+ * Assignment is placed AFTER the generic world-command binding loop
+ * (which unconditionally writes Orchestrator.prototype.loadMap from
+ * WORLD_COMMANDS) so this explicit version wins.
+ */
+Orchestrator.prototype.loadMap = function (name) {
+    const promises = [];
+    for (const t of this.targets) {
+        if (!t) continue;
+        promises.push(t.loadMap?.(name));
+    }
+    return Promise.all(promises);
+};
 
 /** Re-fire whichever overlay the provider says is currently visible,
  *  targeted at a single render target instead of fanning to all. Used

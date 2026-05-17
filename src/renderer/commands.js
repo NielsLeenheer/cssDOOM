@@ -43,6 +43,7 @@ import * as sprites from './scene/entities/sprites.js';
 import * as doors from './scene/mechanics/doors.js';
 import * as lifts from './scene/mechanics/lifts.js';
 import * as crushers from './scene/mechanics/crushers.js';
+import * as scene from './scene/scene.js';
 import { toggleSwitchState } from './scene/mechanics/switches.js';
 import { lowerTaggedFloor } from './scene/surfaces/floors.js';
 import * as effects from './effects.js';
@@ -164,6 +165,17 @@ export const COMMANDS = {
     // sees the same tint without needing to know host's App state.
     showPaused: { kind: 'per-pane', impl: (renderer) => renderer.rendererEl.classList.add('paused') },
     hidePaused: { kind: 'per-pane', impl: (renderer) => renderer.rendererEl.classList.remove('paused') },
+
+    // ── World: per-renderer map load ──────────────────────────────────────
+    // Impl lives in scene.js. The auto-binding at the bottom of this file
+    // wires DomRenderer.prototype.loadMap → impl(this, name) and
+    // RenderSink.prototype.loadMap → forwardWorld('loadMap', [name]).
+    // Orchestrator.prototype.loadMap has a custom override in
+    // orchestrator.js that returns Promise.all of per-target results so
+    // callers can await every local renderer's build. No serialize (name
+    // is wire-safe). No mirror (loadMap rebuilds the scene from scratch
+    // — there's no rendererState field to update).
+    loadMap: { kind: 'world', impl: scene.loadMap },
 
     // ── World: enemies / things / projectiles / effects ───────────────────
     setEnemyState: { kind: 'world', impl: sprites.setEnemyState },

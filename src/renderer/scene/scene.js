@@ -14,7 +14,8 @@
  */
 
 import { makeSceneState } from '../dom-renderer.js';
-import { mapData } from '../../shared/maps/index.js';
+import * as maps from '../../shared/maps/index.js';
+import { rendererState } from '../renderer-state.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
 import { buildFloors } from './surfaces/floors.js';
@@ -24,6 +25,7 @@ import { buildThing } from './entities/things.js';
 import { buildDoor } from './mechanics/doors.js';
 import { buildLift } from './mechanics/lifts.js';
 import { buildCrusher } from './mechanics/crushers.js';
+import { updateCulling as runCulling } from './culling.js';
 
 // Fixed perspective for kiosk panes. Kiosk hardware is known and the
 // pane's internal logical width is 1920px regardless of HD vs 4K
@@ -86,7 +88,7 @@ export function updatePerspective(renderer) {
  * Builds the renderer scene as a pure DocumentFragment, returning
  * `{ fragment, sceneState }`. The caller hands these to a renderer:
  *
- *   const { fragment, sceneState } = await buildScene();
+ *   const { fragment, sceneState } = await buildScene(mapData);
  *   renderer.sceneEl.replaceChildren(fragment);
  *   Object.assign(renderer.sceneState, sceneState);
  *
@@ -102,8 +104,14 @@ export function updatePerspective(renderer) {
  * as-is.
  *
  * Async because it preloads textures before returning.
+ *
+ * Note: sub-helpers (buildWalls, buildFloors, ...) still read mapData
+ * via their own module imports. The parameter here is the public
+ * contract — current value will match via the live ES module binding,
+ * so they're consistent today. A future cleanup would pass mapData
+ * through ctx so sub-helpers stop importing it.
  */
-export async function buildScene() {
+export async function buildScene(mapData) {
     const ctx = {
         fragment: document.createDocumentFragment(),
         sceneState: makeSceneState(),
@@ -142,6 +150,51 @@ export async function buildScene() {
     await preloadTextures(ctx.fragment);
 
     return { fragment: ctx.fragment, sceneState: ctx.sceneState };
+}
+
+/**
+ * Full per-renderer map-load sequence:
+ *   1. Resolve mapData via maps.load (idempotent on master after Level
+ *      has already loaded; first call on joiner side).
+ *   2. Build a fresh scene fragment + sceneState from mapData.
+ *   3. Absorb both into the renderer (replace its DOM subtree + alias
+ *      state).
+ *   4. Prime this renderer's camera so the first composited frame has
+ *      the right transform.
+ *   5. Prime culling once so visibility classifications are correct on
+ *      the first composited frame.
+ *
+ * Each DomRenderer in the orchestrator's target list runs this
+ * independently — no cross-pane coupling. On master, the camera
+ * prime reads `rendererState.cameras[playerIndex]` which aliases
+ * `state.players[playerIndex]` (mutated by applyPlayerStart before
+ * this runs). On a joiner, the same alias is the locally-mirrored
+ * camera populated by `applyCameraUpdate`.
+ *
+ * Wired onto DomRenderer.prototype as the `loadMap` world-command
+ * impl via commands.js's auto-binding loop. Returns a Promise so the
+ * orchestrator's `loadMap` override can Promise.all every local
+ * renderer.
+ */
+export async function loadMap(renderer, name) {
+    await maps.load(name);
+    const { fragment, sceneState } = await buildScene(maps.mapData);
+    renderer.sceneEl.replaceChildren(fragment);
+    Object.assign(renderer.sceneState, sceneState);
+
+    // Warmup phase — primes camera transform + culling visibility so
+    // the browser doesn't have to composite the entire level on the
+    // first RAF frame. Calling through the auto-generated per-pane
+    // prototype method keeps the prime local to this renderer; we
+    // skip the orchestrator so other panes don't get double-primed
+    // when a sibling DomRenderer's loadMap runs.
+    const camera = rendererState.cameras[renderer.playerIndex];
+    if (camera) {
+        renderer.updateCamera(camera);
+    }
+    if (renderer.sceneState.wallElements.length > 0) {
+        runCulling(renderer, rendererState.things, false);
+    }
 }
 
 /**
