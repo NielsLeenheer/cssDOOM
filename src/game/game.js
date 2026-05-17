@@ -373,11 +373,13 @@ export class Game {
                 orchestrator,
             });
             this._subscribeLevel(this.level);
-            // The level-load fires onLevel('changing', { name }) which
-            // master.js subscribes to and turns into broadcastLoadMap
-            // on the MasterConnection — so every connected client begins
-            // its own loadMap in parallel with master's. No explicit
-            // broadcast call needed here.
+            // Level.load fires onLevel('changing', { name }), which
+            // master.js's subscriber turns into beginCoordinatedLoad
+            // (resets per-session readyToPlay flags + pauses LOOKING).
+            // Level.load's own `await this.orchestrator.loadMap(name)`
+            // then fans `cmd-world loadMap` through every RenderSink
+            // so every connected joiner rebuilds its local scene in
+            // parallel with master's.
             await this.level.load();
             _setCurrentLevel(this.level);
         }
@@ -431,11 +433,11 @@ export class Game {
      * trigger. Called from `actions/gates.js` on FIRE_DOWN during
      * the match-end gate.
      *
-     * The Level construction here goes through Game's normal subscribe
-     * path (`_subscribeLevel`), which is what makes the NEXT exit-switch
-     * fire `_onLevelComplete` — switches.js used to do `setTimeout(
-     * shared/maps/index.js::loadMap)` which built a Level without that
-     * subscription, silently breaking results on match 2+.
+     * The Level construction here goes through Game's `_subscribeLevel`,
+     * which is what makes the NEXT exit-switch fire `_onLevelComplete`
+     * (and from there back into Game.restartMatch). DM map advancement
+     * is owned by Game so the subscription chain stays intact across
+     * matches.
      */
     async restartMatch() {
         orchestrator.hideResults();
@@ -580,16 +582,11 @@ export class Game {
      * point. endMatch computes the winner, transitions GAME_STATE to
      * ENDED, signals showResults, and fires onMatch('ended'); Game's
      * own onMatch subscriber then flips _state → RESULTS. In BOTH
-     * modes we stash payload.nextMap so the next advance (Game.advance
-     * for SP, Game.restartMatch for DM) loads the right map.
-     *
-     * switches.js used to also `setTimeout(loadMap(nextMap), 1000)`
-     * for DM, which constructed a Level via shared/maps/index.js::loadMap
-     * — bypassing Game's _subscribeLevel. After that, the new Level
-     * had no Game subscriber, so the NEXT exit-switch silently
-     * dropped its level-complete on the floor: no _onLevelComplete,
-     * no endMatch, no results. That's gone — Game.restartMatch
-     * owns DM map advancement now.
+     * modes we stash payload.nextMap so the next advance
+     * (Game.advance for SP, Game.restartMatch for DM) loads the
+     * right map. Map advancement is owned by Game so every
+     * subsequent Level is constructed through `_subscribeLevel` and
+     * its level-complete reaches this handler.
      */
     _onLevelComplete(payload) {
         // Stash next-map so the post-overlay advance path (Game.advance

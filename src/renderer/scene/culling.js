@@ -252,10 +252,11 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
  * loop. Elements are hidden/shown by toggling the `hidden` attribute which
  * maps to `display: none` and fully removes them from compositor work.
  *
- * Callers pass `worldThings` (typically state.things / rendererState.things)
- * so the culler can look up live positions of dynamic things, and
- * `spectatorActive` to skip ceiling culling in spectator mode. Both are
- * plain data — culling.js no longer imports from src/game/ or src/ui/.
+ * Callers pass `worldThings` (the local window's `rendererState.things`)
+ * so the culler can look up live positions and collected status of
+ * dynamic things, and `spectatorActive` to skip ceiling culling in
+ * spectator mode. Both are plain data — culling.js depends only on
+ * the renderer layer.
  *
  * `collectStats` gates the trailing writes to the module-global
  * `cullingStats`. The manager passes `true` only for renderer 0 so the
@@ -387,10 +388,11 @@ export function updateCulling(renderer, worldThings, spectatorActive, collectSta
             continue;
         }
 
-        // For things tied to live game entries (enemies, players), use the
-        // current position from state.things — t.x/t.y are spawn-time
-        // values and would let a fast-moving DM player drift outside their
-        // opponent's culling frustum even when standing in plain view.
+        // For things tied to live mirrored entries (enemies, players), use
+        // the current position from rendererState.things — t.x/t.y are
+        // spawn-time values and would let a fast-moving DM player drift
+        // outside their opponent's culling frustum even when standing in
+        // plain view.
         const tx = gameEntry ? gameEntry.x : t.x;
         const ty = gameEntry ? gameEntry.y : t.y;
         const relX = tx - playerX;

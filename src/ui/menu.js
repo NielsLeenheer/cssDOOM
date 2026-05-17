@@ -35,11 +35,7 @@ for (const name of MAPS) {
         // properly torn down (Game.stop clears the intermission
         // overlay + onAdvance callback, hides results, etc.) and a
         // fresh Game is constructed with the picked map as
-        // mapCursor. The historical loadMap shim direct call
-        // bypassed all that — leaving stale intermission DOM up
-        // and a dangling onAdvance callback that, when fired,
-        // loaded the PREVIOUS level's next-map instead of the
-        // user's pick. window.app is set in app.js boot before any
+        // mapCursor. window.app is set in app.js boot before any
         // UI/menu code runs; a missing app here is a boot-order bug
         // that should crash loud, not fall back silently.
         window.app.startLocalGame({

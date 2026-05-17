@@ -128,11 +128,11 @@ export class RemoteGame {
             // setGameState). Impls live in lobby.js, client-lobby.js,
             // network-lobby.js, scoreboard.js, and game-state.js.
             //
-            // Coordinated in-place loadMap is no longer a ClientConnection
-            // callback — the envelope rides `cmd-world loadMap` through
-            // RenderClient, which calls `this.orchestrator.loadMap(name)`
-            // on the joiner and posts MSG.READY_TO_PLAY after the local
-            // scene rebuild resolves (see render-client.js).
+            // Coordinated in-place loadMap rides `cmd-world loadMap`
+            // through RenderClient — see render-client.js for the
+            // special-case that calls `orchestrator.loadMap(name)`
+            // on the joiner and posts MSG.READY_TO_PLAY once the
+            // local scene rebuild resolves.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
             onLeave: () => this._onLeave(),
             // Master signalled every joiner is ready. Visual state

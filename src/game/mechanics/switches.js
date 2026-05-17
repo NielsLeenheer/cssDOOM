@@ -94,10 +94,10 @@ export function tryUseSwitch(player) {
                     //        showResults; Game.restartMatch later
                     //        advances mapCursor (to the nextMap stashed
                     //        on _pendingNextMap below) and constructs
-                    //        the next Level. switches.js used to do an
-                    //        end-run via setTimeout(loadMap), which
-                    //        orphaned Game's subscription on the new
-                    //        Level and silently broke results on match 2+.
+                    //        the next Level via the subscribed path.
+                    //        Map advancement is owned by Game so every
+                    //        new Level is wired to fire level-complete
+                    //        back into Game on the next exit.
                     const nextMap = linedef.specialType === SECRET_EXIT_SPECIAL
                         ? getSecretExitMap()
                         : getNextMap();

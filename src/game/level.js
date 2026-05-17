@@ -1,15 +1,16 @@
 /**
  * Level — one loaded map being simulated.
  *
- * `load()` mirrors the body of `loadMap()` in `shared/maps/index.js` — same
- * calls, same order, same side effects on `state.*`. Game owns Level
- * construction; `loadMap` survives as a shim for the callers that
- * don't hold a Level instance (menu, debug, mechanics/switches,
- * RemoteGame, attract). Level emits `changing` / `loaded` /
- * `level-complete` / `player-died` / `player-spawned`; the
- * module-level emitter handles `changing` / `loaded` (cross-instance
- * subscribers) and per-instance events go through each Level's own
- * `on`.
+ * Game owns Level construction for normal gameplay (Game.beginPlay /
+ * Game.advance / Game.restartMatch). Callers without a Game (attract,
+ * debug warp, SP dead-respawn) use the `swapLevel(name)` helper at
+ * the bottom of this file, which constructs + loads + starts a Level
+ * and registers it as the current Level for this window.
+ *
+ * Level emits `changing` / `loaded` / `level-complete` / `player-died`
+ * / `player-spawned`. The module-level emitter handles `changing` /
+ * `loaded` (cross-instance subscribers); per-instance events flow
+ * through each Level's own `on`.
  */
 
 import { EYE_HEIGHT } from './constants.js';
@@ -31,13 +32,13 @@ import * as renderer from '../renderer/index.js';
 
 /**
  * Module-level registry for "the Level currently being simulated by
- * this window." Set by `loadMap()` (the shim) and by Game.beginPlay;
- * read by the RAF tick and the level-event call sites in switches /
- * damage / spawn.
+ * this window." Set by Game.beginPlay (the canonical path) and by
+ * `swapLevel` (callers without a Game). Read by the RAF tick and
+ * the level-event call sites in switches / damage / spawn.
  *
  * Two accessors are intentional: `getCurrentLevel` is the stable read
  * API used by callers. The underscored `_setCurrentLevel` is for the
- * writers — by convention only `loadMap` and Game touch it.
+ * writers — by convention only Game and `swapLevel` touch it.
  */
 let _currentLevel = null;
 export function getCurrentLevel() { return _currentLevel; }
@@ -139,15 +140,14 @@ export class Level {
         // Prime rendererState.cameras BEFORE scene.loadMap's per-renderer
         // warmup reads it. applyPlayerStart just wrote each player's
         // new x/y/z/angle into state.players; this updateCamera dispatch
-        // runs the mirror (writing into rendererState.cameras) and
-        // fans to every render target. The fan-out also forwards over
-        // each RenderSink to its joiner, so the joiner's
-        // scene.loadMap warmup primes against fresh data instead of
-        // whatever was left in its rendererState from the previous map.
-        // The renderer (master + joiner alike) reads from rendererState
-        // — never from state.players directly — so this priming step
-        // is what makes the warmup work after the
-        // bindRendererStateToMaster alias was removed.
+        // runs the mirror (which copies the stripped camera fields into
+        // rendererState.cameras) and fans to every render target. The
+        // fan-out also forwards over each RenderSink to its joiner, so
+        // the joiner's scene.loadMap warmup primes against fresh data
+        // instead of whatever was left in its rendererState from the
+        // previous map. The renderer (master + joiner alike) reads from
+        // rendererState — never from state.players directly — so this
+        // priming step is what makes the warmup land correct values.
         for (const player of state.players) {
             renderer.updateCamera(player, player.viewportIndex);
         }

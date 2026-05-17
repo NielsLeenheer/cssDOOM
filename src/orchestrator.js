@@ -548,13 +548,13 @@ for (const [name, pull] of Object.entries(OVERLAY_PULLERS)) {
 /**
  * loadMap is a world command — every target receives it — but unlike
  * the generic fan-out we need to AWAIT every local renderer's scene
- * build so callers (Level.load in step 4) can synchronize on "all
- * panes built." Each DomRenderer's loadMap returns a Promise
- * (buildScene is async); each RenderSink's loadMap returns undefined
- * (the wire envelope is fire-and-forget). Promise.all accepts
- * non-Promise values transparently, so we await DomRenderers and
- * ignore Sinks — joiner completion is signalled separately via
- * MSG.READY_TO_PLAY (step 5 wires this on the joiner side).
+ * build so callers (Level.load) can synchronize on "all panes built."
+ * Each DomRenderer's loadMap returns a Promise (buildScene is async);
+ * each RenderSink's loadMap returns undefined (the wire envelope is
+ * fire-and-forget). Promise.all accepts non-Promise values
+ * transparently, so we await DomRenderers and ignore Sinks — joiner
+ * completion is signalled separately via MSG.READY_TO_PLAY, posted
+ * by the joiner's RenderClient after its local scene rebuild resolves.
  *
  * Assignment is placed AFTER the generic world-command binding loop
  * (which unconditionally writes Orchestrator.prototype.loadMap from
