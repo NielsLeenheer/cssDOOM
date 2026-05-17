@@ -35,7 +35,7 @@
 
 import { state } from './game/state.js';
 import { Player } from './game/player/player.js';
-import { currentMap, loadMap } from './shared/maps.js';
+import { currentMap, loadMap } from './shared/maps/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
 import { setDefaultSlot } from './input/claim-registry.js';

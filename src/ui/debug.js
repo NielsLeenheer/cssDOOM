@@ -10,7 +10,7 @@ import { EYE_HEIGHT } from '../game/constants.js';
 import { THING_NAMES } from '../renderer/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
 import { updateCamera } from '../renderer/index.js';
-import { mapData, currentMap, loadMap, getNextMap } from '../shared/maps.js';
+import { mapData, currentMap, loadMap, getNextMap } from '../shared/maps/index.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { endMatch } from '../game/match.js';
 import { enterAttract } from './attract.js';

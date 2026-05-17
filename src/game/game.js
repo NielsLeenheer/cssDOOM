@@ -17,7 +17,7 @@ import { state } from './state.js';
 import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
-import { getNextMap } from '../shared/maps.js';
+import { getNextMap } from '../shared/maps/index.js';
 import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
@@ -434,7 +434,7 @@ export class Game {
      * The Level construction here goes through Game's normal subscribe
      * path (`_subscribeLevel`), which is what makes the NEXT exit-switch
      * fire `_onLevelComplete` — switches.js used to do `setTimeout(
-     * shared/maps.js::loadMap)` which built a Level without that
+     * shared/maps/index.js::loadMap)` which built a Level without that
      * subscription, silently breaking results on match 2+.
      */
     async restartMatch() {
@@ -584,7 +584,7 @@ export class Game {
      * for SP, Game.restartMatch for DM) loads the right map.
      *
      * switches.js used to also `setTimeout(loadMap(nextMap), 1000)`
-     * for DM, which constructed a Level via shared/maps.js::loadMap
+     * for DM, which constructed a Level via shared/maps/index.js::loadMap
      * — bypassing Game's _subscribeLevel. After that, the new Level
      * had no Game subscriber, so the NEXT exit-switch silently
      * dropped its level-complete on the floor: no _onLevelComplete,

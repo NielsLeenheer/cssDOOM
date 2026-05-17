@@ -12,7 +12,7 @@
 
 import { EYE_HEIGHT, PLAYER_RADIUS } from '../constants.js';
 import { state } from '../state.js';
-import { mapData } from '../../shared/maps.js';
+import { mapData } from '../../shared/maps/index.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { getFloorHeightAt, getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';

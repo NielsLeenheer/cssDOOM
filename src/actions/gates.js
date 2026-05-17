@@ -28,7 +28,7 @@ import { isMatchEnded, restartMatch, startMatch, isMatchLobby } from '../game/ma
 import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { tryClaimSlot } from '../input/claim-registry.js';
-import { currentMap, loadMap } from '../shared/maps.js';
+import { currentMap, loadMap } from '../shared/maps/index.js';
 import { countOccupied as countNetworkLobbyOccupied } from '../ui/network-lobby.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';

@@ -14,7 +14,7 @@
  */
 
 import { makeSceneState } from '../dom-renderer.js';
-import { mapData } from '../../shared/maps.js';
+import { mapData } from '../../shared/maps/index.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
 import { buildFloors } from './surfaces/floors.js';
@@ -94,10 +94,12 @@ export function updatePerspective(renderer) {
  * call buildScene() again to produce its own independent fragment. The
  * scene is fully self-contained: static geometry (sectors, walls, floors,
  * ceilings, player billboard) plus dynamic level objects (things, doors,
- * lifts, crushers). Game-side init functions are expected to have run
- * first — they populate `mapData.thingRenderSpecs`, annotate doors with
- * `trackWalls`, and leave `mapData.lifts` / `mapData.crushers` ready to
- * read.
+ * lifts, crushers). Map-side enrichment (`shared/maps/things.js` and
+ * `shared/maps/doors.js`) is expected to have run first — it
+ * annotates each `mapData.things[i]` in place with category /
+ * sectorIndex / floorHeight / gameId and each `mapData.doors[i]`
+ * with `trackWalls`. `mapData.lifts` / `mapData.crushers` are read
+ * as-is.
  *
  * Async because it preloads textures before returning.
  */
@@ -113,10 +115,15 @@ export async function buildScene() {
     buildCeilings(ctx);
     buildPlayer(ctx);
 
-    // Dynamic level objects — game-side init has populated the data
-    // these helpers read.
-    if (mapData?.thingRenderSpecs) {
-        for (const spec of mapData.thingRenderSpecs) buildThing(ctx, spec);
+    // Dynamic level objects — map-side init has enriched mapData.things
+    // in place with sectorIndex / floorHeight / category / gameId for
+    // each surviving entry. Skip entries without `category`: those are
+    // skill / MP-only filtered out and shouldn't render.
+    if (mapData?.things) {
+        for (const thing of mapData.things) {
+            if (thing.category === undefined) continue;
+            buildThing(ctx, thing);
+        }
     }
     if (mapData?.doors) {
         for (const door of mapData.doors) buildDoor(ctx, door, door.trackWalls || []);

@@ -21,10 +21,10 @@
 import { USE_RANGE, DOOR_CLOSE_DELAY } from '../constants.js';
 
 import { state } from '../state.js';
-import { mapData } from '../../shared/maps.js';
+import { mapData } from '../../shared/maps/index.js';
 import { getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
-import { sectorCenter } from '../../shared/maps.js';
+import { sectorCenter } from '../../shared/maps/index.js';
 import { setDoorState } from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 
@@ -52,43 +52,25 @@ export function isDoorClosed(wall) {
  * draw the door container with its static track side walls. No renderer
  * commands; buildScene reads mapData.doors directly.
  */
-export function initDoors() {
+/**
+ * State-side init for doors. Reads `mapData.doors` (with
+ * `door.trackWalls` already annotated by
+ * `src/shared/maps/doors.js::initDoors`) and populates
+ * `state.doorState` with the per-door runtime entry the simulation
+ * mutates during play.
+ */
+export function initDoorsState() {
     state.doorState = new Map();
     if (!mapData.doors) return;
 
     for (const door of mapData.doors) {
-        // Identify face walls — any upper wall bordering the door sector
-        const faceWalls = [];
-        for (const wall of mapData.walls) {
-            if (!wall.isUpperWall) continue;
-            if (wall.frontSectorIndex !== door.sectorIndex && wall.backSectorIndex !== door.sectorIndex) continue;
-            faceWalls.push(wall);
-        }
-
-        // Identify track walls — solid walls adjacent to face walls that form the door jambs
-        const trackWalls = [];
-        for (const wall of mapData.walls) {
-            if (!wall.isSolid || wall.isDoor) continue;
-            if (wall.bottomHeight !== door.floorHeight || wall.topHeight !== door.closedHeight) continue;
-            if (!wall.texture || wall.texture === '-') continue;
-            const isAdjacent = faceWalls.some(fw =>
-                (wall.start.x === fw.start.x && wall.start.y === fw.start.y) ||
-                (wall.start.x === fw.end.x && wall.start.y === fw.end.y) ||
-                (wall.end.x === fw.start.x && wall.end.y === fw.start.y) ||
-                (wall.end.x === fw.end.x && wall.end.y === fw.end.y)
-            );
-            if (isAdjacent) trackWalls.push(wall);
-        }
-
-        door.trackWalls = trackWalls;
-
         state.doorState.set(door.sectorIndex, {
             open: false,
             sectorIndex: door.sectorIndex,
             passable: false,
             timer: null,
             passableTimer: null,
-            keyRequired: door.keyRequired || null
+            keyRequired: door.keyRequired || null,
         });
     }
 }

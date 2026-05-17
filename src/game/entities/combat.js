@@ -10,7 +10,7 @@ import {
 
 import { state } from '../state.js';
 import { Player } from '../player/player.js';
-import { currentMap } from '../../shared/maps.js';
+import { currentMap } from '../../shared/maps/index.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';
 import { hasPowerup } from '../player/pickups.js';

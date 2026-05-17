@@ -2,12 +2,12 @@
  * Menu — level / skill / mode selection overlay (UI only).
  *
  * Renders the buttons, owns menu open/close, and routes clicks into the
- * mode coordinator (`src/mode.js`) and the map loader (`shared/maps.js`).
+ * mode coordinator (`src/mode.js`) and the map loader (`shared/maps/index.js`).
  * No game-state, renderer, audio, or networking logic lives here.
  */
 
 import { state } from '../game/state.js';
-import { currentMap, MAPS, loadMap } from '../shared/maps.js';
+import { currentMap, MAPS, loadMap } from '../shared/maps/index.js';
 import { dom } from '../renderer/dom.js';
 import { switchMode } from '../mode.js';
 

@@ -4,7 +4,7 @@
 
 import { SKY_TEXTURE } from '../constants.js';
 
-import { mapData } from '../../../shared/maps.js';
+import { mapData } from '../../../shared/maps/index.js';
 import { buildHorizontalSurface } from './horizontal.js';
 
 export function buildCeilings(ctx) {

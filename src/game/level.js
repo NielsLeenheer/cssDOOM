@@ -1,7 +1,7 @@
 /**
  * Level — one loaded map being simulated.
  *
- * `load()` mirrors the body of `loadMap()` in `shared/maps.js` — same
+ * `load()` mirrors the body of `loadMap()` in `shared/maps/index.js` — same
  * calls, same order, same side effects on `state.*`. Game owns Level
  * construction; `loadMap` survives as a shim for the callers that
  * don't hold a Level instance (menu, debug, mechanics/switches,
@@ -20,22 +20,15 @@ import { domRendererManager } from '../renderer/dom-renderer-manager.js';
 import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
 import { buildSectorAdjacency } from './sound-propagation.js';
 import { clearSpatialGrid, buildSpatialGrid } from './spatial-grid.js';
-import { initDoors } from './mechanics/doors.js';
-import { initLifts } from './mechanics/lifts.js';
-import { initCrushers } from './mechanics/crushers.js';
-import { initThings } from './entities/things-init.js';
+import { initDoorsState } from './mechanics/doors.js';
+import { initLiftsState } from './mechanics/lifts.js';
+import { initCrushersState } from './mechanics/crushers.js';
+import { initThingsState } from './entities/things-init.js';
 import { initSpStats } from './sp-stats.js';
 import { updateCulling } from '../renderer/scene/culling.js';
 import * as renderer from '../renderer/index.js';
-import {
-    fetchMapJson,
-    decorateMapData,
-    _setMapData,
-    _setCurrentMap,
-    getCurrentMap,
-    applyPlayerStart,
-    addPlayerThings,
-} from '../shared/maps.js';
+import * as maps from '../shared/maps/index.js';
+import { applyPlayerStart, addPlayerThings } from '../shared/maps/index.js';
 
 /**
  * Module-level registry for "the Level currently being simulated by
@@ -88,7 +81,7 @@ export class Level {
 
     async load() {
         const name = this.map;
-        const isInitialLoad = !getCurrentMap();
+        const isInitialLoad = !maps.currentMap;
 
         // Tell any connected client that the scene is about to be
         // rebuilt. Subscribers (master.js's broadcast setup) subscribe
@@ -110,10 +103,10 @@ export class Level {
             await showLevelTransition();
         }
 
-        const mapData = await fetchMapJson(name);
-        _setCurrentMap(name);
-        _setMapData(mapData);
-        decorateMapData(mapData);
+        // Fetch + enrich mapData. Mutates `maps.mapData` and
+        // `maps.currentMap`. State.* is NOT touched here — that's
+        // the initThingsState / initDoorsState / etc. calls below.
+        await maps.load(name);
         applyPlayerStart();
 
         // Death restarts with a full reset (health/ammo/weapons); level
@@ -135,15 +128,14 @@ export class Level {
             await new Promise(r => setTimeout(r, 100));
         }
 
-        // Game-side level init: mutates state.* (state.things,
-        // state.doorState, state.liftState, state.crusherState),
-        // annotates mapData with the render specs that buildScene reads
-        // (mapData.thingRenderSpecs, door.trackWalls). No renderer
-        // commands fire here.
-        initThings();
-        initDoors();
-        initLifts();
-        initCrushers();
+        // Game-side state init: populates state.things, state.doorState,
+        // state.liftState, state.crusherState from the enriched mapData.
+        // Map enrichment (mapData.things annotations, door.trackWalls)
+        // already ran inside maps.load above.
+        initThingsState();
+        initDoorsState();
+        initLiftsState();
+        initCrushersState();
 
         // Build every local renderer's scene independently. The
         // manager's registry already reflects what this window needs

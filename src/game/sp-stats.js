@@ -16,7 +16,7 @@
  */
 
 import { state } from './state.js';
-import { mapData } from '../shared/maps.js';
+import { mapData } from '../shared/maps/index.js';
 import { ENEMIES } from './constants.js';
 
 // MF_COUNTITEM in DOOM source — armor, bonuses, soulsphere, powerups.

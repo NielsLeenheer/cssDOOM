@@ -37,7 +37,7 @@ import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
 import { hideInitialOverlay } from '../ui/overlay.js';
 import { setAudioEnabled } from '../audio/audio.js';
-import { loadMap } from '../shared/maps.js';
+import { loadMap } from '../shared/maps/index.js';
 import { setClientSlot } from '../ui/client-lobby.js';
 import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyRemoteGameState } from '../game/game-state.js';

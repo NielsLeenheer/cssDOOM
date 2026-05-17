@@ -15,7 +15,7 @@
  */
 
 import { captureSpStats } from '../game/sp-stats.js';
-import { currentMap } from '../shared/maps.js';
+import { currentMap } from '../shared/maps/index.js';
 import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
 import { registerOverlayImpl } from '../renderer/commands.js';
 

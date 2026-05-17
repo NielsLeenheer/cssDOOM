@@ -24,11 +24,11 @@ import {
 } from '../constants.js';
 
 import { state } from '../state.js';
-import { mapData } from '../../shared/maps.js';
+import { mapData } from '../../shared/maps/index.js';
 import { toggleDoor } from './doors.js';
 import { activateLift } from './lifts.js';
 import { activateCrusher } from './crushers.js';
-import { getNextMap, getSecretExitMap } from '../../shared/maps.js';
+import { getNextMap, getSecretExitMap } from '../../shared/maps/index.js';
 import * as renderer from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
 import { getCurrentLevel } from '../level.js';

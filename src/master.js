@@ -23,8 +23,8 @@
  */
 
 import { state } from './game/state.js';
-import { mapData, currentMap } from './shared/maps.js';
-import { loadMap } from './shared/maps.js';
+import { mapData, currentMap } from './shared/maps/index.js';
+import { loadMap } from './shared/maps/index.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
@@ -148,7 +148,7 @@ function gameLoop(timestamp) {
     // instance, which internally no-ops if paused. Game owns the Level
     // via `app.game.level`, but the gameLoop reads through the
     // singleton registry (`getCurrentLevel`) because that's what
-    // `shared/maps.js::loadMap` writes on map change — and loadMap is
+    // `shared/maps/index.js::loadMap` writes on map change — and loadMap is
     // the entry point for the callers (menu, debug, switches, etc.)
     // that don't hold a Level instance themselves.
     getCurrentLevel()?.tick(timestamp);

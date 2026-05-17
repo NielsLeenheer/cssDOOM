@@ -22,7 +22,7 @@
 import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../constants.js';
 
 import { state } from '../state.js';
-import { mapData, sectorCenter } from '../../shared/maps.js';
+import { mapData, sectorCenter } from '../../shared/maps/index.js';
 import { orchestrator } from '../../orchestrator.js';
 import { setLiftState, updateThingPosition } from '../../renderer/index.js';
 import { isMatchLobby } from '../match.js';
@@ -32,7 +32,7 @@ const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation dur
 // Cached flat array of { sectorIndex, entry } for zero-alloc iteration in the hot path
 let liftEntries = [];
 
-export function initLifts() {
+export function initLiftsState() {
     state.liftState = new Map();
     if (!mapData.lifts) return;
 

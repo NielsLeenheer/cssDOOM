@@ -27,7 +27,7 @@
  */
 
 import { state } from '../game/state.js';
-import { loadMap } from '../shared/maps.js';
+import { loadMap } from '../shared/maps/index.js';
 import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
 import { resetMatch, endMatch } from '../game/match.js';

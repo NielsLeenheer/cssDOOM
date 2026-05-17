@@ -20,7 +20,7 @@
  */
 
 import { state } from '../state.js';
-import { mapData } from '../../shared/maps.js';
+import { mapData } from '../../shared/maps/index.js';
 import { getSectorAt } from '../physics.js';
 import { damagePlayer } from '../player/damage.js';
 import { setCrusherOffset } from '../../renderer/index.js';
@@ -33,7 +33,7 @@ const CRUSHER_DAMAGE_INTERVAL = 4 / 35; // 4 tics ≈ 0.114 seconds
 
 let crusherEntries = [];
 
-export function initCrushers() {
+export function initCrushersState() {
     state.crusherState = new Map();
     crusherEntries = [];
     if (!mapData.crushers) return;

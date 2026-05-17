@@ -13,7 +13,7 @@
 
 import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
-import { mapData } from '../../../shared/maps.js';
+import { mapData } from '../../../shared/maps/index.js';
 import { appendToSector, getSectorLight } from '../sectors.js';
 
 /** Creates a wall DOM element from wall data with the given floor/ceiling heights. */
@@ -60,7 +60,7 @@ export function buildWalls(ctx) {
         if (wallLength < 1 || wallHeight < 1) continue;
 
         // Skip lower walls on lift sector boundaries — shaft walls created
-        // by initLifts() cover this geometry with the correct height span
+        // by initLiftsState() cover this geometry with the correct height span
         if (wall.isLiftWall) continue;
 
         // Skip untextured walls — in DOOM, texture name "-" or empty means transparent/passable

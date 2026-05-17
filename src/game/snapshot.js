@@ -20,7 +20,7 @@
 
 import { state } from './state.js';
 import { PICKUPS, ENEMIES } from './constants.js';
-import { currentMap } from '../shared/maps.js';
+import { currentMap } from '../shared/maps/index.js';
 import { getFloorHeightAt } from './physics.js';
 import { getCurrentTimerText } from './match.js';
 

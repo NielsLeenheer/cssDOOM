@@ -13,7 +13,7 @@
 
 import { state } from './state.js';
 import { Player } from './player/player.js';
-import { loadMap, currentMap } from '../shared/maps.js';
+import { loadMap, currentMap } from '../shared/maps/index.js';
 import { clearMovingState } from './movement.js';
 import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
 import { orchestrator } from '../orchestrator.js';

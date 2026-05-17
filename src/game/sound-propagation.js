@@ -11,7 +11,7 @@
  * 2 = reached through one block).
  */
 
-import { mapData } from '../shared/maps.js';
+import { mapData } from '../shared/maps/index.js';
 import { getSectorAt } from './physics.js';
 import { state } from './state.js';
 

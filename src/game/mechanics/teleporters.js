@@ -18,7 +18,7 @@
 import { EYE_HEIGHT, PLAYER_RADIUS, SHOOTABLE, BARREL_RADIUS } from '../constants.js';
 
 import { state } from '../state.js';
-import { mapData } from '../../shared/maps.js';
+import { mapData } from '../../shared/maps/index.js';
 import { getFloorHeightAt } from '../physics.js';
 import * as renderer from '../../renderer/index.js';
 import { orchestrator } from '../../orchestrator.js';
