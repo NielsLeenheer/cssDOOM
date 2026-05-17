@@ -84,7 +84,7 @@ export function applyLobbyState(msg) {
 // double-written here. Also gates against .network-client because
 // Network DM remotes don't use the per-pane press-to-claim overlay —
 // network-lobby.js's renderLobbyState handles their slot list instead.
-import { registerOverlayImpl } from '../renderer/commands.js';
+import { registerOverlayImpl } from '../commands.js';
 function applyLobbyStatePayload(payload) {
     if (!document.body.classList.contains('client-window')) return;
     if (document.body.classList.contains('network-client')) return;

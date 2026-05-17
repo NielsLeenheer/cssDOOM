@@ -28,10 +28,10 @@
  * (decouple loading order) goes with it. Documented as deferred work.
  */
 
-import './lobby.js';
-import './network-lobby.js';
-import './client-lobby.js';
-import './intermission.js';
-import './scoreboard.js';
+import '../renderer/screens/lobby.js';
+import '../renderer/screens/network-lobby.js';
+import '../renderer/screens/client-lobby.js';
+import '../renderer/screens/intermission.js';
+import '../renderer/screens/scoreboard.js';
 import '../renderer/hud/match-timer.js';
 import '../game/game-state.js';

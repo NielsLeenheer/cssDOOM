@@ -17,17 +17,17 @@
  * subscription is gone. Auto-start is owned by Game._checkAutoStart
  * (same READY_FLASH delay as before).
  *
- * Network DM lobby UI lives in src/ui/network-lobby.js — a 4-slot
+ * Network DM lobby UI lives in src/renderer/screens/network-lobby.js — a 4-slot
  * list rather than per-pane prompts. Both modules register impls on
  * the same showLobby command and each gates on state.networkMode
  * internally so only one paints per call.
  */
 
-import { state } from '../game/state.js';
-import { orchestrator } from '../orchestrator.js';
-import { isSlotClaimedLocally } from '../input/claim-registry.js';
-import { isMatchLobby, onMatch } from '../game/match.js';
-import { registerOverlayImpl } from '../renderer/commands.js';
+import { state } from '../../game/state.js';
+import { orchestrator } from '../../orchestrator.js';
+import { isSlotClaimedLocally } from '../../input/claim-registry.js';
+import { isMatchLobby, onMatch } from '../../game/match.js';
+import { registerOverlayImpl } from '../commands.js';
 
 let externalSlotsRef = () => new Set();
 
@@ -98,7 +98,7 @@ export function initLobby({ getExternallyClaimedSlots }) {
  * unclaimed AND every lower-numbered slot is already claimed.
  */
 function updateLobbyUI() {
-    // Network DM has its own lobby UI in src/ui/network-lobby.js.
+    // Network DM has its own lobby UI in src/renderer/screens/network-lobby.js.
     if (state.networkMode === 'host') return;
 
     const inLobby = isMatchLobby();

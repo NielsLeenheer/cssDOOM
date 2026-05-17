@@ -26,13 +26,13 @@
  * timer doesn't fire on a user mid-decision or mid-transition.
  */
 
-import { state } from '../game/state.js';
-import { swapLevel } from '../game/level.js';
-import { getFloorHeightAt } from '../game/physics.js';
-import { EYE_HEIGHT } from '../game/constants.js';
-import { resetMatch, endMatch } from '../game/match.js';
-import { isMenuOpen } from './menu.js';
-import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
+import { state } from '../../game/state.js';
+import { swapLevel } from '../../game/level.js';
+import { getFloorHeightAt } from '../../game/physics.js';
+import { EYE_HEIGHT } from '../../game/constants.js';
+import { resetMatch, endMatch } from '../../game/match.js';
+import { isMenuOpen } from '../../ui/menu.js';
+import { GAME_STATE, getGameState, transitionTo } from '../../game/game-state.js';
 
 // Idle thresholds.
 //   GAME_IDLE_MS — in-progress match → end the match so the scoreboard

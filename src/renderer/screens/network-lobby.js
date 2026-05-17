@@ -34,9 +34,9 @@
  */
 
 import qrcode from 'qrcode-generator';
-import { state } from '../game/state.js';
-import { isSlotClaimedLocally, onClaimChange, unclaimSlotsNotIn } from '../input/claim-registry.js';
-import { registerOverlayImpl } from '../renderer/commands.js';
+import { state } from '../../game/state.js';
+import { isSlotClaimedLocally, onClaimChange, unclaimSlotsNotIn } from '../../input/claim-registry.js';
+import { registerOverlayImpl } from '../commands.js';
 
 const MAX_SLOTS = 4;
 

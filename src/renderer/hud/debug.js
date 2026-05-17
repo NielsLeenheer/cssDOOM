@@ -14,8 +14,8 @@ import { mapData, currentMap, getNextMap } from '../../shared/maps/index.js';
 import { swapLevel } from '../../game/level.js';
 import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { endMatch } from '../../game/match.js';
-import { enterAttract } from '../../ui/attract.js';
-import { showIntermission } from '../../ui/intermission.js';
+import { enterAttract } from '../screens/attract.js';
+import { showIntermission } from '../screens/intermission.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 

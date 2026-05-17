@@ -22,7 +22,7 @@
  */
 
 import { listenForNetworkClients } from './transport/webrtc-transport.js';
-import { setNetworkRoomCode } from './ui/network-lobby.js';
+import { setNetworkRoomCode } from './renderer/screens/network-lobby.js';
 import { MasterConnection } from './transport/peer-connection.js';
 
 // 32-char alphabet without visually-ambiguous glyphs (no 0/O, 1/I/L,

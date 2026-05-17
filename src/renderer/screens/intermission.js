@@ -14,10 +14,10 @@
  * body[data-game-state="intermission"]).
  */
 
-import { captureSpStats } from '../game/sp-stats.js';
-import { currentMap } from '../shared/maps/index.js';
-import { GAME_STATE, getGameState, transitionTo } from '../game/game-state.js';
-import { registerOverlayImpl } from '../renderer/commands.js';
+import { captureSpStats } from '../../game/sp-stats.js';
+import { currentMap } from '../../shared/maps/index.js';
+import { GAME_STATE, getGameState, transitionTo } from '../../game/game-state.js';
+import { registerOverlayImpl } from '../commands.js';
 
 const LABEL_BASE = '/assets/intermission';
 const COUNT_UP_MS = 1200;     // per-row duration

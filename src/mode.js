@@ -40,7 +40,7 @@ import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
 import { setDefaultSlot } from './input/claim-registry.js';
 import { configureAudio } from './audio/audio.js';
-import { resetNetworkLobby, setNetworkSlotState, setLocallyClaimableSlots } from './ui/network-lobby.js';
+import { resetNetworkLobby, setNetworkSlotState, setLocallyClaimableSlots } from './renderer/screens/network-lobby.js';
 import { openRoom, closeRoom } from './network-host.js';
 import { orchestrator } from './orchestrator.js';
 

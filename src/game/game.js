@@ -22,8 +22,8 @@ import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
-import { getCarriedOverClaims } from '../ui/lobby.js';
-import { getNetworkSlotOccupants } from '../ui/network-lobby.js';
+import { getCarriedOverClaims } from '../renderer/screens/lobby.js';
+import { getNetworkSlotOccupants } from '../renderer/screens/network-lobby.js';
 
 // How long to keep the just-claimed pane's READY indicator visible
 // before auto-starting the match. If a slot un-claims during the
@@ -657,7 +657,7 @@ export class Game {
     }
 
     /** Unified lobby payload consumed by every lobby renderer
-     *  ([ui/lobby.js], [ui/network-lobby.js], [ui/client-lobby.js]).
+     *  ([renderer/screens/lobby.js], [renderer/screens/network-lobby.js], [renderer/screens/client-lobby.js]).
      *  Combines roster info (slots + mapCursor) with the master-side
      *  per-slot bookkeeping (claims, carried-over claims, network
      *  occupants) so every consumer can pick the fields it needs from

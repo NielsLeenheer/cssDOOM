@@ -20,7 +20,7 @@
  */
 
 import { registerInputProvider } from '../orchestrator.js';
-import { pingActivity } from '../ui/attract.js';
+import { pingActivity } from '../renderer/screens/attract.js';
 import { emit } from './event-bus.js';
 import { MSG } from '../transport/protocol.js';
 

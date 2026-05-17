@@ -30,7 +30,7 @@
  * with a negative total — that's intentional, not a bug.
  */
 
-import { registerOverlayImpl } from '../renderer/commands.js';
+import { registerOverlayImpl } from '../commands.js';
 
 const CELL_WIDTH = 2;
 const TOTAL_WIDTH = 2;
