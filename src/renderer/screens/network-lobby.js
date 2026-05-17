@@ -36,22 +36,21 @@
 import qrcode from 'qrcode-generator';
 import { state } from '../../game/state.js';
 import { isSlotClaimedLocally, onClaimChange, unclaimSlotsNotIn } from '../../input/claim-registry.js';
+import {
+    ensureNetworkSlotStateInitialized,
+    getNetworkSlotState,
+    resetNetworkSlotState,
+    setNetworkSlotOccupant,
+    getLocallyClaimableSlots,
+    setLocallyClaimableSlotsState,
+    getRoomCode,
+    setRoomCodeState,
+} from '../../game/lobby-state.js';
 import { registerOverlayImpl } from '../commands.js';
 
 const MAX_SLOTS = 4;
 
 let allLobbyRoots = []; // every .pane-network-lobby in the DOM
-let slotState = []; // [{ occupant, label }] indexed by slot
-let locallyClaimableSlots = new Set();
-let roomCode = null;
-
-/** Current slot occupants ('empty'|'host'|'local'|'remote'), by slot.
- *  Used by master.js when building the LOBBY_STATE envelope so the
- *  network-lobby view propagates to joiners alongside the local-DM
- *  claim bits. */
-export function getNetworkSlotOccupants() {
-    return slotState.map(s => s.occupant);
-}
 
 /** Apply an incoming LOBBY_STATE's slotOccupants array (joiner side).
  *  Mirrors master's slot rows into this window's network-lobby UI. */
@@ -68,11 +67,7 @@ export function applyNetworkLobbyState(occupants) {
 // from a one-shot DOMContentLoaded if available.
 function refreshDom() {
     allLobbyRoots = Array.from(document.querySelectorAll('.pane-network-lobby'));
-    if (slotState.length === 0) {
-        for (let i = 0; i < MAX_SLOTS; i++) {
-            slotState.push({ occupant: 'empty', labelOverride: null });
-        }
-    }
+    ensureNetworkSlotStateInitialized();
 }
 
 /**
@@ -88,7 +83,7 @@ function refreshDom() {
  * input modules at boot) light up as PLAYER N READY on entry.
  */
 export function setLocallyClaimableSlots(slots) {
-    locallyClaimableSlots = new Set(slots);
+    setLocallyClaimableSlotsState(slots);
     // Drop any persistent sessionStorage claim bound to a slot
     // outside this set. Without this, a kiosk-DM session that
     // claimed gamepad-1 → slot 1 would leak that binding into a
@@ -109,18 +104,19 @@ export function setLocallyClaimableSlots(slots) {
  */
 function syncFromClaims() {
     refreshDom();
+    const slotState = getNetworkSlotState();
     for (let i = 0; i < MAX_SLOTS; i++) {
         const cur = slotState[i]?.occupant;
         if (cur === 'remote') continue;
         const isClaimed = isSlotClaimedLocally(i);
         if (isClaimed && cur !== 'local' && cur !== 'host') {
-            slotState[i].occupant = 'local';
+            setNetworkSlotOccupant(i, 'local', slotState[i].labelOverride);
             for (const root of allLobbyRoots) {
                 const row = root.querySelector(`.network-slot[data-slot="${i}"]`);
                 if (row) row.dataset.occupant = 'local';
             }
         } else if (!isClaimed && (cur === 'local')) {
-            slotState[i].occupant = 'empty';
+            setNetworkSlotOccupant(i, 'empty', slotState[i].labelOverride);
             for (const root of allLobbyRoots) {
                 const row = root.querySelector(`.network-slot[data-slot="${i}"]`);
                 if (row) row.dataset.occupant = 'empty';
@@ -136,9 +132,7 @@ function syncFromClaims() {
  */
 export function resetNetworkLobby() {
     refreshDom();
-    for (let i = 0; i < MAX_SLOTS; i++) {
-        slotState[i] = { occupant: 'empty', labelOverride: null };
-    }
+    resetNetworkSlotState();
     setNetworkRoomCode(null);
     renderAllLabels();
     updateReadyAttribute();
@@ -152,9 +146,9 @@ export function resetNetworkLobby() {
  */
 export function setNetworkSlotState(slot, { occupant = 'empty', label = null } = {}) {
     refreshDom();
+    const slotState = getNetworkSlotState();
     if (!slotState[slot]) return;
-    slotState[slot].occupant = occupant;
-    slotState[slot].labelOverride = label;
+    setNetworkSlotOccupant(slot, occupant, label);
     for (const root of allLobbyRoots) {
         const row = root.querySelector(`.network-slot[data-slot="${slot}"]`);
         if (row) row.dataset.occupant = occupant;
@@ -166,7 +160,7 @@ export function setNetworkSlotState(slot, { occupant = 'empty', label = null } =
 /** Populate room-code display in every pane copy. Null shows placeholder. */
 export function setNetworkRoomCode(code) {
     refreshDom();
-    roomCode = code;
+    setRoomCodeState(code);
     const text = code ?? '- - - -';
     const svg = code ? renderQrSvg(code) : '';
     for (const root of allLobbyRoots) {
@@ -193,16 +187,11 @@ function renderQrSvg(code) {
     return qr.createSvgTag({ scalable: true, margin: 1 });
 }
 
-/** Number of slots currently occupied (anything other than 'empty'). */
-export function countOccupied() {
-    let n = 0;
-    for (const s of slotState) if (s.occupant !== 'empty') n++;
-    return n;
-}
-
 // ── Internal: label + ready-attribute rendering ─────────────────────────
 
 function nextClaimableSlot() {
+    const slotState = getNetworkSlotState();
+    const locallyClaimableSlots = getLocallyClaimableSlots();
     for (let i = 0; i < MAX_SLOTS; i++) {
         if (slotState[i]?.occupant !== 'empty') continue;
         if (locallyClaimableSlots.has(i)) return i;
@@ -211,7 +200,7 @@ function nextClaimableSlot() {
 }
 
 function labelFor(slot) {
-    const s = slotState[slot];
+    const s = getNetworkSlotState()[slot];
     if (!s) return '';
     if (s.labelOverride) return s.labelOverride;
     if (s.occupant !== 'empty') return `Player ${slot + 1} ready`;
@@ -231,8 +220,10 @@ function renderAllLabels() {
 }
 
 function updateReadyAttribute() {
-    const ready = countOccupied() >= 2;
-    if (ready) {
+    const slotState = getNetworkSlotState();
+    let n = 0;
+    for (const s of slotState) if (s.occupant !== 'empty') n++;
+    if (n >= 2) {
         document.body.dataset.networkReady = 'true';
     } else {
         delete document.body.dataset.networkReady;

@@ -22,8 +22,7 @@ import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
-import { getCarriedOverClaims } from '../renderer/screens/lobby.js';
-import { getNetworkSlotOccupants } from '../renderer/screens/network-lobby.js';
+import { getCarriedOverClaims, getNetworkSlotOccupants } from './lobby-state.js';
 
 // How long to keep the just-claimed pane's READY indicator visible
 // before auto-starting the match. If a slot un-claims during the

@@ -27,24 +27,10 @@ import { state } from '../../game/state.js';
 import { orchestrator } from '../../orchestrator.js';
 import { isSlotClaimedLocally } from '../../input/claim-registry.js';
 import { isMatchLobby, onMatch } from '../../game/match.js';
+import { getCarriedOverClaims, setCarriedOverClaims } from '../../game/lobby-state.js';
 import { registerOverlayImpl } from '../commands.js';
 
 let externalSlotsRef = () => new Set();
-
-// Snapshot of which slots were already claimed at the start of the
-// current lobby session (refreshed on match.js's 'reset' event).
-// Slots in this set are "carried over" — they shouldn't flash READY
-// when the new lobby begins because nobody just pressed a button for
-// them. Slots claimed AFTER the session started (i.e., during the
-// current lobby) are the "fresh" ones that get the READY overlay.
-let carriedOverClaims = new Set();
-
-/** Slots carried over from the previous match — used by master broadcast
- *  to communicate the fresh-vs-carried distinction to clients so they
- *  can suppress their own READY flash on a back-to-back rematch. */
-export function getCarriedOverClaims() {
-    return carriedOverClaims;
-}
 
 /**
  * Wire the externally-claimed-slots getter (so panes whose slot is
@@ -67,11 +53,12 @@ export function initLobby({ getExternallyClaimedSlots }) {
         // Snapshot already-claimed slots so they're treated as carried
         // over (no READY flash) in the new lobby session. Any claim
         // added AFTER this point is "fresh" and will flash READY.
-        carriedOverClaims = new Set();
+        const carried = new Set();
         const ext = externalSlotsRef();
         for (let i = 0; i < state.players.length; i++) {
-            if (isSlotClaimedLocally(i) || ext.has(i)) carriedOverClaims.add(i);
+            if (isSlotClaimedLocally(i) || ext.has(i)) carried.add(i);
         }
+        setCarriedOverClaims(carried);
         // No explicit repaint call: Game.restartMatch (the caller that
         // triggers match-reset) pushes showLobby via orchestrator
         // immediately after, which fires updateLobbyUI through the
@@ -123,7 +110,7 @@ function updateLobbyUI() {
             // Fresh claim (made this lobby session) gets the READY flash;
             // a claim that carried over from before match-reset behaves
             // like 'active' — no overlay, just normal scene.
-            claimState = carriedOverClaims.has(slot) ? 'active' : 'ready';
+            claimState = getCarriedOverClaims().has(slot) ? 'active' : 'ready';
         } else if (slot === promptingSlot) {
             claimState = 'prompting';
         } else {

@@ -30,7 +30,7 @@ import { spawnPlayer } from '../game/player/spawn.js';
 import { tryClaimSlot } from '../input/claim-registry.js';
 import { currentMap } from '../shared/maps/index.js';
 import { swapLevel } from '../game/level.js';
-import { countOccupied as countNetworkLobbyOccupied } from '../renderer/screens/network-lobby.js';
+import { countOccupied as countNetworkLobbyOccupied } from '../game/lobby-state.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';
 
