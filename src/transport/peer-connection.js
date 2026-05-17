@@ -162,8 +162,8 @@ export class MasterConnection {
             alive: false,
             ready: false,
             // Set by MSG.READY_TO_PLAY; reset to false on each
-            // broadcastLoadMap so awaitAllReadyToPlay tracks the latest
-            // load round.
+            // beginCoordinatedLoad so awaitAllReadyToPlay tracks the
+            // latest load round.
             readyToPlay: false,
             lastPong: 0,
             pingTimer: null,
@@ -242,40 +242,50 @@ export class MasterConnection {
     }
 
     /**
-     * Unpause LOOKING after a non-coordinated loadMap (switches.js's
-     * DM exit-switch path). The coordinated handshake uses
-     * broadcastPlay() to unpause; this is the fallback for callers
-     * that fire loadMap directly without the handshake.
+     * Unpause LOOKING after a non-coordinated map load (any caller
+     * that drives Level.load without going through Game.beginPlay's
+     * awaitAllReadyToPlay → broadcastPlay path, e.g. swapLevel via
+     * attract / debug / gates / match). The coordinated handshake
+     * uses broadcastPlay() to unpause; this is the fallback so the
+     * pause from beginCoordinatedLoad doesn't strand LOOKING when
+     * no broadcastPlay follows.
      */
     resumeAfterLevelLoad() {
         this.paused = false;
     }
 
     /**
-     * Broadcast a coordinated loadMap to every alive peer. Resets
-     * per-session readyToPlay flags so awaitAllReadyToPlay can detect
-     * "every peer has acknowledged the NEW load." Pauses LOOKING for the
-     * duration of the handshake so a fresh peer can't ACK against the
-     * pre-load snapshot mid-flight; broadcastPlay() unpauses.
+     * Begin a coordinated multi-peer load. Resets per-session
+     * `readyToPlay` flags so `awaitAllReadyToPlay` can detect
+     * "every peer has acknowledged the new load." Captures the
+     * alive-peer set in `_loadInFlight` so late joiners arriving
+     * during the handshake don't block the await. Pauses LOOKING
+     * acceptance so a peer sending LOOKING mid-handshake can't ACK
+     * against the pre-load snapshot.
      *
-     * Snapshots `_loadInFlight` (Set of peerKeys) at call time so
-     * `awaitAllReadyToPlay` only waits on the peers that actually
-     * received this LOAD_MAP. Peers that join LATER (e.g. a peer that
-     * disconnected mid-handshake and reconnects, or a brand-new joiner
-     * that arrives after broadcastLoadMap) get the new level through
-     * the regular ACK path (snapshotProvider's `level` field) instead;
-     * blocking the handshake on their never-coming READY_TO_PLAY would
-     * just stall master for `timeoutMs` and hide the user's
-     * level-start input behind that delay.
+     * Bookkeeping only — does NOT send any envelope. The
+     * `cmd-world loadMap` envelope is fired by master's Level.load
+     * via `await this.orchestrator.loadMap(name)`, which fans
+     * through every RenderSink. `beginCoordinatedLoad` MUST run
+     * BEFORE that fan-out (from master.js's `onLevel('changing')`
+     * subscriber): otherwise a fast joiner could send READY_TO_PLAY
+     * before the flag reset wipes it back to false, and master would
+     * proceed without actually waiting for the joiner's new-scene
+     * confirmation.
+     *
+     * Peers that join LATER (a peer reconnecting mid-handshake, or a
+     * brand-new joiner that arrives after this fires) get the new
+     * level through the regular ACK path (snapshotProvider's `level`
+     * field) instead; they're not in `_loadInFlight` so they don't
+     * block the await.
      */
-    broadcastLoadMap(name) {
+    beginCoordinatedLoad() {
         this.paused = true;
         this._loadInFlight = new Set();
         for (const session of this._peers.values()) {
             if (!session.alive) continue;
             session.readyToPlay = false;
             this._loadInFlight.add(session.peerKey);
-            this._postTo(session, { type: MSG.LOAD_MAP, name });
         }
     }
 
@@ -295,8 +305,8 @@ export class MasterConnection {
 
     /**
      * Promise that resolves when every alive peer has sent
-     * MSG.READY_TO_PLAY since the most recent broadcastLoadMap (or
-     * immediately, when no peer is alive).
+     * MSG.READY_TO_PLAY since the most recent beginCoordinatedLoad
+     * (or immediately, when no peer is alive).
      *
      * Times out after `timeoutMs` (default 10 s) with a console.warn,
      * resolving anyway so a crashed / slow client doesn't hang the
@@ -304,11 +314,10 @@ export class MasterConnection {
      * caller diagnostics.
      */
     awaitAllReadyToPlay({ timeoutMs = 10_000 } = {}) {
-        // Only wait on peers that actually received the current
-        // broadcastLoadMap — see `_loadInFlight` in broadcastLoadMap.
-        // Peers that disconnected since (alive=false) are skipped;
-        // peers that joined later aren't in the set so they don't
-        // block either.
+        // Only wait on peers that were alive at the most recent
+        // beginCoordinatedLoad — see `_loadInFlight`. Peers that
+        // disconnected since (alive=false) are skipped; peers that
+        // joined later aren't in the set so they don't block either.
         const targets = this._loadInFlight;
         const allReady = () => {
             if (!targets || targets.size === 0) return true;
@@ -429,25 +438,22 @@ export class MasterConnection {
  *   Fires when master accepts. `isReconnect` is true if we'd previously
  *   been connected (covering the master-restart case).
  * @param {() => void} [options.onLeave]      Master went silent.
- * @param {(msg: object) => void} [options.onLoadMap]
- *   Master broadcast a coordinated loadMap. Carries `{ name }`.
- *   Handler should call loadMap(name) locally and then `sendReadyToPlay()`
- *   so master can proceed to PLAY.
  * @param {() => void} [options.onPlay]
- *   Master signalled that every joiner has confirmed loadMap. Visual
- *   state is already driven by renderer commands; this is mostly a
- *   synchronization point.
+ *   Master signalled that every joiner has confirmed the coordinated
+ *   load. Visual state is already driven by renderer commands; this
+ *   is mostly a synchronization point. The load envelope itself
+ *   rides `cmd-world loadMap` — RenderClient special-cases that and
+ *   posts MSG.READY_TO_PLAY when the local scene rebuild resolves.
  * @param {(snapshot: object) => void} [options.onSnapshot]
  *   Master sent a world-state snapshot (after our READY). Handler
  *   should reconcile our freshly-built scene against master's
  *   authoritative state.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onLoadMap, onPlay, onSnapshot } = {}) {
+    constructor({ transport = null, onAck, onLeave, onPlay, onSnapshot } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
-        this.onLoadMap = onLoadMap;
         this.onPlay = onPlay;
         this.onSnapshot = onSnapshot;
         this.lastFromMaster = 0;
@@ -458,8 +464,9 @@ export class ClientConnection extends PeerConnectionBase {
     }
 
     /**
-     * Send MSG.READY_TO_PLAY to master. Called from the onLoadMap
-     * handler after the local loadMap finishes.
+     * Send MSG.READY_TO_PLAY to master. Called from RenderClient's
+     * `cmd-world loadMap` special-case after the local scene rebuild
+     * resolves — master's awaitAllReadyToPlay polls this flag.
      */
     sendReadyToPlay() {
         this._post({ type: MSG.READY_TO_PLAY });
@@ -486,12 +493,6 @@ export class ClientConnection extends PeerConnectionBase {
             if (!this._timeoutCheck) this._startWatchdog();
         } else if (msg.type === MSG.LEAVING) {
             this._handlePeerGone();
-        } else if (msg.type === MSG.LOAD_MAP) {
-            // Coordinated in-place load. Handler is responsible for
-            // calling sendReadyToPlay() once the local scene is
-            // rebuilt; without that, master's awaitAllReadyToPlay
-            // never resolves and the match-start times out.
-            this.onLoadMap?.(msg);
         } else if (msg.type === MSG.PLAY) {
             this.onPlay?.();
         } else if (msg.type === MSG.WORLD_SNAPSHOT) {

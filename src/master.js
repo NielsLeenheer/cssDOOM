@@ -24,7 +24,6 @@
 
 import { state } from './game/state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
-import { loadMap } from './shared/maps/index.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
@@ -148,9 +147,10 @@ function gameLoop(timestamp) {
     // instance, which internally no-ops if paused. Game owns the Level
     // via `app.game.level`, but the gameLoop reads through the
     // singleton registry (`getCurrentLevel`) because that's what
-    // `shared/maps/index.js::loadMap` writes on map change — and loadMap is
-    // the entry point for the callers (menu, debug, switches, etc.)
-    // that don't hold a Level instance themselves.
+    // `game/level.js::swapLevel` writes on map change — and swapLevel
+    // is the entry point for the callers (attract, debug,
+    // gates SP-respawn, match.restartMatch fallback) that don't hold
+    // a Level instance themselves.
     getCurrentLevel()?.tick(timestamp);
     renderAllActivePanes();
 
@@ -179,19 +179,24 @@ function setupMasterBroadcast() {
     let pendingLevel = null;
     onLevel('changing', ({ name }) => {
         pendingLevel = name ?? null;
-        // Broadcast a coordinated loadMap to every alive peer. Peers
-        // stay alive across the load: they receive MSG.LOAD_MAP,
-        // call loadMap locally without reloading the page, and reply
-        // with MSG.READY_TO_PLAY. broadcastLoadMap also pauses LOOKING
-        // for the duration of the handshake.
+        // Prepare the coordinated multi-peer handshake: reset every
+        // alive session's readyToPlay flag, capture _loadInFlight, pause
+        // LOOKING. Bookkeeping only — the actual `cmd-world loadMap`
+        // envelope is fired by Level.load's own
+        // `await this.orchestrator.loadMap(name)` call (which fans
+        // through every RenderSink to every alive peer). This must run
+        // BEFORE that fan-out so a fast joiner's READY_TO_PLAY can't
+        // race the reset — JS execution order guarantees this because
+        // the subscriber is synchronous.
         //
         // For the coordinated host-fire-start path, Game.beginPlay
-        // calls awaitAllReadyToPlay → broadcastPlay after this fires.
-        // For uncoordinated paths (legacy switches.js DM exit-switch
-        // setTimeout(loadMap)), there's no awaitAllReadyToPlay step —
-        // master proceeds and clients catch up via the renderer-command
-        // pipeline. onLevel('loaded') unpauses below regardless.
-        masterConnection?.broadcastLoadMap(name);
+        // calls awaitAllReadyToPlay → broadcastPlay after Level.load
+        // returns. For uncoordinated paths (swapLevel via attract /
+        // debug / gates / match-restart fallback), there's no
+        // awaitAllReadyToPlay step — master proceeds and clients catch
+        // up via the renderer-command pipeline. onLevel('loaded')
+        // unpauses LOOKING below regardless.
+        masterConnection?.beginCoordinatedLoad();
     });
     onLevel('loaded', () => {
         pendingLevel = null;

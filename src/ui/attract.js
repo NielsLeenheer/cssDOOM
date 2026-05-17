@@ -27,7 +27,7 @@
  */
 
 import { state } from '../game/state.js';
-import { loadMap } from '../shared/maps/index.js';
+import { swapLevel } from '../game/level.js';
 import { getFloorHeightAt } from '../game/physics.js';
 import { EYE_HEIGHT } from '../game/constants.js';
 import { resetMatch, endMatch } from '../game/match.js';
@@ -143,7 +143,7 @@ export async function enterAttract() {
 
     // Treat attract as "match abandoned" — zero scores and restart the
     // timer so when the next pair of players walks up, they get a fully
-    // fresh match. (resetGameState in loadMap already handles health,
+    // fresh match. (resetGameState in Level.load already handles health,
     // ammo, weapons, projectiles, corpses; map rebuild restores pickups.)
     resetMatch();
 
@@ -151,7 +151,7 @@ export async function enterAttract() {
     // at fresh DM starts, full health, no in-flight projectiles, no
     // corpses lingering from the previous match).
     state.players[0].isDead = true; // force resetGameState path
-    await loadMap('E1M1');
+    await swapLevel('E1M1');
 
     // Resample real floor at each DM start. applyDeathmatchStarts seeds
     // floorHeight from mapData.playerStart and relies on the next
@@ -172,7 +172,7 @@ export async function enterAttract() {
 
 function exitAttract() {
     lastActivityAt = performance.now();
-    // After attract, loadMap put us in a fresh post-resetMatch world.
+    // After attract, swapLevel put us in a fresh post-resetMatch world.
     // resetMatch already transitioned us to LOBBY; we just need to
     // un-set the ATTRACT state. transitionTo(LOBBY) is a no-op if we're
     // somehow not in ATTRACT (e.g., direct dismissIntermission called

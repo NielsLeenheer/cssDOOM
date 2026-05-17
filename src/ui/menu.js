@@ -7,7 +7,7 @@
  */
 
 import { state } from '../game/state.js';
-import { currentMap, MAPS, loadMap } from '../shared/maps/index.js';
+import { currentMap, MAPS } from '../shared/maps/index.js';
 import { dom } from '../renderer/dom.js';
 import { switchMode } from '../mode.js';
 
@@ -35,22 +35,20 @@ for (const name of MAPS) {
         // properly torn down (Game.stop clears the intermission
         // overlay + onAdvance callback, hides results, etc.) and a
         // fresh Game is constructed with the picked map as
-        // mapCursor. The legacy `loadMap(name)` direct call
+        // mapCursor. The historical loadMap shim direct call
         // bypassed all that — leaving stale intermission DOM up
         // and a dangling onAdvance callback that, when fired,
         // loaded the PREVIOUS level's next-map instead of the
-        // user's pick.
-        if (window.app) {
-            window.app.startLocalGame({
-                gameMode: state.gameMode,
-                networkMode: state.networkMode,
-                skillLevel: state.skillLevel ?? 1,
-                rules: null,
-                startMap: name,
-            });
-        } else {
-            loadMap(name);
-        }
+        // user's pick. window.app is set in app.js boot before any
+        // UI/menu code runs; a missing app here is a boot-order bug
+        // that should crash loud, not fall back silently.
+        window.app.startLocalGame({
+            gameMode: state.gameMode,
+            networkMode: state.networkMode,
+            skillLevel: state.skillLevel ?? 1,
+            rules: null,
+            startMap: name,
+        });
         updateMenuSelection();
         toggleMenu(false);
     });
@@ -60,21 +58,18 @@ for (const name of MAPS) {
 
 // Skill buttons. Like the level picker, route through
 // app.startLocalGame so the held Game is reconstructed cleanly
-// rather than leaving stale state around.
+// rather than leaving stale state around. window.app is set in
+// app.js boot before any UI/menu code runs.
 document.querySelectorAll('.menu-skill').forEach(btn => {
     btn.addEventListener('click', () => {
         state.skillLevel = parseInt(btn.dataset.skill);
-        if (window.app) {
-            window.app.startLocalGame({
-                gameMode: state.gameMode,
-                networkMode: state.networkMode,
-                skillLevel: state.skillLevel,
-                rules: null,
-                startMap: currentMap ?? 'E1M1',
-            });
-        } else {
-            loadMap(currentMap);
-        }
+        window.app.startLocalGame({
+            gameMode: state.gameMode,
+            networkMode: state.networkMode,
+            skillLevel: state.skillLevel,
+            rules: null,
+            startMap: currentMap ?? 'E1M1',
+        });
         updateMenuSelection();
         toggleMenu(false);
     });

@@ -37,7 +37,6 @@ import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
 import { hideInitialOverlay } from '../ui/overlay.js';
 import { setAudioEnabled } from '../audio/audio.js';
-import { loadMap } from '../shared/maps/index.js';
 import { setClientSlot } from '../ui/client-lobby.js';
 import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyRemoteGameState } from '../game/game-state.js';
@@ -128,21 +127,14 @@ export class RemoteGame {
             // renderer-command pipeline (showLobby, showResults,
             // setGameState). Impls live in lobby.js, client-lobby.js,
             // network-lobby.js, scoreboard.js, and game-state.js.
+            //
+            // Coordinated in-place loadMap is no longer a ClientConnection
+            // callback — the envelope rides `cmd-world loadMap` through
+            // RenderClient, which calls `this.orchestrator.loadMap(name)`
+            // on the joiner and posts MSG.READY_TO_PLAY after the local
+            // scene rebuild resolves (see render-client.js).
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
             onLeave: () => this._onLeave(),
-            // Coordinated in-place loadMap. Rebuilds the scene on the
-            // existing page (so transitionToLevel keeps weapons / ammo
-            // / armor across maps) and replies with READY_TO_PLAY when
-            // finished so master can proceed to PLAY.
-            onLoadMap: async (msg) => {
-                if (!msg?.name) return;
-                try {
-                    await loadMap(msg.name);
-                } catch (err) {
-                    console.warn('[remote-game] loadMap failed:', err);
-                }
-                this._connection.sendReadyToPlay();
-            },
             // Master signalled every joiner is ready. Visual state
             // continues to ride the renderer-command pipeline; this
             // hook is a placeholder for a future local PLAYING flag.
@@ -197,7 +189,14 @@ export class RemoteGame {
         this.orchestrator.replaceTarget(slotIndex, renderer);
 
         if (payload.level) {
-            await loadMap(payload.level);
+            // Initial-bootstrap load — goes through the same per-window
+            // pipeline as subsequent coordinated loads (orchestrator
+            // fans to the joiner's local DomRenderer → scene.loadMap).
+            // No READY_TO_PLAY here: ACK is not part of the coordinated
+            // handshake. MSG.READY (sent from _wireUp below) is the
+            // bootstrap-finished signal master gates the spawn / initial
+            // state burst on.
+            await this.orchestrator.loadMap(payload.level);
         }
         if (payload.gameState) applyRemoteGameState(payload.gameState);
         setClientSlot(slotIndex);

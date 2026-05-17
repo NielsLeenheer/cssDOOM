@@ -1,5 +1,6 @@
 /**
- * Shared map data store + loader.
+ * Shared map data store + loader. Pure data layer — zero `game/`
+ * imports.
  *
  * Owns the parsed JSON map data (walls, sectors, things, doors,
  * lifts, etc.) loaded from `maps/E*M*.json`. Both the game layer
@@ -11,14 +12,15 @@
  * annotate mapData in place. State population (`state.things`,
  * `state.doorState`, etc.) is NOT done here — it's the game
  * layer's concern, handled by `initThingsState` / `initDoorsState`
- * / etc. in `src/game/`.
+ * / etc. in `src/game/`. Renderer-side scene construction
+ * (buildScene + per-renderer warmup) lives in `src/renderer/scene/`
+ * and reads mapData via its own import.
  *
- * The `loadMap` shim survives through step 5; deleted then.
+ * Callers that need "construct + load + start a Level for this map"
+ * use `swapLevel` in `src/game/level.js`. That's a game-layer
+ * concern and lives there.
  */
 
-import { state } from '../../game/state.js';
-import { Level, _setCurrentLevel } from '../../game/level.js';
-import { orchestrator } from '../../orchestrator.js';
 import { initThings } from './things.js';
 import { initDoors } from './doors.js';
 
@@ -56,28 +58,6 @@ export async function load(name) {
     currentMap = name;
     initThings(raw);
     initDoors(raw);
-}
-
-// ── Loader shim — goes away in step 5 ─────────────────────────────
-
-/**
- * Backward-compat shim for callers that don't hold a Game instance
- * (menu, debug, switches, RemoteGame, attract). Constructs a Level,
- * loads it, starts it ticking, and registers it as the current Level
- * for this window via `_setCurrentLevel`. Callers that own a Game
- * (master.js boot) construct Levels directly via Game.beginPlay.
- */
-export async function loadMap(name) {
-    const lvl = new Level({
-        map: name,
-        players: state.players,
-        rules: state.match?.rules ?? null,
-        orchestrator,
-    });
-    await lvl.load();
-    lvl.start();
-    _setCurrentLevel(lvl);
-    return lvl;
 }
 
 // ── Map sequencing ────────────────────────────────────────────────

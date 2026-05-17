@@ -10,7 +10,8 @@ import { EYE_HEIGHT } from '../game/constants.js';
 import { THING_NAMES } from '../renderer/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
 import { updateCamera } from '../renderer/index.js';
-import { mapData, currentMap, loadMap, getNextMap } from '../shared/maps/index.js';
+import { mapData, currentMap, getNextMap } from '../shared/maps/index.js';
+import { swapLevel } from '../game/level.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { endMatch } from '../game/match.js';
 import { enterAttract } from './attract.js';
@@ -58,7 +59,7 @@ window.load = async function (slot = 0) {
     const data = JSON.parse(json);
     if (data.map !== currentMap) {
         console.log(`Switching to ${data.map}...`);
-        await loadMap(data.map);
+        await swapLevel(data.map);
     }
     const player = state.players[0];
     player.x = data.x;
@@ -396,7 +397,7 @@ export function initDebugMenu() {
     intermissionBtn.textContent = 'Show intermission';
     intermissionBtn.style.cssText = buttonStyle;
     intermissionBtn.addEventListener('click', () => {
-        showIntermission(getNextMap(), (next) => { if (next) loadMap(next); });
+        showIntermission(getNextMap(), (next) => { if (next) swapLevel(next); });
     });
     details.appendChild(intermissionBtn);
 

@@ -13,7 +13,8 @@
 
 import { state } from './state.js';
 import { Player } from './player/player.js';
-import { loadMap, currentMap } from '../shared/maps/index.js';
+import { currentMap } from '../shared/maps/index.js';
+import { swapLevel } from './level.js';
 import { clearMovingState } from './movement.js';
 import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
 import { orchestrator } from '../orchestrator.js';
@@ -260,5 +261,5 @@ export function isMatchEnded() {
 /** Resets and reloads the current map for a fresh DM match. */
 export function restartMatch() {
     resetMatch();
-    loadMap(currentMap);
+    swapLevel(currentMap);
 }

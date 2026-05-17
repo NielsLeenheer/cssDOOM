@@ -26,6 +26,7 @@ import { initThingsState } from './entities/things-init.js';
 import { initSpStats } from './sp-stats.js';
 import * as maps from '../shared/maps/index.js';
 import { applyPlayerStart, addPlayerThings } from './player/start.js';
+import { orchestrator } from '../orchestrator.js';
 
 /**
  * Module-level registry for "the Level currently being simulated by
@@ -82,15 +83,19 @@ export class Level {
 
         // Tell any connected client that the scene is about to be
         // rebuilt. Subscribers (master.js's broadcast setup) subscribe
-        // via onLevel('changing', ...) at boot and turn the event into
-        // MSG.LOAD_MAP for every alive peer.
+        // via onLevel('changing', ...) at boot and call
+        // `beginCoordinatedLoad` to reset per-session readyToPlay
+        // flags + pause LOOKING before the orchestrator.loadMap
+        // fan-out below sends the `cmd-world loadMap` envelope to
+        // every alive peer.
         //
         // Fires unconditionally — including on the initial load. A
         // tempting shortcut would be to skip this when isInitialLoad
         // is true (rationale: "no client connected yet"), but Network
         // DM host doesn't preload — the FIRST Level.load happens at
         // host-fire-start, with joiners already waiting in the lobby.
-        // They need this event to start their own load.
+        // They need this event so master's beginCoordinatedLoad
+        // primes the handshake before their cmd-world loadMap arrives.
         //
         // The showLevelTransition fade is still gated on
         // !isInitialLoad — there's no scene to fade FROM on the very
@@ -266,4 +271,46 @@ export class Level {
         const set = this._listeners.get(event);
         if (set) for (const h of set) h(payload);
     }
+}
+
+/**
+ * Construct a fresh Level for the named map, load it, start ticking,
+ * and register it as the current Level for this window.
+ *
+ * Used by master-side callers that swap maps mid-session WITHOUT
+ * going through the full Game lifecycle:
+ *   - attract.js::enterAttract — kiosk idle, no Game-managed match.
+ *   - debug.js — window.load save-slot warp, intermission button.
+ *   - gates.js — SP dead-respawn after cooldown.
+ *   - match.js::restartMatch — defensive fallback when
+ *     `app.game.restartMatch` is unavailable.
+ *
+ * Game-managed transitions (SP intermission advance, DM
+ * restartMatch, kiosk match restart) construct Levels directly via
+ * Game.beginPlay / Game.restartMatch / Game.advance — they don't
+ * call this.
+ *
+ * Joiner-side never calls this. The joiner doesn't construct
+ * Levels — it receives `cmd-world loadMap` envelopes through
+ * RenderClient, which dispatches to its local orchestrator.loadMap
+ * and signals MSG.READY_TO_PLAY after the scene rebuild resolves.
+ *
+ * Levels constructed here are NOT routed through
+ * Game._subscribeLevel, so per-Level events (player-died,
+ * player-spawned, level-complete) don't reach a Game handler.
+ * Current callers don't trigger those events on Levels they create.
+ * Future callers that need the subscription should go through
+ * Game.beginPlay.
+ */
+export async function swapLevel(name) {
+    const lvl = new Level({
+        map: name,
+        players: state.players,
+        rules: state.match?.rules ?? null,
+        orchestrator,
+    });
+    await lvl.load();
+    lvl.start();
+    _setCurrentLevel(lvl);
+    return lvl;
 }

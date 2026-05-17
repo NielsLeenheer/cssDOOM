@@ -28,7 +28,8 @@ import { isMatchEnded, restartMatch, startMatch, isMatchLobby } from '../game/ma
 import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { tryClaimSlot } from '../input/claim-registry.js';
-import { currentMap, loadMap } from '../shared/maps/index.js';
+import { currentMap } from '../shared/maps/index.js';
+import { swapLevel } from '../game/level.js';
 import { countOccupied as countNetworkLobbyOccupied } from '../ui/network-lobby.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';
@@ -113,11 +114,13 @@ export function initGates() {
     // the game-state.js machine LOBBY → ACTIVE.
     //
     // Joiner-side level load rides the coordinated handshake:
-    // Level.load fires 'changing' → master broadcasts MSG.LOAD_MAP →
-    // joiner does an in-place loadMap (no page reload, so inventory
-    // survives via Level.load's transitionToLevel path) → joiner
-    // replies MSG.READY_TO_PLAY → master awaits all readies →
-    // master broadcasts MSG.PLAY → both sides start ticking.
+    // Level.load fires 'changing' → master's onLevel subscriber calls
+    // beginCoordinatedLoad (resets readyToPlay flags) → Level.load's
+    // `await this.orchestrator.loadMap(name)` fans `cmd-world loadMap`
+    // through every RenderSink → joiner's RenderClient dispatches to
+    // its local orchestrator.loadMap (scene.loadMap rebuilds the
+    // pane) → RenderClient posts MSG.READY_TO_PLAY → master awaits
+    // all readies → master broadcasts MSG.PLAY → both sides start ticking.
     on(A.FIRE_DOWN, ({ slot }) => {
         if (window.app?.game?.networkMode !== 'host') return;
         if (!isMatchLobby()) return;
@@ -168,7 +171,7 @@ export function initGates() {
         if (gameMode === 'deathmatch') {
             spawnPlayer(player);
         } else {
-            loadMap(currentMap);
+            swapLevel(currentMap);
         }
         return true;
     }, { priority: GATE_PRIORITY.DEAD_RESPAWN });

@@ -35,7 +35,7 @@
 
 import { state } from './game/state.js';
 import { Player } from './game/player/player.js';
-import { currentMap, loadMap } from './shared/maps/index.js';
+import { currentMap } from './shared/maps/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
 import { setDefaultSlot } from './input/claim-registry.js';
@@ -202,17 +202,15 @@ export async function switchMode(name) {
     // reshape, audio reconfig, network signaling room, body data
     // attributes, state.players sizing) — Game doesn't replicate
     // those today.
-    if (window.app) {
-        await window.app.startLocalGame({
-            gameMode: preset.gameMode,
-            networkMode: preset.networkMode,
-            skillLevel: state.skillLevel ?? 1,
-            rules: null,
-            startMap: currentMap ?? 'E1M1',
-        });
-    } else {
-        // Defensive fallback for callers that fire before app boot
-        // (shouldn't happen, but cheaper to guard than crash).
-        loadMap(currentMap);
-    }
+    // window.app is set in app.js's boot, before any UI / menu code
+    // can run. If it's missing here, that's a boot-order bug we want
+    // to surface with a real TypeError rather than mask with a
+    // fallback that constructs a Level outside Game's lifecycle.
+    await window.app.startLocalGame({
+        gameMode: preset.gameMode,
+        networkMode: preset.networkMode,
+        skillLevel: state.skillLevel ?? 1,
+        rules: null,
+        startMap: currentMap ?? 'E1M1',
+    });
 }

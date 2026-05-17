@@ -65,14 +65,13 @@ export const MSG = {
     ANALOG: 'analog',
     PING: 'ping',
     // ── Coordinated level-load handshake ──────────────────────────────
-    // Master → clients: "rebuild your scene to this map name." Clients
-    // call loadMap locally (no page reload), then send READY_TO_PLAY
-    // back so master knows when every joiner has the new scene up.
-    LOAD_MAP: 'load-map',
-    // Client → master: "I've finished loadMap; the new scene is built
-    // and I'm ready to receive renderer commands." Master gates the
-    // match-start (PLAY broadcast + level.start) on receiving this from
-    // every alive peer.
+    // The level-load envelope itself rides the existing CMD_WORLD
+    // pipeline: master's Level.load → orchestrator.loadMap fans
+    // `cmd-world loadMap` through every RenderSink. The joiner's
+    // RenderClient special-cases that command and emits READY_TO_PLAY
+    // after the local scene rebuild resolves. Master gates the
+    // match-start (PLAY broadcast + level.start) on receiving
+    // READY_TO_PLAY from every alive peer.
     READY_TO_PLAY: 'ready-to-play',
     // Master → clients: "every peer is ready; start ticking." Today
     // it's a synchronization signal; clients don't act on it directly

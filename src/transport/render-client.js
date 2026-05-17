@@ -81,10 +81,27 @@ export class RenderClient {
         cmd?.mirror?.(...args);
 
         const fn = this.orchestrator[method];
-        if (typeof fn === 'function') {
-            fn.apply(this.orchestrator, args);
-        } else {
+        if (typeof fn !== 'function') {
             console.warn(`RenderClient: unknown world method '${method}'`);
+            return;
+        }
+
+        const result = fn.apply(this.orchestrator, args);
+
+        // loadMap is the only world command on the joiner that needs a
+        // follow-up: master's awaitAllReadyToPlay polls session.readyToPlay,
+        // which the joiner satisfies by sending MSG.READY_TO_PLAY after
+        // its local scene rebuild resolves. orchestrator.loadMap returns
+        // Promise.all of per-target results — on the joiner that's the
+        // single local DomRenderer, so awaiting it is awaiting
+        // scene.loadMap's clear + maps.load + build + absorb + warmup
+        // chain. `.finally` so the signal still fires on failure (master
+        // proceeds; joiner's pane may be blank) — better than master
+        // timing out.
+        if (method === 'loadMap') {
+            Promise.resolve(result)
+                .catch((err) => console.warn('[render-client] loadMap failed:', err))
+                .finally(() => this.channel.send({ type: MSG.READY_TO_PLAY }));
         }
     }
 }
