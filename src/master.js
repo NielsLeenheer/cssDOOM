@@ -50,7 +50,7 @@ import { setNetworkSlotState } from './ui/network-lobby.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { initLobby } from './ui/lobby.js';
 import { onMatch, ensureMatchSize } from './game/match.js';
-import { getWorldSnapshot } from './game/snapshot.js';
+import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 
@@ -249,28 +249,52 @@ function setupMasterBroadcast() {
         },
         onReady: (peerKey) => {
             // Client has confirmed its RenderClient is subscribed. NOW
-            // it's safe to spawn the player and fire the initial-state
-            // burst — the switchWeapon / createPlayerSprite world
+            // it's safe to fire the initial-state catch-up — the
             // commands these produce land on a listening transport.
             const slot = orchestrator.currentRemoteSlot(peerKey);
             if (slot == null) return;
 
-            // updateHud is event-driven (gated on player._hudDirty), so
-            // we mark this slot's player dirty here. Without it, any
-            // freshly-attached pane — Local DM secondary clicked via
-            // detach, OR Network DM remote joining mid-session — would
-            // stare at blank HUD digits until the next damage / ammo /
-            // weapon-switch event. Fires for any peer regardless of
-            // mode; the field is harmless when state.players[slot] is
-            // undefined (Network DM remote at a slot not yet sized —
-            // ensurePlayerCount below handles that and the next frame
-            // flushes via the same gate).
+            // updateHud is event-driven (gated on player._hudDirty),
+            // so we mark this slot's player dirty here. The next
+            // gameLoop frame fires updateHud through the per-pane
+            // dispatch which reaches the newly-attached pane via its
+            // RenderSink. Without this, any peer would stare at blank
+            // HUD digits until the next damage / ammo / weapon-switch
+            // event. (HUD isn't in the world snapshot because it's
+            // per-pane derived state, not world state.) Harmless when
+            // state.players[slot] is undefined (Network DM remote at
+            // a slot not yet sized — ensurePlayerCount below handles
+            // that and the next frame flushes via the same gate.)
             if (state.players[slot]) state.players[slot]._hudDirty = true;
 
+            // World-state snapshot. The freshly-attached pane's scene
+            // has every pickup uncollected, every enemy alive, every
+            // door at its map-default state, no corpses, and no
+            // cross-pane player billboards. Master sends its
+            // authoritative state so the receiver reconciles. Applies
+            // to ANY peer with a wire (Local DM secondary OR Network
+            // DM remote). Skip if no map is loaded yet (still in
+            // lobby) — the joiner's upcoming orchestrator.loadMap
+            // will build a fresh scene against the new map and a
+            // following snapshot (if mid-match) catches it up then.
+            if (getCurrentLevel()) {
+                masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
+            }
+
+            // If a results / intermission / lobby overlay is currently
+            // visible, replay it onto just this peer's sink. The
+            // orchestrator asks the provider (Game) what's visible and
+            // pulls fresh payload via the same getter as the live fire
+            // path, so the new pane sees current data — not whatever
+            // was stashed at the original fire time.
+            orchestrator.replayCurrentOverlayTo(orchestrator.target(slot));
+
             // Everything below is Network-DM-host-specific: roster
-            // sizing, audio listener config, spawn-if-dead, world
-            // snapshot. Local DM secondary shares state with master
-            // and doesn't need any of it.
+            // sizing for late-joining remotes, audio listener config
+            // for a new physical machine, spawn-if-dead for the
+            // previous peer's abandoned slot. Local DM secondary
+            // shares master's roster + audio + level, so it doesn't
+            // need any of this.
             if (state.networkMode !== 'host' || peerKey === 'local') return;
             ensurePlayerCount(slot + 1);
             // Keep state.match.kills sized to the roster so awardFrag
@@ -296,29 +320,28 @@ function setupMasterBroadcast() {
             if (player && player.isDead && getCurrentLevel()) {
                 spawnPlayer(player);
             }
-            // World-state snapshot. The joiner's fresh-built scene has
-            // every pickup uncollected, every enemy alive, every door
-            // at its map-default state, and no corpses. Send master's
-            // authoritative state so the joiner reconciles. Skip if
-            // no map is loaded yet (still in lobby) — the joiner's
-            // upcoming loadMap will build a fresh scene anyway.
-            if (getCurrentLevel()) {
-                masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
-            }
-            // If a results / intermission / lobby overlay is currently
-            // visible, replay it onto just this joiner's sink. The
-            // orchestrator asks the provider (Game) what's visible and
-            // pulls fresh payload via the same getter as the live fire
-            // path, so the joiner sees current data — not whatever was
-            // stashed at the original fire time.
-            orchestrator.replayCurrentOverlayTo(orchestrator.target(slot));
         },
         onLeave: (peerKey) => {
             // Capture the slot before unbinding — the orchestrator
             // forgets the peer after unbindRemoteSlot, and we need
             // the slot index to clear its row in the network lobby UI.
             const slot = orchestrator.currentRemoteSlot(peerKey);
-            orchestrator.unbindRemoteSlot(peerKey);
+            // After the unbind's grace expires, the slot's restored
+            // local DomRenderer rebuilds its scene from scratch
+            // (just-built = every pickup uncollected, every enemy
+            // alive, no player billboards, no corpses). Catch it up
+            // by applying the current world snapshot directly to
+            // that one renderer — direct dispatch (not via
+            // orchestrator) so other already-in-sync local
+            // renderers + remote sinks aren't disturbed by
+            // re-fired non-idempotent commands like createCorpse.
+            orchestrator.unbindRemoteSlot(peerKey, {
+                onGraceRebuilt: (rebuiltRenderer) => {
+                    if (getCurrentLevel()) {
+                        applyWorldSnapshot(rebuiltRenderer, getWorldSnapshot());
+                    }
+                },
+            });
             if (state.networkMode === 'host' && peerKey !== 'local' && slot != null) {
                 // Mark the departed player as dead + collected so they
                 // drop out of the visible world (no sprite, no collision)

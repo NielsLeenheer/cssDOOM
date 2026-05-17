@@ -323,6 +323,12 @@ export function createProjectile(renderer, projectileId, { type, width, height, 
  * { display:none }).
  */
 export function createPlayerSprite(renderer, thingIndex, playerIndex, x, y, floorHeight, sectorIndex) {
+    // Idempotent — calling twice for the same renderer + thingIndex is a
+    // no-op. Lets master fan createPlayerSprite to all renderers on every
+    // peer-attach / pane-rebuild without worrying about duplicate
+    // billboards on renderers that already have the sprite.
+    if (renderer.sceneState.thingDom.has(thingIndex)) return;
+
     const container = document.createElement('div');
     container.className = 'enemy player';
     container.dataset.playerIndex = String(playerIndex);

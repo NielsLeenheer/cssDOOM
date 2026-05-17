@@ -40,7 +40,7 @@ import { setAudioEnabled } from '../audio/audio.js';
 import { setClientSlot } from '../ui/client-lobby.js';
 import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyRemoteGameState } from '../game/game-state.js';
-import * as renderer from '../renderer/index.js';
+import { applyWorldSnapshot } from '../game/snapshot.js';
 
 // 60Hz analog snapshot push (matches master's game loop cadence).
 const ANALOG_PUSH_INTERVAL_MS = 16;
@@ -148,7 +148,18 @@ export class RemoteGame {
             // position, corpses re-appear at their original death
             // points. Animations are suppressed for the apply so the
             // catch-up doesn't visibly re-play every event.
-            onSnapshot: (snapshot) => this._applyWorldSnapshot(snapshot),
+            // Master sent a world-state snapshot. Reconcile our fresh-
+            // built scene against master's authoritative state — dead
+            // enemies stay dead, collected pickups stay collected,
+            // doors / lifts / crushers at their current position,
+            // corpses re-appear at their original death points, and
+            // every other player's billboard gets created. We pass
+            // the joiner's own Orchestrator as the target so the
+            // renderer commands fan to the local DomRenderer AND fire
+            // the mirrors that populate rendererState (different from
+            // master's local-pane-rebuild path, which passes the
+            // specific renderer for direct dispatch — see master.js).
+            onSnapshot: (snapshot) => applyWorldSnapshot(this.orchestrator, snapshot),
         });
 
         domRendererManager.startCullingLoop({
@@ -237,79 +248,6 @@ export class RemoteGame {
         // arrives — without this the world commands fire before our
         // RenderClient is subscribed.
         this._connection.channel.send({ type: MSG.READY });
-    }
-
-    /**
-     * Apply a world-state snapshot from master. Walks the payload and
-     * fires existing renderer commands to reconcile our scene against
-     * master's authoritative state — pickups that have been collected
-     * are marked .collected, dead enemies get .dead + the death sprite
-     * row, doors / lifts / crushers snap to their current position,
-     * and corpses appear at their original death points.
-     *
-     * Animations are CSS-suppressed during the apply (via
-     * `body.snapshot-applying` — see touch-controls.css / viewport.css)
-     * so the catch-up doesn't visibly re-play every death and door
-     * open since match start.
-     */
-    _applyWorldSnapshot(snapshot) {
-        if (!snapshot) return;
-
-        document.body.classList.add('snapshot-applying');
-        try {
-            for (const t of snapshot.things ?? []) {
-                if (t.collected) {
-                    // Apply visual position first so dead things land at
-                    // wherever they actually fell (lifts can carry corpses).
-                    renderer.updateThingPosition(t.gameId, t.x, t.y, t.floorHeight);
-                    if (t.sectorIndex != null) {
-                        renderer.reparentThingToSector(t.gameId, t.sectorIndex);
-                    }
-                    if (t.category === 'enemy' || t.category === 'barrel') {
-                        renderer.killEnemy(t.gameId, t.type, true);
-                    } else {
-                        renderer.collectItem(t.gameId);
-                    }
-                } else if (t.x != null && t.y != null) {
-                    // Alive but possibly off-spawn (wandered enemy).
-                    renderer.updateThingPosition(t.gameId, t.x, t.y, t.floorHeight);
-                    if (t.sectorIndex != null) {
-                        renderer.reparentThingToSector(t.gameId, t.sectorIndex);
-                    }
-                }
-            }
-            for (const d of snapshot.doors ?? []) {
-                renderer.setDoorState(d.sectorIndex, d.state);
-            }
-            for (const l of snapshot.lifts ?? []) {
-                renderer.setLiftState(l.sectorIndex, l.state);
-            }
-            for (const c of snapshot.crushers ?? []) {
-                renderer.setCrusherOffset(c.sectorIndex, c.offset);
-            }
-            for (const corpse of snapshot.corpses ?? []) {
-                renderer.createCorpse(
-                    corpse.x, corpse.y, corpse.floorHeight,
-                    corpse.sectorIndex, corpse.playerIndex,
-                );
-            }
-            // If the joiner reconnects mid-countdown, master only fires
-            // setMatchTimer when the displayed second changes — they'd
-            // wait up to a second to see the readout otherwise. Apply
-            // the value carried in the snapshot so it lands immediately.
-            renderer.setMatchTimer(snapshot.timerText ?? null);
-        } finally {
-            // Wait two animation frames before removing the suppressor:
-            // one for the style changes (data-state flips, class adds)
-            // to flush, one safety frame so the no-animation rule has
-            // covered any transition that would otherwise have started
-            // on those changes.
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    document.body.classList.remove('snapshot-applying');
-                });
-            });
-        }
     }
 
     _initInputForwarder() {

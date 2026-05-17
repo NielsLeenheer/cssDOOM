@@ -356,8 +356,16 @@ class Orchestrator {
      * state, paneEl's `data-active` flips back to "true" so CSS reveals
      * it again, and `#game[data-active-renderers]` updates so the
      * remaining locals reflow to share the screen.
+     *
+     * Optional `onGraceRebuilt(renderer)` callback fires once the
+     * post-grace rebuild completes. Game-side code (master.js) uses it
+     * to re-fire per-player setup that the original level-load fan-out
+     * landed only on renderers existing at the time (createPlayerSprite
+     * for cross-pane billboards). No callback fires if the slot had no
+     * local DomRenderer (savedTarget was null) or if a reconnect
+     * cancelled the grace timer.
      */
-    unbindRemoteSlot(peerKey) {
+    unbindRemoteSlot(peerKey, { onGraceRebuilt } = {}) {
         const binding = this._remoteBindings.get(peerKey);
         if (!binding) return;
 
@@ -378,23 +386,24 @@ class Orchestrator {
         const rendererToRebuild = savedTarget?.kind === 'dom' ? savedTarget : null;
 
         if (binding.unbindGraceTimer) clearTimeout(binding.unbindGraceTimer);
-        binding.unbindGraceTimer = setTimeout(() => {
+        binding.unbindGraceTimer = setTimeout(async () => {
             // If a reconnect arrived during grace, bindRemoteSlot
             // cancelled this timer and we never reach this body.
             this._remoteBindings.delete(peerKey);
+            if (!rendererToRebuild) return;
             // `reload()` rebuilds against the map this renderer last
             // loaded — the renderer owns that memory so the
             // orchestrator doesn't need to import the maps layer.
-            rendererToRebuild?.reload();
+            // Await so onGraceRebuilt fires with a fully-built scene.
+            await rendererToRebuild.reload();
             // Re-mark the pane as active so CSS reveals it (the
             // sceneEl is repopulated by reload above). Done after
             // reload so the pane doesn't flash empty during the
             // rebuild — but reload is fast enough on master that
             // the gap is imperceptible.
-            if (rendererToRebuild) {
-                rendererToRebuild.paneEl.dataset.active = 'true';
-                this._publishActiveRendererCount();
-            }
+            rendererToRebuild.paneEl.dataset.active = 'true';
+            this._publishActiveRendererCount();
+            onGraceRebuilt?.(rendererToRebuild);
         }, RECONNECT_GRACE_MS);
 
         console.log('[orchestrator] client unbound from slot', slot, '- peer', peerKey);
