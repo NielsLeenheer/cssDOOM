@@ -38,7 +38,7 @@ import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
-import { initDebugMenu, updateDebugStats } from './ui/debug.js';
+import { initDebugMenu, updateDebugStats } from './renderer/hud/debug.js';
 import { attractTick, isAttractActive } from './ui/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';

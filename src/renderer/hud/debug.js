@@ -4,18 +4,18 @@
  * Also provides culling toggles with live stats.
  */
 
-import { culling, cullingStats } from '../renderer/scene/culling.js';
-import { state, debug } from '../game/state.js';
-import { EYE_HEIGHT } from '../game/constants.js';
-import { THING_NAMES } from '../renderer/scene/constants.js';
-import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
-import { updateCamera } from '../renderer/index.js';
-import { mapData, currentMap, getNextMap } from '../shared/maps/index.js';
-import { swapLevel } from '../game/level.js';
-import { forEachWallInAABB } from '../game/spatial-grid.js';
-import { endMatch } from '../game/match.js';
-import { enterAttract } from './attract.js';
-import { showIntermission } from './intermission.js';
+import { culling, cullingStats } from '../scene/culling.js';
+import { state, debug } from '../../game/state.js';
+import { EYE_HEIGHT } from '../../game/constants.js';
+import { THING_NAMES } from '../scene/constants.js';
+import { getFloorHeightAt, getSectorAt } from '../../game/physics.js';
+import { updateCamera } from '../index.js';
+import { mapData, currentMap, getNextMap } from '../../shared/maps/index.js';
+import { swapLevel } from '../../game/level.js';
+import { forEachWallInAABB } from '../../game/spatial-grid.js';
+import { endMatch } from '../../game/match.js';
+import { enterAttract } from '../../ui/attract.js';
+import { showIntermission } from '../../ui/intermission.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 

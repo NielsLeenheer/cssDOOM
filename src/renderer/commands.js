@@ -46,9 +46,9 @@ import * as crushers from './scene/mechanics/crushers.js';
 import * as scene from './scene/scene.js';
 import { toggleSwitchState } from './scene/mechanics/switches.js';
 import { lowerTaggedFloor } from './scene/surfaces/floors.js';
-import * as effects from './effects.js';
-import * as weapons from './weapons.js';
-import { updateHud } from './hud.js';
+import * as effects from './hud/effects.js';
+import * as weapons from './hud/weapons.js';
+import { updateHud } from './hud/hud.js';
 import { updateCamera } from './scene/camera.js';
 import * as playerVisuals from './scene/entities/player.js';
 import {

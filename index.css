@@ -18,10 +18,10 @@
 @import url('src/renderer/scene/entities/decorations.css');
 @import url('src/renderer/scene/entities/player.css');
 @import url('src/renderer/scene/camera.css');
-@import url('src/ui/weapons.css');
-@import url('src/ui/hud.css');
+@import url('src/renderer/hud/weapons.css');
+@import url('src/renderer/hud/hud.css');
 @import url('src/ui/menu.css');
 @import url('src/ui/network-lobby.css');
 @import url('src/ui/spectator.css');
-@import url('src/ui/touch-controls.css');
+@import url('src/renderer/hud/touch-controls.css');
 @import url('src/ui/help.css');

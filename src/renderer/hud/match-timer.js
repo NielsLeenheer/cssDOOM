@@ -10,7 +10,7 @@
  * in/out.
  */
 
-import { registerOverlayImpl } from '../renderer/commands.js';
+import { registerOverlayImpl } from '../commands.js';
 
 export function applyMatchTimer(text) {
     if (text) {
