@@ -252,9 +252,26 @@ function setupMasterBroadcast() {
             // it's safe to spawn the player and fire the initial-state
             // burst — the switchWeapon / createPlayerSprite world
             // commands these produce land on a listening transport.
-            if (state.networkMode !== 'host' || peerKey === 'local') return;
             const slot = orchestrator.currentRemoteSlot(peerKey);
             if (slot == null) return;
+
+            // updateHud is event-driven (gated on player._hudDirty), so
+            // we mark this slot's player dirty here. Without it, any
+            // freshly-attached pane — Local DM secondary clicked via
+            // detach, OR Network DM remote joining mid-session — would
+            // stare at blank HUD digits until the next damage / ammo /
+            // weapon-switch event. Fires for any peer regardless of
+            // mode; the field is harmless when state.players[slot] is
+            // undefined (Network DM remote at a slot not yet sized —
+            // ensurePlayerCount below handles that and the next frame
+            // flushes via the same gate).
+            if (state.players[slot]) state.players[slot]._hudDirty = true;
+
+            // Everything below is Network-DM-host-specific: roster
+            // sizing, audio listener config, spawn-if-dead, world
+            // snapshot. Local DM secondary shares state with master
+            // and doesn't need any of it.
+            if (state.networkMode !== 'host' || peerKey === 'local') return;
             ensurePlayerCount(slot + 1);
             // Keep state.match.kills sized to the roster so awardFrag
             // can index kills[killer.index][victim.index] and the
@@ -288,11 +305,6 @@ function setupMasterBroadcast() {
             if (getCurrentLevel()) {
                 masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
             }
-            // updateHud is event-driven (gated on player._hudDirty),
-            // so we force a flush for this slot's player — otherwise
-            // the joiner would stare at blank HUD digits until the
-            // player's next damage / ammo / kill event.
-            if (state.players[slot]) state.players[slot]._hudDirty = true;
             // If a results / intermission / lobby overlay is currently
             // visible, replay it onto just this joiner's sink. The
             // orchestrator asks the provider (Game) what's visible and
