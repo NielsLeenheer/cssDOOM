@@ -281,9 +281,8 @@ export class Level {
  * going through the full Game lifecycle:
  *   - attract.js::enterAttract — kiosk idle, no Game-managed match.
  *   - debug.js — window.load save-slot warp, intermission button.
- *   - gates.js — SP dead-respawn after cooldown.
- *   - match.js::restartMatch — defensive fallback when
- *     `app.game.restartMatch` is unavailable.
+ *   - gates.js — SP dead-respawn after cooldown (no Game.respawnSP()
+ *     exists yet; future cleanup would add one and drop this caller).
  *
  * Game-managed transitions (SP intermission advance, DM
  * restartMatch, kiosk match restart) construct Levels directly via

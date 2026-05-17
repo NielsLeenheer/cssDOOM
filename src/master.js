@@ -169,13 +169,15 @@ function gameLoop(timestamp) {
  */
 let masterConnection = null;
 function setupMasterBroadcast() {
-    // Track the level we're transitioning to. `currentMap` from maps.js
-    // doesn't get updated until partway through loadMap (after the fetch),
+    // Track the level we're transitioning to. `currentMap` from
+    // shared/maps/index.js doesn't get updated until partway through
+    // `maps.load` (after the fetch + parse, before the enrichment),
     // so a fast client reconnecting in the middle of a level change
-    // would otherwise receive an ACK pointing at the OLD level — and end
-    // up loading stale geometry while master streams new-level deltas at
-    // it. Stashing the intended new level here means snapshotProvider
-    // always reflects where master is heading, not where it just left.
+    // would otherwise receive an ACK pointing at the OLD level — and
+    // end up loading stale geometry while master streams new-level
+    // deltas at it. Stashing the intended new level here means
+    // snapshotProvider always reflects where master is heading, not
+    // where it just left.
     let pendingLevel = null;
     onLevel('changing', ({ name }) => {
         pendingLevel = name ?? null;

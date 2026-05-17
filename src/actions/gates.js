@@ -24,8 +24,8 @@
 
 import { state } from '../game/state.js';
 import { isMenuOpen } from '../ui/menu.js';
-import { isMatchEnded, restartMatch, startMatch, isMatchLobby } from '../game/match.js';
-import { isIntermissionActive, dismissIntermission } from '../ui/intermission.js';
+import { isMatchEnded, isMatchLobby } from '../game/match.js';
+import { isIntermissionActive } from '../ui/intermission.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { tryClaimSlot } from '../input/claim-registry.js';
 import { currentMap } from '../shared/maps/index.js';
@@ -47,11 +47,9 @@ export const GATE_PRIORITY = {
 };
 
 export function initGates() {
-    // ── Intermission dismiss — SP only. Prefer Game.advance (pushes
-    // hideIntermission via orchestrator, advances mapCursor, awaits
-    // beginPlay → Level reload). Falls back to dismissIntermission if
-    // a boot path didn't construct a Game (defensive — shouldn't
-    // happen).
+    // ── Intermission dismiss — SP only. Calls Game.advance which
+    // pushes hideIntermission via orchestrator, advances mapCursor,
+    // and awaits beginPlay → Level reload.
     //
     // FIRE_DOWN / USE / weapon-switch during INTERMISSION all advance
     // to the next level. The USE handler in particular matters
@@ -61,11 +59,7 @@ export function initGates() {
     // intermission count-up.
     const intermissionAdvance = () => {
         if (!isIntermissionActive()) return;
-        if (window.app?.game?.advance) {
-            window.app.game.advance();
-        } else {
-            dismissIntermission();
-        }
+        window.app.game.advance();
         return true;
     };
     on(A.FIRE_DOWN,     intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
@@ -74,16 +68,13 @@ export function initGates() {
     on(A.WEAPON_NEXT,   intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
     on(A.WEAPON_SELECT, intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
 
-    // ── Match-end restart — DM only. Prefer Game.restartMatch (pushes
-    // hideResults, transitions LOBBY, pushes showLobby). Falls back
-    // to legacy restartMatch for defensive safety.
+    // ── Match-end restart — DM only. Calls Game.restartMatch which
+    // pushes hideResults, transitions LOBBY, pushes showLobby, and
+    // constructs the next Level (advancing mapCursor if an exit
+    // switch set _pendingNextMap).
     on(A.FIRE_DOWN, () => {
         if (!isMatchEnded()) return;
-        if (window.app?.game?.restartMatch) {
-            window.app.game.restartMatch();
-        } else {
-            restartMatch();
-        }
+        window.app.game.restartMatch();
         return true;
     }, { priority: GATE_PRIORITY.MATCH_END });
 
@@ -126,11 +117,7 @@ export function initGates() {
         if (!isMatchLobby()) return;
         if (slot !== 0) return;
         if (countNetworkLobbyOccupied() < 2) return;
-        if (window.app?.game?.beginPlay) {
-            window.app.game.beginPlay();
-        } else {
-            startMatch();
-        }
+        window.app.game.beginPlay();
         return true;
     }, { priority: GATE_PRIORITY.NETWORK_START });
 
