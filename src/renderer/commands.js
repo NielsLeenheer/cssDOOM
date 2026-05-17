@@ -70,9 +70,10 @@ import {
 // from both lobby.js and network-lobby.js; each gates on
 // state.networkMode internally so only the right one paints.
 //
-// Side-effect anchor for the ui/* modules lives at src/ui/overlays.js;
-// without it a UI module whose named exports are unused elsewhere can
-// fall out of the bundle entirely and silently un-register its impls.
+// Side-effect anchor for screen/overlay modules lives at
+// src/renderer/overlays/overlays.js; without it a module whose named
+// exports are unused elsewhere can fall out of the bundle entirely
+// and silently un-register its impls.
 
 const overlayImpls = new Map();
 

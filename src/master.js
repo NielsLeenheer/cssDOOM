@@ -33,7 +33,7 @@ import { buildModeConfigFromUrl } from './game/mode-config.js';
 import { Game } from './game/game.js';
 import { App } from './app.js';
 import { configureAudio } from './audio/audio.js';
-import { hideInitialOverlay } from './ui/overlay.js';
+import { hideInitialOverlay } from './renderer/overlays/overlay.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
@@ -55,11 +55,11 @@ import { spawnPlayer } from './game/player/spawn.js';
 import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
 
 // Side-effect anchor for renderer-command overlay impls. See
-// src/ui/overlays.js — without this import, modules whose only public
+// src/renderer/overlays/overlays.js — without this import, modules whose only public
 // surface is `registerOverlayImpl(...)` (today: scoreboard.js) can fall
 // out of the bundle when their named imports get cleaned up elsewhere,
 // silently breaking the corresponding renderer command.
-import './ui/overlays.js';
+import './renderer/overlays/overlays.js';
 
 // ── Debug toggle ───────────────────────────────────────────────────────
 

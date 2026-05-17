@@ -35,10 +35,10 @@ import * as A from '../input/actions.js';
 import { isAttractActive } from '../renderer/screens/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
-import { hideInitialOverlay } from '../ui/overlay.js';
+import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
 import { setAudioEnabled } from '../audio/audio.js';
 import { setClientSlot } from '../renderer/screens/client-lobby.js';
-import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
+import { ensureDisconnectedOverlay } from '../renderer/overlays/disconnected-overlay.js';
 import { applyRemoteGameState } from '../game/game-state.js';
 import { applyWorldSnapshot } from '../game/snapshot.js';
 

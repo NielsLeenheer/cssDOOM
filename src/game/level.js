@@ -17,7 +17,7 @@ import { EYE_HEIGHT } from './constants.js';
 import { state } from './state.js';
 import { updateGame } from './index.js';
 import { transitionToLevel, resetGameState } from './player/damage.js';
-import { showLevelTransition, hideLevelTransition } from '../ui/overlay.js';
+import { showLevelTransition, hideLevelTransition } from '../renderer/overlays/overlay.js';
 import { buildSectorAdjacency } from './sound-propagation.js';
 import { clearSpatialGrid, buildSpatialGrid } from './spatial-grid.js';
 import { initDoorsState } from './mechanics/doors.js';

@@ -16,10 +16,10 @@
 import { App } from './app.js';
 
 // Side-effect anchor for renderer-command overlay impls. See
-// src/ui/overlays.js — without this import, joiner-side overlays that
+// src/renderer/overlays/overlays.js — without this import, joiner-side overlays that
 // arrive over the wire (the scoreboard fan-out from master, etc.) have
 // no registered handler and render empty.
-import './ui/overlays.js';
+import './renderer/overlays/overlays.js';
 
 export async function initClientWindow({ roomCode = null } = {}) {
     // Boot-time window configuration. Both Local DM secondaries and
