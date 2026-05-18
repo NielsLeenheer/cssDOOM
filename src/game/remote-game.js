@@ -39,7 +39,6 @@ import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
 import { setAudioEnabled } from '../audio/audio.js';
 import { setClientSlot } from '../renderer/screens/client-lobby.js';
 import { ensureDisconnectedOverlay } from '../renderer/overlays/disconnected-overlay.js';
-import { applyRemoteGameState } from '../game/game-state.js';
 import { applyWorldSnapshot } from '../game/snapshot.js';
 
 // 60Hz analog snapshot push (matches master's game loop cadence).
@@ -211,7 +210,7 @@ export class RemoteGame {
             // state burst on.
             await this.orchestrator.loadMap(payload.level);
         }
-        if (payload.gameState) applyRemoteGameState(payload.gameState);
+        if (payload.gameState) this.orchestrator.setGameState(payload.gameState);
         setClientSlot(slotIndex);
 
         this._wireUp();

@@ -640,8 +640,8 @@ body[data-game-state="ended"] .pane-win {
    Single-player intermission — KILLS / ITEMS / SECRET / TIME on the
    WIMAP0 backdrop, shown between levels. Same `.pane-intermission`
    container pattern as the DM scoreboard's `.pane-win`. Visibility
-   driven by body[data-game-state="intermission"] (set by transitionTo
-   in src/game/game-state.js).
+   driven by body[data-game-state="intermission"] (written by the
+   setGameState window-command impl in src/renderer/commands.js).
    ======================================================================== */
 
 .pane-intermission {

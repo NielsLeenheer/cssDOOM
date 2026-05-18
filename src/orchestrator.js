@@ -48,7 +48,7 @@
  */
 
 import { RenderSink } from './transport/render-sink.js';
-import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
+import { PER_PANE_COMMANDS, WORLD_COMMANDS, WINDOW_COMMANDS } from './renderer/commands.js';
 import * as audio from './audio/audio.js';
 import { setSlotAudioSuppressed } from './audio/audio.js';
 
@@ -519,6 +519,24 @@ for (const name of Object.keys(WORLD_COMMANDS)) {
         for (const t of this.targets) {
             if (!t) continue;
             t[name]?.(...args);
+        }
+    };
+}
+
+// Window commands: fire impl once on THIS window, then forward one
+// envelope per joiner sink (each sink is one joiner window). Joiners
+// receive CMD_WORLD and dispatch through their own orchestrator's
+// prototype method — which is the same loop, with zero sinks on the
+// joiner so impl fires once on that window too. No DomRenderer / no
+// RenderSink prototype binding for window kind: the orchestrator's
+// dispatch IS the binding.
+for (const name of Object.keys(WINDOW_COMMANDS)) {
+    const { impl, serialize } = WINDOW_COMMANDS[name];
+    Orchestrator.prototype[name] = function (...args) {
+        impl(...args);
+        const wireArgs = serialize ? serialize(...args) : args;
+        for (const t of this.targets) {
+            if (t?.kind === 'sink') t.forwardWorld(name, wireArgs);
         }
     };
 }

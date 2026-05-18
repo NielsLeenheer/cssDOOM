@@ -17,12 +17,11 @@
  * `commands.js`. When a screen's impls are imported directly by
  * commands.js, its side-effect import drops off this list (commands.js
  * already pulls the module into the bundle via the direct import).
- * intermission, scoreboard, and the match timer have been converted;
- * lobby / network-lobby / client-lobby / game-state still use the
- * registry.
+ * Only the lobby family (lobby + network-lobby + client-lobby —
+ * three handlers on showLobby/hideLobby) still uses the registry,
+ * waiting on LOBBY_REFACTOR_PLAN.
  */
 
 import '../screens/lobby.js';
 import '../screens/network-lobby.js';
 import '../screens/client-lobby.js';
-import '../../game/game-state.js';

@@ -14,17 +14,28 @@
  * it through the four files used to be a silent client desync;
  * with the registry it's impossible.
  *
- * Two kinds:
+ * Three kinds:
  *
  *   `per-pane`  — addressed to one pane. impl signature is
- *                 (paneIndex, ...args). For RenderSink, an optional
+ *                 (renderer, ...args). For RenderSink, an optional
  *                 `serialize(...args)` strips non-cloneable refs (player
  *                 objects, etc.) before postMessage; defaults to identity.
  *
- *   `world`     — no pane. impl signature is (...args). The orchestrator
- *                 calls impl locally (existing helpers iterate panes
- *                 internally) and forwards the call to every sink so
- *                 clients mirror the same world change.
+ *   `world`     — addressed to every pane in every window. impl signature
+ *                 is (renderer, ...args). The orchestrator iterates all
+ *                 targets: each local DomRenderer runs impl(self, ...args);
+ *                 each RenderSink forwards to its joiner over the wire.
+ *
+ *   `window`    — addressed to every WINDOW (master + each joiner) but
+ *                 fired once per window, not once per pane. impl signature
+ *                 is (...args) — no renderer arg, because the thing being
+ *                 written is window-scoped (e.g. `document.body.dataset.X`),
+ *                 not pane-scoped. The orchestrator fires impl once
+ *                 locally, then posts one envelope per joiner sink. On
+ *                 the joiner, RenderClient dispatches via the joiner's
+ *                 orchestrator → impl fires once on that window.
+ *                 NOT bound onto DomRenderer or RenderSink prototypes;
+ *                 the orchestrator dispatches it directly.
  *
  * Optional `mirror` callback — runs on the receive side (RenderClient)
  * before dispatching to the local DomRenderer/Orchestrator. Keeps the
@@ -59,10 +70,14 @@ import {
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showTimer } from './hud/match-timer.js';
-// Overlay-style commands (showLobby / hideLobby / setGameState)
-// currently dispatch through a late-binding registry: their impl is
-// a thin `fireOverlay(name, ...)` wrapper that fans to any handler
-// the screen modules have registered via `registerOverlayImpl`.
+import { applyGameState } from '../game/game-state.js';
+// Lobby commands (showLobby / hideLobby) currently dispatch through
+// a late-binding registry: their impl is a thin
+// `fireOverlay(name, ...)` wrapper that fans to any handler the
+// screen modules have registered via `registerOverlayImpl`. The
+// registry is needed because three screen modules (lobby +
+// network-lobby + client-lobby) all register on the same command
+// and each gates on state.networkMode / body classes internally.
 //
 // Why the registry exists: the direct-import shape
 // (`commands.js → screens/lobby.js → orchestrator.js → commands.js`)
@@ -79,9 +94,9 @@ import { showTimer } from './hud/match-timer.js';
 // `src/renderer/screens/` and don't transitively import the
 // orchestrator, commands.js can import each screen's impl directly
 // and the registry indirection drops away one command at a time.
-// intermission, scoreboard, and the match timer are already
-// direct-import (see imports below). LOBBY_REFACTOR_PLAN covers the
-// lobby family; setGameState is the last single-handler holdout.
+// intermission, scoreboard, match timer, and setGameState are
+// already direct-import (see imports below). LOBBY_REFACTOR_PLAN
+// covers the lobby family — the last registry holdout.
 
 const overlayImpls = new Map();
 
@@ -276,13 +291,24 @@ export const COMMANDS = {
     hideResults:      { kind: 'world', impl: clearResults },
     showTimer:        { kind: 'world', impl: showTimer },
 
-    // game-state transitions. Master's game-state.js calls
-    // `broadcastGameState(next)` on every transitionTo; this fans out
-    // through the renderer-command pipeline. The impl is idempotent on
-    // master (applyRemoteGameState early-returns when state hasn't
-    // changed) and writes body[data-game-state] on the client so CSS gates
-    // (`body[data-game-state="lobby"] ...`) stay aligned with master.
-    setGameState:     { kind: 'world', impl: (_renderer, payload) => fireOverlay('setGameState', payload) },
+    // ── Window: game-state transition ────────────────────────────────────
+    // Every window (master + each joiner) holds its own `current` game
+    // state and its own `body[data-game-state]` attribute. Both must
+    // reflect the same value at all times so CSS gates
+    // (`body[data-game-state="lobby"] …`) stay aligned. Window-kind so
+    // the impl fires once per window — a split-screen master with two
+    // DomRenderers writes the body once, not twice. Game code calls
+    // `orchestrator.setGameState(value)`; the impl updates the pure
+    // state in game-state.js and writes the body. Joiners receive a
+    // CMD_WORLD envelope and dispatch through their own orchestrator,
+    // which fires the same impl on their window.
+    setGameState:     {
+        kind: 'window',
+        impl: (value) => {
+            applyGameState(value);
+            document.body.dataset.gameState = value;
+        },
+    },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(
@@ -291,6 +317,10 @@ export const PER_PANE_COMMANDS = Object.fromEntries(
 
 export const WORLD_COMMANDS = Object.fromEntries(
     Object.entries(COMMANDS).filter(([, c]) => c.kind === 'world'),
+);
+
+export const WINDOW_COMMANDS = Object.fromEntries(
+    Object.entries(COMMANDS).filter(([, c]) => c.kind === 'window'),
 );
 
 // ── Prototype binding ────────────────────────────────────────────────────

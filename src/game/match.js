@@ -14,7 +14,7 @@
 import { state } from './state.js';
 import { Player } from './player/player.js';
 import { clearMovingState } from './movement.js';
-import { GAME_STATE, getGameState, transitionTo } from './game-state.js';
+import { GAME_STATE, getGameState } from './game-state.js';
 import { orchestrator } from '../orchestrator.js';
 
 const DEFAULT_FRAG_LIMIT = 20;
@@ -69,7 +69,7 @@ export function resetMatch({
     for (const p of state.players) { p.score = 0; p._hudDirty = true; }
     orchestrator.hideResults();
     hideTimer();
-    transitionTo(GAME_STATE.LOBBY);
+    orchestrator.setGameState(GAME_STATE.LOBBY);
     // Notify lobby UI + master broadcast that a new match cycle
     // started, so the lobby can clear stale claims and master can
     // re-broadcast LOBBY_STATE. Decoupling via the module-level
@@ -85,7 +85,7 @@ export function startMatch() {
     if (getGameState() !== GAME_STATE.LOBBY) return;
     if (!state.match) return;
     state.match.startTime = performance.now();
-    transitionTo(GAME_STATE.ACTIVE);
+    orchestrator.setGameState(GAME_STATE.ACTIVE);
 }
 
 /** True if a DM match is in the lobby state — exists but not yet started. */
@@ -121,7 +121,7 @@ export function clearMatch() {
     state.match = null;
     orchestrator.hideResults();
     hideTimer();
-    transitionTo(GAME_STATE.ACTIVE);
+    orchestrator.setGameState(GAME_STATE.ACTIVE);
 }
 
 /**
@@ -237,7 +237,7 @@ export function endMatch() {
     // scoreboard → attract. Clear it explicitly here.
     for (const p of state.players) clearMovingState(p);
 
-    transitionTo(GAME_STATE.ENDED);
+    orchestrator.setGameState(GAME_STATE.ENDED);
     // Signal the scoreboard — orchestrator pulls the current payload
     // from the registered provider (Game.getResultsPayload), so this
     // call carries no data. The same signal fires from both the

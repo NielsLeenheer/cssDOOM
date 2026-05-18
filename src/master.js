@@ -52,7 +52,7 @@ import { initLobby } from './renderer/screens/lobby.js';
 import { onMatch, ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
-import { setGameStateBroadcaster, getGameState, GAME_STATE } from './game/game-state.js';
+import { getGameState, GAME_STATE } from './game/game-state.js';
 
 // Side-effect anchor for renderer-command overlay impls. See
 // src/renderer/overlays/overlays.js — without this import, modules whose only public
@@ -381,14 +381,6 @@ function setupMasterBroadcast() {
     // exit-switch path) both push orchestrator.showResults, which fans
     // to master's own pane(s) AND every connected client.
 
-    // Mirror every game-state transition onto the client. game-state.js
-    // calls this on each transitionTo. Routes through the renderer-
-    // command pipeline, which fans the call to every target including
-    // each RenderSink → client's DomRenderer, where the registered impl
-    // calls applyRemoteGameState to flip body[data-game-state].
-    setGameStateBroadcaster((s) => {
-        orchestrator.setGameState(s);
-    });
 }
 
 // broadcastLobbyState used to build a lobby payload from master-side
