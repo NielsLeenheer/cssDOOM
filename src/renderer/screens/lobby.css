@@ -153,6 +153,11 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 
 .network-invite-qr:empty { display: none; }
 
+/* The invite (room code + QR) is meaningful only to the host who's
+   sharing the code. Joiners already entered the code to get here;
+   hide the whole invite section on their windows. */
+body.network-client .network-invite { display: none; }
+
 /* Per-pane action prompt ---------------------------------------------
    Hidden by default. body[data-network-ready="true"] (set by the JS
    when ≥ 2 slots are occupied) flips it on. The text differs per
