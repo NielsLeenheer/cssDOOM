@@ -47,10 +47,27 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 }
 
 .network-lobby-title {
-    font-size: 28px;
-    color: #dc0000;
-    text-transform: uppercase;
-    letter-spacing: 4px;
+    /* M_NEWG.png is the original DOOM menu's "NEW GAME" sprite,
+       native 121×15. 2× scale keeps the pixel art crisp. */
+    height: 30px;
+    width: auto;
+    image-rendering: pixelated;
+}
+
+.network-lobby-level {
+    /* WILV0N.png — the same white intermission level-name sprites
+       (87×12 native) used by the SP intermission screen and the
+       menu's level picker. JS sets src from payload.mapCursor; hide
+       when no sprite resolves (non-E1 episode or null cursor). */
+    height: 24px;
+    width: auto;
+    image-rendering: pixelated;
+    margin-top: -12px;
+}
+
+.network-lobby-level:not([src]),
+.network-lobby-level[src=""] {
+    display: none;
 }
 
 /* Slot list ------------------------------------------------------------ */

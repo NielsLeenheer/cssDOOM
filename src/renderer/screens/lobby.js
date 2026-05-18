@@ -72,6 +72,21 @@ function renderNetworkLobby(renderer, payload) {
     const root = renderer.paneEl.querySelector('.pane-network-lobby');
     if (!root) return;
 
+    // Level-name sprite (white WILV0N from the SP intermission set).
+    // Same per-map source as the menu's level picker — empty src
+    // hides the element via CSS for non-E1 episodes.
+    const levelEl = root.querySelector('.network-lobby-level');
+    if (levelEl) {
+        const src = levelNameSpriteSrc(payload.mapCursor);
+        if (src) {
+            levelEl.src = src;
+            levelEl.alt = payload.mapCursor ?? '';
+        } else {
+            levelEl.removeAttribute('src');
+            levelEl.alt = '';
+        }
+    }
+
     for (let i = 0; i < MAX_SLOTS; i++) {
         const occupant = payload.slotOccupants?.[i] ?? 'empty';
         const row = root.querySelector(`.network-slot[data-slot="${i}"]`);
@@ -99,6 +114,17 @@ function labelFor(occupant, slot, promptingSlot) {
     if (occupant !== 'empty') return `Player ${slot + 1} ready`;
     if (slot === promptingSlot) return 'Press button to join';
     return 'Waiting for player';
+}
+
+/** Map E1M{N} (N = 1..9) to its WILV0{N-1} sprite path. Returns null
+ *  for map names that don't match the E1 episode (no sprite shipped).
+ *  Same logic as src/renderer/screens/intermission.js. */
+function levelNameSpriteSrc(mapName) {
+    if (!mapName) return null;
+    const match = /^E1M([1-9])$/.exec(mapName);
+    if (!match) return null;
+    const idx = Number(match[1]) - 1;
+    return `/assets/intermission/WILV0${idx}.png`;
 }
 
 function renderQrSvg(code) {
