@@ -244,28 +244,27 @@ onClaimChange(() => {
 });
 
 // ── Renderer-command entry points ──────────────────────────────────────
-// Symmetric with src/ui/lobby.js: Game pushes lobby commands and the
-// world-command impls call into both modules. This module gates on
-// `state.networkMode === 'host'` because the network lobby view only
-// renders for the host configuration; non-network DM is handled by
-// lobby.js.
+// Network DM impl for showLobby. Same code on master and on a Network
+// DM remote (.network-client body class) — both apply the payload's
+// slot occupants to the .pane-network-lobby DOM. Local DM (variant:
+// 'local') is handled by lobby.js / client-lobby.js. Local DM
+// secondaries don't have .network-client and the variant guard keeps
+// them out either way.
 
-/** Renderer-command impl for showLobby in network
- *  mode. On master, re-derive from claim-registry like syncFromClaims
- *  does. On a Network DM remote (.network-client body class), paint the
- *  slot list from the payload's slotOccupants array — the remote has no
- *  claim-registry of its own, so master is the authoritative source.
- *  Local DM secondaries don't have .network-client and stay out — their
- *  per-pane data-claim-state is set by client-lobby.js's impl. */
 export function renderLobbyState(payload) {
-    if (state.networkMode === 'host') {
-        syncFromClaims();
-        renderAllLabels();
-        return;
-    }
-    if (document.body.classList.contains('network-client')
-        && payload && Array.isArray(payload.slotOccupants)) {
-        applyNetworkLobbyState(payload.slotOccupants);
+    if (!payload || payload.variant !== 'network') return;
+    if (!Array.isArray(payload.slotOccupants)) return;
+
+    applyNetworkLobbyState(payload.slotOccupants);
+
+    // body[data-network-ready] gates the "PRESS FIRE TO START" CSS
+    // selector for the host pane. Written from payload.canStart so
+    // master and joiner stay aligned without each running their own
+    // count loop.
+    if (payload.canStart) {
+        document.body.dataset.networkReady = 'true';
+    } else {
+        delete document.body.dataset.networkReady;
     }
 }
 
@@ -276,7 +275,7 @@ export function clearLobby() {
 }
 
 // Register render-only handlers. Parallel with lobby.js;
-// renderLobbyState() above gates on state.networkMode='host' so only
-// the network branch paints when networkMode matches.
+// renderLobbyState() above gates on payload.variant === 'network' so
+// only the network branch paints when the master is in Network DM.
 registerOverlayImpl('showLobby', renderLobbyState);
 registerOverlayImpl('hideLobby', clearLobby);

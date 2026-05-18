@@ -54,24 +54,22 @@ export function applyLobbyState(msg) {
         return;
     }
 
-    // body[data-game-state] is mirrored by the setGameState renderer
-    // command (impl in game-state.js). This module only updates the
-    // per-pane data-claim-state attribute.
+    // body[data-game-state] is mirrored by the setGameState
+    // window-command impl in commands.js. This module only updates
+    // the per-pane data-claim-state attribute.
 
-    // Same algorithm as lobby.js's updateLobbyUI: lowest unclaimed slot
-    // is the one currently 'prompting'; freshly-claimed slots get
-    // 'ready' (READY flash); slots whose claim carried over from the
-    // previous match behave like 'active' (no flash, since nobody just
-    // pressed a button for them); higher-indexed unclaimed slots are
-    // 'waiting'; outside the lobby every slot is 'active'.
+    // Same algorithm as lobby.js's master-side impl, run for this
+    // window's one pane. promptingSlot comes pre-derived in the
+    // payload so we don't re-compute it here.
     let claimState;
     if (!msg.inLobby) {
         claimState = 'active';
     } else if (msg.slotsClaimed[mySlot]) {
         claimState = msg.slotsCarriedOver?.[mySlot] ? 'active' : 'ready';
+    } else if (mySlot === msg.promptingSlot) {
+        claimState = 'prompting';
     } else {
-        const promptingSlot = msg.slotsClaimed.findIndex(c => !c);
-        claimState = (mySlot === promptingSlot) ? 'prompting' : 'waiting';
+        claimState = 'waiting';
     }
 
     const paneEl = document.querySelector(`.pane[data-player="${mySlot}"]`);
