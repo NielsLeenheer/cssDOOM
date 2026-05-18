@@ -22,7 +22,13 @@ import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
-import { getCarriedOverClaims, getNetworkSlotOccupants } from './lobby-state.js';
+import {
+    getCarriedOverClaims,
+    getNetworkSlotOccupants,
+    getRoomCode,
+    getLocallyClaimableSlots,
+    countOccupied as countNetworkLobbyOccupied,
+} from './lobby-state.js';
 
 // How long to keep the just-claimed pane's READY indicator visible
 // before auto-starting the match. If a slot un-claims during the
@@ -657,23 +663,53 @@ export class Game {
 
     /** Unified lobby payload consumed by every lobby renderer
      *  ([renderer/screens/lobby.js], [renderer/screens/network-lobby.js], [renderer/screens/client-lobby.js]).
-     *  Combines roster info (slots + mapCursor) with the master-side
-     *  per-slot bookkeeping (claims, carried-over claims, network
-     *  occupants) so every consumer can pick the fields it needs from
-     *  one canonical shape. Used to be split across two payload shapes
-     *  pushed from two places (Game vs master.js::broadcastLobbyState),
-     *  which forced handlers to gate on which fields were present. */
+     *  One canonical shape; each consumer reads the fields it cares
+     *  about. The Stage-A additive expansion (variant, roomCode,
+     *  locallyClaimableSlots, promptingSlot, canStart) lets the
+     *  existing impls migrate off claim-registry / state.players /
+     *  isMatchLobby re-derivation onto pure payload reads — see
+     *  LOBBY_REFACTOR_PLAN. */
     getLobbyPayload() {
         const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
         const carried = getCarriedOverClaims();
         const slotsCarriedOver = state.players.map((_, i) => carried.has(i));
+        const variant = state.networkMode === 'host' ? 'network' : 'local';
+        const slotOccupants = getNetworkSlotOccupants();
+        const locallyClaimableSlots = [...getLocallyClaimableSlots()];
+
+        // Pre-derive promptingSlot so impls stay dumb:
+        //   local:   lowest slot where slot is unclaimed
+        //   network: lowest empty slot that's locally-claimable
+        let promptingSlot = -1;
+        if (variant === 'local') {
+            for (let i = 0; i < slotsClaimed.length; i++) {
+                if (!slotsClaimed[i]) { promptingSlot = i; break; }
+            }
+        } else {
+            const claimable = new Set(locallyClaimableSlots);
+            for (let i = 0; i < slotOccupants.length; i++) {
+                if (slotOccupants[i] === 'empty' && claimable.has(i)) {
+                    promptingSlot = i;
+                    break;
+                }
+            }
+        }
+
         return {
             inLobby: isMatchLobby(),
             slots: this.roster,
             mapCursor: this.mapCursor,
             slotsClaimed,
             slotsCarriedOver,
-            slotOccupants: getNetworkSlotOccupants(),
+            slotOccupants,
+            // Stage A additions — populated alongside the legacy
+            // fields so existing impls keep working while the
+            // migration is in flight.
+            variant,
+            roomCode: getRoomCode(),
+            locallyClaimableSlots,
+            promptingSlot,
+            canStart: countNetworkLobbyOccupied() >= 2,
         };
     }
 
