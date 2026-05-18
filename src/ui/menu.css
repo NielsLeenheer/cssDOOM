@@ -92,7 +92,7 @@ body.client-window #menu-button:hover { filter: none; }
     font-family: 'STCFN', monospace;
     /* Override STCFN's red CPAL palette with white — defined in reset.css. */
     font-palette: --stcfn-white;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.6;
     color: #888; /* non-COLR fallback */
     text-align: center;
@@ -127,7 +127,7 @@ body.client-window #menu-button:hover { filter: none; }
 .menu-heading {
     font-family: 'STCFN', monospace;
     font-palette: --stcfn-white;
-    font-size: 12px;
+    font-size: 14px;
     color: #666; /* non-COLR fallback */
     text-transform: uppercase;
     margin-bottom: 12px;
@@ -209,7 +209,7 @@ body.client-window #menu-button:hover { filter: none; }
 
     & .menu-mode-label {
         font-family: 'STCFN', monospace;
-        font-size: 16px;
+        font-size: 18px;
         color: #dc0000; /* DOOM red — matches the level-selector digit sprite */
         text-transform: uppercase;
         padding: 4px 0;
@@ -235,7 +235,7 @@ body.client-window #menu-button:hover { filter: none; }
 
     & .menu-action-label {
         font-family: 'STCFN', monospace;
-        font-size: 16px;
+        font-size: 18px;
         color: #dc0000;
         text-transform: uppercase;
         padding: 4px 0;
