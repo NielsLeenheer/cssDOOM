@@ -2,32 +2,36 @@
  * Lobby controller — owns the press-to-claim UX for Local DM.
  *
  * Responsibilities:
- *   - Drives per-pane `[data-claim-state]` attributes so each pane's
- *     join prompt knows whether its slot is prompting / ready / waiting /
- *     active. (Lobby vs. active mode itself is driven by
- *     `body[data-game-state="lobby"]`, written by the legacy
- *     game-state.js machine when `resetMatch()` runs.)
+ *   - Drives per-pane `[data-claim-state]` attributes (master side)
+ *     so each pane's join prompt knows whether its slot is prompting
+ *     / ready / waiting / active. Lobby vs. active mode itself is
+ *     driven by `body[data-game-state="lobby"]`, written by the
+ *     setGameState window-command impl.
+ *   - Owns the match-reset hook that snapshots already-claimed
+ *     slots into `carriedOverClaims` so back-to-back matches don't
+ *     re-flash READY on claims a player kept across the reset.
  *
  * Repaint trigger: Game and master.js push `showLobby` through the
- * orchestrator on every claim change (and on lobby entry / exit). The
- * orchestrator pulls the current payload from Game (the registered
- * payload provider) so what lands on every renderer matches Game's
- * truth at dispatch time. The renderer-command impl below is the
- * sole driver; the legacy direct `onClaimChange(updateLobbyUI)`
- * subscription is gone. Auto-start is owned by Game._checkAutoStart
- * (same READY_FLASH delay as before).
+ * orchestrator on every claim change (and on lobby entry / exit).
+ * The orchestrator pulls the current payload from Game (the
+ * registered payload provider) so what lands on every renderer
+ * matches Game's truth at dispatch time. This impl reads the payload
+ * only — no claim-registry / state.players / isMatchLobby
+ * re-derivation. Auto-start is owned by Game._checkAutoStart.
  *
- * Network DM lobby UI lives in src/renderer/screens/network-lobby.js — a 4-slot
- * list rather than per-pane prompts. Both modules register impls on
- * the same showLobby command and each gates on state.networkMode
- * internally so only one paints per call.
+ * Network DM lobby UI lives in src/renderer/screens/network-lobby.js —
+ * a 4-slot list rather than per-pane prompts. Both modules register
+ * impls on the same showLobby command; this one early-returns when
+ * payload.variant !== 'local'. Local DM secondaries (detached
+ * windows) get their data-claim-state from client-lobby.js's impl
+ * — this module's first gate (.client-window) keeps them out.
  */
 
 import { state } from '../../game/state.js';
 import { orchestrator } from '../../orchestrator.js';
 import { isSlotClaimedLocally } from '../../input/claim-registry.js';
-import { isMatchLobby, onMatch } from '../../game/match.js';
-import { getCarriedOverClaims, setCarriedOverClaims } from '../../game/lobby-state.js';
+import { onMatch } from '../../game/match.js';
+import { setCarriedOverClaims } from '../../game/lobby-state.js';
 import { registerOverlayImpl } from '../commands.js';
 
 let externalSlotsRef = () => new Set();
@@ -66,78 +70,52 @@ export function initLobby({ getExternallyClaimedSlots }) {
     });
 }
 
-/**
- * Update per-pane DOM attributes from current claim/match state.
- * Called by the renderer-command impl in response to Game's
- * showLobby / updateLobbyState pushes.
+// ── Renderer-command entry points ──────────────────────────────────────
+// Game / master.js push showLobby / hideLobby through the orchestrator
+// (see src/renderer/commands.js). The impl below is the master-side
+// handler for the Local DM variant. It reads the payload only; all
+// per-slot state (claim status, carry-over flags, the prompting slot)
+// is pre-derived by Game.getLobbyPayload().
+
+/** Renderer-command impl for showLobby.
+ *  Master-only, Local-DM variant — Local DM secondaries get their
+ *  data-claim-state from client-lobby.js's impl; Network DM uses
+ *  network-lobby.js's impl. Each pane on this window gets its slot's
+ *  claim state written.
  *
- * Per-pane `data-claim-state` is one of:
- *   "prompting" — this pane's slot is the next to claim. Shows PRESS
- *                  BUTTON TO JOIN. Only one pane has this state at a
- *                  time (sequential join, left → right).
- *   "ready"     — this pane's slot is claimed but match hasn't started.
- *                  Shows READY overlay; bound player can warm up.
- *   "waiting"   — pane is later in the sequence than the currently-
- *                  prompting one. Dimmed; no overlay.
- *   "active"    — match has started; no overlay, normal gameplay.
- *
- * The "next to claim" rule is: a pane is prompting iff its slot is
- * unclaimed AND every lower-numbered slot is already claimed.
+ *  Per-pane `data-claim-state` is one of:
+ *    "prompting" — this pane's slot is the next to claim. Shows
+ *                   PRESS BUTTON TO JOIN. Only one pane has this
+ *                   state at a time (sequential join, left → right).
+ *    "ready"     — this pane's slot is claimed but match hasn't
+ *                   started. Shows READY overlay.
+ *    "waiting"   — pane is later in the sequence than the currently-
+ *                   prompting one. Dimmed; no overlay.
+ *    "active"    — match has started; no overlay, normal gameplay.
  */
-function updateLobbyUI() {
-    // Network DM has its own lobby UI in src/renderer/screens/network-lobby.js.
-    if (state.networkMode === 'host') return;
-
-    const inLobby = isMatchLobby();
-    const externalSlots = externalSlotsRef();
-    const isClaimed = (slot) => isSlotClaimedLocally(slot) || externalSlots.has(slot);
-
-    // Find the lowest unclaimed slot — that's the one currently prompting.
-    // Slots below it are 'ready' (claimed); slots above are 'waiting'.
-    let promptingSlot = -1;
-    for (let i = 0; i < state.players.length; i++) {
-        if (!isClaimed(i)) { promptingSlot = i; break; }
-    }
+function renderLobbyState(payload) {
+    if (document.body.classList.contains('client-window')) return;
+    if (payload?.variant !== 'local') return;
 
     for (const paneEl of document.querySelectorAll('.pane')) {
         const slot = parseInt(paneEl.dataset.player ?? '-1', 10);
         if (!Number.isFinite(slot) || slot < 0) continue;
 
         let claimState;
-        if (!inLobby) {
+        if (!payload.inLobby) {
             claimState = 'active';
-        } else if (isClaimed(slot)) {
+        } else if (payload.slotsClaimed[slot]) {
             // Fresh claim (made this lobby session) gets the READY flash;
             // a claim that carried over from before match-reset behaves
             // like 'active' — no overlay, just normal scene.
-            claimState = getCarriedOverClaims().has(slot) ? 'active' : 'ready';
-        } else if (slot === promptingSlot) {
+            claimState = payload.slotsCarriedOver[slot] ? 'active' : 'ready';
+        } else if (slot === payload.promptingSlot) {
             claimState = 'prompting';
         } else {
             claimState = 'waiting';
         }
         paneEl.dataset.claimState = claimState;
     }
-}
-
-// ── Renderer-command entry points ──────────────────────────────────────
-// Game / master.js push showLobby / hideLobby through the orchestrator
-// (see src/renderer/commands.js). The impls below are the per-window
-// render-only handlers — they re-derive from current globals
-// (state.players, claim-registry, isMatchLobby) rather than reading the
-// payload. Future work could move re-derivation off globals and onto
-// the payload so the carriedOverClaims state can also migrate into
-// Game; today the carriedOverClaims tracking still lives in the
-// onMatch('reset') handler above.
-
-/** Renderer-command impl for showLobby.
- *  Master-only — derives data-claim-state from local claim-registry,
- *  which doesn't exist on a client. Local DM secondaries get their
- *  data-claim-state from client-lobby.js's impl (payload-driven);
- *  Network DM clients use network-lobby.js's impl. */
-function renderLobbyState(_payload) {
-    if (document.body.classList.contains('client-window')) return;
-    updateLobbyUI();
 }
 
 /** Renderer-command impl for hideLobby. CSS hides the lobby overlay
