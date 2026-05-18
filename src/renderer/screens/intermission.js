@@ -17,7 +17,6 @@
 import { captureSpStats } from '../../game/sp-stats.js';
 import { currentMap } from '../../shared/maps/index.js';
 import { GAME_STATE, getGameState, transitionTo } from '../../game/game-state.js';
-import { registerOverlayImpl } from '../commands.js';
 
 const LABEL_BASE = '/assets/intermission';
 const COUNT_UP_MS = 1200;     // per-row duration
@@ -252,21 +251,19 @@ function levelNameSpriteSrc(mapName) {
 
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showIntermission / hideIntermission through the
-// orchestrator (see src/renderer/commands.js); switches.js no longer
-// calls showIntermission directly. The advance callback is a no-op
-// because Game.advance is the sole dismiss path: actions/gates.js's
-// intermissionAdvance fires Game.advance on FIRE_DOWN, which pushes
-// hideIntermission via orchestrator. dismissIntermission's onAdvance
-// invocation is dead code on master (gates routes to Game.advance
-// first) and on the joiner (gates aren't initialized client-side).
+// orchestrator (see src/renderer/commands.js); commands.js imports
+// these directly and wires them as the world-command impls. The
+// advance callback is a no-op because Game.advance is the sole
+// dismiss path: actions/gates.js's intermissionAdvance fires
+// Game.advance on FIRE_DOWN, which pushes hideIntermission via
+// orchestrator. dismissIntermission's onAdvance invocation is dead
+// code on master (gates routes to Game.advance first) and on the
+// joiner (gates aren't initialized client-side).
 
-function renderIntermission(payload) {
+export function renderIntermission(_renderer, payload) {
     showIntermission(payload?.nextMap ?? null, () => {});
 }
 
-function clearIntermission() {
+export function clearIntermission(_renderer) {
     hideIntermission();
 }
-
-registerOverlayImpl('showIntermission', renderIntermission);
-registerOverlayImpl('hideIntermission', clearIntermission);

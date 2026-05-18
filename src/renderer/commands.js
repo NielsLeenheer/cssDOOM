@@ -56,24 +56,31 @@ import {
     applyThingPositionUpdate,
     applyThingCollected,
 } from './renderer-state.js';
-// Overlay commands (showLobby / hideLobby / showIntermission /
-// hideIntermission / showResults / hideResults / setGameState)
-// dispatch through a late-binding registry rather than
-// importing the ui/* modules directly. The direct-import shape
-// (`commands.js → ui/lobby.js → orchestrator.js → commands.js`) is a
-// cycle that crashed Firefox via TDZ on the COMMANDS export.
+import { renderIntermission, clearIntermission } from './screens/intermission.js';
+// Overlay-style commands (showLobby / hideLobby / showResults /
+// hideResults / setMatchTimer / setGameState) currently dispatch
+// through a late-binding registry: their impl is a thin
+// `fireOverlay(name, ...)` wrapper that fans to any handler the
+// screen modules have registered via `registerOverlayImpl`.
 //
-// Registry pattern: ui/* modules import `registerOverlayImpl` from
-// here at their own module-load time and push their render-only
-// handlers in. commands.js never imports ui/*, so the cycle is broken.
-// Multiple handlers per command are supported — showLobby has handlers
-// from both lobby.js and network-lobby.js; each gates on
-// state.networkMode internally so only the right one paints.
+// Why the registry exists: the direct-import shape
+// (`commands.js → screens/lobby.js → orchestrator.js → commands.js`)
+// would be a cycle that crashed Firefox via TDZ on the COMMANDS
+// export. The registry lets screen modules push their handlers in at
+// their own module-eval time so commands.js never has to import them.
 //
-// Side-effect anchor for screen/overlay modules lives at
-// src/renderer/overlays/overlays.js; without it a module whose named
-// exports are unused elsewhere can fall out of the bundle entirely
-// and silently un-register its impls.
+// Side-effect anchor for the still-registered screens lives at
+// src/renderer/overlays/overlays.js — without it a module whose
+// named exports are unused elsewhere can fall out of the bundle
+// entirely and silently un-register its impls.
+//
+// Migration in progress: now that screens live under
+// `src/renderer/screens/` and don't transitively import the
+// orchestrator, commands.js can import each screen's impl directly
+// and the registry indirection drops away one command at a time.
+// intermission was first (see import below). LOBBY_REFACTOR_PLAN
+// covers the lobby family; scoreboard / setMatchTimer / setGameState
+// follow the same shape.
 
 const overlayImpls = new Map();
 
@@ -262,8 +269,8 @@ export const COMMANDS = {
     // where it expected `{scores, kills, winnerIndex, mapName}`.
     showLobby:        { kind: 'world', impl: (_renderer, payload) => fireOverlay('showLobby', payload) },
     hideLobby:        { kind: 'world', impl: (_renderer) => fireOverlay('hideLobby') },
-    showIntermission: { kind: 'world', impl: (_renderer, payload) => fireOverlay('showIntermission', payload) },
-    hideIntermission: { kind: 'world', impl: (_renderer) => fireOverlay('hideIntermission') },
+    showIntermission: { kind: 'world', impl: renderIntermission },
+    hideIntermission: { kind: 'world', impl: clearIntermission },
     showResults:      { kind: 'world', impl: (_renderer, payload) => fireOverlay('showResults', payload) },
     hideResults:      { kind: 'world', impl: (_renderer) => fireOverlay('hideResults') },
     setMatchTimer:    { kind: 'world', impl: (_renderer, text) => fireOverlay('setMatchTimer', text) },
