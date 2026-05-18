@@ -228,7 +228,7 @@ export function applyWorldSnapshot(target, snapshot) {
         // timer envelope only fires when the displayed second changes —
         // they'd wait up to a second to see the readout otherwise.
         // Apply the value carried in the snapshot so it lands immediately.
-        target.setMatchTimer(snapshot.timerText ?? null);
+        target.showTimer(snapshot.timerText ?? null);
     } finally {
         // Wait two animation frames before removing the suppressor: one
         // for the style changes (data-state flips, class adds) to flush,

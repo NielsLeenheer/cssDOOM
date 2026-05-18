@@ -182,13 +182,13 @@ function updateCountdown(remainingMs) {
     const text = `${m}:${s.toString().padStart(2, '0')}`;
     if (text === _currentTimerText) return;
     _currentTimerText = text;
-    orchestrator.setMatchTimer(text);
+    orchestrator.showTimer(text);
 }
 
 function hideTimer() {
     if (_currentTimerText === null) return;
     _currentTimerText = null;
-    orchestrator.setMatchTimer(null);
+    orchestrator.showTimer(null);
 }
 
 /** Current m:ss text being broadcast, or null if the timer is hidden.

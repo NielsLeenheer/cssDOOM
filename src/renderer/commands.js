@@ -58,11 +58,11 @@ import {
 } from './renderer-state.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
-// Overlay-style commands (showLobby / hideLobby / setMatchTimer /
-// setGameState) currently dispatch through a late-binding registry:
-// their impl is a thin `fireOverlay(name, ...)` wrapper that fans to
-// any handler the screen modules have registered via
-// `registerOverlayImpl`.
+import { showTimer } from './hud/match-timer.js';
+// Overlay-style commands (showLobby / hideLobby / setGameState)
+// currently dispatch through a late-binding registry: their impl is
+// a thin `fireOverlay(name, ...)` wrapper that fans to any handler
+// the screen modules have registered via `registerOverlayImpl`.
 //
 // Why the registry exists: the direct-import shape
 // (`commands.js → screens/lobby.js → orchestrator.js → commands.js`)
@@ -79,9 +79,9 @@ import { renderResults, clearResults } from './screens/scoreboard.js';
 // `src/renderer/screens/` and don't transitively import the
 // orchestrator, commands.js can import each screen's impl directly
 // and the registry indirection drops away one command at a time.
-// intermission and scoreboard are already direct-import (see imports
-// below). LOBBY_REFACTOR_PLAN covers the lobby family;
-// setMatchTimer / setGameState follow the same shape.
+// intermission, scoreboard, and the match timer are already
+// direct-import (see imports below). LOBBY_REFACTOR_PLAN covers the
+// lobby family; setGameState is the last single-handler holdout.
 
 const overlayImpls = new Map();
 
@@ -274,7 +274,7 @@ export const COMMANDS = {
     hideIntermission: { kind: 'world', impl: clearIntermission },
     showResults:      { kind: 'world', impl: renderResults },
     hideResults:      { kind: 'world', impl: clearResults },
-    setMatchTimer:    { kind: 'world', impl: (_renderer, text) => fireOverlay('setMatchTimer', text) },
+    showTimer:        { kind: 'world', impl: showTimer },
 
     // game-state transitions. Master's game-state.js calls
     // `broadcastGameState(next)` on every transitionTo; this fans out
