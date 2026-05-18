@@ -163,20 +163,25 @@ function snapshotCorpses() {
  *     rendererState; fan-out reaches the joiner's single local
  *     DomRenderer).
  *
- * Animations are CSS-suppressed during the apply (via
- * `body.snapshot-applying` — see touch-controls.css / viewport.css)
- * so the catch-up doesn't visibly re-play every death and door open
- * since match start.
+ * Animations are CSS-suppressed during the apply via the
+ * `snapshot-applying` class on the affected pane(s) (see
+ * viewport.css). Scoped per-pane so the catch-up of one renderer
+ * does not freeze a sibling renderer's animations.
  *
  * Both DomRenderer.prototype and Orchestrator.prototype carry the
  * same auto-bound world-command method names from
  * `renderer/commands.js`, so the same call sites work for either
  * target shape.
+ *
+ * Both the call shape and the no-mirrors asymmetry are documented
+ * smells slated for a proper refactor — see
+ * docs/SNAPSHOT_REFACTOR.md and docs/RENDERER_STATE_REFACTOR.md.
  */
 export function applyWorldSnapshot(target, snapshot) {
     if (!target || !snapshot) return;
 
-    document.body.classList.add('snapshot-applying');
+    const paneEls = paneElementsOf(target);
+    for (const el of paneEls) el.classList.add('snapshot-applying');
     try {
         for (const sprite of snapshot.playerSprites ?? []) {
             target.createPlayerSprite(
@@ -236,8 +241,24 @@ export function applyWorldSnapshot(target, snapshot) {
         // transition that would otherwise have started on those changes.
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                document.body.classList.remove('snapshot-applying');
+                for (const el of paneEls) el.classList.remove('snapshot-applying');
             });
         });
     }
+}
+
+/** Resolve the pane element(s) the snapshot is being applied to.
+ *  Accepts either a DomRenderer (single paneEl) or an Orchestrator
+ *  (paneEls of every local DomRenderer target — sinks have none).
+ *  In practice each call site addresses exactly one pane: master
+ *  grace-rebuild passes a single DomRenderer; joiner-side has one
+ *  local DomRenderer on the orchestrator. */
+function paneElementsOf(target) {
+    if (target?.paneEl) return [target.paneEl];
+    if (Array.isArray(target?.targets)) {
+        return target.targets
+            .filter(t => t && t.paneEl)
+            .map(t => t.paneEl);
+    }
+    return [];
 }

@@ -192,14 +192,15 @@ body.client-window .pane {
     perspective-origin: 50% 50%;
 }
 
-/* While master's world-state snapshot is being applied on the joiner —
-   suppress every animation and transition under .viewport so the
-   catch-up doesn't visibly re-play every enemy death and door open
-   since match start. The body class is added in RemoteGame's
-   _applyWorldSnapshot and removed two frames later, after the style
-   changes have flushed. */
-body.snapshot-applying .viewport,
-body.snapshot-applying .viewport * {
+/* While a world-state snapshot is being applied to a renderer —
+   suppress every animation and transition under that renderer's
+   .viewport so the catch-up doesn't visibly re-play every enemy
+   death and door open since match start. Scoped to the specific
+   pane so other panes in the same window keep animating normally
+   during one renderer's catch-up. Class added in snapshot.js's
+   applyWorldSnapshot and removed two frames later. */
+.pane.snapshot-applying .viewport,
+.pane.snapshot-applying .viewport * {
     animation: none !important;
     transition: none !important;
 }
