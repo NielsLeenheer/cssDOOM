@@ -4,7 +4,7 @@
    The lobby DOM lives inside the pane template, alongside .pane-win and
    .pane-intermission. Every pane (master's panes and each remote's single
    pane) gets its own copy of this subtree; the JS in
-   src/renderer/screens/network-lobby.js keeps the slot rows + room code in sync across
+   src/renderer/screens/lobby.js (network variant) keeps the slot rows + room code in sync across
    all copies. The per-pane action prompt is driven by CSS.
    ======================================================================== */
 

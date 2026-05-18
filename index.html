@@ -168,12 +168,14 @@
             <div class="pane-intermission"></div>
             <div class="pane-timer"></div>
             <!-- Network DM lobby — per-pane, mirrors the .pane-win /
-                 .pane-intermission pattern. Managed by src/renderer/screens/network-lobby.js;
-                 visibility gated on body[data-network-mode="host"][data-game-state="lobby"].
-                 Slot rows + room code are kept in sync across all panes by
-                 the JS; per-pane action prompt (PRESS FIRE TO START vs
-                 WAITING) is driven by CSS based on this pane's data-player
-                 and body[data-network-ready]. -->
+                 .pane-intermission pattern. Managed by
+                 src/renderer/screens/lobby.js (network variant);
+                 visibility gated on
+                 body[data-network-mode="host"][data-game-state="lobby"].
+                 Slot rows + room code are kept in sync across all
+                 panes by the JS; per-pane action prompt (PRESS FIRE
+                 TO START vs WAITING) is driven by CSS based on this
+                 pane's data-player and body[data-network-ready]. -->
             <div class="pane-network-lobby">
                 <div class="network-lobby-inner">
                     <div class="network-lobby-title">Join game</div>

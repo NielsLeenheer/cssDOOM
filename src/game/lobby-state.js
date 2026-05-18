@@ -1,18 +1,22 @@
 /**
  * Lobby state — the per-slot occupant roster + lobby-session metadata
- * that both the Local DM and Network DM lobby screens read from.
+ * that both the Local DM and Network DM lobby screens read from
+ * (via Game.getLobbyPayload).
  *
- * Pure data + accessors; no DOM. Renderer screens import the
- * read-side for their rendering; mutation sites (mode.js,
- * network-host.js, lobby screen handlers) update through the setters
- * here and then trigger `orchestrator.showLobby()` so the next
- * render reflects the change.
+ * Pure data + accessors; no DOM. Mutation sites (mode.js,
+ * network-host.js, master.js's onJoin/onLeave handlers) update
+ * through the setters here and then trigger `orchestrator.showLobby()`
+ * so the next render reflects the change.
  *
- * Functions that ALSO touch the DOM (setNetworkSlotState,
- * setNetworkRoomCode, etc.) still live in src/renderer/screens/
- * — they call into the setters here for the state half and keep
- * their DOM half local.
+ * The match-reset hook below snapshots which slots were already
+ * claimed at the start of the current lobby session into
+ * `carriedOverClaims` so back-to-back rematches don't re-flash READY
+ * on claims the player kept across the reset.
  */
+
+import { state } from './state.js';
+import { onMatch } from './match.js';
+import { isSlotClaimedLocally } from '../input/claim-registry.js';
 
 const MAX_SLOTS = 4;
 
@@ -118,3 +122,21 @@ export function getRoomCode() {
 export function setRoomCodeState(code) {
     roomCode = code;
 }
+
+// ── Match-reset hook ──
+// Snapshots already-claimed slots into carriedOverClaims at the
+// start of every match cycle. Claims made AFTER this fires (i.e.,
+// during the new lobby session) are the "fresh" ones that get the
+// READY overlay flash; carried-over claims don't re-flash.
+//
+// Subscribed at module load. Game.restartMatch / match.js::resetMatch
+// emit 'reset' which triggers this; the next orchestrator.showLobby
+// (fired by master.js's onMatch('reset') subscriber) renders the
+// updated state.
+onMatch('reset', () => {
+    const carried = new Set();
+    for (let i = 0; i < state.players.length; i++) {
+        if (isSlotClaimedLocally(i)) carried.add(i);
+    }
+    carriedOverClaims = carried;
+});

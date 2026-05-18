@@ -38,9 +38,13 @@ import { Player } from './game/player/player.js';
 import { currentMap } from './shared/maps/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
-import { setDefaultSlot } from './input/claim-registry.js';
+import { setDefaultSlot, unclaimSlotsNotIn } from './input/claim-registry.js';
 import { configureAudio } from './audio/audio.js';
-import { resetNetworkLobby, setNetworkSlotState, setLocallyClaimableSlots } from './renderer/screens/network-lobby.js';
+import {
+    resetNetworkSlotState,
+    setNetworkSlotOccupant,
+    setLocallyClaimableSlotsState,
+} from './game/lobby-state.js';
 import { openRoom, closeRoom } from './network-host.js';
 import { orchestrator } from './orchestrator.js';
 
@@ -123,14 +127,24 @@ export function applyMode(gameMode, networkMode = 'standalone') {
         state.players.length = localCount;
         resetMatch();
         setDefaultSlot(isKiosk ? null : 0);
-        resetNetworkLobby();
-        setLocallyClaimableSlots(isKiosk ? [0, 1] : []);
+        // Lobby state setup for a fresh Network DM session. The
+        // claim-registry purge drops any sessionStorage claim bound
+        // to a slot outside the allowed set, so a kiosk-DM session
+        // that claimed gamepad-1 → slot 1 can't leak into a
+        // subsequent non-kiosk Network DM where slot 1 is remote-only.
+        const claimable = isKiosk ? [0, 1] : [];
+        resetNetworkSlotState();
+        setLocallyClaimableSlotsState(claimable);
+        unclaimSlotsNotIn(claimable);
+        if (!isKiosk) setNetworkSlotOccupant(0, 'host');
         // Tell the orchestrator which slot is the FIRST a joining
         // remote may take — without this it defaults to 1, which on
         // kiosk Network DM (locals at 0+1) would steal slot 1 from
         // the second local pane the first time a joiner connects.
         orchestrator.setMinRemoteSlot(localCount);
-        if (!isKiosk) setNetworkSlotState(0, { occupant: 'host' });
+        // Push the new lobby state out to every renderer (master's
+        // local panes + any sinks that are already up).
+        orchestrator.showLobby();
         openRoom();
     } else if (gameMode === 'deathmatch' && networkMode === 'client') {
         // Client window. The remote's actual identity (its slot) is set

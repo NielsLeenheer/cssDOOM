@@ -37,7 +37,6 @@ import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
 import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
 import { setAudioEnabled } from '../audio/audio.js';
-import { setClientSlot } from '../renderer/screens/client-lobby.js';
 import { ensureDisconnectedOverlay } from '../renderer/overlays/disconnected-overlay.js';
 import { applyWorldSnapshot } from '../game/snapshot.js';
 
@@ -128,8 +127,9 @@ export class RemoteGame {
             transport: this._transport, // null for Local DM → BroadcastChannel default
             // Lobby / match-end / game-state UI updates ride the
             // renderer-command pipeline (showLobby, showResults,
-            // setGameState). Impls live in lobby.js, client-lobby.js,
-            // network-lobby.js, scoreboard.js, and game-state.js.
+            // setGameState). Impls live in renderer/screens/lobby.js,
+            // renderer/screens/scoreboard.js, and the setGameState
+            // window-command impl in renderer/commands.js.
             //
             // Coordinated in-place loadMap rides `cmd-world loadMap`
             // through RenderClient — see render-client.js for the
@@ -211,7 +211,6 @@ export class RemoteGame {
             await this.orchestrator.loadMap(payload.level);
         }
         if (payload.gameState) this.orchestrator.setGameState(payload.gameState);
-        setClientSlot(slotIndex);
 
         this._wireUp();
 

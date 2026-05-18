@@ -70,10 +70,17 @@ export function resetMatch({
     orchestrator.hideResults();
     hideTimer();
     orchestrator.setGameState(GAME_STATE.LOBBY);
+    // Clear any transient held-input from the previous match (a fire
+    // key still down from the kill that ended it would otherwise
+    // blow through the lobby into the next match) but keep
+    // device→slot claims so a player on a given monitor keeps their
+    // controller→pane assignment across back-to-back games. The
+    // kiosk loop is players standing side-by-side — we do NOT want
+    // their assignments to shuffle between matches.
+    orchestrator.resetTransientInputs();
     // Notify lobby UI + master broadcast that a new match cycle
-    // started, so the lobby can clear stale claims and master can
-    // re-broadcast LOBBY_STATE. Decoupling via the module-level
-    // emitter keeps match.js free of input/UI/transport imports.
+    // started, so lobby-state can snapshot carried-over claims and
+    // master can re-broadcast showLobby with the fresh payload.
     _emitMatchEvent('reset');
 }
 

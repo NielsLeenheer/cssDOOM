@@ -69,54 +69,9 @@ import {
 } from './renderer-state.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
+import { showLobby, hideLobby } from './screens/lobby.js';
 import { showTimer } from './hud/match-timer.js';
 import { applyGameState } from '../game/game-state.js';
-// Lobby commands (showLobby / hideLobby) currently dispatch through
-// a late-binding registry: their impl is a thin
-// `fireOverlay(name, ...)` wrapper that fans to any handler the
-// screen modules have registered via `registerOverlayImpl`. The
-// registry is needed because three screen modules (lobby +
-// network-lobby + client-lobby) all register on the same command
-// and each gates on state.networkMode / body classes internally.
-//
-// Why the registry exists: the direct-import shape
-// (`commands.js → screens/lobby.js → orchestrator.js → commands.js`)
-// would be a cycle that crashed Firefox via TDZ on the COMMANDS
-// export. The registry lets screen modules push their handlers in at
-// their own module-eval time so commands.js never has to import them.
-//
-// Side-effect anchor for the still-registered screens lives at
-// src/renderer/overlays/overlays.js — without it a module whose
-// named exports are unused elsewhere can fall out of the bundle
-// entirely and silently un-register its impls.
-//
-// Migration in progress: now that screens live under
-// `src/renderer/screens/` and don't transitively import the
-// orchestrator, commands.js can import each screen's impl directly
-// and the registry indirection drops away one command at a time.
-// intermission, scoreboard, match timer, and setGameState are
-// already direct-import (see imports below). LOBBY_REFACTOR_PLAN
-// covers the lobby family — the last registry holdout.
-
-const overlayImpls = new Map();
-
-/**
- * Register a render-only handler for an overlay command. Called by
- * ui/* modules at their own module-eval time. Multiple registrations
- * for the same command name accumulate — every registered handler
- * fires when the command is invoked.
- */
-export function registerOverlayImpl(name, fn) {
-    if (!overlayImpls.has(name)) overlayImpls.set(name, []);
-    overlayImpls.get(name).push(fn);
-}
-
-/** Internal dispatcher used by the overlay command impls below. */
-function fireOverlay(name, ...args) {
-    const fns = overlayImpls.get(name);
-    if (!fns) return;
-    for (const fn of fns) fn(...args);
-}
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -263,28 +218,20 @@ export const COMMANDS = {
 
     // ── World: lobby / intermission / results overlays ───────────────────
     // Stateful overlays — the show* variants are signals; the
-    // orchestrator pulls the actual payload from Game (the registered
-    // payload provider) at dispatch time via its show* overrides (see
-    // orchestrator.js OVERLAY_PULLERS). Callers (match.js::endMatch,
-    // Game.{start, beginPlay, restartMatch, _onLevelComplete},
-    // master.js's onJoin/onLeave/onClaimChange/onMatch.reset) just
-    // signal — they don't carry data. World-kind so master fans the
-    // same command to every client's RenderClient and the visual
-    // stays in sync across master + remote panes without a
-    // side-channel envelope. Each impl calls into multiple UI
-    // modules; each module gates internally on state.networkMode /
-    // body classes so only the right one paints.
-    //
-    // World-command impls are invoked by DomRenderer as
-    // `impl(this, ...args)` — renderer first, then the orchestrator
-    // caller's args. The overlay impls don't use the renderer (they
-    // route through the registry which targets DOM globally), so the
-    // first slot is named `_renderer` and ignored. Without this
-    // convention the renderer was captured as `payload` and
-    // showResults crashed in scoreboard.js with a DomRenderer object
-    // where it expected `{scores, kills, winnerIndex, mapName}`.
-    showLobby:        { kind: 'world', impl: (_renderer, payload) => fireOverlay('showLobby', payload) },
-    hideLobby:        { kind: 'world', impl: (_renderer) => fireOverlay('hideLobby') },
+    // orchestrator pulls the actual payload from Game (the
+    // registered payload provider) at dispatch time via its show*
+    // overrides (see orchestrator.js OVERLAY_PULLERS). Callers
+    // (match.js::endMatch, Game.{start, beginPlay, restartMatch,
+    // _onLevelComplete}, master.js's
+    // onJoin/onLeave/onClaimChange/onMatch.reset) just signal — they
+    // don't carry data. World-kind so master fans the same command
+    // to every client's RenderClient and the visual stays in sync
+    // across master + remote panes without a side-channel envelope.
+    // Each impl is per-pane in practice: it reads `renderer.paneEl`
+    // and `renderer.playerIndex` to write into THIS pane only;
+    // multiple targets means the impl fires once per pane.
+    showLobby:        { kind: 'world', impl: showLobby },
+    hideLobby:        { kind: 'world', impl: hideLobby },
     showIntermission: { kind: 'world', impl: renderIntermission },
     hideIntermission: { kind: 'world', impl: clearIntermission },
     showResults:      { kind: 'world', impl: renderResults },

@@ -661,14 +661,12 @@ export class Game {
         return { nextMap: this._pendingNextMap ?? null };
     }
 
-    /** Unified lobby payload consumed by every lobby renderer
-     *  ([renderer/screens/lobby.js], [renderer/screens/network-lobby.js], [renderer/screens/client-lobby.js]).
-     *  One canonical shape; each consumer reads the fields it cares
-     *  about. The Stage-A additive expansion (variant, roomCode,
-     *  locallyClaimableSlots, promptingSlot, canStart) lets the
-     *  existing impls migrate off claim-registry / state.players /
-     *  isMatchLobby re-derivation onto pure payload reads — see
-     *  LOBBY_REFACTOR_PLAN. */
+    /** Unified lobby payload consumed by the lobby screen
+     *  ([renderer/screens/lobby.js]). One canonical shape covering
+     *  both variants; the screen branches internally on
+     *  payload.variant ('local' | 'network'). Every field used by
+     *  rendering is included here so the screen reads only the
+     *  payload — no game-side globals. */
     getLobbyPayload() {
         const slotsClaimed = state.players.map((_, i) => isSlotClaimedLocally(i));
         const carried = getCarriedOverClaims();

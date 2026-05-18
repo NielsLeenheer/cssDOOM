@@ -118,9 +118,9 @@ export function unclaim(deviceId) {
 }
 
 /**
- * Release every claim whose slot is NOT in the allowed set. Used by
- * mode switches (network-lobby.js::setLocallyClaimableSlots) to drop
- * stale sessionStorage-persisted bindings when entering a mode where
+ * Release every claim whose slot is NOT in the allowed set. Used
+ * by mode switches (mode.js::applyMode) to drop stale
+ * sessionStorage-persisted bindings when entering a mode where
  * those slots are no longer locally claimable.
  *
  * Example: a kiosk DM session binds kbm-A → slot 0 and gamepad-1 →

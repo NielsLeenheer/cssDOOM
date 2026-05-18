@@ -46,20 +46,13 @@ import { onClaimChange } from './input/claim-registry.js';
 import { BroadcastChannelTransport } from './transport/transport.js';
 import { BROADCAST_CHANNEL_NAME } from './transport/protocol.js';
 import { initMasterConnection } from './network-host.js';
-import { setNetworkSlotState } from './renderer/screens/network-lobby.js';
+import { setNetworkSlotOccupant } from './game/lobby-state.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
-import { initLobby } from './renderer/screens/lobby.js';
 import { onMatch, ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { getGameState, GAME_STATE } from './game/game-state.js';
 
-// Side-effect anchor for renderer-command overlay impls. See
-// src/renderer/overlays/overlays.js — without this import, modules whose only public
-// surface is `registerOverlayImpl(...)` (today: scoreboard.js) can fall
-// out of the bundle when their named imports get cleaned up elsewhere,
-// silently breaking the corresponding renderer command.
-import './renderer/overlays/overlays.js';
 
 // ── Debug toggle ───────────────────────────────────────────────────────
 
@@ -240,7 +233,7 @@ function setupMasterBroadcast() {
             // in network mode and this is an actual remote (not the
             // Local DM 'local' BroadcastChannel peer).
             if (state.networkMode === 'host' && peerKey !== 'local') {
-                setNetworkSlotState(slot, { occupant: 'remote' });
+                setNetworkSlotOccupant(slot, 'remote');
             }
             // Send current lobby state right away so the freshly-
             // connected client's pane shows the correct prompt
@@ -353,7 +346,7 @@ function setupMasterBroadcast() {
                     player.isDead = true;
                     if (player.thingRef) player.thingRef.collected = true;
                 }
-                setNetworkSlotState(slot, { occupant: 'empty' });
+                setNetworkSlotOccupant(slot, 'empty');
                 // Re-broadcast so any still-connected joiners drop
                 // the departed peer's row to "WAITING FOR PLAYER".
                 orchestrator.showLobby();
@@ -424,9 +417,8 @@ export async function initMaster({ isKiosk = false } = {}) {
     //
     // Local DM has no "externally claimed" slots: a connected Local DM secondary
     // is display-only and doesn't claim slot 1 — master's local kbm-B /
-    // gamepad must do that explicitly. Network DM will swap in a getter
-    // returning remote-occupied slots.
-    initLobby({ getExternallyClaimedSlots: () => new Set() });
+    // gamepad must do that explicitly. (The carried-over-claims
+    // snapshot fires on every match-reset; see lobby-state.js.)
 
     // Pre-seed an App with a Game so `window.app.game` is inspectable
     // from the dev console before App.start runs. App.start will tear
