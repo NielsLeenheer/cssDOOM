@@ -474,22 +474,14 @@ class Orchestrator {
 // call. In Network DM, a RenderSink at the player's slot forwards to the
 // wire.
 //
-// Mirror callbacks (declared on COMMANDS entries in renderer/commands.js)
-// fire BEFORE fan-out, in the orchestrator — one site, both windows.
-// Master: invoked when game code calls `renderer.updateCamera(player, slot)`,
-// the mirror writes the stripped fields into rendererState before the
-// local DomRenderer's CSS update + the wire forward to any RenderSinks.
-// Joiner: RenderClient delegates inbound envelopes through its local
-// orchestrator, which runs the same mirror at the same site.
-//
-// The same `serialize` that RenderSink uses to strip args for the wire
-// also normalizes the args before mirror invocation. Today's mirrors
-// expect the stripped shape (`(pane, transform)`, not `(pane,
-// livePlayer)`); running serialize at the orchestrator's mirror site
-// keeps the mirror contract uniform regardless of who fired the command.
-// Mirror fires exactly once per dispatch — independent of how many
-// local targets the command fans to (mirror SP has two DomRenderers
-// sharing playerIndex 0; the mirror still runs once).
+// Mirror callback (declared on a COMMANDS entry in
+// renderer/commands.js) fires BEFORE fan-out, once per dispatch — same
+// site on master and joiner. Today only `updateCamera` registers a
+// mirror; its mirror keeps the audio module's per-listener camera
+// state in sync (AudioRenderer isn't yet an orchestrator target — see
+// ARCHITECTURE_DEBT.md issue 8). The same `serialize` that RenderSink
+// uses to strip args for the wire also normalizes args before mirror
+// invocation so the mirror sees the wire-format shape.
 for (const name of Object.keys(PER_PANE_COMMANDS)) {
     const { mirror, serialize } = PER_PANE_COMMANDS[name];
     Orchestrator.prototype[name] = function (playerIndex, ...args) {

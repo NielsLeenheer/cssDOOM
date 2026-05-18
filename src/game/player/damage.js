@@ -237,8 +237,8 @@ function clearSceneState() {
         // as a different sprite moving around with the player).
         player.thingRef = null;
     }
-    // Clear in place so the rendererState alias (master:
-    // rendererState.things === state.things) stays valid across map loads.
+    // Clear in place to preserve the array identity for any external
+    // references held across map loads.
     state.things.length = 0;
     for (let index = 0; index < state.projectiles.length; index++) renderer.removeProjectile(state.projectiles[index].id);
     state.projectiles = [];

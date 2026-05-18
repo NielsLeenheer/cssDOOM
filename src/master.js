@@ -7,8 +7,6 @@
  *
  * `initMaster()` wires:
  *
- *   - Game state binding: aliases rendererState to live game state so
- *     master-side reads see authoritative values with no copy step.
  *   - Action handlers: bus subscribers in `src/actions/*` that dispatch
  *     fire/use/weapon/menu events into game functions.
  *   - Input modules: keyboard+mouse, touch, gamepad, and the remote

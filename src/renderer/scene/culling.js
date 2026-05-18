@@ -389,7 +389,7 @@ export function updateCulling(renderer, worldThings, spectatorActive, collectSta
         }
 
         // For things tied to live mirrored entries (enemies, players), use
-        // the current position from rendererState.things — t.x/t.y are
+        // the current position from renderer.state.things — t.x/t.y are
         // spawn-time values and would let a fast-moving DM player drift
         // outside their opponent's culling frustum even when standing in
         // plain view.

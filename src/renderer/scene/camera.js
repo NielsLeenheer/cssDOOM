@@ -41,9 +41,9 @@
  * camera transform each frame.
  */
 export function updateCamera(renderer, player) {
-    // Per-renderer world-view state (the singleton `rendererState.cameras`
-    // mirror still fires too during the step-1 transition; this is the
-    // new authoritative read source for the DomRenderer side).
+    // Per-renderer world-view state — the culler / scene warmup read
+    // from here. AudioRenderer maintains its own state.camera in
+    // parallel (driven by the orchestrator's updateCamera mirror).
     const cam = renderer.state.camera;
     cam.x = player.x;
     cam.y = player.y;

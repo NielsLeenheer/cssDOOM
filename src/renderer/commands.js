@@ -37,17 +37,18 @@
  *                 NOT bound onto DomRenderer or RenderSink prototypes;
  *                 the orchestrator dispatches it directly.
  *
- * Optional `mirror` callback — runs on the receive side (RenderClient)
- * before dispatching to the local DomRenderer/Orchestrator. Keeps the
- * client's `rendererState` (camera positions, thing positions,
- * collected flags) in sync with the master so the client's culling
- * loop reads fresh values. Signature mirrors the wire-format args:
+ * Optional `mirror` callback — runs in the orchestrator's dispatch
+ * loop before fanning to targets. Today only `updateCamera`
+ * registers one; its mirror keeps the audio module's per-listener
+ * camera state in sync (AudioRenderer isn't yet an orchestrator
+ * target — see ARCHITECTURE_DEBT.md issue 8). Signature mirrors
+ * the wire-format args (post-serialize):
  *
  *   per-pane: mirror(paneIndex, ...serializedArgs)
  *   world:    mirror(...serializedArgs)
  *
- * Commands without renderer-state side-effects (most of them) omit
- * `mirror` entirely.
+ * Commands without a mirror (most of them) omit the field; the
+ * dispatch loop just skips the mirror invocation in that case.
  */
 
 import * as sprites from './scene/entities/sprites.js';
@@ -62,11 +63,7 @@ import * as weapons from './hud/weapons.js';
 import { updateHud } from './hud/hud.js';
 import { updateCamera } from './scene/camera.js';
 import * as playerVisuals from './scene/entities/player.js';
-import {
-    applyCameraUpdate,
-    applyThingPositionUpdate,
-    applyThingCollected,
-} from './renderer-state.js';
+import { updateListenerCameras } from '../audio/audio.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showLobby, hideLobby } from './screens/lobby.js';
@@ -113,11 +110,15 @@ const stripEnemyRotation = (thingIndex, enemy, viewers) => [
 
 export const COMMANDS = {
     // ── Per-player: camera & HUD ──────────────────────────────────────────
+    // updateCamera's mirror keeps every AudioRenderer at the matching
+    // slot in sync. AudioRenderer isn't yet an orchestrator target
+    // (see ARCHITECTURE_DEBT.md issue 8); until it is, this mirror is
+    // the bridge from the per-pane dispatch to the audio side.
     updateCamera: {
         kind: 'per-pane',
         impl: updateCamera,
         serialize: stripCameraTransform,
-        mirror: (pane, transform) => applyCameraUpdate(pane, transform),
+        mirror: updateListenerCameras,
     },
     updateHud: { kind: 'per-pane', impl: updateHud, serialize: stripHudData },
 
@@ -152,36 +153,20 @@ export const COMMANDS = {
     // Orchestrator.prototype.loadMap has a custom override in
     // orchestrator.js that returns Promise.all of per-target results so
     // callers can await every local renderer's build. No serialize (name
-    // is wire-safe). No mirror (loadMap rebuilds the scene from scratch
-    // — there's no rendererState field to update).
+    // is wire-safe). No mirror needed — loadMap rebuilds the scene from
+    // scratch on each renderer; subsequent updateCamera /
+    // updateThingPosition dispatches populate per-renderer state.
     loadMap: { kind: 'world', impl: scene.loadMap },
 
     // ── World: enemies / things / projectiles / effects ───────────────────
     setEnemyState: { kind: 'world', impl: sprites.setEnemyState },
     resetEnemy: { kind: 'world', impl: sprites.resetEnemy },
-    killEnemy: {
-        kind: 'world',
-        impl: sprites.killEnemy,
-        mirror: (thingIndex) => applyThingCollected(thingIndex, true),
-    },
+    killEnemy: { kind: 'world', impl: sprites.killEnemy },
     updateEnemyRotation: { kind: 'world', impl: sprites.updateEnemyRotation, serialize: stripEnemyRotation },
-    updateThingPosition: {
-        kind: 'world',
-        impl: sprites.updateThingPosition,
-        mirror: (thingIndex, x, y, floorHeight) =>
-            applyThingPositionUpdate(thingIndex, x, y, floorHeight),
-    },
+    updateThingPosition: { kind: 'world', impl: sprites.updateThingPosition },
     reparentThingToSector: { kind: 'world', impl: sprites.reparentThingToSector },
-    collectItem: {
-        kind: 'world',
-        impl: sprites.collectItem,
-        mirror: (thingIndex) => applyThingCollected(thingIndex, true),
-    },
-    uncollectItem: {
-        kind: 'world',
-        impl: sprites.uncollectItem,
-        mirror: (thingIndex) => applyThingCollected(thingIndex, false),
-    },
+    collectItem: { kind: 'world', impl: sprites.collectItem },
+    uncollectItem: { kind: 'world', impl: sprites.uncollectItem },
     setThingMoving: { kind: 'world', impl: sprites.setThingMoving },
     createPuff: { kind: 'world', impl: sprites.createPuff },
     createExplosion: { kind: 'world', impl: sprites.createExplosion },
@@ -189,21 +174,12 @@ export const COMMANDS = {
     createProjectile: { kind: 'world', impl: sprites.createProjectile },
     removeProjectile: { kind: 'world', impl: sprites.removeProjectile },
     // Establishing a player thing in the world also creates its
-    // rendererState entry — same semantics as updateThingPosition,
-    // only at create-time. Without this mirror the culler's first
-    // read (between addPlayerThings and the first per-frame
-    // movement-update) sees `rendererState.things[i] === undefined`
-    // and falls back to the thingContainer's spawn x/y. Correct
-    // today, but reliance on the fallback path was a "works because
-    // of lazy allocation" subtlety; the mirror makes the contract
-    // explicit. `_playerIndex` and `_sectorIndex` are ignored here
-    // — neither is rendererState territory.
-    createPlayerSprite: {
-        kind: 'world',
-        impl: sprites.createPlayerSprite,
-        mirror: (thingIndex, _playerIndex, x, y, floorHeight) =>
-            applyThingPositionUpdate(thingIndex, x, y, floorHeight),
-    },
+    // per-renderer state entry — the impl populates
+    // renderer.state.things[thingIndex] alongside the DOM creation
+    // so the culler's first read (between addPlayerThings and the
+    // first per-frame movement-update) sees a real position rather
+    // than an undefined entry.
+    createPlayerSprite: { kind: 'world', impl: sprites.createPlayerSprite },
     createCorpse: { kind: 'world', impl: sprites.createCorpse },
     playPlayerAttack: { kind: 'world', impl: sprites.playPlayerAttack },
 

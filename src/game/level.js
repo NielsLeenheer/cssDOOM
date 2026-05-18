@@ -137,17 +137,19 @@ export class Level {
         initLiftsState();
         initCrushersState();
 
-        // Prime rendererState.cameras BEFORE scene.loadMap's per-renderer
-        // warmup reads it. applyPlayerStart just wrote each player's
-        // new x/y/z/angle into state.players; this updateCamera dispatch
-        // runs the mirror (which copies the stripped camera fields into
-        // rendererState.cameras) and fans to every render target. The
-        // fan-out also forwards over each RenderSink to its joiner, so
-        // the joiner's scene.loadMap warmup primes against fresh data
-        // instead of whatever was left in its rendererState from the
-        // previous map. The renderer (master + joiner alike) reads from
-        // rendererState — never from state.players directly — so this
-        // priming step is what makes the warmup land correct values.
+        // Prime each renderer's own state.camera BEFORE scene.loadMap's
+        // per-renderer warmup reads it. applyPlayerStart just wrote
+        // each player's new x/y/z/angle into state.players; this
+        // updateCamera dispatch fans to every render target so each
+        // local DomRenderer's impl writes its state.camera (and the
+        // audio module's mirror keeps each AudioRenderer's listener
+        // current). The fan-out also forwards over each RenderSink to
+        // its joiner, so the joiner's scene.loadMap warmup primes
+        // against fresh data instead of whatever was left in its
+        // per-renderer state from the previous map. Renderers read
+        // their own state.camera — never state.players directly — so
+        // this priming step is what makes the warmup land correct
+        // values.
         for (const player of state.players) {
             renderer.updateCamera(player, player.viewportIndex);
         }

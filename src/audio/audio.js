@@ -27,8 +27,6 @@
  * handle this at module load.
  */
 
-import { rendererState } from '../renderer/renderer-state.js';
-
 // ── Web Audio context + unlock ─────────────────────────────────────────
 
 let ctx = null;
@@ -112,18 +110,38 @@ function bearingToPan(dx, dy, listenerAngle) {
 class AudioRenderer {
     /**
      * @param {object} cfg
-     * @param {number} cfg.slot        rendererState.cameras index this listener reads from
+     * @param {number} cfg.slot        listener slot. Per-pane updateCamera
+     *                                 commands at this slot index keep
+     *                                 `this.state.camera` current.
      * @param {'left'|'right'|null} cfg.paneSide  if set, pan locks to this side;
      *                                            null = bearing-based.
      */
     constructor({ slot, paneSide }) {
         this.slot = slot;
         this.paneSide = paneSide;
+        // Per-listener world view. Only x/y/angle are read in play();
+        // kept narrow rather than mirroring DomRenderer's full 6
+        // fields. updateCamera() below writes these from incoming
+        // command dispatches.
+        this.state = { camera: { x: 0, y: 0, angle: 0 } };
+    }
+
+    /** Receive an updateCamera dispatch addressed to this slot. Wired
+     *  from the orchestrator's updateCamera mirror via
+     *  `updateListenerCameras` below — the mirror walks the renderers
+     *  collection and calls this on every AudioRenderer at the matching
+     *  slot. Same `transform` payload as DomRenderer's updateCamera
+     *  receives (the stripped player object). */
+    updateCamera(transform) {
+        if (!transform) return;
+        const cam = this.state.camera;
+        cam.x = transform.x;
+        cam.y = transform.y;
+        cam.angle = transform.angle;
     }
 
     play(name, x, y) {
-        const listener = rendererState.cameras[this.slot];
-        if (!listener) return;
+        const listener = this.state.camera;
         const dx = x - listener.x;
         const dy = y - listener.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -176,6 +194,25 @@ function playBuffer(name, volume, pan) {
 export function configureAudio(slotCount) {
     lastSlotCount = slotCount;
     rebuildRenderers();
+}
+
+/**
+ * Fan an incoming updateCamera dispatch to every AudioRenderer at
+ * the given slot. Wired as the `mirror` callback on the updateCamera
+ * COMMANDS entry (see src/renderer/commands.js) — the orchestrator's
+ * per-pane dispatch fires it once per dispatch, before fanning the
+ * DOM-side impl to render targets. This is what keeps each
+ * listener's `state.camera` current without AudioRenderer having
+ * to be a proper orchestrator target.
+ *
+ * Transitional shape — the cleaner long-term move is making
+ * AudioRenderer an orchestrator target with its own dispatch entry.
+ * See ARCHITECTURE_DEBT.md issue 8.
+ */
+export function updateListenerCameras(slot, transform) {
+    for (const r of renderers) {
+        if (r.slot === slot) r.updateCamera(transform);
+    }
 }
 
 function rebuildRenderers() {

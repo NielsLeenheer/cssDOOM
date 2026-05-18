@@ -7,12 +7,13 @@
  * per-pane prototype method (matched by playerIndex to the local
  * DomRenderer), world commands via the world prototype method.
  *
- * Mirror invocation (writes to `rendererState.cameras[i]` /
- * `rendererState.things[i]`) happens inside the orchestrator's
- * dispatch — same code path master and joiner share, so the mirror
- * declarations in [../renderer/commands.js](../renderer/commands.js)
- * are the single source of truth for "what runs when a command
- * dispatches." RenderClient never imports the COMMANDS registry.
+ * Mirror invocation (updateCamera's mirror keeps the audio module's
+ * per-listener camera state current) happens inside the
+ * orchestrator's dispatch — same code path master and joiner share,
+ * so the mirror declarations in
+ * [../renderer/commands.js](../renderer/commands.js) are the single
+ * source of truth for "what runs when a command dispatches."
+ * RenderClient never imports the COMMANDS registry.
  *
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, heartbeat, disconnect) is layered on top of
@@ -64,9 +65,9 @@ export class RenderClient {
 
     _dispatchPaneCommand({ target, method, args }) {
         // Delegate through the orchestrator so its per-pane prototype
-        // binding runs the mirror (writes rendererState) AND fans to
-        // the local DomRenderer in one place — same mechanism master
-        // uses when its own game code calls renderer.* commands.
+        // binding runs any registered mirror AND fans to the local
+        // DomRenderer in one place — same mechanism master uses when
+        // its own game code calls renderer.* commands.
         const fn = this.orchestrator[method];
         if (typeof fn === 'function') {
             fn.call(this.orchestrator, target, ...args);

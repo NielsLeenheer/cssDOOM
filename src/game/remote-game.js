@@ -158,10 +158,11 @@ export class RemoteGame {
             // corpses re-appear at their original death points, and
             // every other player's billboard gets created. We pass
             // the joiner's own Orchestrator as the target so the
-            // renderer commands fan to the local DomRenderer AND fire
-            // the mirrors that populate rendererState (different from
-            // master's local-pane-rebuild path, which passes the
-            // specific renderer for direct dispatch — see master.js).
+            // renderer commands fan to the local DomRenderer — its
+            // impls populate the renderer's own state and DOM
+            // (different from master's local-pane-rebuild path,
+            // which passes the specific renderer for direct dispatch
+            // — see master.js).
             onSnapshot: (snapshot) => applyWorldSnapshot(this.orchestrator, snapshot),
         });
 

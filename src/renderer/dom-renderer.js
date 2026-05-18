@@ -85,11 +85,6 @@ export class DomRenderer {
         // collectItem, etc.) as they receive dispatches. Read by the
         // culler and the scene warmup. Independent per renderer —
         // sibling renderers in the same window each have their own.
-        // The legacy module-level `rendererState` singleton in
-        // `renderer-state.js` still lives in parallel during the
-        // step-1 transition (see docs/RENDERER_STATE_REFACTOR.md);
-        // it stays around until AudioRenderer becomes a proper
-        // orchestrator target (issue 8) and stops needing it.
         this.state = makeRendererState();
 
         // Remembered for `reload()` — set inside scene.loadMap on

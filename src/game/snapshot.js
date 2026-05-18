@@ -147,8 +147,8 @@ function snapshotCorpses() {
  * Apply a world snapshot to a render `target` — either a specific
  * DomRenderer (direct dispatch: fires only on that renderer, no
  * orchestrator fan-out) or an Orchestrator (fans to every local
- * target on that window, runs mirrors so rendererState gets
- * populated).
+ * target on that window — each impl populates that renderer's own
+ * state + DOM).
  *
  * Two callers:
  *
@@ -159,9 +159,9 @@ function snapshotCorpses() {
  *     createCorpse on them would create duplicates).
  *
  *   - Joiner side (RemoteGame's onSnapshot → applies via the
- *     joiner's Orchestrator; mirrors fire to populate
- *     rendererState; fan-out reaches the joiner's single local
- *     DomRenderer).
+ *     joiner's Orchestrator; fan-out reaches the joiner's single
+ *     local DomRenderer, whose impls populate its per-renderer
+ *     state and DOM).
  *
  * Animations are CSS-suppressed during the apply via the
  * `snapshot-applying` class on the affected pane(s) (see
