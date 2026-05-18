@@ -38,12 +38,56 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 }
 
 .network-lobby-inner {
+    /* Two-column layout on the host: main content (75%) + invite
+       aside (25%). On joiners the aside is display:none and the
+       main column expands to full width via flex-grow. On narrow
+       viewports both columns stack vertically (media query below). */
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 24px;
+    padding: 32px;
+    width: 100%;
+    max-width: 960px;
+    box-sizing: border-box;
+}
+
+.network-lobby-main {
+    flex: 3 1 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 24px;
-    padding: 32px;
-    min-width: 360px;
+    min-width: 0;
+}
+
+.network-lobby-aside {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    /* Translucent panel so the WIMAP0 backdrop shows through behind
+       the invite — gives the QR a contained context without making
+       it feel like a foreign element. */
+    background: rgba(0, 0, 0, 0.6);
+    min-width: 0;
+}
+
+/* The invite section is meaningful only to the host who's sharing
+   the code; joiners already entered it to connect. Hide the entire
+   aside column on joiners — the main column's flex-grow makes it
+   fill the remaining space. */
+body.network-client .network-lobby-aside { display: none; }
+
+/* Narrow viewports (phone joining as host, or a tight host window):
+   stack columns vertically with main on top, aside below. */
+@media (max-width: 720px) {
+    .network-lobby-inner {
+        flex-direction: column;
+    }
 }
 
 .network-lobby-title {
@@ -79,7 +123,7 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    width: 100%;
+    min-width: 360px;
 }
 
 .network-slot {
@@ -102,8 +146,8 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 
 .network-slot-swatch {
     position: relative;
-    width: calc(48px * var(--screen-scale, 1));
-    height: calc(48px * var(--screen-scale, 1));
+    width: 48px;
+    height: 48px;
     background: no-repeat center / cover;
     border: 1px solid rgba(0, 0, 0, 0.4);
     image-rendering: pixelated;
@@ -135,8 +179,9 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 
 .network-invite-row {
     display: flex;
-    align-items: baseline;
-    gap: 12px;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
 }
 
 .network-invite-label {
@@ -155,7 +200,6 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 .network-invite-qr {
     width: 160px;
     height: 160px;
-    background: #fff;
     padding: 8px;
     box-sizing: content-box;
 
@@ -170,11 +214,6 @@ body.network-client[data-game-state="lobby"] .pane-network-lobby {
 
 .network-invite-qr:empty { display: none; }
 
-/* The invite (room code + QR) is meaningful only to the host who's
-   sharing the code. Joiners already entered the code to get here;
-   hide the whole invite section on their windows. */
-body.network-client .network-invite { display: none; }
-
 /* Per-pane action prompt ---------------------------------------------
    Hidden by default. body[data-network-ready="true"] (set by the JS
    when ≥ 2 slots are occupied) flips it on. The text differs per
@@ -183,7 +222,10 @@ body.network-client .network-invite { display: none; }
 
 .network-action-prompt {
     font-size: 16px;
-    color: #dc0000;
+    /* COLR palette baked into STCFN — same white variant the HUD
+       and menu headings use. `color` is just the non-COLR fallback. */
+    font-palette: --stcfn-white;
+    color: #ccc;
     text-transform: uppercase;
     letter-spacing: 2px;
     min-height: 1.2em;
@@ -195,5 +237,4 @@ body[data-network-ready="true"] .pane[data-player="0"] .network-action-prompt::a
 }
 body[data-network-ready="true"] .pane:not([data-player="0"]) .network-action-prompt::after {
     content: 'Waiting for game to start';
-    color: #ccc;
 }

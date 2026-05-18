@@ -136,5 +136,14 @@ function renderQrSvg(code) {
     const qr = qrcode(0, 'M'); // typeNumber=0 (auto), error level M
     qr.addData(url);
     qr.make();
-    return qr.createSvgTag({ scalable: true, margin: 1 });
+    // Default output is black cells on a white background rect.
+    // Swap to white cells on a transparent background so the
+    // translucent aside backdrop shows through the QR's negative
+    // space — fits the DOOM aesthetic better than a stark white
+    // card. Modern phone scanners (iOS/Android camera) read inverted
+    // QR codes natively. Single occurrence of each fill in the
+    // library's output, so plain .replace is enough.
+    return qr.createSvgTag({ scalable: true, margin: 1 })
+        .replace('fill="white"', 'fill="transparent"')
+        .replace('fill="black"', 'fill="white"');
 }
