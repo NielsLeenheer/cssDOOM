@@ -57,11 +57,12 @@ import {
     applyThingCollected,
 } from './renderer-state.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
-// Overlay-style commands (showLobby / hideLobby / showResults /
-// hideResults / setMatchTimer / setGameState) currently dispatch
-// through a late-binding registry: their impl is a thin
-// `fireOverlay(name, ...)` wrapper that fans to any handler the
-// screen modules have registered via `registerOverlayImpl`.
+import { renderResults, clearResults } from './screens/scoreboard.js';
+// Overlay-style commands (showLobby / hideLobby / setMatchTimer /
+// setGameState) currently dispatch through a late-binding registry:
+// their impl is a thin `fireOverlay(name, ...)` wrapper that fans to
+// any handler the screen modules have registered via
+// `registerOverlayImpl`.
 //
 // Why the registry exists: the direct-import shape
 // (`commands.js → screens/lobby.js → orchestrator.js → commands.js`)
@@ -78,9 +79,9 @@ import { renderIntermission, clearIntermission } from './screens/intermission.js
 // `src/renderer/screens/` and don't transitively import the
 // orchestrator, commands.js can import each screen's impl directly
 // and the registry indirection drops away one command at a time.
-// intermission was first (see import below). LOBBY_REFACTOR_PLAN
-// covers the lobby family; scoreboard / setMatchTimer / setGameState
-// follow the same shape.
+// intermission and scoreboard are already direct-import (see imports
+// below). LOBBY_REFACTOR_PLAN covers the lobby family;
+// setMatchTimer / setGameState follow the same shape.
 
 const overlayImpls = new Map();
 
@@ -271,8 +272,8 @@ export const COMMANDS = {
     hideLobby:        { kind: 'world', impl: (_renderer) => fireOverlay('hideLobby') },
     showIntermission: { kind: 'world', impl: renderIntermission },
     hideIntermission: { kind: 'world', impl: clearIntermission },
-    showResults:      { kind: 'world', impl: (_renderer, payload) => fireOverlay('showResults', payload) },
-    hideResults:      { kind: 'world', impl: (_renderer) => fireOverlay('hideResults') },
+    showResults:      { kind: 'world', impl: renderResults },
+    hideResults:      { kind: 'world', impl: clearResults },
     setMatchTimer:    { kind: 'world', impl: (_renderer, text) => fireOverlay('setMatchTimer', text) },
 
     // game-state transitions. Master's game-state.js calls

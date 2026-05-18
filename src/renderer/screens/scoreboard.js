@@ -30,8 +30,6 @@
  * with a negative total — that's intentional, not a bug.
  */
 
-import { registerOverlayImpl } from '../commands.js';
-
 const CELL_WIDTH = 2;
 const TOTAL_WIDTH = 2;
 
@@ -44,46 +42,37 @@ const TOTAL_WIDTH = 2;
  */
 const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 
+// ── Renderer-command entry points ──────────────────────────────────────
+// Game pushes showResults / hideResults through the orchestrator (see
+// src/renderer/commands.js, which imports the two impls below
+// directly). The impls fan to master's own DomRenderer and to every
+// connected client's RenderSink, carrying the full scoreboard payload
+// over the wire.
+//
+// DOM is fully rebuilt each call via replaceChildren — idempotent
+// against repeated invocations.
+
 /**
- * Render the scoreboard into every `.pane-win` element in the DOM.
+ * @param {*} _renderer  Ignored — the impl rebuilds every `.pane-win`
+ *                       globally rather than addressing one renderer.
  * @param {{
  *   mapName: string,
  *   scores: number[],
  *   kills: number[][],
  *   winnerIndex: number,
- * }} data
+ * }} payload
  */
-export function showScoreboard(data) {
+export function renderResults(_renderer, payload) {
     for (const container of document.querySelectorAll('.pane-win')) {
-        container.replaceChildren(buildScoreboardNode(data));
+        container.replaceChildren(buildScoreboardNode(payload));
     }
 }
 
-/** Clear the scoreboard out of every overlay. */
-export function hideScoreboard() {
+export function clearResults(_renderer) {
     for (const container of document.querySelectorAll('.pane-win')) {
         container.replaceChildren();
     }
 }
-
-// ── Renderer-command entry points ──────────────────────────────────────
-// Game pushes showResults / hideResults through the orchestrator (see
-// src/renderer/commands.js). The impls fan to master's own DomRenderer
-// (which calls showScoreboard locally) and to every connected client's
-// RenderSink, carrying the full scoreboard payload over the wire.
-
-/** Renderer-command impl for showResults. DOM is fully rebuilt each
- *  call via replaceChildren — idempotent against repeated invocations. */
-function renderResults(payload) {
-    showScoreboard(payload);
-}
-
-function clearResults() {
-    hideScoreboard();
-}
-
-registerOverlayImpl('showResults', renderResults);
-registerOverlayImpl('hideResults', clearResults);
 
 function buildScoreboardNode({ scores, kills, winnerIndex }) {
     const root = document.createElement('div');
