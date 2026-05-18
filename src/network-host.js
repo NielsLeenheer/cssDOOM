@@ -26,11 +26,15 @@ import { setRoomCodeState } from './game/lobby-state.js';
 import { orchestrator } from './orchestrator.js';
 import { MasterConnection } from './transport/peer-connection.js';
 
-// 32-char alphabet without visually-ambiguous glyphs (no 0/O, 1/I/L,
-// B/8 swap-prone shapes), 4 chars per code — that's ~1M unique codes,
-// plenty for the kiosk + occasional collision retry. Matches the
-// Worker's `^[A-Z0-9]{4,8}$` regex (the alphabet is a strict subset).
-const ROOM_CODE_CHARS = 'ACDEFGHJKMNPQRTUVWXYZ234679';
+// 25-char alphabet without visually-ambiguous glyphs:
+//   0/O, 1/I/L, 5/S, 8/B  — round / vertical-stroke confusion
+//   2/Z                    — angular pair, easy to mis-type from a QR
+//   V/U, V/Y               — drop V so both confusions go away,
+//                             keeping the more common U and Y.
+// 4 chars per code = 25⁴ = ~390k unique codes — plenty for the
+// kiosk + occasional collision retry. Matches the Worker's
+// `^[A-Z0-9]{4,8}$` regex (this alphabet is a strict subset).
+const ROOM_CODE_CHARS = 'ACDEFGHJKMNPQRTUWXY234679';
 const ROOM_CODE_LEN = 4;
 
 let masterConnection = null;
