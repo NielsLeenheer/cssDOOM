@@ -27,7 +27,6 @@
 import { updatePerspective } from './scene/scene.js';
 import { updateCulling as runCulling } from './scene/culling.js';
 import * as spectator from './spectator.js';
-import { rendererState } from './renderer-state.js';
 
 // Per-player and world command methods are bound onto this prototype
 // at the bottom of `commands.js` — commands.js owns the registry and
@@ -79,6 +78,20 @@ export class DomRenderer {
         // each map load.
         this.sceneState = makeSceneState();
 
+        // Per-renderer world view — the camera this renderer renders
+        // from and the array of things-in-the-world this renderer
+        // knows about (positions, collected flags). Populated by the
+        // renderer-command impls (updateCamera, updateThingPosition,
+        // collectItem, etc.) as they receive dispatches. Read by the
+        // culler and the scene warmup. Independent per renderer —
+        // sibling renderers in the same window each have their own.
+        // The legacy module-level `rendererState` singleton in
+        // `renderer-state.js` still lives in parallel during the
+        // step-1 transition (see docs/RENDERER_STATE_REFACTOR.md);
+        // it stays around until AudioRenderer becomes a proper
+        // orchestrator target (issue 8) and stops needing it.
+        this.state = makeRendererState();
+
         // Remembered for `reload()` — set inside scene.loadMap on
         // each successful load. Null until the first load completes.
         this._lastLoadedMap = null;
@@ -95,18 +108,12 @@ export class DomRenderer {
     }
 
     /**
-     * Live camera the culler / audio read for this renderer's viewer.
-     *
-     * On master, `rendererState.cameras` aliases `state.players` so the
-     * lookup returns the live Player object the simulation mutates each
-     * frame. On a client the array is a local mirror populated by
-     * `applyCameraUpdate`. Either way, indexing by this renderer's
-     * `playerIndex` gives us "the camera this pane is rendering for" —
-     * including mirror SP, where both renderers share playerIndex 0 and
-     * therefore both read player 0's pose.
+     * Live camera the culler reads for this renderer's viewer.
+     * Populated by `updateCamera` dispatches (the impl writes both
+     * the DOM transform AND `renderer.state.camera`).
      */
     get camera() {
-        return rendererState.cameras[this.playerIndex];
+        return this.state.camera;
     }
 
     /**
@@ -174,7 +181,7 @@ export class DomRenderer {
     updateCulling(spectatorActive, collectStats) {
         if (!this.camera) return;
         if (!this.hasScene) return;
-        runCulling(this, rendererState.things, spectatorActive, collectStats);
+        runCulling(this, this.state.things, spectatorActive, collectStats);
     }
 
     // ── Spectator mode ───────────────────────────────────────────────────
@@ -208,5 +215,30 @@ export function makeSceneState() {
         projectileDom: new Map(),      // Map<projectileId, element>
         perspectiveValue: 700,
     };
+}
+
+/** Initial per-renderer world-view state. `camera` is the single
+ *  viewer the culler / DOM transforms key off; `things[i]` records
+ *  the position + collected flag for each in-world thing the
+ *  renderer needs to draw / cull. Populated lazily by the impls
+ *  (updateCamera, updateThingPosition, etc.). */
+export function makeRendererState() {
+    return {
+        camera: { x: 0, y: 0, z: 0, angle: 0, floorHeight: 0, isFiring: false },
+        things: [],
+    };
+}
+
+/** Lazily allocate a per-thing state entry on a renderer. Used by
+ *  the renderer-command impls that update thing position / collected
+ *  state. */
+export function ensureThing(state, thingIndex) {
+    let thing = state.things[thingIndex];
+    if (!thing) {
+        thing = state.things[thingIndex] = {
+            x: 0, y: 0, floorHeight: 0, collected: false,
+        };
+    }
+    return thing;
 }
 

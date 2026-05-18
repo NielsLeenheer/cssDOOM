@@ -252,7 +252,7 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
  * loop. Elements are hidden/shown by toggling the `hidden` attribute which
  * maps to `display: none` and fully removes them from compositor work.
  *
- * Callers pass `worldThings` (the local window's `rendererState.things`)
+ * Callers pass `worldThings` (this renderer's `renderer.state.things`)
  * so the culler can look up live positions and collected status of
  * dynamic things, and `spectatorActive` to skip ceiling culling in
  * spectator mode. Both are plain data — culling.js depends only on

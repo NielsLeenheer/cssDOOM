@@ -15,7 +15,6 @@
 
 import { makeSceneState } from '../dom-renderer.js';
 import * as maps from '../../shared/maps/index.js';
-import { rendererState } from '../renderer-state.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
 import { buildFloors } from './surfaces/floors.js';
@@ -177,9 +176,8 @@ export async function buildScene(mapData) {
  *
  * Each DomRenderer in the orchestrator's target list runs this
  * independently — no cross-pane coupling. The camera prime reads
- * `rendererState.cameras[playerIndex]`, populated on BOTH master
- * and joiner by the `updateCamera` mirror declared in
- * `renderer/commands.js`. Master's `Level.load` fires an explicit
+ * `renderer.state.camera`, populated by the `updateCamera` impl on
+ * every dispatch. Master's `Level.load` fires an explicit
  * `renderer.updateCamera` for each player after `applyPlayerStart`
  * and BEFORE this `orchestrator.loadMap(name)` call so the warmup
  * sees fresh values on the first composited frame. The same
@@ -220,16 +218,18 @@ export async function loadMap(renderer, name) {
 
     // Warmup phase — primes camera transform + culling visibility so
     // the browser doesn't have to composite the entire level on the
-    // first RAF frame. Calling through the auto-generated per-pane
-    // prototype method keeps the prime local to this renderer; we
-    // skip the orchestrator so other panes don't get double-primed
-    // when a sibling DomRenderer's loadMap runs.
-    const camera = rendererState.cameras[renderer.playerIndex];
-    if (camera) {
-        renderer.updateCamera(camera);
+    // first RAF frame. Reads from this renderer's own state (which
+    // was populated by `updateCamera` / `updateThingPosition`
+    // dispatches fired before loadMap). Calling through the
+    // auto-generated per-pane prototype method keeps the prime
+    // local to this renderer; we skip the orchestrator so other
+    // panes don't get double-primed when a sibling DomRenderer's
+    // loadMap runs.
+    if (renderer.state.camera) {
+        renderer.updateCamera(renderer.state.camera);
     }
     if (renderer.hasScene) {
-        runCulling(renderer, rendererState.things, false);
+        runCulling(renderer, renderer.state.things, false);
     }
 }
 

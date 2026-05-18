@@ -41,6 +41,17 @@
  * camera transform each frame.
  */
 export function updateCamera(renderer, player) {
+    // Per-renderer world-view state (the singleton `rendererState.cameras`
+    // mirror still fires too during the step-1 transition; this is the
+    // new authoritative read source for the DomRenderer side).
+    const cam = renderer.state.camera;
+    cam.x = player.x;
+    cam.y = player.y;
+    cam.z = player.z;
+    cam.angle = player.angle;
+    cam.floorHeight = player.floorHeight ?? 0;
+    cam.isFiring = player.isFiring ?? false;
+
     const viewportStyle = renderer.viewportEl.style;
 
     // Horizontal position along the east-west axis

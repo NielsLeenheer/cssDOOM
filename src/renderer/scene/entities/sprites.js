@@ -7,10 +7,16 @@
  * world dispatch fans every command to every render target so each renderer
  * updates its own per-pane DOM independently.
  *
+ * Impls that update thing position / collected state also write to
+ * `renderer.state.things[]` (the per-renderer world-view used by the
+ * culler). See dom-renderer.js's `makeRendererState` / `ensureThing`.
+ *
  * Enemy rotation picks its viewer via `viewers[renderer.playerIndex]` — in
  * mirror SP both renderers share playerIndex 0 and compute against player 0;
  * in DM each renderer reads its own player.
  */
+
+import { ensureThing } from '../../dom-renderer.js';
 
 // ============================================================================
 // Sprite Sheet Layout
@@ -80,6 +86,14 @@ export function setEnemyState(renderer, thingIndex, thingType, newState) {
  * surviving the cull system's display:none → block flips.
  */
 export function killEnemy(renderer, thingIndex, thingType, instant = false) {
+    // Per-renderer world-view state — match what the mirror does on
+    // the singleton. `collected` is the catch-all "skip this thing"
+    // flag the culler reads (pickups + dead things alike). Set
+    // unconditionally so the per-instance state matches the mirror
+    // even if the DOM hasn't been built for this thing yet on this
+    // renderer.
+    ensureThing(renderer.state, thingIndex).collected = true;
+
     const layout = SPRITE_LAYOUT[thingType];
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
@@ -203,6 +217,13 @@ export function resetEnemy(renderer, thingIndex, thingType, x, y, floorHeight) {
 
 /** Update a thing's position and floor height in this renderer's pane. */
 export function updateThingPosition(renderer, thingIndex, x, y, floorHeight) {
+    // Per-renderer world-view state (read by the culler). The
+    // singleton mirror still fires in parallel during step 1.
+    const thing = ensureThing(renderer.state, thingIndex);
+    thing.x = x;
+    thing.y = y;
+    if (floorHeight !== undefined) thing.floorHeight = floorHeight;
+
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
     domData.element.style.setProperty('--x', x);
@@ -231,6 +252,7 @@ export function reparentThingToSector(renderer, thingIndex, sectorIndex) {
 
 /** Mark a pickup/thing element as collected in this renderer's pane (hides it via CSS). */
 export function collectItem(renderer, thingIndex) {
+    ensureThing(renderer.state, thingIndex).collected = true;
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (domData) domData.element.classList.add('collected');
 }
@@ -238,6 +260,7 @@ export function collectItem(renderer, thingIndex) {
 /** Reverse of collectItem — removes the .collected class so the sprite
  *  re-appears. Used when a player respawns. */
 export function uncollectItem(renderer, thingIndex) {
+    ensureThing(renderer.state, thingIndex).collected = false;
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (domData) domData.element.classList.remove('collected');
 }
@@ -328,6 +351,14 @@ export function createPlayerSprite(renderer, thingIndex, playerIndex, x, y, floo
     // peer-attach / pane-rebuild without worrying about duplicate
     // billboards on renderers that already have the sprite.
     if (renderer.sceneState.thingDom.has(thingIndex)) return;
+
+    // Per-renderer world-view state — establish the thing entry so
+    // the culler's first-frame read sees a real position rather than
+    // an undefined entry (the singleton mirror does the same).
+    const thing = ensureThing(renderer.state, thingIndex);
+    thing.x = x;
+    thing.y = y;
+    thing.floorHeight = floorHeight ?? 0;
 
     const container = document.createElement('div');
     container.className = 'enemy player';

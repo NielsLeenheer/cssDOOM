@@ -1,29 +1,28 @@
 /**
- * RendererState — the explicit contract for everything the renderer
- * reads from the game world.
+ * RendererState — LEGACY shared singleton.
+ *
+ * **Transitional, to be removed.** See
+ * docs/RENDERER_STATE_REFACTOR.md for the staged plan. This module
+ * is kept alive in step 1 only because `src/audio/audio.js` still
+ * reads `rendererState.cameras[slot]` out of band. It dies in step
+ * 2, when AudioRenderer becomes a proper orchestrator target
+ * (ARCHITECTURE_DEBT.md issue 8) and maintains its own per-instance
+ * state.
+ *
+ * DomRenderer reads have moved to per-instance `renderer.state`
+ * (set up in `dom-renderer.js`'s constructor); the impls in
+ * `scene/camera.js` and `scene/entities/sprites.js` write to both
+ * per-instance state AND this singleton (via the mirror callbacks
+ * fired by the orchestrator dispatch) during the transition. The
+ * singleton's only remaining reader is the audio module.
+ *
+ * --- (Original docstring kept for context until removal:) ---
  *
  * `cameras[slot]` and `things[index]` are independently-allocated
  * objects populated by the `mirror` callbacks declared on entries in
  * [commands.js](commands.js). The orchestrator's per-pane / world
  * dispatch loops fire the mirrors before fanning to render targets,
- * so the population mechanism is identical on master and joiner:
- *
- *   Master: game code calls `renderer.updateCamera(player, slot)`
- *           → orchestrator runs the mirror (writes rendererState
- *           here) → fans to local DomRenderers + RenderSinks.
- *
- *   Joiner: wire envelope arrives → RenderClient delegates to local
- *           orchestrator → orchestrator runs the mirror (writes
- *           rendererState here) → fans to the local DomRenderer.
- *
- * The renderer (culling, camera transforms, sprite billboards,
- * scene.loadMap warmup) reads ONLY from this object. There is no
- * `state.*` import anywhere in `src/renderer/`, `src/transport/`,
- * or `src/orchestrator.js`.
- *
- * Field set is the minimum the renderer + culler actually read.
- * Adding a new render-time read means adding a field here AND
- * declaring it in the mirror callback for the relevant command(s).
+ * so the population mechanism is identical on master and joiner.
  *
  *   cameras[slot]: { x, y, z, angle, floorHeight, isFiring }
  *   things[index]: { x, y, floorHeight, collected }
