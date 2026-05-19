@@ -36,7 +36,6 @@ import { isAttractActive } from '../renderer/screens/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
 import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
-import { setAudioEnabled } from '../audio/audio.js';
 import { ensureDisconnectedOverlay } from '../renderer/overlays/disconnected-overlay.js';
 import { applyWorldSnapshot } from '../game/snapshot.js';
 
@@ -235,7 +234,7 @@ export class RemoteGame {
         // Local DM secondary shares physical audio with master, so
         // mute to avoid echo. Network DM remote on a separate machine
         // plays its own audio.
-        if (!this._forwardInput) setAudioEnabled(false);
+        if (!this._forwardInput) this.orchestrator.setAudioEnabled(false);
 
         this._renderClient = new RenderClient(
             this._connection.channel,

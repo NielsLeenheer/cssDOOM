@@ -39,7 +39,6 @@ import { currentMap } from './shared/maps/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
 import { setDefaultSlot, unclaimSlotsNotIn } from './input/claim-registry.js';
-import { configureAudio } from './audio/audio.js';
 import {
     resetNetworkSlotState,
     setNetworkSlotOccupant,
@@ -165,9 +164,12 @@ export function applyMode(gameMode, networkMode = 'standalone') {
 
     // (Re)build per-listener AudioRenderers for the new roster. SP gets
     // one bearing-pan renderer; DM gets two pane-side-locked renderers
-    // (slot 0 left, slot 1 right). No-op on a Local DM secondary —
-    // setAudioEnabled(false) was called in initClient.
-    configureAudio(state.players.length);
+    // (slot 0 left, slot 1 right). On a Local DM secondary this still
+    // builds them; RemoteGame._wireUp calls
+    // orchestrator.setAudioEnabled(false) immediately afterwards which
+    // tears them back down — brief flicker is harmless (no playSound
+    // can fire between applyMode and _wireUp).
+    orchestrator.configureAudio(state.players.length);
 }
 
 /**

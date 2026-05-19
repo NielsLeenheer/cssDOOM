@@ -3,29 +3,23 @@
  *
  * `AudioRenderer` is an orchestrator render target alongside DomRenderer
  * and RenderSink. Each instance represents one local listener (one local
- * player's pane). The orchestrator's per-pane updateCamera dispatch
- * naturally lands on the AudioRenderer with the matching `playerIndex`,
- * keeping each listener's `state.camera` current. The orchestrator's
- * `playSound` dispatch fans to every audio target locally (each runs
- * its own distance / pan math from its listener position) and to every
- * RenderSink over the wire (the receiving window's orchestrator then
+ * player's pane). Per-pane `updateCamera` dispatch lands on the renderer
+ * with the matching `playerIndex` (orchestrator-side fan-out keeps its
+ * `state.camera` current). World `playSound` dispatch fans to every
+ * audio target locally (each runs its own distance / pan math) and to
+ * every RenderSink over the wire (the receiving window's orchestrator
  * fans to its own audio targets).
  *
- * Lifecycle is owned by this module: `configureAudio(slotCount)`
- * (re)builds the local listener set and (de)registers each renderer
- * with the orchestrator. `setAudioEnabled(false)` (used by the Local
- * DM secondary so master and secondary don't double-play through the
- * same speakers) deregisters every listener. The orchestrator's
- * `bindRemoteSlot` reaches in via `findTarget(slot, 'audio')` to drop
- * a single listener when a Network DM remote takes that slot — the
- * remote plays its own audio on its own device.
+ * **Lifecycle is owned by the orchestrator.** `orchestrator.configureAudio`
+ * (re)builds the local listener set; `orchestrator.setAudioEnabled`
+ * toggles the master switch. This module only provides the class plus
+ * the Web Audio plumbing it uses internally — there are no module-level
+ * lifecycle exports.
  *
  * Buffers are fetched + decoded on first use and cached. iOS Safari
  * requires a user gesture to unlock the AudioContext; global listeners
  * handle this at module load.
  */
-
-import { orchestrator } from '../orchestrator.js';
 
 // ── Web Audio context + unlock ─────────────────────────────────────────
 
@@ -76,12 +70,6 @@ function loadBuffer(name) {
     return promise;
 }
 
-// ── Module-level state ─────────────────────────────────────────────────
-
-let enabled = true;
-let renderers = [];
-let lastSlotCount = 0;
-
 // ── Distance + bearing math ────────────────────────────────────────────
 
 // Maximum audible range, in world units. DOOM levels are ~5000-20000
@@ -104,9 +92,28 @@ function bearingToPan(dx, dy, listenerAngle) {
     return Math.sin(relative);
 }
 
+// Per-sound nodes, computed at play time so concurrent sounds don't
+// stomp on each other's gain/pan values.
+function playBuffer(name, volume, pan) {
+    if (!ctx) return;
+    loadBuffer(name).then(buffer => {
+        if (!buffer || !ctx) return;
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctx.createGain();
+        gain.gain.value = volume;
+        const panner = ctx.createStereoPanner();
+        panner.pan.value = pan;
+        src.connect(panner);
+        panner.connect(gain);
+        gain.connect(ctx.destination);
+        src.start();
+    });
+}
+
 // ── AudioRenderer (per-listener) ───────────────────────────────────────
 
-class AudioRenderer {
+export class AudioRenderer {
     /**
      * @param {object} cfg
      * @param {number} cfg.slot        listener slot. Per-pane updateCamera
@@ -125,7 +132,7 @@ class AudioRenderer {
         this.playerIndex = slot;
 
         this.paneSide = paneSide;
-        // Per-listener world view. Only x/y/angle are read in play();
+        // Per-listener world view. Only x/y/angle are read in playSound();
         // kept narrow rather than mirroring DomRenderer's full 6
         // fields. updateCamera() below writes these from incoming
         // per-pane command dispatches.
@@ -148,14 +155,13 @@ class AudioRenderer {
 
     /**
      * World playSound dispatch. Computes volume from distance and pan
-     * from listener-bearing (or locked pane side in split-screen),
-     * then schedules a Web Audio playback. Out-of-range sounds drop
-     * silently. UI sounds are not modelled here — every sound has a
-     * world position.
+     * from listener-bearing (or locked pane side in split-screen), then
+     * schedules a Web Audio playback. Out-of-range sounds drop silently.
+     * Disabled / suppressed-slot listeners aren't in the orchestrator's
+     * target list at all, so this never fires for them.
      */
     playSound(name, opts) {
-        if (!enabled || !ctx || !unlocked) return;
-        if (!opts) return;
+        if (!ctx || !unlocked || !opts) return;
         const listener = this.state.camera;
         const dx = opts.x - listener.x;
         const dy = opts.y - listener.y;
@@ -167,102 +173,4 @@ class AudioRenderer {
                   : bearingToPan(dx, dy, listener.angle);
         playBuffer(name, volume, pan);
     }
-}
-
-// Per-sound nodes, computed at play time so concurrent sounds don't
-// stomp on each other's gain/pan values.
-function playBuffer(name, volume, pan) {
-    if (!ctx) return;
-    loadBuffer(name).then(buffer => {
-        if (!buffer || !ctx) return;
-        const src = ctx.createBufferSource();
-        src.buffer = buffer;
-        const gain = ctx.createGain();
-        gain.gain.value = volume;
-        const panner = ctx.createStereoPanner();
-        panner.pan.value = pan;
-        src.connect(panner);
-        panner.connect(gain);
-        gain.connect(ctx.destination);
-        src.start();
-    });
-}
-
-// ── Public API ─────────────────────────────────────────────────────────
-
-/**
- * (Re)build the listener list for the current mode and sync each
- * renderer's membership in the orchestrator's target list. Listener
- * count drives the pan mode:
- *
- *   count === 1  → one renderer, bearing-based pan (solo)
- *   count >= 2   → one renderer per slot, locked to L/R pane side
- *                  (Local DM split-screen)
- *
- * Slots currently bound to a Network DM remote get pruned afterwards:
- * `bindRemoteSlot` will remove the renderer for that slot via
- * `orchestrator.removeTarget(findTarget(slot, 'audio'))` so the same
- * mechanism handles bind-before-configure and configure-after-bind.
- *
- * Called by `applyMode` whenever the player roster resizes and by
- * `master.js`'s onJoin handler. Cheap — renderer instances hold no
- * Web Audio nodes; those are created per-sound in `playBuffer`.
- */
-export function configureAudio(slotCount) {
-    lastSlotCount = slotCount;
-    rebuildRenderers();
-}
-
-function rebuildRenderers() {
-    // Drop the previous generation of listeners from the orchestrator
-    // before replacing them. Defensive removeTarget is safe — it
-    // no-ops on missing entries (e.g. a slot that bindRemoteSlot
-    // already pulled out).
-    for (const r of renderers) orchestrator.removeTarget(r);
-    renderers = [];
-
-    if (!enabled) return;
-
-    // Skip slots a Network DM remote currently owns audio for — that
-    // peer plays its own sounds on its own device. Without the skip,
-    // a configureAudio call after the bind would resurrect a listener
-    // bindRemoteSlot just dropped. `split` keys off the EFFECTIVE
-    // listener count after suppression so a Network DM master with 1
-    // local + 1 remote keeps its solo listener on bearing-pan instead
-    // of locking to one side.
-    const activeSlots = [];
-    for (let slot = 0; slot < lastSlotCount; slot++) {
-        if (orchestrator.isSlotAudioSuppressed(slot)) continue;
-        activeSlots.push(slot);
-    }
-    const split = activeSlots.length >= 2;
-    activeSlots.forEach((slot, idx) => {
-        const paneSide = split ? (idx === 0 ? 'left' : 'right') : null;
-        const renderer = new AudioRenderer({ slot, paneSide });
-        renderers.push(renderer);
-        orchestrator.addTarget(renderer);
-    });
-}
-
-/**
- * Master switch — when false, every listener is dropped from the
- * orchestrator so world `playSound` dispatch can't reach an audio
- * target on this window. Used by the Local DM secondary so master
- * and secondary don't double-play through the same room speakers.
- */
-export function setAudioEnabled(value) {
-    if (enabled === value) return;
-    enabled = value;
-    rebuildRenderers();
-}
-
-/**
- * Rebuild the listener set from the last configured slot count and
- * the orchestrator's current per-slot suppression state. Called by
- * `bindRemoteSlot` / `unbindRemoteSlot` when suppression toggles so
- * the surviving listener's pan mode picks up the new effective count
- * (split-pan with 2 active → bearing-pan with 1).
- */
-export function refreshAudioRenderers() {
-    rebuildRenderers();
 }

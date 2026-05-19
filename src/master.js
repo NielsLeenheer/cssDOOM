@@ -30,7 +30,6 @@ import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { buildModeConfigFromUrl } from './game/mode-config.js';
 import { Game } from './game/game.js';
 import { App } from './app.js';
-import { configureAudio } from './audio/audio.js';
 import { hideInitialOverlay } from './renderer/overlays/overlay.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
@@ -297,7 +296,7 @@ function setupMasterBroadcast() {
             ensureMatchSize(state.players.length);
             // Reflect the new roster size in audio listener config — a
             // fresh AudioRenderer for the new slot if needed.
-            configureAudio(state.players.length);
+            orchestrator.configureAudio(state.players.length);
             // If this slot's player is currently marked dead (typically
             // because the previous peer here disconnected — onLeave
             // flags isDead so the abandoned slot drops out of the

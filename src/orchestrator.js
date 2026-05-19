@@ -56,7 +56,7 @@
 
 import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS, WINDOW_COMMANDS } from './renderer/commands.js';
-import { refreshAudioRenderers } from './audio/audio.js';
+import { AudioRenderer } from './audio/audio.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -129,7 +129,7 @@ class Orchestrator {
         // can restore it; may be null for network-only slots that never
         // had a local pane), and the deferred-unhide grace timer.
         this._occupiedRemoteSlots = new Set();
-        this._remoteBindings = new Map(); // peerKey → { slot, savedTarget, unbindGraceTimer }
+        this._remoteBindings = new Map(); // peerKey → { slot, sink, savedDom, unbindGraceTimer, suppressAudio }
 
         // Lowest slot index a joining remote can be allocated to. Held
         // local slots (master's host, kiosk's second local) must be
@@ -157,6 +157,15 @@ class Orchestrator {
         //   getIntermissionPayload()   → { nextMap }
         //   getLobbyPayload()          → unified lobby state
         this._provider = null;
+
+        // ── Audio listener lifecycle ────────────────────────────────
+        // Tracks the configured roster size + the global enable
+        // switch so `_rebuildAudioTargets` can recreate the audio
+        // listener set on any change (configureAudio, setAudioEnabled,
+        // bindRemoteSlot, unbindRemoteSlot). Listeners themselves
+        // live in `this.targets` like any other render target.
+        this._audioEnabled = true;
+        this._audioSlotCount = 0;
     }
 
     /** Register / clear the overlay payload provider. Game wires this
@@ -263,13 +272,81 @@ class Orchestrator {
         return this._remoteBindings.get(peerKey)?.slot ?? null;
     }
 
+    // ── Audio listener lifecycle ────────────────────────────────────────
+    //
+    // The orchestrator owns the set of AudioRenderer targets the same
+    // way it owns DomRenderers and RenderSinks. `configureAudio` sets
+    // the roster size; `setAudioEnabled` flips the master switch; bind /
+    // unbind toggle per-slot suppression. Every change funnels through
+    // `_rebuildAudioTargets`, which derives the live set from the
+    // current configuration in one place.
+
     /**
-     * True if a remote currently bound to `slot` had `suppressAudio` set
-     * (a Network DM remote on a separate machine plays its own audio).
-     * audio.js queries this from `rebuildRenderers` so a configureAudio
-     * call after a bind doesn't resurrect a listener the bind dropped.
+     * (Re)build the listener set for a new player-roster size. Listener
+     * count drives the pan mode (1 = bearing-pan, 2+ = locked L/R for
+     * split-screen). Called by `mode.js`'s applyMode whenever the
+     * roster resizes and by `master.js`'s onJoin handler.
      */
-    isSlotAudioSuppressed(slot) {
+    configureAudio(slotCount) {
+        this._audioSlotCount = slotCount;
+        this._rebuildAudioTargets();
+    }
+
+    /**
+     * Master switch — when false, every listener is dropped from the
+     * target list so world `playSound` dispatch can't reach an audio
+     * target on this window. Used by the Local DM secondary so master
+     * and secondary don't double-play through the same room speakers.
+     */
+    setAudioEnabled(value) {
+        if (this._audioEnabled === value) return;
+        this._audioEnabled = value;
+        this._rebuildAudioTargets();
+    }
+
+    /**
+     * Reconcile audio targets with current config. Drops every
+     * AudioRenderer in `this.targets` and recreates listeners for the
+     * effective slot set — slots up to `_audioSlotCount`, minus those
+     * a Network DM remote currently owns audio for (the remote plays
+     * its own sounds on its own device).
+     *
+     * Pan mode keys off the EFFECTIVE listener count after suppression
+     * so a Network DM master with 1 local + 1 remote keeps its solo
+     * listener on bearing-pan instead of locking to one side.
+     *
+     * Listener state.camera is reset on rebuild — the very next
+     * per-pane updateCamera dispatch (which runs before any playSound
+     * in a frame) restores correct values, so this gap is invisible.
+     */
+    _rebuildAudioTargets() {
+        for (const t of [...this.targets]) {
+            if (t.kind === 'audio') this.removeTarget(t);
+        }
+
+        if (!this._audioEnabled) return;
+
+        const activeSlots = [];
+        for (let slot = 0; slot < this._audioSlotCount; slot++) {
+            if (this._isSlotAudioSuppressed(slot)) continue;
+            activeSlots.push(slot);
+        }
+        const split = activeSlots.length >= 2;
+        activeSlots.forEach((slot, idx) => {
+            const paneSide = split ? (idx === 0 ? 'left' : 'right') : null;
+            this.addTarget(new AudioRenderer({ slot, paneSide }));
+        });
+    }
+
+    /** True if a remote currently OWNS this slot AND had `suppressAudio`
+     *  set (Network DM remote on a separate machine plays its own audio).
+     *  The `_occupiedRemoteSlots` gate is what lets a mid-grace unbind
+     *  return the listener to the active set even though the binding
+     *  itself lingers in `_remoteBindings` until the grace timer fires
+     *  (the binding is kept around so a same-peer reconnect can recover
+     *  its `savedDom`). Internal to the audio-rebuild path. */
+    _isSlotAudioSuppressed(slot) {
+        if (!this._occupiedRemoteSlots.has(slot)) return false;
         for (const b of this._remoteBindings.values()) {
             if (b.slot === slot && b.suppressAudio) return true;
         }
@@ -295,10 +372,9 @@ class Orchestrator {
         const suppressAudio = opts.suppressAudio === true;
 
         // Mid-grace reconnect by the same peer: cancel its visual-unhide
-        // so the user doesn't see a flash, and recover its saved targets.
+        // so the user doesn't see a flash, and recover its savedDom.
         const previous = this._remoteBindings.get(peerKey);
         let savedDom = previous?.savedDom ?? null;
-        let savedAudio = previous?.savedAudio ?? null;
         if (previous?.unbindGraceTimer) {
             clearTimeout(previous.unbindGraceTimer);
         }
@@ -313,7 +389,6 @@ class Orchestrator {
                 clearTimeout(b.unbindGraceTimer);
                 this._remoteBindings.delete(otherKey);
                 savedDom = savedDom ?? b.savedDom;
-                savedAudio = savedAudio ?? b.savedAudio;
             }
         }
 
@@ -336,19 +411,6 @@ class Orchestrator {
             this._publishActiveRendererCount();
         }
 
-        // The remote plays its own audio on its own device — drop our
-        // listener for this slot so master doesn't double-play. Restored
-        // on unbind. (When false, master keeps the listener: Local DM
-        // secondary scenarios share physical speakers with master, so
-        // master must play this slot's sounds for the local pane.)
-        let localAudio = null;
-        if (suppressAudio) {
-            localAudio = savedAudio ?? this.findTarget(slot, 'audio');
-            if (localAudio && this.targets.includes(localAudio)) {
-                this.removeTarget(localAudio);
-            }
-        }
-
         const sink = new RenderSink(transport, slot);
         this.addTarget(sink);
 
@@ -356,15 +418,16 @@ class Orchestrator {
             slot,
             sink,
             savedDom: localDom ?? null,
-            savedAudio: localAudio ?? null,
             unbindGraceTimer: null,
             suppressAudio,
         });
 
-        // If we just dropped a listener, the surviving listeners need
-        // their pan mode recomputed (going from split L/R to solo
-        // bearing-pan when one of two slots becomes suppressed).
-        if (suppressAudio) refreshAudioRenderers();
+        // Reconcile audio listeners against the new binding state. If
+        // suppressAudio was set, the listener at this slot is now
+        // dropped from the target list and the surviving listeners'
+        // pan mode is recomputed (split L/R → solo bearing-pan when
+        // one of two slots becomes suppressed).
+        if (suppressAudio) this._rebuildAudioTargets();
 
         console.log('[orchestrator] client bound at slot', slot, '- peer', peerKey);
     }
@@ -391,7 +454,7 @@ class Orchestrator {
         const binding = this._remoteBindings.get(peerKey);
         if (!binding) return;
 
-        const { slot, sink, savedDom, savedAudio } = binding;
+        const { slot, sink, savedDom, suppressAudio } = binding;
 
         // Pull the sink so master's per-frame commands stop forwarding
         // to a vanished peer.
@@ -403,16 +466,13 @@ class Orchestrator {
         // grace so a quick reconnect doesn't flash the pane visible.
         if (savedDom) this.addTarget(savedDom);
 
-        // Restore the local AudioRenderer (only present if suppressAudio
-        // had pulled it out on bind — Network DM remote scenarios). On
-        // Local DM secondary unbinds, savedAudio is null and audio was
-        // never suppressed. Re-derive pan mode for the new active set
-        // — the restored listener may need to flip from solo-bearing
-        // back to split L/R now that there are 2 active again.
-        if (savedAudio) {
-            this.addTarget(savedAudio);
-            refreshAudioRenderers();
-        }
+        // Reconcile audio: the slot is no longer remote-owned (we just
+        // dropped it from `_occupiedRemoteSlots`), so `_isSlotAudioSuppressed`
+        // returns false for it and the rebuild brings the listener back.
+        // The binding itself stays in `_remoteBindings` during grace so
+        // a mid-grace reconnect can recover savedDom; the suppressAudio
+        // flag on it is meaningless once the slot is unoccupied.
+        if (suppressAudio) this._rebuildAudioTargets();
 
         if (binding.unbindGraceTimer) clearTimeout(binding.unbindGraceTimer);
         binding.unbindGraceTimer = setTimeout(async () => {

@@ -148,8 +148,8 @@ export class MasterConnection {
      *   plays its own world audio on its own device (Network DM remote on its
      *   own browser). Master then suppresses its own AudioRenderer for that
      *   slot so the sound doesn't double-play. Default false matches the
-     *   Local DM secondary, which calls `setAudioEnabled(false)` itself, so
-     *   master is the only one playing.
+     *   Local DM secondary, which calls `orchestrator.setAudioEnabled(false)`
+     *   itself, so master is the only one playing.
      */
     addPeer(transport, peerKey, opts = {}) {
         if (this._peers.has(peerKey)) {
