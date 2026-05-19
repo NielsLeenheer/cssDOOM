@@ -48,7 +48,6 @@ import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { onMatch, ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
-import { getGameState, GAME_STATE } from './game/game-state.js';
 
 
 // ── Debug toggle ───────────────────────────────────────────────────────
@@ -205,7 +204,6 @@ function setupMasterBroadcast() {
             // host fires the match start, the Level registry populates
             // and joiners then arrive into the live level.
             level: getCurrentLevel() ? (pendingLevel ?? currentMap) : null,
-            gameState: getGameState(),
             slotIndex: orchestrator.nextOrCurrentRemoteSlot(peerKey),
         }),
         onRemoteInput: (msg, _peerKey) => applyRemoteInput(msg),

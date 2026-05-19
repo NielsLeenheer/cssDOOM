@@ -32,7 +32,7 @@ import { getFloorHeightAt } from '../../game/physics.js';
 import { EYE_HEIGHT } from '../../shared/constants.js';
 import { resetMatch, endMatch } from '../../game/match.js';
 import { isMenuOpen } from '../../ui/menu.js';
-import { GAME_STATE, getGameState } from '../../game/game-state.js';
+import { GAME_STATE, getGameState, setGameState } from '../../game/game-state.js';
 import { orchestrator } from '../../orchestrator.js';
 
 // Idle thresholds.
@@ -176,7 +176,7 @@ export async function enterAttract() {
     for (const p of state.players) baseAngles.push(p.angle);
     rotateStartTime = performance.now();
     entering = false;
-    orchestrator.setGameState(GAME_STATE.ATTRACT);
+    setGameState(GAME_STATE.ATTRACT);
     orchestrator.showAttract();
 }
 
@@ -184,10 +184,10 @@ function exitAttract() {
     lastActivityAt = performance.now();
     // After attract, swapLevel put us in a fresh post-resetMatch world.
     // resetMatch already transitioned us to LOBBY; we just need to
-    // un-set the ATTRACT state. orchestrator.setGameState(LOBBY) is a
+    // un-set the ATTRACT state. setGameState(LOBBY) is a
     // no-op if we're somehow not in ATTRACT (e.g., direct pingActivity
-    // call) — applyGameState early-returns on same-state writes.
-    orchestrator.setGameState(GAME_STATE.LOBBY);
+    // call) — setGameState early-returns on same-state writes.
+    setGameState(GAME_STATE.LOBBY);
     orchestrator.hideAttract();
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the

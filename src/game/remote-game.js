@@ -219,7 +219,6 @@ export class RemoteGame {
             // state burst on.
             await this.orchestrator.loadMap(payload.level);
         }
-        if (payload.gameState) this.orchestrator.setGameState(payload.gameState);
 
         this._wireUp();
 

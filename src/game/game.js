@@ -19,7 +19,7 @@ import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap, currentMap } from '../shared/maps/index.js';
 import { captureSpStats } from './sp-stats.js';
-import { GAME_STATE, getGameState } from './game-state.js';
+import { GAME_STATE, getGameState, setGameState } from './game-state.js';
 import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
@@ -522,7 +522,7 @@ export class Game {
         // BEFORE hideIntermission so CSS hides the overlay via the body
         // attribute first, then the DOM clears.
         if (getGameState() === GAME_STATE.INTERMISSION) {
-            orchestrator.setGameState(GAME_STATE.ACTIVE);
+            setGameState(GAME_STATE.ACTIVE);
         }
         orchestrator.hideIntermission();
         if (this._pendingNextMap) {
@@ -626,7 +626,7 @@ export class Game {
             // visibility, and fan the transition to every joiner.
             // Owning this here (not inside the renderer impl) keeps
             // the renderer a pure projection target.
-            orchestrator.setGameState(GAME_STATE.INTERMISSION);
+            setGameState(GAME_STATE.INTERMISSION);
             orchestrator.showIntermission();
         } else {
             // DM: funnel into the same endMatch path as frag/time-limit.

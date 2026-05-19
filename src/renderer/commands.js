@@ -14,7 +14,7 @@
  * it through the four files used to be a silent client desync;
  * with the registry it's impossible.
  *
- * Three kinds:
+ * Two kinds:
  *
  *   `per-pane`  — addressed to one pane. impl signature is
  *                 (renderer, ...args). For RenderSink, an optional
@@ -25,17 +25,6 @@
  *                 is (renderer, ...args). The orchestrator iterates all
  *                 targets: each local DomRenderer runs impl(self, ...args);
  *                 each RenderSink forwards to its joiner over the wire.
- *
- *   `window`    — addressed to every WINDOW (master + each joiner) but
- *                 fired once per window, not once per pane. impl signature
- *                 is (...args) — no renderer arg, because the thing being
- *                 written is window-scoped (e.g. `document.body.dataset.X`),
- *                 not pane-scoped. The orchestrator fires impl once
- *                 locally, then posts one envelope per joiner sink. On
- *                 the joiner, RenderClient dispatches via the joiner's
- *                 orchestrator → impl fires once on that window.
- *                 NOT bound onto DomRenderer or RenderSink prototypes;
- *                 the orchestrator dispatches it directly.
  */
 
 import * as sprites from './scene/entities/sprites.js';
@@ -54,7 +43,6 @@ import { renderIntermission, clearIntermission } from './screens/intermission.js
 import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showLobby, hideLobby } from './screens/lobby.js';
 import { showTimer } from './hud/match-timer.js';
-import { applyGameState } from '../game/game-state.js';
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -207,22 +195,6 @@ export const COMMANDS = {
     showAttract:      { kind: 'world', impl: (r) => r.paneEl.querySelector('.pane-attract')?.classList.add('active') },
     hideAttract:      { kind: 'world', impl: (r) => r.paneEl.querySelector('.pane-attract')?.classList.remove('active') },
     showTimer:        { kind: 'world', impl: showTimer },
-
-    // ── Window: game-state transition ────────────────────────────────────
-    // Every window (master + each joiner) holds its own `current` value
-    // in game-state.js. This window-kind command keeps them in sync:
-    // master calls `orchestrator.setGameState(value)`, the impl updates
-    // the pure state on master, and joiners receive a CMD_WORLD
-    // envelope that dispatches the same impl on their window. No DOM
-    // writes — visibility is driven entirely by per-pane `.active`
-    // classes on the overlay containers (see show* / hide* impls
-    // above) and `:has()` reactions in CSS.
-    setGameState:     {
-        kind: 'window',
-        impl: (value) => {
-            applyGameState(value);
-        },
-    },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(
@@ -231,10 +203,6 @@ export const PER_PANE_COMMANDS = Object.fromEntries(
 
 export const WORLD_COMMANDS = Object.fromEntries(
     Object.entries(COMMANDS).filter(([, c]) => c.kind === 'world'),
-);
-
-export const WINDOW_COMMANDS = Object.fromEntries(
-    Object.entries(COMMANDS).filter(([, c]) => c.kind === 'window'),
 );
 
 // ── Prototype binding ────────────────────────────────────────────────────

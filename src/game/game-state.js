@@ -1,5 +1,5 @@
 /**
- * Unified game-state machine — pure state, no DOM.
+ * Window-local game-state machine — pure state, no DOM, no transport.
  *
  * The game lives in exactly one of these states at any time:
  *
@@ -15,12 +15,13 @@
  * combinations of `state.match.started/ended` + per-screen `isXActive()`
  * helpers that used to live across half a dozen modules.
  *
- * To CHANGE the state, call `orchestrator.setGameState(value)` — that's
- * a window-kind renderer command (see src/renderer/commands.js) which
- * updates `current` here AND writes `body.dataset.gameState` AND fans
- * to every joiner so their game-state stays aligned. This module
- * never touches the DOM and never imports the renderer; the only
- * mutator is `applyGameState`, which the renderer command impl calls.
+ * `setGameState(value)` is the only mutator. It writes the local
+ * `current` and returns. **There is no cross-window sync** — each
+ * window (master + each joiner) has its own `current`. In practice
+ * only master code reads `current` (match.js, game.js, gates.js,
+ * etc.); joiners are render-only and never consult the value. CSS
+ * visibility on every window derives from per-pane `.active` classes
+ * on the overlay containers, not from this state.
  *
  * Per-player concerns (`player.isDead`) stay separate — those aren't
  * game-wide. The master menu (`isMenuOpen()`) is also orthogonal: it
@@ -43,12 +44,11 @@ export function getGameState() {
 }
 
 /**
- * Pure state mutator — called by the renderer-side setGameState
- * window-command impl. Not for direct use by game code; call
- * `orchestrator.setGameState(value)` instead so master and joiner
- * both update.
+ * Write the local state. Same-value writes early-return. No
+ * notification, no DOM, no transport — callers fire any companion
+ * renderer commands (showLobby, showResults, etc.) themselves.
  */
-export function applyGameState(next) {
+export function setGameState(next) {
     if (next === current) return;
     current = next;
 }

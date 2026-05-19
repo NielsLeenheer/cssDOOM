@@ -16,7 +16,7 @@ import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { endMatch } from '../../game/match.js';
 import { enterAttract } from '../screens/attract.js';
 import { captureSpStats } from '../../game/sp-stats.js';
-import { GAME_STATE } from '../../game/game-state.js';
+import { GAME_STATE, setGameState } from '../../game/game-state.js';
 import { orchestrator } from '../../orchestrator.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
@@ -406,7 +406,7 @@ export function initDebugMenu() {
         // since debug.js bypasses _onLevelComplete, _pendingNextMap
         // isn't set and advance() won't load the next map. (Same
         // limitation as before this refactor.)
-        orchestrator.setGameState(GAME_STATE.INTERMISSION);
+        setGameState(GAME_STATE.INTERMISSION);
         orchestrator.showIntermission({
             nextMap: getNextMap(),
             mapName: currentMap,
