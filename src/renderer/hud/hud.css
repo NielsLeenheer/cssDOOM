@@ -732,9 +732,12 @@ body[data-game-state="intermission"] .pane-intermission {
 
 /* ========================================================================
    Deathmatch countdown timer (last 60 s)
-   Shown when body[data-timer-active="true"]. Top-centre m:ss readout in
-   DOOM red; fades in / out via the body attribute and pulses for the
-   final 10 s. Lives per-pane inside .pane; default position is fixed
+   Top-centre m:ss readout in DOOM red. Visibility is driven by the
+   text content itself — the renderer writes the m:ss string when
+   active and an empty string when not, and CSS toggles `display`
+   off `:empty` / `:not(:empty)`. No window-scoped visibility flag,
+   so the renderer impl only touches its own pane.
+   Lives per-pane inside .pane; default position is fixed
    (viewport-centred) so split-screen still reads as one timer. Video-
    wall flips to absolute so each monitor gets its own.
    ======================================================================== */
@@ -753,7 +756,7 @@ body[data-game-state="intermission"] .pane-intermission {
     pointer-events: none;
 }
 
-body[data-game-mode="deathmatch"][data-timer-active="true"] .pane-timer {
+body[data-game-mode="deathmatch"] .pane-timer:not(:empty) {
     display: block;
 }
 

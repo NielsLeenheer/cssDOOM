@@ -5,21 +5,12 @@
  * readout without each running its own clock (and risking drift over a
  * multi-minute match).
  *
- * Text is the value to display, or null to hide. Hiding also clears
- * `body[data-timer-active]` which the CSS uses to fade the readout
- * in/out.
+ * Text is the value to display, or null/empty to hide. The CSS reads
+ * the text presence directly (`.pane-timer:not(:empty)`) — no
+ * separate visibility flag needed.
  */
 
-export function showTimer(_renderer, text) {
-    if (text) {
-        for (const el of document.querySelectorAll('.pane-timer')) el.textContent = text;
-        if (document.body.dataset.timerActive !== 'true') {
-            document.body.dataset.timerActive = 'true';
-        }
-    } else {
-        if (document.body.dataset.timerActive === 'true') {
-            delete document.body.dataset.timerActive;
-        }
-        for (const el of document.querySelectorAll('.pane-timer')) el.textContent = '';
-    }
+export function showTimer(renderer, text) {
+    const el = renderer.paneEl.querySelector('.pane-timer');
+    if (el) el.textContent = text || '';
 }
