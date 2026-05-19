@@ -17,7 +17,8 @@ import { state } from './state.js';
 import { ensurePlayerCount } from '../mode.js';
 import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
-import { getNextMap } from '../shared/maps/index.js';
+import { getNextMap, currentMap } from '../shared/maps/index.js';
+import { captureSpStats } from './sp-stats.js';
 import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
@@ -656,9 +657,21 @@ export class Game {
         };
     }
 
-    /** Intermission payload — the next map the SP advance() will load. */
+    /**
+     * Intermission payload — everything the SP intermission screen
+     * paints. `nextMap` drives the post-intermission load;
+     * `mapName` is the level just finished (the screen renders its
+     * title sprite); `stats` is the kills / items / secrets / time
+     * snapshot. The renderer impl reads this and nothing else —
+     * pulling here is the only sanctioned game-state read in the
+     * dispatch path.
+     */
     getIntermissionPayload() {
-        return { nextMap: this._pendingNextMap ?? null };
+        return {
+            nextMap: this._pendingNextMap ?? null,
+            mapName: currentMap,
+            stats: captureSpStats(),
+        };
     }
 
     /** Unified lobby payload consumed by the lobby screen

@@ -16,6 +16,7 @@ import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { endMatch } from '../../game/match.js';
 import { enterAttract } from '../screens/attract.js';
 import { showIntermission } from '../screens/intermission.js';
+import { captureSpStats } from '../../game/sp-stats.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 
@@ -397,7 +398,11 @@ export function initDebugMenu() {
     intermissionBtn.textContent = 'Show intermission';
     intermissionBtn.style.cssText = buttonStyle;
     intermissionBtn.addEventListener('click', () => {
-        showIntermission(getNextMap(), (next) => { if (next) swapLevel(next); });
+        showIntermission({
+            nextMap: getNextMap(),
+            mapName: currentMap,
+            stats: captureSpStats(),
+        }, (next) => { if (next) swapLevel(next); });
     });
     details.appendChild(intermissionBtn);
 

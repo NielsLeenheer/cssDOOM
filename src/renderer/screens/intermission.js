@@ -14,8 +14,6 @@
  * body[data-game-state="intermission"]).
  */
 
-import { captureSpStats } from '../../game/sp-stats.js';
-import { currentMap } from '../../shared/maps/index.js';
 import { GAME_STATE, getGameState } from '../../game/game-state.js';
 import { orchestrator } from '../../orchestrator.js';
 
@@ -33,22 +31,28 @@ let finalizeAnimation = null;
 
 /**
  * Render the intermission and arm the fire-key advance callback.
- * @param {string|null} nextMap   Map to load when the player presses fire,
- *                                or null if there's no next map (final
- *                                level). The advance handler is still
- *                                installed but does nothing in that case.
+ * @param {object} payload
+ * @param {string|null} payload.nextMap  Map to load when the player presses fire,
+ *                                       or null if there's no next map (final
+ *                                       level). The advance handler is still
+ *                                       installed but does nothing in that case.
+ * @param {string|null} payload.mapName  Name of the level just finished — drives
+ *                                       the WILV title sprite at the top of the
+ *                                       screen.
+ * @param {{kills,items,secrets,elapsedMs}|null} payload.stats  SP stats snapshot.
+ *                                       Null outside SP mode, in which case
+ *                                       the function early-returns.
  * @param {() => void} advanceCallback  Called once the player dismisses
  *                                the screen — typically `() => loadMap(next)`.
  */
-export function showIntermission(nextMap, advanceCallback) {
-    const stats = captureSpStats();
-    if (!stats) return;
+export function showIntermission(payload, advanceCallback) {
+    if (!payload?.stats) return;
 
-    pendingNextMap = nextMap;
+    pendingNextMap = payload.nextMap;
     onAdvance = advanceCallback;
 
     for (const container of document.querySelectorAll('.pane-intermission')) {
-        container.replaceChildren(buildIntermissionNode());
+        container.replaceChildren(buildIntermissionNode(payload.mapName));
     }
     orchestrator.setGameState(GAME_STATE.INTERMISSION);
 
@@ -57,7 +61,7 @@ export function showIntermission(nextMap, advanceCallback) {
     dismissable = false;
     setTimeout(() => { dismissable = true; }, 500);
 
-    runCountUp(stats);
+    runCountUp(payload.stats);
 }
 
 export function hideIntermission() {
@@ -112,18 +116,18 @@ export function dismissIntermission() {
     setTimeout(hideIntermission, 600);
 }
 
-function buildIntermissionNode() {
+function buildIntermissionNode(mapName) {
     const root = document.createElement('div');
     root.className = 'intermission';
 
     const header = document.createElement('div');
     header.className = 'intermission-header';
-    const levelSrc = levelNameSpriteSrc(currentMap);
+    const levelSrc = levelNameSpriteSrc(mapName);
     if (levelSrc) {
         const level = document.createElement('img');
         level.className = 'intermission-level';
         level.src = levelSrc;
-        level.alt = currentMap || '';
+        level.alt = mapName || '';
         header.appendChild(level);
     }
     const finished = document.createElement('img');
@@ -262,7 +266,7 @@ function levelNameSpriteSrc(mapName) {
 // joiner (gates aren't initialized client-side).
 
 export function renderIntermission(_renderer, payload) {
-    showIntermission(payload?.nextMap ?? null, () => {});
+    showIntermission(payload, () => {});
 }
 
 export function clearIntermission(_renderer) {

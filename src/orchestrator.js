@@ -154,7 +154,7 @@ class Orchestrator {
         // Provider contract (Game implements all):
         //   getCurrentOverlay()        → 'showResults' | 'showIntermission' | 'showLobby' | null
         //   getResultsPayload()        → scoreboard data
-        //   getIntermissionPayload()   → { nextMap }
+        //   getIntermissionPayload()   → { nextMap, mapName, stats }
         //   getLobbyPayload()          → unified lobby state
         this._provider = null;
 
