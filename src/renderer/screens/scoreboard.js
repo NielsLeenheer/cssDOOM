@@ -49,12 +49,13 @@ const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 // connected client's RenderSink, carrying the full scoreboard payload
 // over the wire.
 //
+// World-kind dispatch fires once per render target; each call writes
+// only that target's pane via `renderer.paneEl.querySelector('.pane-win')`.
 // DOM is fully rebuilt each call via replaceChildren — idempotent
 // against repeated invocations.
 
 /**
- * @param {*} _renderer  Ignored — the impl rebuilds every `.pane-win`
- *                       globally rather than addressing one renderer.
+ * @param {object} renderer  DomRenderer for the pane this call addresses.
  * @param {{
  *   mapName: string,
  *   scores: number[],
@@ -62,16 +63,14 @@ const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
  *   winnerIndex: number,
  * }} payload
  */
-export function renderResults(_renderer, payload) {
-    for (const container of document.querySelectorAll('.pane-win')) {
-        container.replaceChildren(buildScoreboardNode(payload));
-    }
+export function renderResults(renderer, payload) {
+    const container = renderer.paneEl.querySelector('.pane-win');
+    if (container) container.replaceChildren(buildScoreboardNode(payload));
 }
 
-export function clearResults(_renderer) {
-    for (const container of document.querySelectorAll('.pane-win')) {
-        container.replaceChildren();
-    }
+export function clearResults(renderer) {
+    const container = renderer.paneEl.querySelector('.pane-win');
+    if (container) container.replaceChildren();
 }
 
 function buildScoreboardNode({ scores, kills, winnerIndex }) {
