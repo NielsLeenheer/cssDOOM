@@ -108,7 +108,7 @@ export class Game {
         orchestrator.setPayloadProvider(this);
 
         this._transitionTo('LOBBY');
-        orchestrator.showLobby();
+        orchestrator.showLobby(this.getLobbyPayload());
         this._emit('lobby-updated', this.getLobbyPayload());
 
         // Subscribe to device→slot claim changes so Local DM
@@ -127,7 +127,7 @@ export class Game {
         // NETWORK_START gate, not all-claimed auto-start.
         onClaimChange(() => {
             if (this._state !== 'LOBBY') return;
-            orchestrator.showLobby();
+            orchestrator.showLobby(this.getLobbyPayload());
             this._emit('lobby-updated', this.getLobbyPayload());
             this._checkAutoStart();
         });
@@ -141,7 +141,9 @@ export class Game {
         onMatch('ended', () => {
             if (this._state === 'ENDED' || this._state === 'RESULTS') return;
             this._transitionTo('RESULTS');
-            this._emit('match-ended', this.getResultsPayload());
+            const payload = this.getResultsPayload();
+            orchestrator.showResults(payload);
+            this._emit('match-ended', payload);
         });
 
         if (this.gameMode === 'singleplayer') {
@@ -346,7 +348,7 @@ export class Game {
      */
     claimSlot(slot, deviceId) {
         ensurePlayerCount(slot + 1);
-        orchestrator.showLobby();
+        orchestrator.showLobby(this.getLobbyPayload());
         this._emit('roster-updated', {
             slot,
             deviceId,
@@ -428,7 +430,7 @@ export class Game {
         // here (no claim change), so we have to push the re-render
         // explicitly. Otherwise the READY! overlay lingers over the
         // running match.
-        orchestrator.showLobby();
+        orchestrator.showLobby(this.getLobbyPayload());
         this._emit('lobby-updated', this.getLobbyPayload());
     }
 
@@ -464,7 +466,7 @@ export class Game {
         resetMatch();
 
         this._transitionTo('LOBBY');
-        orchestrator.showLobby();
+        orchestrator.showLobby(this.getLobbyPayload());
         this._emit('lobby-updated', this.getLobbyPayload());
         this._emit('match-restarted', { mapCursor: this.mapCursor });
 
@@ -627,7 +629,7 @@ export class Game {
             // Owning this here (not inside the renderer impl) keeps
             // the renderer a pure projection target.
             setGameState(GAME_STATE.INTERMISSION);
-            orchestrator.showIntermission();
+            orchestrator.showIntermission(this.getIntermissionPayload());
         } else {
             // DM: funnel into the same endMatch path as frag/time-limit.
             // The onMatch('ended') subscriber in start() flips _state

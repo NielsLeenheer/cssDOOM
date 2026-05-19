@@ -245,16 +245,10 @@ export function endMatch() {
     for (const p of state.players) clearMovingState(p);
 
     setGameState(GAME_STATE.ENDED);
-    // Signal the scoreboard — orchestrator pulls the current payload
-    // from the registered provider (Game.getResultsPayload), so this
-    // call carries no data. The same signal fires from both the
-    // frag/time-limit path (this function) and the DM exit-switch
-    // path (Game._onLevelComplete now calls endMatch), so winner +
-    // payload are always computed by the same code.
-    orchestrator.showResults();
-    // Notify subscribers (Game re-emits as 'match-ended'). Subscriber
-    // pulls a fresh payload from Game.getResultsPayload if it needs
-    // one, matching the orchestrator pattern.
+    // Notify subscribers. Game's onMatch('ended') subscriber owns the
+    // scoreboard dispatch (`orchestrator.showResults(game.getResultsPayload())`)
+    // — match.js doesn't import Game and doesn't construct the payload
+    // itself.
     _emitMatchEvent('ended');
 }
 
