@@ -200,6 +200,15 @@ export class RemoteGame {
         // APIs (no reaching past either's surface).
         domRendererManager.resetToJoinerSlot(slotIndex);
 
+        // One local audio listener at the master-assigned slot. applyMode
+        // skipped this because the slot wasn't known yet, AND
+        // resetToJoinerSlot just cleared every target — so this is the
+        // first time the joiner has any AudioRenderers. The listener's
+        // playerIndex matches the slot master sends updateCamera /
+        // playSound under, so the per-pane dispatch lands on it
+        // naturally.
+        this.orchestrator.configureAudio([slotIndex]);
+
         if (payload.level) {
             // Initial-bootstrap load — goes through the same per-window
             // pipeline as subsequent coordinated loads (orchestrator

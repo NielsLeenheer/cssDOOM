@@ -159,13 +159,14 @@ class Orchestrator {
         this._provider = null;
 
         // ── Audio listener lifecycle ────────────────────────────────
-        // Tracks the configured roster size + the global enable
-        // switch so `_rebuildAudioTargets` can recreate the audio
-        // listener set on any change (configureAudio, setAudioEnabled,
-        // bindRemoteSlot, unbindRemoteSlot). Listeners themselves
-        // live in `this.targets` like any other render target.
+        // Tracks the slots this window plays audio for + the global
+        // enable switch. `_rebuildAudioTargets` recreates the
+        // AudioRenderer set from these on any change (configureAudio,
+        // setAudioEnabled, bindRemoteSlot, unbindRemoteSlot). The
+        // listeners themselves live in `this.targets` like any other
+        // render target.
         this._audioEnabled = true;
-        this._audioSlotCount = 0;
+        this._audioSlots = [];
     }
 
     /** Register / clear the overlay payload provider. Game wires this
@@ -282,13 +283,21 @@ class Orchestrator {
     // current configuration in one place.
 
     /**
-     * (Re)build the listener set for a new player-roster size. Listener
-     * count drives the pan mode (1 = bearing-pan, 2+ = locked L/R for
-     * split-screen). Called by `mode.js`'s applyMode whenever the
-     * roster resizes and by `master.js`'s onJoin handler.
+     * (Re)build the listener set for the slots this window should play
+     * audio for. Master passes `[...state.players.keys()]` (its local
+     * roster, slots 0..N-1); a Network DM joiner passes `[slotIndex]`
+     * (its single master-assigned slot — its `state.players` array
+     * indices don't align with the master-side slot, so it can't use
+     * a `.keys()` of its local roster).
+     *
+     * Listener count drives the pan mode after suppression: 1 = bearing
+     * pan, 2+ = locked L/R for split-screen. Called by `mode.js`'s
+     * applyMode (master path), `master.js`'s onJoin handler, and the
+     * joiner's `_onAck` after `resetToJoinerSlot` puts its DomRenderer
+     * at the assigned slot.
      */
-    configureAudio(slotCount) {
-        this._audioSlotCount = slotCount;
+    configureAudio(slots) {
+        this._audioSlots = [...slots];
         this._rebuildAudioTargets();
     }
 
@@ -307,9 +316,9 @@ class Orchestrator {
     /**
      * Reconcile audio targets with current config. Drops every
      * AudioRenderer in `this.targets` and recreates listeners for the
-     * effective slot set — slots up to `_audioSlotCount`, minus those
-     * a Network DM remote currently owns audio for (the remote plays
-     * its own sounds on its own device).
+     * effective slot set — `_audioSlots` minus those a Network DM
+     * remote currently owns audio for (the remote plays its own
+     * sounds on its own device).
      *
      * Pan mode keys off the EFFECTIVE listener count after suppression
      * so a Network DM master with 1 local + 1 remote keeps its solo
@@ -326,11 +335,7 @@ class Orchestrator {
 
         if (!this._audioEnabled) return;
 
-        const activeSlots = [];
-        for (let slot = 0; slot < this._audioSlotCount; slot++) {
-            if (this._isSlotAudioSuppressed(slot)) continue;
-            activeSlots.push(slot);
-        }
+        const activeSlots = this._audioSlots.filter(s => !this._isSlotAudioSuppressed(s));
         const split = activeSlots.length >= 2;
         activeSlots.forEach((slot, idx) => {
             const paneSide = split ? (idx === 0 ? 'left' : 'right') : null;

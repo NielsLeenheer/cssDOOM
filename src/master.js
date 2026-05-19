@@ -295,8 +295,9 @@ function setupMasterBroadcast() {
             // (post-resetMatch) needs the matrix grown to match.
             ensureMatchSize(state.players.length);
             // Reflect the new roster size in audio listener config — a
-            // fresh AudioRenderer for the new slot if needed.
-            orchestrator.configureAudio(state.players.length);
+            // fresh AudioRenderer for the new slot if needed
+            // (suppressed slots get filtered out inside the rebuild).
+            orchestrator.configureAudio([...state.players.keys()]);
             // If this slot's player is currently marked dead (typically
             // because the previous peer here disconnected — onLeave
             // flags isDead so the abandoned slot drops out of the

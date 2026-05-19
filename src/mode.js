@@ -155,21 +155,23 @@ export function applyMode(gameMode, networkMode = 'standalone') {
         setDefaultSlot(0);
     }
 
-    // Reshape the master's local DomRenderers for this mode. Client
-    // windows skip this — they manage exactly one renderer for their
-    // own slot (see client.js).
+    // Reshape the master's local DomRenderers + audio listeners for
+    // this mode. Client windows skip both: they manage exactly one
+    // DomRenderer for their master-assigned slot (handled by
+    // RemoteGame._onAck → domRendererManager.resetToJoinerSlot), and
+    // their audio listener also lives at that slot (set by _onAck
+    // after the slot is known — applyMode runs BEFORE the join
+    // handshake assigns one, so configureAudio here would land at the
+    // wrong index).
     if (!document.body.classList.contains('client-window')) {
         domRendererManager.reshape(gameMode, networkMode);
+        // Master plays audio for every local player. SP gets one
+        // bearing-pan listener; DM gets two pane-side-locked listeners
+        // (slot 0 left, slot 1 right). Suppressed slots (Network DM
+        // remotes that play their own audio) are filtered inside
+        // _rebuildAudioTargets.
+        orchestrator.configureAudio([...state.players.keys()]);
     }
-
-    // (Re)build per-listener AudioRenderers for the new roster. SP gets
-    // one bearing-pan renderer; DM gets two pane-side-locked renderers
-    // (slot 0 left, slot 1 right). On a Local DM secondary this still
-    // builds them; RemoteGame._wireUp calls
-    // orchestrator.setAudioEnabled(false) immediately afterwards which
-    // tears them back down — brief flicker is harmless (no playSound
-    // can fire between applyMode and _wireUp).
-    orchestrator.configureAudio(state.players.length);
 }
 
 /**
