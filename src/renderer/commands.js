@@ -53,7 +53,6 @@ import * as playerVisuals from './scene/entities/player.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showLobby, hideLobby } from './screens/lobby.js';
-import { showAttract, hideAttract } from './screens/attract.js';
 import { showTimer } from './hud/match-timer.js';
 import { applyGameState } from '../game/game-state.js';
 
@@ -198,8 +197,15 @@ export const COMMANDS = {
     hideIntermission: { kind: 'world', impl: clearIntermission },
     showResults:      { kind: 'world', impl: renderResults },
     hideResults:      { kind: 'world', impl: clearResults },
-    showAttract:      { kind: 'world', impl: showAttract },
-    hideAttract:      { kind: 'world', impl: hideAttract },
+    // Attract overlay is one static element per pane (logo + "PRESS
+    // TO START" text in the pane template). Visibility is a per-pane
+    // `.active` class toggled by these impls. Inlined here (same
+    // shape as showPaused/hidePaused above) because the real attract
+    // module imports `game/level.js` and would create an init-time
+    // cycle (commands → attract → match → movement → renderer/index
+    // → commands) that breaks COMMANDS initialization.
+    showAttract:      { kind: 'world', impl: (r) => r.paneEl.querySelector('.pane-attract')?.classList.add('active') },
+    hideAttract:      { kind: 'world', impl: (r) => r.paneEl.querySelector('.pane-attract')?.classList.remove('active') },
     showTimer:        { kind: 'world', impl: showTimer },
 
     // ── Window: game-state transition ────────────────────────────────────

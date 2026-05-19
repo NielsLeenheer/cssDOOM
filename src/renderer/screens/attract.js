@@ -63,21 +63,13 @@ export function isAttractActive() {
     return getGameState() === GAME_STATE.ATTRACT;
 }
 
-// ── Renderer-command entry points ──────────────────────────────────────
-// The attract overlay's static content lives in the pane template
-// (logo + PRESS TO START); these commands flip the per-pane `.active`
-// class that CSS reads for visibility. World-kind so master's
-// enterAttract / exitAttract fan to every joiner's pane(s) automatically.
-
-export function showAttract(renderer) {
-    const el = renderer.paneEl.querySelector('.pane-attract');
-    if (el) el.classList.add('active');
-}
-
-export function hideAttract(renderer) {
-    const el = renderer.paneEl.querySelector('.pane-attract');
-    if (el) el.classList.remove('active');
-}
+// The renderer-side `showAttract` / `hideAttract` impls (per-pane
+// `.active` class toggles) live inline in `src/renderer/commands.js`.
+// They're not in this file because attract.js's game/ imports would
+// create an init-time cycle through commands.js → here → match.js →
+// movement.js → renderer/index.js → commands.js, breaking COMMANDS
+// initialization. attract.js's lifecycle (enterAttract / exitAttract)
+// still drives them via `orchestrator.showAttract()` / `.hideAttract()`.
 
 /**
  * Called by input modules whenever they observe a button press, axis nudge,
