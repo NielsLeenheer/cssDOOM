@@ -39,13 +39,12 @@ import { initDebugMenu, updateDebugStats } from './renderer/hud/debug.js';
 import { attractTick, isAttractActive } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
-import { onClaimChange } from './input/claim-registry.js';
 import { BroadcastChannelTransport } from './transport/transport.js';
 import { BROADCAST_CHANNEL_NAME } from './transport/protocol.js';
 import { initMasterConnection } from './network-host.js';
 import { setNetworkSlotOccupant } from './game/lobby-state.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
-import { onMatch, ensureMatchSize } from './game/match.js';
+import { ensureMatchSize } from './game/match.js';
 import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
 
@@ -215,12 +214,11 @@ function setupMasterBroadcast() {
             // in network mode and this is an actual remote (not the
             // Local DM 'local' BroadcastChannel peer).
             if (state.networkMode === 'host' && peerKey !== 'local') {
+                // setNetworkSlotOccupant emits a lobby-state change;
+                // Game's onLobbyChange subscriber repaints. No explicit
+                // showLobby needed here.
                 setNetworkSlotOccupant(slot, 'remote');
             }
-            // Send current lobby state right away so the freshly-
-            // connected client's pane shows the correct prompt
-            // immediately (instead of waiting for the next claim event).
-            orchestrator.showLobby();
         },
         onReady: (peerKey) => {
             // Client has confirmed its RenderClient is subscribed. NOW
@@ -329,10 +327,11 @@ function setupMasterBroadcast() {
                     player.isDead = true;
                     if (player.thingRef) player.thingRef.collected = true;
                 }
+                // setNetworkSlotOccupant emits a lobby-state change;
+                // Game's onLobbyChange subscriber repaints (the
+                // remaining connected joiners drop the departed peer's
+                // row to "WAITING FOR PLAYER" via that path).
                 setNetworkSlotOccupant(slot, 'empty');
-                // Re-broadcast so any still-connected joiners drop
-                // the departed peer's row to "WAITING FOR PLAYER".
-                orchestrator.showLobby();
             }
         },
     });
@@ -344,27 +343,22 @@ function setupMasterBroadcast() {
     const localTransport = new BroadcastChannelTransport(BROADCAST_CHANNEL_NAME);
     masterConnection.addPeer(localTransport, 'local');
 
-    // Mirror master's lobby state onto any connected client. Fires on
-    // every local claim add/remove (via the orchestrator's claim notify)
-    // and on match-reset. orchestrator.showLobby pulls the current
-    // payload from Game (see Game.getLobbyPayload) and fans to every
-    // target — master's own panes + each connected sink.
-    onClaimChange(() => orchestrator.showLobby());
-    onMatch('reset',  () => orchestrator.showLobby());
+    // Lobby repaint triggers live in the state owners now:
+    //   - Local-DM claim changes → Game's onClaimChange subscriber
+    //   - Network-DM roster / room-code → Game's onLobbyChange
+    //     subscriber (fired from lobby-state.js setters)
+    //   - Match reset → match.js's 'reset' emit → lobby-state's
+    //     setCarriedOverClaims → onLobbyChange → Game
+    // master.js used to host duplicate onClaimChange + onMatch('reset')
+    // subscribers that called orchestrator.showLobby; both are gone.
 
     // Scoreboard fan-out to clients is handled by the renderer-command
-    // pipeline: match.js::endMatch and Game._onLevelComplete (DM
-    // exit-switch path) both push orchestrator.showResults, which fans
-    // to master's own pane(s) AND every connected client.
+    // pipeline: match.js::endMatch's _emitMatchEvent('ended') triggers
+    // Game's onMatch('ended') subscriber, which fires
+    // orchestrator.showResults(getResultsPayload()). DM exit-switch
+    // path funnels through the same endMatch.
 
 }
-
-// broadcastLobbyState used to build a lobby payload from master-side
-// state and push it through orchestrator.updateLobbyState. Both the
-// payload-build and the updateLobbyState command have been folded
-// away: Game owns the unified payload via getLobbyPayload, and
-// orchestrator.showLobby pulls it on every signal. Call sites now
-// just signal `orchestrator.showLobby()`.
 
 // ── Boot ───────────────────────────────────────────────────────────────
 

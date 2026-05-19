@@ -23,7 +23,6 @@
 
 import { listenForNetworkClients } from './transport/webrtc-transport.js';
 import { setRoomCodeState } from './game/lobby-state.js';
-import { orchestrator } from './orchestrator.js';
 import { MasterConnection } from './transport/peer-connection.js';
 
 // 25-char alphabet without visually-ambiguous glyphs:
@@ -116,8 +115,9 @@ export function openRoom() {
     }
     if (roomController) return;
     if (!activeRoomCode) activeRoomCode = generateRoomCode();
+    // setRoomCodeState emits a lobby-state change; Game's
+    // onLobbyChange subscriber repaints with the new code.
     setRoomCodeState(activeRoomCode);
-    orchestrator.showLobby();
     roomController = listenForNetworkClients({
         roomCode: activeRoomCode,
         onPeerConnected: (transport, peerId) => {
@@ -141,8 +141,9 @@ export function closeRoom() {
     }
     if (activeRoomCode) {
         activeRoomCode = null;
+        // setRoomCodeState emits a lobby-state change; Game's
+        // onLobbyChange subscriber repaints with the cleared code.
         setRoomCodeState(null);
-        orchestrator.showLobby();
     }
     console.log('[network-host] room closed');
 }

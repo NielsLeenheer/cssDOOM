@@ -30,6 +30,7 @@ import {
     getRoomCode,
     getLocallyClaimableSlots,
     countOccupied as countNetworkLobbyOccupied,
+    onLobbyChange,
 } from './lobby-state.js';
 
 // How long to keep the just-claimed pane's READY indicator visible
@@ -100,16 +101,29 @@ export class Game {
      * Called from `App.startLocalGame`.
      */
     async start() {
-        // Register as the orchestrator's payload provider so signals
-        // like `orchestrator.showResults()` pull current state from
-        // here rather than the caller carrying a payload. Cleared in
-        // stop() so a stale Game doesn't keep serving payloads after
-        // teardown.
+        // Register as the orchestrator's payload provider so any
+        // remaining puller-driven signals (replayCurrentOverlayTo)
+        // can fetch from here. Cleared in stop() so a stale Game
+        // doesn't keep serving payloads after teardown.
         orchestrator.setPayloadProvider(this);
 
         this._transitionTo('LOBBY');
         orchestrator.showLobby(this.getLobbyPayload());
         this._emit('lobby-updated', this.getLobbyPayload());
+
+        // Subscribe to lobby-state changes. lobby-state.js's setters
+        // (mutated by mode.js, master.js's onJoin/onLeave, network-host
+        // openRoom/closeRoom, and the match-reset hook) emit on every
+        // write — the render decision lives WITH the state owner, not
+        // scattered across the mutators. This subscriber repaints once
+        // per emit, gated on the LOBBY game-state so it stays inert
+        // outside the lobby phase.
+        this._unsubscribeLobbyChange = onLobbyChange(() => {
+            if (this._state !== 'LOBBY') return;
+            const payload = this.getLobbyPayload();
+            orchestrator.showLobby(payload);
+            this._emit('lobby-updated', payload);
+        });
 
         // Subscribe to device→slot claim changes so Local DM
         // auto-starts when both slots are claimed AND the lobby UI
@@ -127,8 +141,9 @@ export class Game {
         // NETWORK_START gate, not all-claimed auto-start.
         onClaimChange(() => {
             if (this._state !== 'LOBBY') return;
-            orchestrator.showLobby(this.getLobbyPayload());
-            this._emit('lobby-updated', this.getLobbyPayload());
+            const payload = this.getLobbyPayload();
+            orchestrator.showLobby(payload);
+            this._emit('lobby-updated', payload);
             this._checkAutoStart();
         });
 
@@ -332,6 +347,14 @@ export class Game {
         // Game (this stop) before constructing the next, so we never
         // clobber a newer provider here.
         orchestrator.setPayloadProvider(null);
+
+        // Drop the lobby-state subscription so a post-stop emit
+        // doesn't fan into a dead Game instance. (Other subscribers
+        // — onClaimChange, onMatch — currently can't be unsubscribed;
+        // they're state-gated to LOBBY instead. See the comment in
+        // start() about claim-registry's missing unsubscribe API.)
+        this._unsubscribeLobbyChange?.();
+        this._unsubscribeLobbyChange = null;
 
         this._transitionTo('ENDED');
         this._emit('game-ended', {});

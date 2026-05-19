@@ -3,10 +3,12 @@
  * that both the Local DM and Network DM lobby screens read from
  * (via Game.getLobbyPayload).
  *
- * Pure data + accessors; no DOM. Mutation sites (mode.js,
- * network-host.js, master.js's onJoin/onLeave handlers) update
- * through the setters here and then trigger `orchestrator.showLobby()`
- * so the next render reflects the change.
+ * Pure data + accessors; no DOM. Mutation goes through the setters
+ * below. Each setter calls `_emitLobbyChange()` after mutating so the
+ * single subscriber (Game.start wires `onLobbyChange`) fires
+ * `orchestrator.showLobby(getLobbyPayload())` once per change. Callers
+ * never trigger renders themselves — the state owner does, because the
+ * lobby update IS a consequence of the state changing.
  *
  * The match-reset hook below snapshots which slots were already
  * claimed at the start of the current lobby session into
@@ -19,6 +21,26 @@ import { onMatch } from './match.js';
 import { isSlotClaimedLocally } from '../input/claim-registry.js';
 
 const MAX_SLOTS = 4;
+
+// ── Change-event channel ──
+// Synchronous fan-out — every subscriber runs before the setter
+// returns. Matches the pattern of onMatch / onLevel emitters
+// elsewhere in this codebase.
+//
+// Coalescing: none. If a caller mutates several setters back-to-back
+// (e.g. mode.js entering Network DM), each emit fires the subscriber
+// separately, producing N renders for one logical change. Renders
+// are idempotent so this is benign; revisit if profiling shows it.
+const _listeners = new Set();
+
+export function onLobbyChange(handler) {
+    _listeners.add(handler);
+    return () => _listeners.delete(handler);
+}
+
+function _emitLobbyChange() {
+    for (const h of _listeners) h();
+}
 
 // ── Local DM carried-over claims ──
 // Snapshot of which slots were already claimed at the start of the
@@ -35,6 +57,7 @@ export function getCarriedOverClaims() {
 
 export function setCarriedOverClaims(s) {
     carriedOverClaims = s;
+    _emitLobbyChange();
 }
 
 // ── Network DM slot state ──
@@ -78,14 +101,15 @@ export function resetNetworkSlotState() {
     for (let i = 0; i < MAX_SLOTS; i++) {
         slotState[i] = { occupant: 'empty', labelOverride: null };
     }
+    _emitLobbyChange();
 }
 
-/** Set a single slot's occupant + label override. Caller is expected
- *  to also push DOM updates and trigger the next showLobby render. */
+/** Set a single slot's occupant + label override. */
 export function setNetworkSlotOccupant(slot, occupant, labelOverride = null) {
     if (!slotState[slot]) return;
     slotState[slot].occupant = occupant;
     slotState[slot].labelOverride = labelOverride;
+    _emitLobbyChange();
 }
 
 /** Number of slots currently occupied (anything other than 'empty'). */
@@ -110,6 +134,7 @@ export function getLocallyClaimableSlots() {
 
 export function setLocallyClaimableSlotsState(slots) {
     locallyClaimableSlots = new Set(slots);
+    _emitLobbyChange();
 }
 
 // ── Network DM room code ──
@@ -121,6 +146,7 @@ export function getRoomCode() {
 
 export function setRoomCodeState(code) {
     roomCode = code;
+    _emitLobbyChange();
 }
 
 // ── Match-reset hook ──
@@ -130,13 +156,13 @@ export function setRoomCodeState(code) {
 // READY overlay flash; carried-over claims don't re-flash.
 //
 // Subscribed at module load. Game.restartMatch / match.js::resetMatch
-// emit 'reset' which triggers this; the next orchestrator.showLobby
-// (fired by master.js's onMatch('reset') subscriber) renders the
-// updated state.
+// emit 'reset' which triggers this; setCarriedOverClaims fires the
+// lobby-change emit so any active Game-side subscriber renders the
+// updated state without needing its own match-reset wire.
 onMatch('reset', () => {
     const carried = new Set();
     for (let i = 0; i < state.players.length; i++) {
         if (isSlotClaimedLocally(i)) carried.add(i);
     }
-    carriedOverClaims = carried;
+    setCarriedOverClaims(carried);
 });
