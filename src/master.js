@@ -36,7 +36,7 @@ import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
 import { initDebugMenu, updateDebugStats } from './renderer/hud/debug.js';
-import { attractTick, isAttractActive } from './renderer/screens/attract.js';
+import { attractTick, isAttractActive } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
 import { onClaimChange } from './input/claim-registry.js';
@@ -89,14 +89,6 @@ function renderAllActivePanes() {
 
 // ── Game loop ──────────────────────────────────────────────────────────
 
-// During attract mode we don't need 60Hz rendering — the rotation is
-// slow enough that 20 fps looks visually identical. Throttling here
-// significantly reduces the kiosk's GPU compositor work (every render
-// re-composites the perspective-transformed scene tree), which is what
-// was spinning the cooling fans during idle attract.
-const ATTRACT_RENDER_INTERVAL_MS = 50;
-let lastAttractRenderAt = 0;
-
 function gameLoop(timestamp) {
     if (!mapData) {
         requestAnimationFrame(gameLoop);
@@ -105,19 +97,14 @@ function gameLoop(timestamp) {
 
     attractTick(timestamp);
     if (isAttractActive()) {
-        // Skip game logic in attract mode — attractTick is rotating the
-        // camera; just render the current scene state and idle the world.
-        // Render at ~20 fps instead of 60 fps to keep idle GPU load down.
-        if (timestamp - lastAttractRenderAt >= ATTRACT_RENDER_INTERVAL_MS) {
-            renderAllActivePanes();
-            lastAttractRenderAt = timestamp;
-        }
+        // World is frozen and every per-pane camera rotation runs
+        // inside the renderer-side attract animation (see
+        // src/renderer/screens/attract.js — self-throttled to ~20 fps
+        // to keep idle GPU load down). Master has no per-frame work
+        // until input wakes us, so just yield to the next RAF.
         requestAnimationFrame(gameLoop);
         return;
     }
-    // Reset the throttle on attract exit so the first post-attract frame
-    // renders immediately rather than waiting for the next interval.
-    lastAttractRenderAt = 0;
 
     // Freeze game logic only when EVERY player is dead. In DM with one
     // player alive, the world (enemies, doors, etc.) keeps ticking and the

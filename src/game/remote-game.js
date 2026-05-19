@@ -32,7 +32,7 @@ import { initGamepadInput } from '../input/gamepad.js';
 import { initTouchInput } from '../input/touch.js';
 import { on } from '../input/event-bus.js';
 import * as A from '../input/actions.js';
-import { isAttractActive } from '../renderer/screens/attract.js';
+import { isAttractActive } from './attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
 import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
@@ -124,11 +124,11 @@ export class RemoteGame {
 
         this._connection = new ClientConnection({
             transport: this._transport, // null for Local DM → BroadcastChannel default
-            // Lobby / match-end / game-state UI updates ride the
+            // Lobby / match-end / overlay updates ride the
             // renderer-command pipeline (showLobby, showResults,
-            // setGameState). Impls live in renderer/screens/lobby.js,
-            // renderer/screens/scoreboard.js, and the setGameState
-            // window-command impl in renderer/commands.js.
+            // showAttract, etc.). Impls live in renderer/screens/.
+            // Game state (game-state.js) is master-local now — the
+            // joiner doesn't sync or read it.
             //
             // Coordinated in-place loadMap rides `cmd-world loadMap`
             // through RenderClient — see render-client.js for the

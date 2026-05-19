@@ -14,7 +14,7 @@ import { mapData, currentMap, getNextMap } from '../../shared/maps/index.js';
 import { swapLevel } from '../../game/level.js';
 import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { endMatch } from '../../game/match.js';
-import { enterAttract } from '../screens/attract.js';
+import { enterAttract } from '../../game/attract.js';
 import { captureSpStats } from '../../game/sp-stats.js';
 import { GAME_STATE, setGameState } from '../../game/game-state.js';
 import { orchestrator } from '../../orchestrator.js';

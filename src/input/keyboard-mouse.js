@@ -49,7 +49,7 @@
 import { registerInputProvider } from '../orchestrator.js';
 import { getDriverSlot, tryClaimSlot, applySavedClaim } from './claim-registry.js';
 import { isMenuOpen } from '../ui/menu.js';
-import { pingActivity } from '../renderer/screens/attract.js';
+import { pingActivity } from '../game/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { emit } from './event-bus.js';
 import * as A from './actions.js';

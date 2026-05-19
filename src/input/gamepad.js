@@ -35,7 +35,7 @@
 
 import { inputs, registerInputProvider } from '../orchestrator.js';
 import { getDriverSlot, unclaim, applySavedClaim } from './claim-registry.js';
-import { pingActivity } from '../renderer/screens/attract.js';
+import { pingActivity } from '../game/attract.js';
 import { emit } from './event-bus.js';
 import * as A from './actions.js';
 
