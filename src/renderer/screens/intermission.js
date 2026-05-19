@@ -4,116 +4,68 @@
  * Mirrors DOOM's post-level summary: FINISHED title over the WIMAP0
  * intermission backdrop, then KILLS / ITEMS / SECRET as % and TIME as
  * m:ss. Each value counts up from zero to its final reading in turn,
- * matching the original game. Shown when the player triggers an exit
- * (switch or walk-over); a fire press snaps any in-progress counter to
- * its final value, a second fire press dismisses and loads the next map.
+ * matching the original game.
  *
- * Built into every `.pane-intermission` element — same pattern as the
- * DM scoreboard. In SP only pane 0 is visible so the second pane's
- * copy is hidden by CSS (display: none on .pane-intermission unless
- * body[data-game-state="intermission"]).
+ * Built per pane, dispatched once per render target. Every write lands
+ * inside `renderer.paneEl` — no document-scoped queries, no body
+ * writes, no game-state reads. CSS hides the screen when
+ * `body[data-game-state="intermission"]` isn't set (that attribute is
+ * owned by Game, not by this module).
+ *
+ * Each pane runs its own count-up animation. Dispatch fires `renderIntermission`
+ * once per renderer within the same task, so they start nearly synchronously
+ * and tick in visual lockstep without explicit cross-pane coordination.
+ * Each pane's cancel-fn lives in a module-local WeakMap keyed on the
+ * pane's intermission container — equivalent to a property on the
+ * element, scoped to this module.
  */
-
-import { GAME_STATE, getGameState } from '../../game/game-state.js';
-import { orchestrator } from '../../orchestrator.js';
 
 const LABEL_BASE = '/assets/intermission';
 const COUNT_UP_MS = 1200;     // per-row duration
 const STEP_DELAY_MS = 250;    // pause between rows
 
-let pendingNextMap = null;
-let onAdvance = null;
-let dismissable = false;
-// Set while the count-up animations are running. First fire press
-// during this period snaps everything to final; second press dismisses.
-let animating = false;
-let finalizeAnimation = null;
+// Per-pane animation cancel-fn lookup. WeakMap keyed on the
+// `.pane-intermission` container so the entry is garbage-collected
+// when the pane is destroyed without explicit cleanup.
+const animationsByPane = new WeakMap();
+
+// ── Renderer-command entry points ──────────────────────────────────────
+// Game pushes showIntermission / hideIntermission through the
+// orchestrator (see src/renderer/commands.js); commands.js imports
+// these directly and wires them as the world-command impls. Game also
+// owns the `body.dataset.gameState` transition that gates CSS
+// visibility — this module never touches it.
 
 /**
- * Render the intermission and arm the fire-key advance callback.
+ * @param {object} renderer  DomRenderer for the pane this call addresses.
  * @param {object} payload
- * @param {string|null} payload.nextMap  Map to load when the player presses fire,
- *                                       or null if there's no next map (final
- *                                       level). The advance handler is still
- *                                       installed but does nothing in that case.
- * @param {string|null} payload.mapName  Name of the level just finished — drives
- *                                       the WILV title sprite at the top of the
- *                                       screen.
- * @param {{kills,items,secrets,elapsedMs}|null} payload.stats  SP stats snapshot.
- *                                       Null outside SP mode, in which case
- *                                       the function early-returns.
- * @param {() => void} advanceCallback  Called once the player dismisses
- *                                the screen — typically `() => loadMap(next)`.
+ * @param {string|null} payload.mapName  Name of the level just finished —
+ *                                       drives the WILV title sprite.
+ * @param {{kills,items,secrets,elapsedMs}|null} payload.stats
+ *                                       Null outside SP mode (function
+ *                                       early-returns).
  */
-export function showIntermission(payload, advanceCallback) {
+export function renderIntermission(renderer, payload) {
     if (!payload?.stats) return;
+    const container = renderer.paneEl.querySelector('.pane-intermission');
+    if (!container) return;
 
-    pendingNextMap = payload.nextMap;
-    onAdvance = advanceCallback;
+    // Cancel any in-flight animation on this pane before rebuilding
+    // (defensive — a second showIntermission without an intervening
+    // hide shouldn't leak RAF / timeout handles).
+    animationsByPane.get(container)?.();
 
-    for (const container of document.querySelectorAll('.pane-intermission')) {
-        container.replaceChildren(buildIntermissionNode(payload.mapName));
-    }
-    orchestrator.setGameState(GAME_STATE.INTERMISSION);
-
-    // Brief grace period — the same fire press that triggered the exit
-    // (in attract-like flows) shouldn't immediately advance the screen.
-    dismissable = false;
-    setTimeout(() => { dismissable = true; }, 500);
-
-    runCountUp(payload.stats);
+    container.replaceChildren(buildIntermissionNode(payload.mapName));
+    const cancel = runCountUp(container, payload.stats);
+    animationsByPane.set(container, cancel);
 }
 
-export function hideIntermission() {
-    if (getGameState() === GAME_STATE.INTERMISSION) {
-        orchestrator.setGameState(GAME_STATE.ACTIVE);
-    }
-    pendingNextMap = null;
-    onAdvance = null;
-    dismissable = false;
-    animating = false;
-    finalizeAnimation?.();
-    finalizeAnimation = null;
-    for (const container of document.querySelectorAll('.pane-intermission')) {
-        container.replaceChildren();
-    }
-}
-
-/** True if the intermission is currently shown (input handlers route
- *  fire to advance instead of fireWeapon). */
-export function isIntermissionActive() {
-    return getGameState() === GAME_STATE.INTERMISSION;
-}
-
-/**
- * Called by input handlers when fire is pressed during intermission.
- * First press during count-up snaps the animation to final values; a
- * subsequent press loads the next map.
- */
-export function dismissIntermission() {
-    if (!isIntermissionActive() || !dismissable) return;
-    if (animating) {
-        finalizeAnimation?.();
-        return;
-    }
-    const next = pendingNextMap;
-    const cb = onAdvance;
-    // Lock against a double-press during the fade. dismissable=false
-    // makes a second dismissIntermission call a no-op until the
-    // intermission state clears.
-    dismissable = false;
-    pendingNextMap = null;
-    onAdvance = null;
-    // Kick off the next map load FIRST — loadMap's fade-to-black
-    // overlay (z-index 10000) starts transitioning in immediately, so
-    // it covers the intermission before we clear it. Hiding the
-    // intermission first would briefly reveal the old level scene
-    // between the dismiss and the fade-in. The loading overlay's fade
-    // is 600 ms; clear the intermission once it's fully opaque so the
-    // black screen smoothly transitions to the new level rather than
-    // back to the old one.
-    cb?.(next);
-    setTimeout(hideIntermission, 600);
+export function clearIntermission(renderer) {
+    const container = renderer.paneEl.querySelector('.pane-intermission');
+    if (!container) return;
+    animationsByPane.get(container)?.();
+    animationsByPane.delete(container);
+    container.replaceChildren();
 }
 
 function buildIntermissionNode(mapName) {
@@ -168,10 +120,10 @@ function buildStatRow(key, labelFile, alt) {
 
 /**
  * Animate each stat counting up from 0 → its target, sequentially.
- * The finalizeAnimation hook lets the input handler snap everything
- * to final mid-count.
+ * Scoped to one pane: all element lookups are inside `container`.
+ * Returns a cancel function that aborts any in-flight RAF / timeout.
  */
-function runCountUp(stats) {
+function runCountUp(container, stats) {
     const steps = [
         { selector: '.intermission-value-kills',   target: percentValue(stats.kills),   format: percentStr },
         { selector: '.intermission-value-items',   target: percentValue(stats.items),   format: percentStr },
@@ -179,35 +131,25 @@ function runCountUp(stats) {
         { selector: '.intermission-value-time',    target: stats.elapsedMs / 1000,       format: timeStr },
     ];
 
-    animating = true;
-
     let cancelled = false;
     let rafId = null;
     let timeoutId = null;
 
-    finalizeAnimation = () => {
-        cancelled = true;
-        if (rafId != null) cancelAnimationFrame(rafId);
-        if (timeoutId != null) clearTimeout(timeoutId);
-        for (const step of steps) writeAll(step.selector, step.format(step.target));
-        animating = false;
-        finalizeAnimation = null;
+    const write = (selector, text) => {
+        const el = container.querySelector(selector);
+        if (el) el.textContent = text;
     };
 
     let i = 0;
     function startNext() {
         if (cancelled) return;
-        if (i >= steps.length) {
-            animating = false;
-            finalizeAnimation = null;
-            return;
-        }
+        if (i >= steps.length) return;
         const step = steps[i++];
         const t0 = performance.now();
         function tick(now) {
             if (cancelled) return;
             const t = Math.min(1, (now - t0) / COUNT_UP_MS);
-            writeAll(step.selector, step.format(step.target * t));
+            write(step.selector, step.format(step.target * t));
             if (t < 1) {
                 rafId = requestAnimationFrame(tick);
             } else {
@@ -218,10 +160,12 @@ function runCountUp(stats) {
         rafId = requestAnimationFrame(tick);
     }
     startNext();
-}
 
-function writeAll(selector, text) {
-    for (const el of document.querySelectorAll(selector)) el.textContent = text;
+    return () => {
+        cancelled = true;
+        if (rafId != null) cancelAnimationFrame(rafId);
+        if (timeoutId != null) clearTimeout(timeoutId);
+    };
 }
 
 function percentValue({ collected, total }) {
@@ -252,23 +196,4 @@ function levelNameSpriteSrc(mapName) {
     if (!match) return null;
     const idx = Number(match[1]) - 1;
     return `${LABEL_BASE}/WILV0${idx}.png`;
-}
-
-// ── Renderer-command entry points ──────────────────────────────────────
-// Game pushes showIntermission / hideIntermission through the
-// orchestrator (see src/renderer/commands.js); commands.js imports
-// these directly and wires them as the world-command impls. The
-// advance callback is a no-op because Game.advance is the sole
-// dismiss path: actions/gates.js's intermissionAdvance fires
-// Game.advance on FIRE_DOWN, which pushes hideIntermission via
-// orchestrator. dismissIntermission's onAdvance invocation is dead
-// code on master (gates routes to Game.advance first) and on the
-// joiner (gates aren't initialized client-side).
-
-export function renderIntermission(_renderer, payload) {
-    showIntermission(payload, () => {});
-}
-
-export function clearIntermission(_renderer) {
-    hideIntermission();
 }

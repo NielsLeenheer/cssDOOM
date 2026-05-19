@@ -25,7 +25,7 @@
 import { state } from '../game/state.js';
 import { isMenuOpen } from '../ui/menu.js';
 import { isMatchEnded, isMatchLobby } from '../game/match.js';
-import { isIntermissionActive } from '../renderer/screens/intermission.js';
+import { GAME_STATE, getGameState } from '../game/game-state.js';
 import { spawnPlayer } from '../game/player/spawn.js';
 import { tryClaimSlot } from '../input/claim-registry.js';
 import { currentMap } from '../shared/maps/index.js';
@@ -58,7 +58,7 @@ export function initGates() {
     // detection — re-firing level-complete and restarting the
     // intermission count-up.
     const intermissionAdvance = () => {
-        if (!isIntermissionActive()) return;
+        if (getGameState() !== GAME_STATE.INTERMISSION) return;
         window.app.game.advance();
         return true;
     };

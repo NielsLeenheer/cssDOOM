@@ -15,8 +15,9 @@ import { swapLevel } from '../../game/level.js';
 import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { endMatch } from '../../game/match.js';
 import { enterAttract } from '../screens/attract.js';
-import { showIntermission } from '../screens/intermission.js';
 import { captureSpStats } from '../../game/sp-stats.js';
+import { GAME_STATE } from '../../game/game-state.js';
+import { orchestrator } from '../../orchestrator.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 
@@ -398,11 +399,19 @@ export function initDebugMenu() {
     intermissionBtn.textContent = 'Show intermission';
     intermissionBtn.style.cssText = buttonStyle;
     intermissionBtn.addEventListener('click', () => {
-        showIntermission({
+        // Drive the same flow Game._onLevelComplete uses: flip the
+        // window state so CSS shows the overlay, then dispatch the
+        // payload-carrying renderer command. Dismissal goes through
+        // gates.js → Game.advance the same way as a real exit — but
+        // since debug.js bypasses _onLevelComplete, _pendingNextMap
+        // isn't set and advance() won't load the next map. (Same
+        // limitation as before this refactor.)
+        orchestrator.setGameState(GAME_STATE.INTERMISSION);
+        orchestrator.showIntermission({
             nextMap: getNextMap(),
             mapName: currentMap,
             stats: captureSpStats(),
-        }, (next) => { if (next) swapLevel(next); });
+        });
     });
     details.appendChild(intermissionBtn);
 

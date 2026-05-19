@@ -19,6 +19,7 @@ import { Level, _setCurrentLevel, getCurrentLevel } from './level.js';
 import { orchestrator } from '../orchestrator.js';
 import { getNextMap, currentMap } from '../shared/maps/index.js';
 import { captureSpStats } from './sp-stats.js';
+import { GAME_STATE, getGameState } from './game-state.js';
 import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
@@ -517,6 +518,12 @@ export class Game {
      * Called from `actions/gates.js` on FIRE_DOWN during INTERMISSION.
      */
     async advance() {
+        // Reverse of _onLevelComplete's setGameState: INTERMISSION → ACTIVE
+        // BEFORE hideIntermission so CSS hides the overlay via the body
+        // attribute first, then the DOM clears.
+        if (getGameState() === GAME_STATE.INTERMISSION) {
+            orchestrator.setGameState(GAME_STATE.ACTIVE);
+        }
         orchestrator.hideIntermission();
         if (this._pendingNextMap) {
             this.mapCursor = this._pendingNextMap;
@@ -614,6 +621,12 @@ export class Game {
             // event-bus-driven.
             if (this.level) this.level.stop();
             this._transitionTo('INTERMISSION');
+            // Drive the parallel game-state.js machine → INTERMISSION
+            // so body.dataset.gameState gates the per-pane overlay
+            // visibility, and fan the transition to every joiner.
+            // Owning this here (not inside the renderer impl) keeps
+            // the renderer a pure projection target.
+            orchestrator.setGameState(GAME_STATE.INTERMISSION);
             orchestrator.showIntermission();
         } else {
             // DM: funnel into the same endMatch path as frag/time-limit.
