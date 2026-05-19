@@ -215,10 +215,11 @@ body.network-client .network-lobby-aside { display: none; }
 .network-invite-qr:empty { display: none; }
 
 /* Per-pane action prompt ---------------------------------------------
-   Hidden by default. body[data-network-ready="true"] (set by the JS
-   when ≥ 2 slots are occupied) flips it on. The text differs per
-   pane: pane 0 (the host's view) prompts the host to fire; every
-   other pane shows the waiting message. */
+   Text content is written by the lobby renderer impl (lobby.js's
+   renderNetworkLobby): empty until ≥ 2 slots are occupied, then
+   "Press fire to start game" on the host's pane and "Waiting for
+   game to start" on every other pane. The CSS only handles
+   appearance — visibility is implicit from the text presence. */
 
 .network-action-prompt {
     font-size: 16px;
@@ -230,11 +231,4 @@ body.network-client .network-lobby-aside { display: none; }
     letter-spacing: 2px;
     min-height: 1.2em;
     margin-top: 8px;
-}
-
-body[data-network-ready="true"] .pane[data-player="0"] .network-action-prompt::after {
-    content: 'Press fire to start game';
-}
-body[data-network-ready="true"] .pane:not([data-player="0"]) .network-action-prompt::after {
-    content: 'Waiting for game to start';
 }

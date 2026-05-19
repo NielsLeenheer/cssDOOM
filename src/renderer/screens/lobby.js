@@ -15,16 +15,16 @@
  *
  *   'network' — Network DM. Updates the `.pane-network-lobby`
  *               subtree inside the pane: per-slot `data-occupant`,
- *               labels, room code text + QR. Also writes
- *               `body.dataset.networkReady` when 2+ slots are
- *               occupied (per-pane impls write the same value
- *               idempotently in kiosk multi-pane mode).
+ *               labels, room code text + QR, and the per-pane
+ *               action prompt (text differs by host vs joiner pane).
  *
- * No game-side reads: the impl never imports state, claim-registry,
- * isMatchLobby, etc. Everything it needs is pre-derived in
- * Game.getLobbyPayload() and arrives via the payload. The match-reset
- * snapshot of carried-over claims lives in src/game/lobby-state.js;
- * the orchestrator.showLobby() trigger sites live in master.js / Game.
+ * Every write lands inside `renderer.paneEl` — no document-scoped
+ * queries, no body writes. No game-side reads either: the impl
+ * never imports state, claim-registry, isMatchLobby, etc.
+ * Everything it needs is pre-derived in Game.getLobbyPayload() and
+ * arrives via the payload. The match-reset snapshot of carried-over
+ * claims lives in src/game/lobby-state.js; the
+ * orchestrator.showLobby() trigger sites live in master.js / Game.
  */
 
 import qrcode from 'qrcode-generator';
@@ -101,12 +101,16 @@ function renderNetworkLobby(renderer, payload) {
     const qrEl = root.querySelector('.network-invite-qr');
     if (qrEl) qrEl.innerHTML = payload.roomCode ? renderQrSvg(payload.roomCode) : '';
 
-    // Window-level "PRESS FIRE TO START" gate. Per-pane impls write
-    // the same value once each in kiosk multi-pane mode — idempotent.
-    if (payload.canStart) {
-        document.body.dataset.networkReady = 'true';
-    } else {
-        delete document.body.dataset.networkReady;
+    // Per-pane action prompt. Text is empty until ≥ 2 slots are
+    // occupied (`payload.canStart`); then host pane prompts "Press
+    // fire", every other pane shows "Waiting." CSS only handles
+    // the appearance — the text presence is the visibility signal,
+    // same pattern as match-timer.
+    const promptEl = root.querySelector('.network-action-prompt');
+    if (promptEl) {
+        promptEl.textContent = !payload.canStart ? ''
+            : renderer.playerIndex === 0 ? 'Press fire to start game'
+            : 'Waiting for game to start';
     }
 }
 
