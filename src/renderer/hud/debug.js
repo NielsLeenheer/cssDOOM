@@ -6,7 +6,7 @@
 
 import { culling, cullingStats } from '../scene/culling.js';
 import { state, debug } from '../../game/state.js';
-import { EYE_HEIGHT } from '../../game/constants.js';
+import { EYE_HEIGHT } from '../../shared/constants.js';
 import { THING_NAMES } from '../scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../../game/physics.js';
 import { updateCamera } from '../index.js';

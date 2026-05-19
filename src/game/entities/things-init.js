@@ -16,7 +16,7 @@ import { state } from '../state.js';
 import {
     THING_HEALTH, ENEMY_AI_STATS, LINE_OF_SIGHT_CHECK_INTERVAL,
     SHOOTABLE, SOLID_THING_RADIUS,
-} from '../constants.js';
+} from '../../shared/constants.js';
 
 export function initThingsState() {
     state.things.length = 0;

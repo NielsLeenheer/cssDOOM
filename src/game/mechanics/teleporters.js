@@ -15,7 +15,7 @@
  * 4. One-shot teleporters (W1, type 39/125) are disabled after first use.
  */
 
-import { EYE_HEIGHT, PLAYER_RADIUS, SHOOTABLE, BARREL_RADIUS } from '../constants.js';
+import { EYE_HEIGHT, PLAYER_RADIUS, SHOOTABLE, BARREL_RADIUS } from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps/index.js';

@@ -6,7 +6,7 @@ import {
     SHOOTABLE, ENEMY_RADIUS, PLAYER_RADIUS,
     BARREL_EXPLOSION_DAMAGE, BARREL_RADIUS,
     INFIGHTING_THRESHOLD,
-} from '../constants.js';
+} from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { Player } from '../player/player.js';

@@ -53,7 +53,7 @@ import { pingActivity } from '../renderer/screens/attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { emit } from './event-bus.js';
 import * as A from './actions.js';
-import { WEAPONS } from '../game/constants.js';
+import { WEAPONS } from '../shared/constants.js';
 
 // ── Constants ──────────────────────────────────────────────────────────
 

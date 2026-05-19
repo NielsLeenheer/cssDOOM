@@ -2,7 +2,7 @@
  * Game update — runs all game systems for a single frame.
  */
 
-import { MAX_FRAME_DELTA_TIME } from './constants.js';
+import { MAX_FRAME_DELTA_TIME } from '../shared/constants.js';
 import { state } from './state.js';
 import { orchestrator } from '../orchestrator.js';
 import { updateMovement } from './movement.js';

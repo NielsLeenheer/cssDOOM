@@ -6,7 +6,7 @@ import {
     ENEMIES, ENEMY_PROJECTILES,
     MELEE_RANGE, LINE_OF_SIGHT_CHECK_INTERVAL, MAX_RENDER_DISTANCE,
     MAX_STEP_HEIGHT,
-} from '../constants.js';
+} from '../../shared/constants.js';
 
 import { state, debug } from '../state.js';
 import { Player } from '../player/player.js';

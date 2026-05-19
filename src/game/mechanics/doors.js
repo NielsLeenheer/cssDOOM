@@ -18,7 +18,7 @@
  *   activates an already-open door, the timer resets.
  */
 
-import { USE_RANGE, DOOR_CLOSE_DELAY } from '../constants.js';
+import { USE_RANGE, DOOR_CLOSE_DELAY } from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps/index.js';

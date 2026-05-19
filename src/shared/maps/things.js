@@ -16,7 +16,7 @@
  * handled by `src/game/entities/things-init.js::initThingsState`.
  */
 
-import { ENEMIES, PICKUPS, SHOOTABLE, SOLID_THING_RADIUS } from '../../game/constants.js';
+import { ENEMIES, PICKUPS, SHOOTABLE, SOLID_THING_RADIUS } from '../constants.js';
 import { getFloorHeightAt, getSectorAt } from '../../game/physics.js';
 import { state } from '../../game/state.js';
 

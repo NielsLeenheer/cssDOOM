@@ -20,7 +20,7 @@
  * these belong here.
  */
 
-import { PLAYER_RADIUS } from '../constants.js';
+import { PLAYER_RADIUS } from '../../shared/constants.js';
 import { state } from '../state.js';
 import { getSectorAt } from '../physics.js';
 import { mapData } from '../../shared/maps/index.js';

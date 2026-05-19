@@ -19,7 +19,7 @@
  * the platform is raised, handled externally by the collision system.
  */
 
-import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../constants.js';
+import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { mapData, sectorCenter } from '../../shared/maps/index.js';

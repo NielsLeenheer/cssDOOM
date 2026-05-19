@@ -17,7 +17,7 @@
 
 import { state } from './state.js';
 import { mapData } from '../shared/maps/index.js';
-import { ENEMIES } from './constants.js';
+import { ENEMIES } from '../shared/constants.js';
 
 // MF_COUNTITEM in DOOM source — armor, bonuses, soulsphere, powerups.
 // Stimpacks/medikits/ammo/weapons/backpack/keys are NOT counted items.

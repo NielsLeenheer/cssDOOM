@@ -21,7 +21,7 @@
 import {
     USE_RANGE, SWITCH_ON_PREFIX, SWITCH_OFF_PREFIX,
     EXIT_SPECIAL, SECRET_EXIT_SPECIAL,
-} from '../constants.js';
+} from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps/index.js';

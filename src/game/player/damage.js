@@ -2,7 +2,7 @@
  * Handles player damage, sector damage, and game state reset.
  */
 
-import { SECTOR_DAMAGE } from '../constants.js';
+import { SECTOR_DAMAGE } from '../../shared/constants.js';
 import { state } from '../state.js';
 import { orchestrator } from '../../orchestrator.js';
 import { pointInPolygon } from '../geometry.js';

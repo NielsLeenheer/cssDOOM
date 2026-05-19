@@ -18,7 +18,7 @@ import {
     PICKUP_EFFECTS, KEY_TYPES, PICKUPS, PICKUP_RANGE,
     MAX_HEALTH, MAX_ARMOR, MAX_AMMO, WEAPON_PICKUPS,
     POWERUP_DURATION,
-} from '../constants.js';
+} from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { equipWeapon } from '../entities/weapons.js';

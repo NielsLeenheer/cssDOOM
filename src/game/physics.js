@@ -12,7 +12,7 @@
  * coordinates regardless of state.players[0]'s position.
  */
 
-import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from './constants.js';
+import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from '../shared/constants.js';
 import { state, debug } from './state.js';
 import { isDoorClosed, getDoorEntry } from './mechanics/doors.js';
 import { circleLineCollision, pointInPolygon } from './geometry.js';

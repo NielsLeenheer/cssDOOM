@@ -29,7 +29,7 @@
 import { state } from '../../game/state.js';
 import { swapLevel } from '../../game/level.js';
 import { getFloorHeightAt } from '../../game/physics.js';
-import { EYE_HEIGHT } from '../../game/constants.js';
+import { EYE_HEIGHT } from '../../shared/constants.js';
 import { resetMatch, endMatch } from '../../game/match.js';
 import { isMenuOpen } from '../../ui/menu.js';
 import { GAME_STATE, getGameState } from '../../game/game-state.js';

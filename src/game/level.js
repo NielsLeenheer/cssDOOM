@@ -13,7 +13,7 @@
  * through each Level's own `on`.
  */
 
-import { EYE_HEIGHT } from './constants.js';
+import { EYE_HEIGHT } from '../shared/constants.js';
 import { state } from './state.js';
 import { updateGame } from './index.js';
 import { transitionToLevel, resetGameState } from './player/damage.js';

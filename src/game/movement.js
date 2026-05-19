@@ -3,7 +3,7 @@
  * floor height tracking, and the moving state flag for head-bob / weapon-bob.
  */
 
-import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED, PLAYER_RADIUS } from './constants.js';
+import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED, PLAYER_RADIUS } from '../shared/constants.js';
 import { canMoveTo, getFloorHeightAt, getSectorAt } from './physics.js';
 import { orchestrator } from '../orchestrator.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';

@@ -2,7 +2,7 @@
  * Projectile movement, collision detection, and explosion effects.
  */
 
-import { SHOOTABLE, ENEMY_RADIUS, EYE_HEIGHT } from '../constants.js';
+import { SHOOTABLE, ENEMY_RADIUS, EYE_HEIGHT } from '../../shared/constants.js';
 
 import { state } from '../state.js';
 import { Player } from '../player/player.js';

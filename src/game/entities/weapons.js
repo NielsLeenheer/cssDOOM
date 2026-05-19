@@ -8,7 +8,7 @@ import {
     PLAYER_ROCKET_SPEED, PLAYER_ROCKET_RADIUS,
     ROCKET_SPLASH_DAMAGE, PLAYER_RADIUS,
     BARREL_RADIUS, WEAPON_SWITCH_MS,
-} from '../constants.js';
+} from '../../shared/constants.js';
 import { getFloorHeightAt, rayHitPoint } from '../physics.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { damagePlayer } from '../player/damage.js';

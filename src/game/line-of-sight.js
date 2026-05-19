@@ -11,7 +11,7 @@
  * floor height from the map data.
  */
 
-import { EYE_HEIGHT } from './constants.js';
+import { EYE_HEIGHT } from '../shared/constants.js';
 import { state } from './state.js';
 import { rayHitsSegment } from './geometry.js';
 import { forEachWallInAABB, forEachSightLineInAABB } from './spatial-grid.js';

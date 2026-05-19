@@ -10,7 +10,7 @@
  *   - Initial weapon load: fist + pistol with 50 bullets, 100 hp.
  */
 
-import { EYE_HEIGHT, PLAYER_RADIUS } from '../constants.js';
+import { EYE_HEIGHT, PLAYER_RADIUS } from '../../shared/constants.js';
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps/index.js';
 import { equipWeapon } from '../entities/weapons.js';
