@@ -140,16 +140,15 @@ export class Level {
         // Prime each renderer's own state.camera BEFORE scene.loadMap's
         // per-renderer warmup reads it. applyPlayerStart just wrote
         // each player's new x/y/z/angle into state.players; this
-        // updateCamera dispatch fans to every render target so each
-        // local DomRenderer's impl writes its state.camera (and the
-        // audio module's mirror keeps each AudioRenderer's listener
-        // current). The fan-out also forwards over each RenderSink to
-        // its joiner, so the joiner's scene.loadMap warmup primes
-        // against fresh data instead of whatever was left in its
-        // per-renderer state from the previous map. Renderers read
-        // their own state.camera — never state.players directly — so
-        // this priming step is what makes the warmup land correct
-        // values.
+        // updateCamera dispatch fans to every target at the matching
+        // slot — the local DomRenderer's impl writes its state.camera
+        // and the local AudioRenderer writes its listener's. The
+        // fan-out also forwards over each RenderSink to its joiner, so
+        // the joiner's scene.loadMap warmup primes against fresh data
+        // instead of whatever was left in its per-renderer state from
+        // the previous map. Renderers read their own state.camera —
+        // never state.players directly — so this priming step is what
+        // makes the warmup land correct values.
         for (const player of state.players) {
             renderer.updateCamera(player, player.viewportIndex);
         }

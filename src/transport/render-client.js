@@ -4,16 +4,12 @@
  *
  * Subscribes to a Transport and delegates incoming envelopes through
  * the local Orchestrator: per-pane commands via the orchestrator's
- * per-pane prototype method (matched by playerIndex to the local
- * DomRenderer), world commands via the world prototype method.
- *
- * Mirror invocation (updateCamera's mirror keeps the audio module's
- * per-listener camera state current) happens inside the
- * orchestrator's dispatch — same code path master and joiner share,
- * so the mirror declarations in
- * [../renderer/commands.js](../renderer/commands.js) are the single
- * source of truth for "what runs when a command dispatches."
- * RenderClient never imports the COMMANDS registry.
+ * per-pane prototype method (which fans to every target whose
+ * playerIndex matches — the local DomRenderer + the local
+ * AudioRenderer if `updateCamera` is the call), world commands via
+ * the world prototype method. `playSound` is one of the world
+ * commands — the client window's AudioRenderers handle the playback;
+ * the joiner has no sinks of its own, so the dispatch stops here.
  *
  * This class only handles message dispatch. Connection lifecycle
  * (announce, handshake, heartbeat, disconnect) is layered on top of
@@ -27,8 +23,8 @@ export class RenderClient {
      * @param {{onMessage: (cb: (msg: object) => void) => () => void}} channel
      *        Transport instance shared with the master-side connection.
      * @param {number} slotIndex     master-side slot this client represents
-     * @param {object} orchestrator  the client's local Orchestrator (handles
-     *                               mirror + fan-out for all commands)
+     * @param {object} orchestrator  the client's local Orchestrator (fans
+     *                               every dispatch to its targets)
      */
     constructor(channel, slotIndex, orchestrator) {
         this.channel = channel;
@@ -52,10 +48,6 @@ export class RenderClient {
             case MSG.CMD_WORLD:
                 this._dispatchWorldCommand(msg);
                 break;
-            case MSG.SOUND:
-                // Re-play through the local orchestrator → local AudioRenderers.
-                this.orchestrator.playSound(msg.name, msg.opts);
-                break;
             // Handshake / lifecycle messages are handled by a separate
             // connection manager that wraps this class.
             default:
@@ -65,9 +57,10 @@ export class RenderClient {
 
     _dispatchPaneCommand({ target, method, args }) {
         // Delegate through the orchestrator so its per-pane prototype
-        // binding runs any registered mirror AND fans to the local
-        // DomRenderer in one place — same mechanism master uses when
-        // its own game code calls renderer.* commands.
+        // binding fans to every target at the addressed slot — the
+        // local DomRenderer plus the local AudioRenderer for commands
+        // both kinds answer (like updateCamera). Same mechanism master
+        // uses when its own game code calls renderer.* commands.
         const fn = this.orchestrator[method];
         if (typeof fn === 'function') {
             fn.call(this.orchestrator, target, ...args);

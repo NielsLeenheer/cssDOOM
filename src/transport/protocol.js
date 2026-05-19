@@ -10,6 +10,10 @@
  *                                                 `target` is master's paneIndex
  *                                                 the sink represents
  *   { type: 'cmd-world', method, args }          world renderer command, fan-out
+ *                                                 (carries `playSound` for
+ *                                                 world-sound triggers — the
+ *                                                 client's orchestrator fans
+ *                                                 to its AudioRenderers)
  *   { type: 'ack', payload: { mode, level,        master accepts a join; carries
  *                              gameState,           the snapshot a freshly-joined
  *                              slotIndex } }       client needs to bootstrap
@@ -79,10 +83,6 @@ export const MSG = {
     // state). Future expansion may flip a local PLAYING flag for input
     // gating on the joiner.
     PLAY: 'play',
-    // Master → client: world sound trigger. Carries `name` (sound asset)
-    // and `opts` ({x, y} only — UI sounds are local and never broadcast).
-    // The client's orchestrator re-plays it through its own AudioRenderers.
-    SOUND: 'sound',
     // Master → client: one-shot world-state snapshot for new / reconnecting
     // joiners. Sent right after the joiner's RenderClient is confirmed
     // subscribed (master's onReady hook). Lets the joiner reconcile its

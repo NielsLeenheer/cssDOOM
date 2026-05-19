@@ -36,19 +36,6 @@
  *                 orchestrator → impl fires once on that window.
  *                 NOT bound onto DomRenderer or RenderSink prototypes;
  *                 the orchestrator dispatches it directly.
- *
- * Optional `mirror` callback — runs in the orchestrator's dispatch
- * loop before fanning to targets. Today only `updateCamera`
- * registers one; its mirror keeps the audio module's per-listener
- * camera state in sync (AudioRenderer isn't yet an orchestrator
- * target — see ARCHITECTURE_DEBT.md issue 8). Signature mirrors
- * the wire-format args (post-serialize):
- *
- *   per-pane: mirror(paneIndex, ...serializedArgs)
- *   world:    mirror(...serializedArgs)
- *
- * Commands without a mirror (most of them) omit the field; the
- * dispatch loop just skips the mirror invocation in that case.
  */
 
 import * as sprites from './scene/entities/sprites.js';
@@ -63,7 +50,6 @@ import * as weapons from './hud/weapons.js';
 import { updateHud } from './hud/hud.js';
 import { updateCamera } from './scene/camera.js';
 import * as playerVisuals from './scene/entities/player.js';
-import { updateListenerCameras } from '../audio/audio.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showLobby, hideLobby } from './screens/lobby.js';
@@ -110,15 +96,14 @@ const stripEnemyRotation = (thingIndex, enemy, viewers) => [
 
 export const COMMANDS = {
     // ── Per-player: camera & HUD ──────────────────────────────────────────
-    // updateCamera's mirror keeps every AudioRenderer at the matching
-    // slot in sync. AudioRenderer isn't yet an orchestrator target
-    // (see ARCHITECTURE_DEBT.md issue 8); until it is, this mirror is
-    // the bridge from the per-pane dispatch to the audio side.
+    // updateCamera fans to every target at the matching playerIndex:
+    // the local DomRenderer transforms its scene; the local
+    // AudioRenderer (audio.js) updates its listener position so the
+    // next playSound math reflects the new viewpoint.
     updateCamera: {
         kind: 'per-pane',
         impl: updateCamera,
         serialize: stripCameraTransform,
-        mirror: updateListenerCameras,
     },
     updateHud: { kind: 'per-pane', impl: updateHud, serialize: stripHudData },
 

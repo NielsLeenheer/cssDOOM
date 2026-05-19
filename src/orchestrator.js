@@ -12,20 +12,27 @@
  * RenderSink streams renderer commands across the channel). The
  * orchestrator owns three concerns that all key off slot index:
  *
- *   1. Render-target dispatch — per-pane commands route to one target by
- *      paneIndex; world commands invoke the local impl once and fan out
- *      to every RenderSink so clients mirror the change.
- *      Command names are generated from
+ *   1. Render-target dispatch — `targets` is a flat list of every
+ *      registered target (DomRenderer, RenderSink, AudioRenderer).
+ *      Per-pane commands fan to every target whose `playerIndex`
+ *      matches the addressed slot; world commands fan to every
+ *      target. Each kind's prototype method decides what it does
+ *      (DomRenderer paints, RenderSink forwards over the wire,
+ *      AudioRenderer updates its per-listener state). Command names
+ *      are generated from
  *      [renderer/commands.js](renderer/commands.js).
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
- *      `unbindRemoteSlot`. A joining client triggers bind: target
- *      swaps for a RenderSink, the master-side pane's sceneEl is
- *      cleared, the paneEl's `data-active` flips to "false" so CSS
- *      hides it, `#game[data-active-renderers]` updates so the
- *      remaining locals reflow to fill the screen, perspective is
- *      refreshed. Unbind is the reverse with a grace-period deferred
- *      unhide so a quickly-reloading client doesn't flash.
+ *      `unbindRemoteSlot`. A joining client triggers bind: the local
+ *      DomRenderer at that slot leaves the target list (its sceneEl
+ *      is cleared and the paneEl's `data-active` flips to "false" so
+ *      CSS hides it), a RenderSink is added in its place, and (for
+ *      Network DM remotes) the local AudioRenderer also leaves so
+ *      master doesn't double-play sounds the remote already plays
+ *      on its own device. `#game[data-active-renderers]` updates so
+ *      the remaining locals reflow to fill the screen. Unbind is
+ *      the reverse with a grace-period deferred visual-unhide so a
+ *      quickly-reloading client doesn't flash.
  *
  *   3. Per-frame input collection — `collectInputs` zeros + sums every
  *      provider's contribution into the per-slot `inputs[]` array, which
@@ -49,8 +56,7 @@
 
 import { RenderSink } from './transport/render-sink.js';
 import { PER_PANE_COMMANDS, WORLD_COMMANDS, WINDOW_COMMANDS } from './renderer/commands.js';
-import * as audio from './audio/audio.js';
-import { setSlotAudioSuppressed } from './audio/audio.js';
+import { refreshAudioRenderers } from './audio/audio.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -104,13 +110,16 @@ export function registerInputProvider(getPlayerIndex, getInput) {
 
 class Orchestrator {
     constructor() {
-        // One target per slot. Starts empty — boot code on master /
-        // client installs DomRenderers via `replaceTarget` based on the
-        // active mode (SP = 1 local renderer at slot 0; mirror SP / DM
-        // = 2 locals; Network DM master = 1 local + sinks at remote
-        // slots). Each DomRenderer owns its own pane DOM and sceneState
-        // — see dom-renderer.js.
-        this.targets = [null, null, null, null];
+        // Flat list of render targets, in registration order. Each
+        // target carries `kind` ('dom' | 'sink' | 'audio') and
+        // `playerIndex` (the slot it services). Multiple targets can
+        // share one slot — e.g. a DomRenderer + an AudioRenderer both
+        // service slot 0 locally. Per-pane dispatch matches against
+        // playerIndex; world dispatch fans to all. Lifecycle (who's
+        // in the list when) is owned by the modules that create
+        // targets: DomRendererManager for 'dom', bindRemoteSlot /
+        // unbindRemoteSlot for 'sink', audio.js for 'audio'.
+        this.targets = [];
 
         // Remote-slot bookkeeping. `_occupiedRemoteSlots` is the set of
         // slots currently held by any remote client. `_remoteBindings`
@@ -167,28 +176,38 @@ class Orchestrator {
         this._minRemoteSlot = slot;
     }
 
-    /** Returns the target for a given slot, or null. */
-    target(slot) {
-        return this.targets[slot] ?? null;
+    /**
+     * Find the first target at the given slot with the given kind, or
+     * null. Callers needing a specific role (the local DomRenderer for
+     * overlay replay, the sink for a remote, the AudioRenderer for
+     * mute) pick by kind — multiple targets can share one slot.
+     */
+    findTarget(slot, kind) {
+        for (const t of this.targets) {
+            if (t.playerIndex === slot && t.kind === kind) return t;
+        }
+        return null;
     }
 
     /**
-     * Swap the target at a given slot. Low-level — `bindRemoteSlot` is
-     * the higher-level entrypoint that also handles pane teardown and
-     * the visibility toggle. Returned: the previous target (may be null).
-     *
-     * Keeps `#game[data-active-renderers]` in sync with the number of
-     * slots currently holding a DomRenderer (vs. a RenderSink or null).
-     * CSS uses this for pane sizing — 1 active renderer = full-width,
-     * 2 = split, etc. Detection reads the `kind` marker each target
-     * sets in its constructor (`'dom'` vs `'sink'`) — used in
-     * bindRemoteSlot / unbindRemoteSlot below.
+     * Register a target. Each target must expose `kind` and
+     * `playerIndex`. Refreshes `#game[data-active-renderers]` because
+     * adding a local DomRenderer changes how CSS sizes the panes.
      */
-    replaceTarget(slot, target) {
-        const previous = this.targets[slot];
-        this.targets[slot] = target;
+    addTarget(target) {
+        this.targets.push(target);
         this._publishActiveRendererCount();
-        return previous;
+    }
+
+    /**
+     * Deregister a target. Silently no-ops if not present so callers
+     * can be defensive without checking first.
+     */
+    removeTarget(target) {
+        const i = this.targets.indexOf(target);
+        if (i < 0) return;
+        this.targets.splice(i, 1);
+        this._publishActiveRendererCount();
     }
 
     /** Recompute and write `#game[data-active-renderers]` based on the
@@ -207,44 +226,16 @@ class Orchestrator {
         gameEl.dataset.activeRenderers = String(count);
     }
 
-    /** All sink targets currently registered (used to fan out sounds). */
-    _sinks() {
-        const out = [];
-        for (const t of this.targets) {
-            if (t && typeof t.forwardWorld === 'function') out.push(t);
-        }
-        return out;
-    }
-
     // ── Spectator mode ───────────────────────────────────────────────────
-    // SP-only feature. All forwards target slot 0 (the master's local
-    // DomRenderer — always present in SP). UI calls these on the
-    // orchestrator and never holds a renderer reference directly.
-    setSpectatorCamera(camera)        { this.targets[0]?.setSpectatorCamera?.(camera); }
-    setSpectatorFollowHeight(height)  { this.targets[0]?.setSpectatorFollowHeight?.(height); }
-    setSpectatorAngle(angle)          { this.targets[0]?.setSpectatorAngle?.(angle); }
-    startSpectatorMode(mode)          { this.targets[0]?.startSpectatorMode?.(mode); }
-    switchSpectatorMode(mode)         { this.targets[0]?.switchSpectatorMode?.(mode); }
-    endSpectatorMode()                { this.targets[0]?.endSpectatorMode?.(); }
-
-    // ── Audio dispatch ───────────────────────────────────────────────────
-
-    /**
-     * Play a sound. Game code calls this for every sound — the orchestrator
-     * decides whether to also broadcast to clients.
-     *
-     *   playSound('DSPISTOL', { x, y })   → world: local play + fan-out to sinks
-     *   playSound('DSSWTCHN', { ui: true }) → UI: centered local play, no broadcast
-     *
-     * UI sounds are local to whichever window initiated them (menu select on
-     * master plays on master only; same for a client).
-     */
-    playSound(name, opts) {
-        audio.playLocal(name, opts);
-        if (opts && !opts.ui) {
-            for (const sink of this._sinks()) sink.forwardSound(name, opts);
-        }
-    }
+    // SP-only feature. All forwards target slot 0's local DomRenderer
+    // (always present in SP). UI calls these on the orchestrator and
+    // never holds a renderer reference directly.
+    setSpectatorCamera(camera)        { this.findTarget(0, 'dom')?.setSpectatorCamera?.(camera); }
+    setSpectatorFollowHeight(height)  { this.findTarget(0, 'dom')?.setSpectatorFollowHeight?.(height); }
+    setSpectatorAngle(angle)          { this.findTarget(0, 'dom')?.setSpectatorAngle?.(angle); }
+    startSpectatorMode(mode)          { this.findTarget(0, 'dom')?.startSpectatorMode?.(mode); }
+    switchSpectatorMode(mode)         { this.findTarget(0, 'dom')?.switchSpectatorMode?.(mode); }
+    endSpectatorMode()                { this.findTarget(0, 'dom')?.endSpectatorMode?.(); }
 
     // ── Remote-slot lifecycle ────────────────────────────────────────────
 
@@ -273,6 +264,19 @@ class Orchestrator {
     }
 
     /**
+     * True if a remote currently bound to `slot` had `suppressAudio` set
+     * (a Network DM remote on a separate machine plays its own audio).
+     * audio.js queries this from `rebuildRenderers` so a configureAudio
+     * call after a bind doesn't resurrect a listener the bind dropped.
+     */
+    isSlotAudioSuppressed(slot) {
+        for (const b of this._remoteBindings.values()) {
+            if (b.slot === slot && b.suppressAudio) return true;
+        }
+        return false;
+    }
+
+    /**
      * Bind a connected peer to the given slot. Installs a RenderSink in
      * place of the DomRenderer, tears down master's local DOM for that
      * pane (since the client now renders it), hides the pane via
@@ -291,9 +295,10 @@ class Orchestrator {
         const suppressAudio = opts.suppressAudio === true;
 
         // Mid-grace reconnect by the same peer: cancel its visual-unhide
-        // so the user doesn't see a flash, and recover its savedTarget.
+        // so the user doesn't see a flash, and recover its saved targets.
         const previous = this._remoteBindings.get(peerKey);
-        let savedTarget = previous?.savedTarget ?? null;
+        let savedDom = previous?.savedDom ?? null;
+        let savedAudio = previous?.savedAudio ?? null;
         if (previous?.unbindGraceTimer) {
             clearTimeout(previous.unbindGraceTimer);
         }
@@ -307,42 +312,59 @@ class Orchestrator {
             if (b.slot === slot && b.unbindGraceTimer) {
                 clearTimeout(b.unbindGraceTimer);
                 this._remoteBindings.delete(otherKey);
-                savedTarget = savedTarget ?? b.savedTarget;
+                savedDom = savedDom ?? b.savedDom;
+                savedAudio = savedAudio ?? b.savedAudio;
             }
         }
 
         this._occupiedRemoteSlots.add(slot);
 
-        // Capture the DomRenderer (if any) currently at this slot BEFORE
-        // we replace the target — if one lived here, that's the renderer
-        // we need to clear on master.
-        const previousRenderer = this.targets[slot];
-        const wasLocalRenderer = previousRenderer?.kind === 'dom';
+        // Pull the local DomRenderer (if any) out of the active target
+        // list — the remote now drives this slot's visual. The renderer
+        // instance survives in savedDom for restore on unbind.
+        const localDom = savedDom ?? this.findTarget(slot, 'dom');
+        if (localDom && this.targets.includes(localDom)) {
+            this.removeTarget(localDom);
+            // Master skips the wasted work on an invisible subtree —
+            // world commands and the culling loop both early-exit on
+            // the now-empty sceneState arrays after clear().
+            localDom.clear();
+            // Mark the pane inactive so CSS hides it (the sceneEl is
+            // empty now). Flips back to "true" on the unbind grace-
+            // expiry path when loadMap rebuilds the scene.
+            localDom.paneEl.dataset.active = 'false';
+            this._publishActiveRendererCount();
+        }
+
+        // The remote plays its own audio on its own device — drop our
+        // listener for this slot so master doesn't double-play. Restored
+        // on unbind. (When false, master keeps the listener: Local DM
+        // secondary scenarios share physical speakers with master, so
+        // master must play this slot's sounds for the local pane.)
+        let localAudio = null;
+        if (suppressAudio) {
+            localAudio = savedAudio ?? this.findTarget(slot, 'audio');
+            if (localAudio && this.targets.includes(localAudio)) {
+                this.removeTarget(localAudio);
+            }
+        }
 
         const sink = new RenderSink(transport, slot);
-        const swappedOut = this.replaceTarget(slot, sink);
+        this.addTarget(sink);
+
         this._remoteBindings.set(peerKey, {
             slot,
-            savedTarget: savedTarget ?? swappedOut,
+            sink,
+            savedDom: localDom ?? null,
+            savedAudio: localAudio ?? null,
             unbindGraceTimer: null,
             suppressAudio,
         });
 
-        // Master skips the wasted work on an invisible subtree — world
-        // commands and the culling loop both early-exit on the now-empty
-        // sceneState arrays after clear(). No clear needed if the slot
-        // didn't have a local renderer (e.g. Network DM slot 2 or 3 bound
-        // from empty state straight to a remote).
-        if (wasLocalRenderer) {
-            previousRenderer.clear();
-            // Mark the pane inactive so CSS hides it (the DomRenderer's
-            // sceneEl is empty now). data-active flips back to "true"
-            // on the unbindRemoteSlot grace-expiry path when loadMap
-            // rebuilds the scene.
-            previousRenderer.paneEl.dataset.active = 'false';
-            this._publishActiveRendererCount();
-        }
-        if (suppressAudio) setSlotAudioSuppressed(slot, true);
+        // If we just dropped a listener, the surviving listeners need
+        // their pan mode recomputed (going from split L/R to solo
+        // bearing-pan when one of two slots becomes suppressed).
+        if (suppressAudio) refreshAudioRenderers();
 
         console.log('[orchestrator] client bound at slot', slot, '- peer', peerKey);
     }
@@ -369,41 +391,48 @@ class Orchestrator {
         const binding = this._remoteBindings.get(peerKey);
         if (!binding) return;
 
-        const { slot, savedTarget } = binding;
-        // Restore whatever target was here before the bind — typically a
-        // DomRenderer for Local DM (slot 1's pane 1 swap). For Network
-        // DM slots that were never local (slot 2 or 3 bound straight to
-        // a remote), savedTarget is null and we leave the slot empty.
-        this.replaceTarget(slot, savedTarget ?? null);
+        const { slot, sink, savedDom, savedAudio } = binding;
+
+        // Pull the sink so master's per-frame commands stop forwarding
+        // to a vanished peer.
+        this.removeTarget(sink);
         this._occupiedRemoteSlots.delete(slot);
 
-        if (binding.suppressAudio) setSlotAudioSuppressed(slot, false);
+        // Restore the local DomRenderer immediately so master's per-frame
+        // commands keep its DOM in sync; visual unhide is deferred via
+        // grace so a quick reconnect doesn't flash the pane visible.
+        if (savedDom) this.addTarget(savedDom);
 
-        // The restored target rebuilds its own scene at grace-expiry —
-        // it reads the current mapData + state, so accumulated runtime
-        // mutations (open doors, dead enemies, collected items) carry
-        // over correctly via the underlying state.* the build reads from.
-        const rendererToRebuild = savedTarget?.kind === 'dom' ? savedTarget : null;
+        // Restore the local AudioRenderer (only present if suppressAudio
+        // had pulled it out on bind — Network DM remote scenarios). On
+        // Local DM secondary unbinds, savedAudio is null and audio was
+        // never suppressed. Re-derive pan mode for the new active set
+        // — the restored listener may need to flip from solo-bearing
+        // back to split L/R now that there are 2 active again.
+        if (savedAudio) {
+            this.addTarget(savedAudio);
+            refreshAudioRenderers();
+        }
 
         if (binding.unbindGraceTimer) clearTimeout(binding.unbindGraceTimer);
         binding.unbindGraceTimer = setTimeout(async () => {
             // If a reconnect arrived during grace, bindRemoteSlot
             // cancelled this timer and we never reach this body.
             this._remoteBindings.delete(peerKey);
-            if (!rendererToRebuild) return;
+            if (!savedDom) return;
             // `reload()` rebuilds against the map this renderer last
             // loaded — the renderer owns that memory so the
             // orchestrator doesn't need to import the maps layer.
             // Await so onGraceRebuilt fires with a fully-built scene.
-            await rendererToRebuild.reload();
+            await savedDom.reload();
             // Re-mark the pane as active so CSS reveals it (the
             // sceneEl is repopulated by reload above). Done after
             // reload so the pane doesn't flash empty during the
             // rebuild — but reload is fast enough on master that
             // the gap is imperceptible.
-            rendererToRebuild.paneEl.dataset.active = 'true';
+            savedDom.paneEl.dataset.active = 'true';
             this._publishActiveRendererCount();
-            onGraceRebuilt?.(rendererToRebuild);
+            onGraceRebuilt?.(savedDom);
         }, RECONNECT_GRACE_MS);
 
         console.log('[orchestrator] client unbound from slot', slot, '- peer', peerKey);
@@ -469,47 +498,30 @@ class Orchestrator {
 }
 
 // Per-player commands: iterate targets and dispatch to every one whose
-// `playerIndex` matches. In normal modes that's exactly one target. In
-// mirror SP, two DomRenderers share playerIndex 0 and both receive the
-// call. In Network DM, a RenderSink at the player's slot forwards to the
-// wire.
-//
-// Mirror callback (declared on a COMMANDS entry in
-// renderer/commands.js) fires BEFORE fan-out, once per dispatch — same
-// site on master and joiner. Today only `updateCamera` registers a
-// mirror; its mirror keeps the audio module's per-listener camera
-// state in sync (AudioRenderer isn't yet an orchestrator target — see
-// ARCHITECTURE_DEBT.md issue 8). The same `serialize` that RenderSink
-// uses to strip args for the wire also normalizes args before mirror
-// invocation so the mirror sees the wire-format shape.
+// `playerIndex` matches. In normal modes a single DomRenderer matches;
+// in mirror SP two DomRenderers share playerIndex 0 and both receive
+// the call; in Network DM a RenderSink at the player's slot forwards
+// to the wire; with AudioRenderer as a target the matching listener
+// also receives the call (e.g. updateCamera keeps its state.camera in
+// sync). Each target's prototype-bound method decides what its kind
+// does with the call.
 for (const name of Object.keys(PER_PANE_COMMANDS)) {
-    const { mirror, serialize } = PER_PANE_COMMANDS[name];
     Orchestrator.prototype[name] = function (playerIndex, ...args) {
-        if (mirror) {
-            const wireArgs = serialize ? serialize(...args) : args;
-            mirror(playerIndex, ...wireArgs);
-        }
         for (const t of this.targets) {
-            if (!t) continue;
             if (t.playerIndex !== playerIndex) continue;
-            t[name](...args);
+            t[name]?.(...args);
         }
     };
 }
 
 // World commands: iterate every target. Each DomRenderer runs the impl
 // against itself; each RenderSink forwards to the wire (its client's
-// own orchestrator then iterates its own targets). Mirror semantics
-// match per-pane above.
+// own orchestrator then iterates its own targets). AudioRenderer has
+// no world commands today, but the optional-chaining handles any kind
+// that doesn't expose a particular method.
 for (const name of Object.keys(WORLD_COMMANDS)) {
-    const { mirror, serialize } = WORLD_COMMANDS[name];
     Orchestrator.prototype[name] = function (...args) {
-        if (mirror) {
-            const wireArgs = serialize ? serialize(...args) : args;
-            mirror(...wireArgs);
-        }
         for (const t of this.targets) {
-            if (!t) continue;
             t[name]?.(...args);
         }
     };
@@ -528,10 +540,26 @@ for (const name of Object.keys(WINDOW_COMMANDS)) {
         impl(...args);
         const wireArgs = serialize ? serialize(...args) : args;
         for (const t of this.targets) {
-            if (t?.kind === 'sink') t.forwardWorld(name, wireArgs);
+            if (t.kind === 'sink') t.forwardWorld(name, wireArgs);
         }
     };
 }
+
+// World sound: hand-rolled rather than registry-driven because the
+// dispatch is intrinsically per-kind — only AudioRenderers actually
+// emit sound (each runs its own distance/pan math from its listener
+// state); DomRenderers ignore it. Sinks still forward via the standard
+// CMD_WORLD envelope (the receiving window's orchestrator dispatches
+// through this same method, where its own AudioRenderers handle the
+// playback). Both call sites — local game code and incoming wire from
+// a joiner — use one entry point so any dispatch goes to every target
+// kind that cares.
+Orchestrator.prototype.playSound = function (name, opts) {
+    for (const t of this.targets) {
+        if (t.kind === 'audio') t.playSound(name, opts);
+        else if (t.kind === 'sink') t.forwardWorld('playSound', [name, opts]);
+    }
+};
 
 // Stateful overlay commands — when called WITHOUT a payload (game code
 // signalling "show what's current"), the orchestrator pulls a fresh
@@ -558,7 +586,6 @@ for (const [name, pull] of Object.entries(OVERLAY_PULLERS)) {
     Orchestrator.prototype[name] = function (payload) {
         if (payload === undefined) payload = this._provider?.[pull]?.();
         for (const t of this.targets) {
-            if (!t) continue;
             t[name]?.(payload);
         }
     };
@@ -582,7 +609,6 @@ for (const [name, pull] of Object.entries(OVERLAY_PULLERS)) {
 Orchestrator.prototype.loadMap = function (name) {
     const promises = [];
     for (const t of this.targets) {
-        if (!t) continue;
         promises.push(t.loadMap?.(name));
     }
     return Promise.all(promises);

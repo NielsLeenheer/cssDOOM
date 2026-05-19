@@ -42,8 +42,9 @@
  */
 export function updateCamera(renderer, player) {
     // Per-renderer world-view state — the culler / scene warmup read
-    // from here. AudioRenderer maintains its own state.camera in
-    // parallel (driven by the orchestrator's updateCamera mirror).
+    // from here. AudioRenderer maintains its own state.camera, kept
+    // current by the same per-pane updateCamera dispatch (it's also a
+    // target at this slot, so the orchestrator fans the call to both).
     const cam = renderer.state.camera;
     cam.x = player.x;
     cam.y = player.y;

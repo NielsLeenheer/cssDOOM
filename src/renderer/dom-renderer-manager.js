@@ -12,8 +12,8 @@
  * (which renderers exist, what their `playerIndex` is, when they die).
  * Orchestrator owns dispatch (which target receives a command). The
  * Manager installs a fresh renderer into Orchestrator via
- * `orchestrator.replaceTarget(slot, renderer)` after creating it, and
- * clears the slot before destroying it.
+ * `orchestrator.addTarget(renderer)` after creating it, and
+ * `orchestrator.removeTarget(renderer)` before destroying it.
  *
  * Both master and joiner use the same primitives. Master typically
  * holds 1–2 local renderers + sinks at the remaining slots; joiner
@@ -52,7 +52,7 @@ class DomRendererManager {
      * Construct a new `DomRenderer` for the given player, append its
      * pane to the game container, and register it. Caller (or reshape)
      * is responsible for installing it as an orchestrator target via
-     * `orchestrator.replaceTarget` at the right slot.
+     * `orchestrator.addTarget`.
      */
     create(playerIndex) {
         const renderer = new DomRenderer({
@@ -77,8 +77,8 @@ class DomRendererManager {
 
     /**
      * Master-side reshape: construct or destroy local renderers to
-     * match what the mode needs, and keep the orchestrator's `targets[]`
-     * in sync. Idempotent.
+     * match what the mode needs, registering / deregistering each
+     * with the orchestrator. Idempotent.
      *
      *   - SP standalone non-kiosk: 1 renderer at slot 0 (playerIndex 0).
      *   - SP standalone kiosk:     2 renderers at slots 0 + 1, both
@@ -108,17 +108,18 @@ class DomRendererManager {
         // Tear down extras (from the end so indices stay stable).
         while (this._renderers.length > desiredCount) {
             const r = this._renderers[this._renderers.length - 1];
-            const slot = orchestrator.targets.indexOf(r);
-            if (slot >= 0) orchestrator.replaceTarget(slot, null);
+            orchestrator.removeTarget(r);
             this.destroy(r);
         }
 
-        // Create missing renderers at the next free slot.
+        // Create missing renderers and register each as a target. New
+        // renderers come in at the end of `this._renderers` so the slot
+        // index is the current length.
         while (this._renderers.length < desiredCount) {
             const slot = this._renderers.length;
             const playerIndex = mirror ? 0 : slot;
             const r = this.create(playerIndex);
-            orchestrator.replaceTarget(slot, r);
+            orchestrator.addTarget(r);
         }
 
         // Update playerIndex on existing renderers in case mirror just
@@ -139,8 +140,8 @@ class DomRendererManager {
     }
 
     /**
-     * Joiner-side bootstrap: tear down any existing renderers, clear
-     * every orchestrator target slot, install one fresh renderer at the
+     * Joiner-side bootstrap: tear down any existing renderers, drop
+     * every orchestrator target, install one fresh renderer at the
      * master-assigned slot. Returns the new renderer.
      *
      * Different from `reshape(gameMode, networkMode)`: reshape is
@@ -148,31 +149,23 @@ class DomRendererManager {
      * flag. Here the slot is dictated by master's ACK payload and
      * there's always exactly one local renderer afterward.
      *
-     * Tear-down and target-clearing both go through the Manager + the
-     * Orchestrator's bookkeeping methods (no direct touch of
-     * `this._renderers` from outside, no direct write to
-     * `orchestrator.targets[i]` — `replaceTarget` keeps
-     * `#game[data-active-renderers]` in sync).
+     * A joiner shouldn't normally have sinks installed (that's a
+     * master-only concept), but any stray target is dropped through
+     * the proper bookkeeping path so the active-renderer-count
+     * dataset stays accurate.
      */
     resetToJoinerSlot(slot) {
-        // Drop any existing renderers, unhooking each from its
-        // orchestrator slot through replaceTarget so the active-
-        // renderer-count dataset stays accurate.
         for (const r of [...this._renderers]) {
-            const slotOfR = orchestrator.targets.indexOf(r);
-            if (slotOfR >= 0) orchestrator.replaceTarget(slotOfR, null);
+            orchestrator.removeTarget(r);
             this.destroy(r);
         }
-        // Clear any non-renderer targets at other slots (a joiner
-        // shouldn't have sinks installed — that's a master-only
-        // concept — but a stray target gets cleared via the proper
-        // bookkeeping path rather than a direct null write).
-        for (let i = 0; i < orchestrator.targets.length; i++) {
-            if (orchestrator.targets[i] != null) orchestrator.replaceTarget(i, null);
+        // Defensive: drop any non-DomRenderer targets too.
+        for (const t of [...orchestrator.targets]) {
+            orchestrator.removeTarget(t);
         }
         const renderer = this.create(slot);
         renderer.paneEl.dataset.slot = String(slot);
-        orchestrator.replaceTarget(slot, renderer);
+        orchestrator.addTarget(renderer);
         return renderer;
     }
 

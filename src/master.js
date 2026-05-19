@@ -278,7 +278,7 @@ function setupMasterBroadcast() {
             // pulls fresh payload via the same getter as the live fire
             // path, so the new pane sees current data — not whatever
             // was stashed at the original fire time.
-            orchestrator.replayCurrentOverlayTo(orchestrator.target(slot));
+            orchestrator.replayCurrentOverlayTo(orchestrator.findTarget(slot, 'sink'));
 
             // Everything below is Network-DM-host-specific: roster
             // sizing for late-joining remotes, audio listener config
