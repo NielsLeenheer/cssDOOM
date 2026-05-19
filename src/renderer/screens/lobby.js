@@ -74,6 +74,18 @@ function renderLocalLobby(renderer, payload) {
 function renderNetworkLobby(renderer, payload) {
     const root = renderer.paneEl.querySelector('.pane-network-lobby');
     if (!root) return;
+    // Gate visibility on whether we're actually in the lobby phase.
+    // `Game.beginPlay` fires `showLobby` once AFTER transitioning to
+    // PLAYING so the Local DM variant can flip its per-pane
+    // `data-claim-state` from 'ready' to 'active' (hiding the READY!
+    // overlay over the running match). On the Network DM path, the
+    // same fire would otherwise re-activate this overlay on top of
+    // the live game. Mirrors `renderLocalLobby`'s `!payload.inLobby`
+    // → `claimState = 'active'` handling.
+    if (!payload.inLobby) {
+        root.classList.remove('active');
+        return;
+    }
     root.classList.add('active');
 
     // Level-name sprite (white WILV0N from the SP intermission set).
