@@ -45,6 +45,7 @@ import { initMasterConnection } from './network-host.js';
 import { setNetworkSlotOccupant } from './game/lobby-state.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { ensureMatchSize } from './game/match.js';
+import { GAME_STATE, getGameState } from './game/game-state.js';
 import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
 import { spawnPlayer } from './game/player/spawn.js';
 
@@ -254,13 +255,24 @@ function setupMasterBroadcast() {
                 masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
             }
 
-            // If a results / intermission / lobby overlay is currently
-            // visible, replay it onto just this peer's sink. The
-            // orchestrator asks the provider (Game) what's visible and
-            // pulls fresh payload via the same getter as the live fire
-            // path, so the new pane sees current data — not whatever
-            // was stashed at the original fire time.
-            orchestrator.replayCurrentOverlayTo(orchestrator.findTarget(slot, 'sink'));
+            // Overlay catch-up — if master is currently in a state
+            // that has a visible overlay (LOBBY, ENDED), send the
+            // current payload directly to this peer's sink only.
+            // Same shape as the world-snapshot send above (per-target
+            // post-READY catch-up); content depends on which state
+            // master is in. INTERMISSION is SP-only so it never
+            // reaches a joiner; ATTRACT is kiosk-only and kiosks
+            // don't accept joiners.
+            const sink = orchestrator.findTarget(slot, 'sink');
+            const game = window.app?.game;
+            if (sink && game) {
+                const gs = getGameState();
+                if (gs === GAME_STATE.LOBBY) {
+                    sink.showLobby(game.getLobbyPayload());
+                } else if (gs === GAME_STATE.ENDED) {
+                    sink.showResults(game.getResultsPayload());
+                }
+            }
 
             // Everything below is Network-DM-host-specific: roster
             // sizing for late-joining remotes, audio listener config

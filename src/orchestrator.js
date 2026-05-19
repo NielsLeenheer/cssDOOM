@@ -141,23 +141,6 @@ class Orchestrator {
         // Set by `mode.js::applyMode` when entering Network DM host.
         this._minRemoteSlot = 1;
 
-        // Authoritative payload provider for stateful overlay commands.
-        // Set by Game.start (cleared on Game.stop) so when game code
-        // signals `orchestrator.showResults()` / `showIntermission()` /
-        // `showLobby()`, the orchestrator can pull the current data
-        // straight from the game instead of relying on the caller to
-        // pass a payload that becomes stale the moment it's sent. The
-        // joiner reconnect path (`replayCurrentOverlayTo`) uses the
-        // same provider, so live fires and reconnect re-fires share one
-        // data source — there's no separate "overlay state" to drift.
-        //
-        // Provider contract (Game implements all):
-        //   getCurrentOverlay()        → 'showResults' | 'showIntermission' | 'showLobby' | null
-        //   getResultsPayload()        → scoreboard data
-        //   getIntermissionPayload()   → { nextMap, mapName, stats }
-        //   getLobbyPayload()          → unified lobby state
-        this._provider = null;
-
         // ── Audio listener lifecycle ────────────────────────────────
         // Tracks the slots this window plays audio for + the global
         // enable switch. `_rebuildAudioTargets` recreates the
@@ -167,12 +150,6 @@ class Orchestrator {
         // render target.
         this._audioEnabled = true;
         this._audioSlots = [];
-    }
-
-    /** Register / clear the overlay payload provider. Game wires this
-     *  in `start()` and clears in `stop()`. */
-    setPayloadProvider(provider) {
-        this._provider = provider;
     }
 
     /**
@@ -608,36 +585,6 @@ Orchestrator.prototype.playSound = function (name, opts) {
     }
 };
 
-// Stateful overlay commands — when called WITHOUT a payload (game code
-// signalling "show what's current"), the orchestrator pulls a fresh
-// payload from the registered provider (Game). When called WITH a
-// payload (RenderClient dispatching an incoming wire envelope on a
-// joiner — see transport/render-client.js::_dispatchWorldCommand),
-// the explicit arg wins. This dual-path lets a master signal and a
-// joiner receive go through the same method without the joiner trying
-// to pull from a provider it doesn't have.
-//
-// Pulling at dispatch time on master means live fires AND joiner-
-// reconnect re-fires share one data source, so they can't drift; no
-// caller carries a payload that goes stale before it's sent.
-//
-// The hide* commands keep the generic wrapper — they're pure signals
-// with no associated data.
-const OVERLAY_PULLERS = {
-    showResults:      'getResultsPayload',
-    showIntermission: 'getIntermissionPayload',
-    showLobby:        'getLobbyPayload',
-};
-
-for (const [name, pull] of Object.entries(OVERLAY_PULLERS)) {
-    Orchestrator.prototype[name] = function (payload) {
-        if (payload === undefined) payload = this._provider?.[pull]?.();
-        for (const t of this.targets) {
-            t[name]?.(payload);
-        }
-    };
-}
-
 /**
  * loadMap is a world command — every target receives it — but unlike
  * the generic fan-out we need to AWAIT every local renderer's scene
@@ -661,18 +608,5 @@ Orchestrator.prototype.loadMap = function (name) {
     return Promise.all(promises);
 };
 
-/** Re-fire whichever overlay the provider says is currently visible,
- *  targeted at a single render target instead of fanning to all. Used
- *  by master.js's onReady to catch a freshly-bound joiner up to the
- *  current visible state without re-rendering existing clients'
- *  overlays. */
-Orchestrator.prototype.replayCurrentOverlayTo = function (target) {
-    if (!target) return;
-    const cmd = this._provider?.getCurrentOverlay?.();
-    if (!cmd) return;
-    const pull = OVERLAY_PULLERS[cmd];
-    if (!pull) return;
-    target[cmd]?.(this._provider[pull]());
-};
 
 export const orchestrator = new Orchestrator();

@@ -101,12 +101,6 @@ export class Game {
      * Called from `App.startLocalGame`.
      */
     async start() {
-        // Register as the orchestrator's payload provider so any
-        // remaining puller-driven signals (replayCurrentOverlayTo)
-        // can fetch from here. Cleared in stop() so a stale Game
-        // doesn't keep serving payloads after teardown.
-        orchestrator.setPayloadProvider(this);
-
         this._transitionTo('LOBBY');
         orchestrator.showLobby(this.getLobbyPayload());
         this._emit('lobby-updated', this.getLobbyPayload());
@@ -341,12 +335,6 @@ export class Game {
         orchestrator.hideLobby();
         orchestrator.hideIntermission();
         orchestrator.hideResults();
-
-        // Surrender the provider slot so a stale Game doesn't keep
-        // serving payloads after teardown. App tears down the old
-        // Game (this stop) before constructing the next, so we never
-        // clobber a newer provider here.
-        orchestrator.setPayloadProvider(null);
 
         // Drop the lobby-state subscription so a post-stop emit
         // doesn't fan into a dead Game instance. (Other subscribers
@@ -662,22 +650,10 @@ export class Game {
         this._emit('level-complete', payload);
     }
 
-    // ── Overlay payload provider ─────────────────────────────────────────
-    // Implements the orchestrator's payload-provider contract. The
-    // orchestrator calls these synchronously from inside its dispatch
-    // when the corresponding signal fires, so what lands on every
-    // renderer is whatever Game says is true right now.
-
-    /** Which overlay command, if any, is currently visible. Drives
-     *  `orchestrator.replayCurrentOverlayTo` on joiner reconnect. */
-    getCurrentOverlay() {
-        switch (this._state) {
-            case 'RESULTS':      return 'showResults';
-            case 'INTERMISSION': return 'showIntermission';
-            case 'LOBBY':        return 'showLobby';
-            default:             return null;
-        }
-    }
+    // ── Overlay payload getters ─────────────────────────────────────────
+    // Game owns the source-of-truth state for each overlay; callers
+    // (Game's own subscribers + master.js's onReady catch-up via
+    // window.app.game) ask Game to build a fresh payload at fire time.
 
     /** Scoreboard payload for `showResults`. winnerIndex defaults to
      *  -1 (which the scoreboard renders as "TIE") if state.match isn't

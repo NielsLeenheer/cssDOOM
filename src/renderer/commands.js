@@ -167,19 +167,17 @@ export const COMMANDS = {
     lowerTaggedFloor: { kind: 'world', impl: lowerTaggedFloor },
 
     // ── World: lobby / intermission / results overlays ───────────────────
-    // Stateful overlays — the show* variants are signals; the
-    // orchestrator pulls the actual payload from Game (the
-    // registered payload provider) at dispatch time via its show*
-    // overrides (see orchestrator.js OVERLAY_PULLERS). Callers
-    // (match.js::endMatch, Game.{start, beginPlay, restartMatch,
-    // _onLevelComplete}, master.js's
-    // onJoin/onLeave/onClaimChange/onMatch.reset) just signal — they
-    // don't carry data. World-kind so master fans the same command
-    // to every client's RenderClient and the visual stays in sync
-    // across master + remote panes without a side-channel envelope.
-    // Each impl is per-pane in practice: it reads `renderer.paneEl`
-    // and `renderer.playerIndex` to write into THIS pane only;
-    // multiple targets means the impl fires once per pane.
+    // Stateful overlays. Every caller passes a complete payload —
+    // Game's subscribers (lobby-state's onLobbyChange, claim-registry's
+    // onClaimChange, onMatch('ended'), _onLevelComplete) build the
+    // payload via `this.getXPayload()` and fire. master.js's onReady
+    // catch-up addresses one sink directly with the same payload.
+    // World-kind so master fans the same command to every client's
+    // RenderClient — the visual stays in sync across master + remote
+    // panes without a side-channel envelope. Each impl is per-pane
+    // in practice: it reads `renderer.paneEl` and `renderer.playerIndex`
+    // to write into THIS pane only; multiple targets means the impl
+    // fires once per pane.
     showLobby:        { kind: 'world', impl: showLobby },
     hideLobby:        { kind: 'world', impl: hideLobby },
     showIntermission: { kind: 'world', impl: renderIntermission },
