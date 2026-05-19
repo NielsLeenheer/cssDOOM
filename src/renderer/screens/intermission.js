@@ -8,9 +8,9 @@
  *
  * Built per pane, dispatched once per render target. Every write lands
  * inside `renderer.paneEl` — no document-scoped queries, no body
- * writes, no game-state reads. CSS hides the screen when
- * `body[data-game-state="intermission"]` isn't set (that attribute is
- * owned by Game, not by this module).
+ * writes, no game-state reads. CSS shows the screen when the per-pane
+ * `.pane-intermission` element carries an `.active` class (added by
+ * `renderIntermission`, removed by `clearIntermission`).
  *
  * Each pane runs its own count-up animation. Dispatch fires `renderIntermission`
  * once per renderer within the same task, so they start nearly synchronously
@@ -56,6 +56,7 @@ export function renderIntermission(renderer, payload) {
     animationsByPane.get(container)?.();
 
     container.replaceChildren(buildIntermissionNode(payload.mapName));
+    container.classList.add('active');
     const cancel = runCountUp(container, payload.stats);
     animationsByPane.set(container, cancel);
 }
@@ -65,6 +66,7 @@ export function clearIntermission(renderer) {
     if (!container) return;
     animationsByPane.get(container)?.();
     animationsByPane.delete(container);
+    container.classList.remove('active');
     container.replaceChildren();
 }
 

@@ -469,7 +469,7 @@ body[data-game-mode="deathmatch"] .renderer.dead .respawn-prompt {
    calls resetMatch() (so the next walk-up starts on a fresh roster),
    which re-enters lobby state and re-paints data-claim-state — without
    the :not gate the prompts would render on top of the attract loop. */
-body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="prompting"] .join-prompt {
+body[data-game-mode="deathmatch"]:not(:has(.pane-attract.active)) .pane[data-claim-state="prompting"] .join-prompt {
     display: flex;
 }
 
@@ -477,14 +477,14 @@ body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-cl
    formally started yet (still waiting on later panes). The bound player
    can move around in warmup; the READY overlay sits on top so the user
    knows the join took. */
-body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="ready"] .join-ready {
+body[data-game-mode="deathmatch"]:not(:has(.pane-attract.active)) .pane[data-claim-state="ready"] .join-ready {
     display: flex;
 }
 
 /* "waiting" — this pane is later in the sequence than the one currently
    prompting. Dim it out so attention focuses on the prompting pane.
    Suppressed during attract for the same reason as the join overlays. */
-body[data-game-mode="deathmatch"]:not([data-game-state="attract"]) .pane[data-claim-state="waiting"] {
+body[data-game-mode="deathmatch"]:not(:has(.pane-attract.active)) .pane[data-claim-state="waiting"] {
     filter: brightness(0.3);
 }
 
@@ -525,7 +525,7 @@ body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status
     pointer-events: none;
 }
 
-body[data-game-state="ended"] .pane-win {
+.pane-win.active {
     display: flex;
 }
 
@@ -645,8 +645,9 @@ body[data-game-state="ended"] .pane-win {
    Single-player intermission — KILLS / ITEMS / SECRET / TIME on the
    WIMAP0 backdrop, shown between levels. Same `.pane-intermission`
    container pattern as the DM scoreboard's `.pane-win`. Visibility
-   driven by body[data-game-state="intermission"] (written by the
-   setGameState window-command impl in src/renderer/commands.js).
+   driven by an `.active` class on the per-pane container, added by
+   the `renderIntermission` renderer command impl (intermission.js)
+   and removed by `clearIntermission`.
    ======================================================================== */
 
 .pane-intermission {
@@ -661,7 +662,7 @@ body[data-game-state="ended"] .pane-win {
     pointer-events: none;
 }
 
-body[data-game-state="intermission"] .pane-intermission {
+.pane-intermission.active {
     display: flex;
 }
 
@@ -763,9 +764,10 @@ body[data-game-mode="deathmatch"] .pane-timer:not(:empty) {
 
 /* ========================================================================
    Attract Loop
-   Shown when body[data-game-state="attract"] — kiosk idle prompt. Camera
-   is slow-rotated by attract.js; this overlay sits on top with a dimmed
-   background and a pulsing "PRESS START" prompt. Lives per-pane inside
+   Shown when each pane's `.pane-attract` carries `.active` (added by
+   the `showAttract` renderer command, removed by `hideAttract`).
+   Camera is slow-rotated by attract.js; this overlay sits on top with
+   a dimmed background and a pulsing "PRESS START" prompt. Lives per-pane inside
    .pane; default position is fixed (full window) for split-screen.
    Video-wall flips to absolute so each monitor gets its own copy.
    ======================================================================== */
@@ -810,7 +812,7 @@ body[data-game-mode="deathmatch"] .pane-timer:not(:empty) {
     50%      { opacity: 1; }
 }
 
-body[data-game-state="attract"] .pane-attract {
+.pane-attract.active {
     display: flex;
 }
 
@@ -819,14 +821,17 @@ body[data-game-state="attract"] .pane-attract {
    now, so the tiny corner button would just clutter the idle screen.
    The status bar itself slides down (via the .status rule below)
    instead of disappearing instantly — the weapon and touch controls
-   follow via their `--status` anchor. */
-body[data-game-state="attract"] #spectator,
-body[data-game-state="attract"] #ui-buttons,
-body[data-game-state="attract"] #menu-button {
+   follow via their `--status` anchor.
+   `:has()` keys off any pane having the active attract overlay —
+   matches the body once attract is showing anywhere in the window,
+   so window-scoped UI hides regardless of split-screen layout. */
+body:has(.pane-attract.active) #spectator,
+body:has(.pane-attract.active) #ui-buttons,
+body:has(.pane-attract.active) #menu-button {
     display: none;
 }
 
-body[data-game-state="attract"] .status {
+body:has(.pane-attract.active) .status {
     bottom: calc(-32px * var(--scale));
 }
 
@@ -837,7 +842,7 @@ body[data-game-state="attract"] .status {
    override the hide translate. The transform's existing 0.8s delay +
    0.3s ease-in (declared on .weapon) staggers it behind the bar — bar
    slides first, weapon follows. */
-body[data-game-state="attract"] .weapon {
+body:has(.pane-attract.active) .weapon {
     /* !important needed because the weapon-bob rule has higher
        specificity (body:not(.spectator) .renderer .weapon:not(.firing):not(.switching))
        and its animation keyframes set transform absolutely. */

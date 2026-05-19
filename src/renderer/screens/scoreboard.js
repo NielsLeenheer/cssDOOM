@@ -9,9 +9,9 @@
  * `position: absolute` so each monitor gets its own bezel-safe overlay.
  * The same renderer paints every container.
  *
- * Visibility is driven by `body[data-game-state="ended"]` (set by
- * the game-state machine when `endMatch()` runs); this module only
- * owns the DOM structure inside the overlay.
+ * Visibility is driven by an `.active` class on each pane's `.pane-win`
+ * container, added by `renderResults` and removed by `clearResults`.
+ * CSS reads only that class — no body flag.
  *
  * On a client window the same module renders the broadcasted snapshot
  * — the data shape is identical to what match.js produces, so there's
@@ -65,12 +65,16 @@ const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
  */
 export function renderResults(renderer, payload) {
     const container = renderer.paneEl.querySelector('.pane-win');
-    if (container) container.replaceChildren(buildScoreboardNode(payload));
+    if (!container) return;
+    container.replaceChildren(buildScoreboardNode(payload));
+    container.classList.add('active');
 }
 
 export function clearResults(renderer) {
     const container = renderer.paneEl.querySelector('.pane-win');
-    if (container) container.replaceChildren();
+    if (!container) return;
+    container.classList.remove('active');
+    container.replaceChildren();
 }
 
 function buildScoreboardNode({ scores, kills, winnerIndex }) {

@@ -53,6 +53,7 @@ import * as playerVisuals from './scene/entities/player.js';
 import { renderIntermission, clearIntermission } from './screens/intermission.js';
 import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showLobby, hideLobby } from './screens/lobby.js';
+import { showAttract, hideAttract } from './screens/attract.js';
 import { showTimer } from './hud/match-timer.js';
 import { applyGameState } from '../game/game-state.js';
 
@@ -197,24 +198,23 @@ export const COMMANDS = {
     hideIntermission: { kind: 'world', impl: clearIntermission },
     showResults:      { kind: 'world', impl: renderResults },
     hideResults:      { kind: 'world', impl: clearResults },
+    showAttract:      { kind: 'world', impl: showAttract },
+    hideAttract:      { kind: 'world', impl: hideAttract },
     showTimer:        { kind: 'world', impl: showTimer },
 
     // ── Window: game-state transition ────────────────────────────────────
-    // Every window (master + each joiner) holds its own `current` game
-    // state and its own `body[data-game-state]` attribute. Both must
-    // reflect the same value at all times so CSS gates
-    // (`body[data-game-state="lobby"] …`) stay aligned. Window-kind so
-    // the impl fires once per window — a split-screen master with two
-    // DomRenderers writes the body once, not twice. Game code calls
-    // `orchestrator.setGameState(value)`; the impl updates the pure
-    // state in game-state.js and writes the body. Joiners receive a
-    // CMD_WORLD envelope and dispatch through their own orchestrator,
-    // which fires the same impl on their window.
+    // Every window (master + each joiner) holds its own `current` value
+    // in game-state.js. This window-kind command keeps them in sync:
+    // master calls `orchestrator.setGameState(value)`, the impl updates
+    // the pure state on master, and joiners receive a CMD_WORLD
+    // envelope that dispatches the same impl on their window. No DOM
+    // writes — visibility is driven entirely by per-pane `.active`
+    // classes on the overlay containers (see show* / hide* impls
+    // above) and `:has()` reactions in CSS.
     setGameState:     {
         kind: 'window',
         impl: (value) => {
             applyGameState(value);
-            document.body.dataset.gameState = value;
         },
     },
 };

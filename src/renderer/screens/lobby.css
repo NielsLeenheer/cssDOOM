@@ -27,13 +27,12 @@
 }
 
 /* Show one copy per pane while we're in the network lobby — both on the
-   host (master) and on every connected Network DM remote. The
-   .network-client body class identifies Network DM joiners (set by
-   RemoteGame.start when roomCode is present); Local DM secondaries
-   also have data-network-mode="client" but use the per-pane
-   press-to-claim UI from lobby.css rather than the 4-slot list. */
-body[data-network-mode="host"][data-game-state="lobby"] .pane-network-lobby,
-body.network-client[data-game-state="lobby"] .pane-network-lobby {
+   host (master) and on every connected Network DM remote. The lobby
+   renderer impl (lobby.js's renderNetworkLobby) adds `.active` when
+   the lobby is showing on this pane; hideLobby removes it. CSS just
+   reflects that flag — visibility is renderer-controlled, not
+   state-flag-driven. */
+.pane-network-lobby.active {
     display: flex;
 }
 

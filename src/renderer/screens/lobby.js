@@ -41,11 +41,14 @@ export function showLobby(renderer, payload) {
     }
 }
 
-/** hideLobby — no-op. CSS hides every lobby element when
- *  `body[data-game-state]` flips off LOBBY, so no per-pane teardown
- *  is needed today. Kept so the command has a real entry point. */
-export function hideLobby(_renderer) {
-    // intentionally empty
+/** hideLobby — removes the per-pane `.active` flag CSS reads to
+ *  show the network-lobby overlay. The local-DM lobby uses
+ *  `pane[data-claim-state]` instead (set by renderLocalLobby with
+ *  payload.inLobby=false when leaving lobby), so no teardown is
+ *  needed for that variant here. */
+export function hideLobby(renderer) {
+    const networkRoot = renderer.paneEl.querySelector('.pane-network-lobby');
+    if (networkRoot) networkRoot.classList.remove('active');
 }
 
 function renderLocalLobby(renderer, payload) {
@@ -71,6 +74,7 @@ function renderLocalLobby(renderer, payload) {
 function renderNetworkLobby(renderer, payload) {
     const root = renderer.paneEl.querySelector('.pane-network-lobby');
     if (!root) return;
+    root.classList.add('active');
 
     // Level-name sprite (white WILV0N from the SP intermission set).
     // Same per-map source as the menu's level picker — empty src

@@ -63,6 +63,22 @@ export function isAttractActive() {
     return getGameState() === GAME_STATE.ATTRACT;
 }
 
+// ── Renderer-command entry points ──────────────────────────────────────
+// The attract overlay's static content lives in the pane template
+// (logo + PRESS TO START); these commands flip the per-pane `.active`
+// class that CSS reads for visibility. World-kind so master's
+// enterAttract / exitAttract fan to every joiner's pane(s) automatically.
+
+export function showAttract(renderer) {
+    const el = renderer.paneEl.querySelector('.pane-attract');
+    if (el) el.classList.add('active');
+}
+
+export function hideAttract(renderer) {
+    const el = renderer.paneEl.querySelector('.pane-attract');
+    if (el) el.classList.remove('active');
+}
+
 /**
  * Called by input modules whenever they observe a button press, axis nudge,
  * pointer motion, or any other live engagement. Resets the idle timer and
@@ -169,6 +185,7 @@ export async function enterAttract() {
     rotateStartTime = performance.now();
     entering = false;
     orchestrator.setGameState(GAME_STATE.ATTRACT);
+    orchestrator.showAttract();
 }
 
 function exitAttract() {
@@ -176,11 +193,10 @@ function exitAttract() {
     // After attract, swapLevel put us in a fresh post-resetMatch world.
     // resetMatch already transitioned us to LOBBY; we just need to
     // un-set the ATTRACT state. orchestrator.setGameState(LOBBY) is a
-    // no-op if we're somehow not in ATTRACT (e.g., direct
-    // dismissIntermission called pingActivity) — applyGameState
-    // early-returns on same-state writes. body[data-game-state] is
-    // written by the setGameState command impl on both master and joiner.
+    // no-op if we're somehow not in ATTRACT (e.g., direct pingActivity
+    // call) — applyGameState early-returns on same-state writes.
     orchestrator.setGameState(GAME_STATE.LOBBY);
+    orchestrator.hideAttract();
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the
     // very next updateGame frame would see elapsed > timeLimit and call
