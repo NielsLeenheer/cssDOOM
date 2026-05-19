@@ -141,9 +141,6 @@ export function applyMode(gameMode, networkMode = 'standalone') {
         // kiosk Network DM (locals at 0+1) would steal slot 1 from
         // the second local pane the first time a joiner connects.
         orchestrator.setMinRemoteSlot(localCount);
-        // Push the new lobby state out to every renderer (master's
-        // local panes + any sinks that are already up).
-        orchestrator.showLobby();
         openRoom();
     } else if (gameMode === 'deathmatch' && networkMode === 'client') {
         // Client window. The remote's actual identity (its slot) is set
