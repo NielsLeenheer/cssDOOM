@@ -171,8 +171,8 @@ export function matchTick() {
 // Last value fanned out to clients. Tracked so we only push an envelope
 // when the displayed value actually changes (once per second during the
 // last 60 s, plus a single hide when the window opens/closes). Also
-// surfaces the current value to snapshot.js so a late-joining client
-// gets it right after their world snapshot applies.
+// surfaces the current value to catchup.js so a late-joining client
+// gets it as part of the unified catchup envelope.
 let _currentTimerText = null;
 
 /** Pushes the m:ss display through the orchestrator in the last 60 s of
@@ -199,8 +199,8 @@ function hideTimer() {
 }
 
 /** Current m:ss text being broadcast, or null if the timer is hidden.
- *  Used by snapshot.js so a late-joining client gets the current
- *  readout immediately after their world snapshot applies. */
+ *  Used by catchup.js so a late-joining client gets the current
+ *  readout in the catchup envelope. */
 export function getCurrentTimerText() {
     return _currentTimerText;
 }

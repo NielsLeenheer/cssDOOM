@@ -83,18 +83,14 @@ export const MSG = {
     // state). Future expansion may flip a local PLAYING flag for input
     // gating on the joiner.
     PLAY: 'play',
-    // Master → client: one-shot world-state snapshot for new / reconnecting
-    // joiners. Sent right after the joiner's RenderClient is confirmed
-    // subscribed (master's onReady hook). Lets the joiner reconcile its
-    // freshly-rebuilt scene (initThings produces every entity in its
-    // alive/uncollected default state) against master's authoritative
-    // state — dead enemies stay dead, collected pickups stay collected,
-    // doors stay at their current open/closed position, corpses appear
-    // at their original death points, etc. Joiner applies via existing
-    // renderer commands with animations temporarily suppressed so the
-    // catch-up doesn't visibly re-play every death and door open since
-    // match start.
-    WORLD_SNAPSHOT: 'world-snapshot',
+    // Master → client: one-shot catch-up envelope for a freshly
+    // attached joiner. Sent right after the joiner's RenderClient is
+    // confirmed subscribed (master's onReady hook). Carries a flat
+    // list of renderer commands covering world (mechanics, things,
+    // corpses, timer), overlay (lobby/results if visible), and the
+    // joiner's own per-pane state (HUD, camera, weapon, dead flag).
+    // See src/game/catchup.js.
+    CATCHUP: 'catchup',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

@@ -360,16 +360,14 @@ export class MasterConnection {
     }
 
     /**
-     * Send the world-state snapshot to a single peer. Used by master
-     * right after that peer's `onReady` fires — the freshly-built
-     * remote scene gets reconciled against master's authoritative
-     * state (dead enemies stay dead, collected pickups stay collected,
-     * doors/lifts at their current position, etc.).
+     * Send the catchup envelope to a single peer. Called from
+     * master's onReady hook — carries world + overlay + per-pane
+     * state as a flat command list. See src/game/catchup.js.
      */
-    sendSnapshot(peerKey, snapshot) {
+    sendCatchup(peerKey, cmds) {
         const session = this._peers.get(peerKey);
         if (!session?.alive) return;
-        this._postTo(session, { type: MSG.WORLD_SNAPSHOT, snapshot });
+        this._postTo(session, { type: MSG.CATCHUP, cmds });
     }
 
     _postTo(session, envelope) {
@@ -400,6 +398,13 @@ export class MasterConnection {
     _handlePeerGone(session) {
         if (!session.alive) return;
         session.alive = false;
+        // Reset ready so the next READY from a reconnecting peer
+        // re-fires onReady (and the catchup it carries). Without
+        // this, a same-peerKey reconnect (Local DM secondary
+        // reopening, Network DM remote rejoining) sees the stale
+        // ready=true from the prior session and silently drops the
+        // catchup fan-out.
+        session.ready = false;
         this._stopHeartbeat(session);
         this.onLeave?.(session.peerKey);
     }
@@ -444,18 +449,18 @@ export class MasterConnection {
  *   is mostly a synchronization point. The load envelope itself
  *   rides `cmd-world loadMap` — RenderClient special-cases that and
  *   posts MSG.READY_TO_PLAY when the local scene rebuild resolves.
- * @param {(snapshot: object) => void} [options.onSnapshot]
- *   Master sent a world-state snapshot (after our READY). Handler
- *   should reconcile our freshly-built scene against master's
- *   authoritative state.
+ * @param {(cmds: object[]) => void} [options.onCatchup]
+ *   Master sent the catchup envelope (after our READY). Handler
+ *   should apply the carried command list to reach master's
+ *   current state — see src/game/catchup.js::applyCatchupCmds.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onPlay, onSnapshot } = {}) {
+    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
         this.onPlay = onPlay;
-        this.onSnapshot = onSnapshot;
+        this.onCatchup = onCatchup;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -495,8 +500,8 @@ export class ClientConnection extends PeerConnectionBase {
             this._handlePeerGone();
         } else if (msg.type === MSG.PLAY) {
             this.onPlay?.();
-        } else if (msg.type === MSG.WORLD_SNAPSHOT) {
-            this.onSnapshot?.(msg.snapshot);
+        } else if (msg.type === MSG.CATCHUP) {
+            this.onCatchup?.(msg.cmds);
         }
     }
 

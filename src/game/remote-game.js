@@ -37,7 +37,7 @@ import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
 import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
 import { ensureDisconnectedOverlay } from '../renderer/overlays/disconnected-overlay.js';
-import { applyWorldSnapshot } from '../game/snapshot.js';
+import { applyCatchupCmds } from '../game/catchup.js';
 
 // 60Hz analog snapshot push (matches master's game loop cadence).
 const ANALOG_PUSH_INTERVAL_MS = 16;
@@ -143,26 +143,18 @@ export class RemoteGame {
             onPlay: () => {
                 // No-op for now.
             },
-            // Master sent a world-state snapshot. Reconcile our
-            // freshly-built scene against master's authoritative
-            // state — dead enemies stay dead, collected pickups stay
-            // collected, doors / lifts / crushers at their current
-            // position, corpses re-appear at their original death
-            // points. Animations are suppressed for the apply so the
-            // catch-up doesn't visibly re-play every event.
-            // Master sent a world-state snapshot. Reconcile our fresh-
-            // built scene against master's authoritative state — dead
-            // enemies stay dead, collected pickups stay collected,
-            // doors / lifts / crushers at their current position,
-            // corpses re-appear at their original death points, and
-            // every other player's billboard gets created. We pass
-            // the joiner's own Orchestrator as the target so the
-            // renderer commands fan to the local DomRenderer — its
-            // impls populate the renderer's own state and DOM
-            // (different from master's local-pane-rebuild path,
-            // which passes the specific renderer for direct dispatch
-            // — see master.js).
-            onSnapshot: (snapshot) => applyWorldSnapshot(this.orchestrator, snapshot),
+            // Apply the catchup envelope against our local
+            // DomRenderer directly — both world and per-pane impls
+            // are auto-bound onto DomRenderer.prototype by
+            // renderer/commands.js. Bypassing the orchestrator
+            // sidesteps its per-pane dispatch signature (which
+            // prefixes playerIndex), and the AudioRenderer's
+            // listener position lands on the next gameLoop frame's
+            // updateCamera anyway.
+            onCatchup: (cmds) => {
+                const renderer = this.orchestrator.findTarget(this._mySlot, 'dom');
+                applyCatchupCmds(renderer, cmds);
+            },
         });
 
         domRendererManager.startCullingLoop({

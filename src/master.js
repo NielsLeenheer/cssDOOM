@@ -45,8 +45,7 @@ import { initMasterConnection } from './network-host.js';
 import { setNetworkSlotOccupant } from './game/lobby-state.js';
 import { initRemoteInput, applyRemoteInput } from './input/remote.js';
 import { ensureMatchSize } from './game/match.js';
-import { GAME_STATE, getGameState } from './game/game-state.js';
-import { getWorldSnapshot, applyWorldSnapshot } from './game/snapshot.js';
+import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
 
 
@@ -228,51 +227,17 @@ function setupMasterBroadcast() {
             const slot = orchestrator.currentRemoteSlot(peerKey);
             if (slot == null) return;
 
-            // updateHud is event-driven (gated on player._hudDirty),
-            // so we mark this slot's player dirty here. The next
-            // gameLoop frame fires updateHud through the per-pane
-            // dispatch which reaches the newly-attached pane via its
-            // RenderSink. Without this, any peer would stare at blank
-            // HUD digits until the next damage / ammo / weapon-switch
-            // event. (HUD isn't in the world snapshot because it's
-            // per-pane derived state, not world state.) Harmless when
-            // state.players[slot] is undefined (Network DM remote at
-            // a slot not yet sized — ensurePlayerCount below handles
-            // that and the next frame flushes via the same gate.)
-            if (state.players[slot]) state.players[slot]._hudDirty = true;
+            // Catchup envelope: world (mechanics, things, corpses,
+            // timer) + overlay (lobby/results if visible) + per-pane
+            // state for the joiner's slot (HUD, camera, weapon, dead
+            // flag). See src/game/catchup.js.
+            const cmds = buildCatchup(slot);
+            if (cmds.length) masterConnection.sendCatchup(peerKey, cmds);
 
-            // World-state snapshot. The freshly-attached pane's scene
-            // has every pickup uncollected, every enemy alive, every
-            // door at its map-default state, no corpses, and no
-            // cross-pane player billboards. Master sends its
-            // authoritative state so the receiver reconciles. Applies
-            // to ANY peer with a wire (Local DM secondary OR Network
-            // DM remote). Skip if no map is loaded yet (still in
-            // lobby) — the joiner's upcoming orchestrator.loadMap
-            // will build a fresh scene against the new map and a
-            // following snapshot (if mid-match) catches it up then.
-            if (getCurrentLevel()) {
-                masterConnection.sendSnapshot(peerKey, getWorldSnapshot());
-            }
-
-            // Overlay catch-up — if master is currently in a state
-            // that has a visible overlay (LOBBY, ENDED), send the
-            // current payload directly to this peer's sink only.
-            // Same shape as the world-snapshot send above (per-target
-            // post-READY catch-up); content depends on which state
-            // master is in. INTERMISSION is SP-only so it never
-            // reaches a joiner; ATTRACT is kiosk-only and kiosks
-            // don't accept joiners.
-            const sink = orchestrator.findTarget(slot, 'sink');
-            const game = window.app?.game;
-            if (sink && game) {
-                const gs = getGameState();
-                if (gs === GAME_STATE.LOBBY) {
-                    sink.showLobby(game.getLobbyPayload());
-                } else if (gs === GAME_STATE.ENDED) {
-                    sink.showResults(game.getResultsPayload());
-                }
-            }
+            // The catchup carries the initial HUD, so clear the dirty
+            // flag — otherwise renderAllActivePanes would redundantly
+            // re-fire updateHud on the very next gameLoop frame.
+            if (state.players[slot]) state.players[slot]._hudDirty = false;
 
             // Everything below is Network-DM-host-specific: roster
             // sizing for late-joining remotes, audio listener config
@@ -313,19 +278,16 @@ function setupMasterBroadcast() {
             // the slot index to clear its row in the network lobby UI.
             const slot = orchestrator.currentRemoteSlot(peerKey);
             // After the unbind's grace expires, the slot's restored
-            // local DomRenderer rebuilds its scene from scratch
-            // (just-built = every pickup uncollected, every enemy
-            // alive, no player billboards, no corpses). Catch it up
-            // by applying the current world snapshot directly to
-            // that one renderer — direct dispatch (not via
-            // orchestrator) so other already-in-sync local
-            // renderers + remote sinks aren't disturbed by
-            // re-fired non-idempotent commands like createCorpse.
+            // local DomRenderer is brand-new — every pickup
+            // uncollected, every enemy alive, no player billboards,
+            // no corpses, default HUD and weapon sprite. Apply the
+            // current catchup directly to that one renderer so
+            // other already-in-sync local renderers and remote sinks
+            // aren't disturbed by re-fired non-idempotent commands
+            // like createCorpse.
             orchestrator.unbindRemoteSlot(peerKey, {
                 onGraceRebuilt: (rebuiltRenderer) => {
-                    if (getCurrentLevel()) {
-                        applyWorldSnapshot(rebuiltRenderer, getWorldSnapshot());
-                    }
+                    applyCatchupCmds(rebuiltRenderer, buildCatchup(slot));
                 },
             });
             if (state.networkMode === 'host' && peerKey !== 'local' && slot != null) {
