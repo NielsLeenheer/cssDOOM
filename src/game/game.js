@@ -81,6 +81,11 @@ export class Game {
         this._state = 'LOBBY'; // new Game() always boots into LOBBY
         this._listeners = new Map();
         this._autoStartTimer = null;
+        // Subscriptions registered in start(), called + cleared in stop().
+        // Each entry is the disposer returned by the state-owner's
+        // on*() function. Keeping this list means a single cleanup
+        // loop in stop() instead of one field per subscription.
+        this._disposers = [];
     }
 
     /** Reads from state directly — see constructor for rationale. */
@@ -110,37 +115,28 @@ export class Game {
         // (mutated by mode.js, master.js's onJoin/onLeave, network-host
         // openRoom/closeRoom, and the match-reset hook) emit on every
         // write — the render decision lives WITH the state owner, not
-        // scattered across the mutators. This subscriber repaints once
-        // per emit, gated on the LOBBY game-state so it stays inert
-        // outside the lobby phase.
-        this._unsubscribeLobbyChange = onLobbyChange(() => {
+        // scattered across the mutators. Repaints once per emit, gated
+        // on LOBBY game-state so warmup mutations don't repaint.
+        this._disposers.push(onLobbyChange(() => {
             if (this._state !== 'LOBBY') return;
             const payload = this.getLobbyPayload();
             orchestrator.showLobby(payload);
             this._emit('lobby-updated', payload);
-        });
+        }));
 
         // Subscribe to device→slot claim changes so Local DM
         // auto-starts when both slots are claimed AND the lobby UI
-        // repaints with the new claim set. Both effects are
-        // state-gated to LOBBY (a stale subscription on a stopped
-        // Game bails before doing anything).
-        //
-        // claim-registry's onClaimChange currently has no
-        // unsubscribe API; multiple Games over a session each
-        // accumulate a subscription. The state-gate keeps stale
-        // subscriptions inert.
-        //
-        // SP doesn't need auto-start — start() drops straight into
-        // beginPlay below. Network DM uses host-fire-start via the
-        // NETWORK_START gate, not all-claimed auto-start.
-        onClaimChange(() => {
+        // repaints with the new claim set. SP doesn't need auto-start
+        // — start() drops straight into beginPlay below. Network DM
+        // uses host-fire-start via the NETWORK_START gate, not
+        // all-claimed auto-start.
+        this._disposers.push(onClaimChange(() => {
             if (this._state !== 'LOBBY') return;
             const payload = this.getLobbyPayload();
             orchestrator.showLobby(payload);
             this._emit('lobby-updated', payload);
             this._checkAutoStart();
-        });
+        }));
 
         // Bridge match.js's 'ended' channel onto Game's own emit
         // pattern + transition the local state machine. match.js::endMatch
@@ -148,13 +144,16 @@ export class Game {
         // path also funnels through it via Game._onLevelComplete) so
         // this subscriber is the single converge point that flips
         // Game._state to RESULTS.
-        onMatch('ended', () => {
+        this._disposers.push(onMatch('ended', () => {
+            // Guard against double-fire within a Game instance — match
+            // limit checks + exit-switch path could theoretically both
+            // trigger endMatch in the same tick.
             if (this._state === 'ENDED' || this._state === 'RESULTS') return;
             this._transitionTo('RESULTS');
             const payload = this.getResultsPayload();
             orchestrator.showResults(payload);
             this._emit('match-ended', payload);
-        });
+        }));
 
         if (this.gameMode === 'singleplayer') {
             await this.beginPlay();
@@ -341,13 +340,14 @@ export class Game {
         orchestrator.hideIntermission();
         orchestrator.hideResults();
 
-        // Drop the lobby-state subscription so a post-stop emit
-        // doesn't fan into a dead Game instance. (Other subscribers
-        // — onClaimChange, onMatch — currently can't be unsubscribed;
-        // they're state-gated to LOBBY instead. See the comment in
-        // start() about claim-registry's missing unsubscribe API.)
-        this._unsubscribeLobbyChange?.();
-        this._unsubscribeLobbyChange = null;
+        // Drop every state-owner subscription so post-stop emits
+        // don't fan into a dead Game. Without this, dead-Game
+        // handlers would still fire on each emit (held alive via
+        // closure) for the rest of the session — App.startLocalGame
+        // constructs a fresh Game on each mode/level switch, and the
+        // old subscriptions would accumulate monotonically.
+        for (const dispose of this._disposers) dispose();
+        this._disposers.length = 0;
 
         this._transitionTo('ENDED');
         this._emit('game-ended', {});

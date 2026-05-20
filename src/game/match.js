@@ -34,7 +34,9 @@ const _matchListeners = new Map();
 
 export function onMatch(eventName, handler) {
     if (!_matchListeners.has(eventName)) _matchListeners.set(eventName, new Set());
-    _matchListeners.get(eventName).add(handler);
+    const set = _matchListeners.get(eventName);
+    set.add(handler);
+    return () => set.delete(handler);
 }
 
 function _emitMatchEvent(eventName, payload) {
