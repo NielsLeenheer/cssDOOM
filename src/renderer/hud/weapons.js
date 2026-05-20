@@ -54,9 +54,19 @@ export function stopFiring(renderer) {
     renderer.weaponEl.classList.remove('firing');
 }
 
-// Clean up the firing class when a CSS fire animation completes on a
-// pane's weapon element, so the weapon returns to its idle sprite frame.
-document.addEventListener('animationend', event => {
-    if (event.animationName !== 'weapon-fire') return;
-    event.target.classList.remove('firing');
-});
+/**
+ * Wire per-renderer weapon-element event listeners. Called once per
+ * DomRenderer at construction (the only point the renderer's
+ * weaponEl exists and is final). The listener lives with the
+ * element — when the pane is destroyed and the element is removed
+ * from the DOM, the listener is GC'd with it.
+ *
+ * Removes the firing class when a fire animation completes so the
+ * weapon returns to its idle sprite frame.
+ */
+export function wireWeaponEvents(weaponEl) {
+    weaponEl.addEventListener('animationend', event => {
+        if (event.animationName !== 'weapon-fire') return;
+        weaponEl.classList.remove('firing');
+    });
+}

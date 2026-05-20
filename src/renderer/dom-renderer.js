@@ -26,6 +26,7 @@
 
 import { updatePerspective } from './scene/scene.js';
 import { updateCulling as runCulling } from './scene/culling.js';
+import { wireWeaponEvents } from './hud/weapons.js';
 import * as spectator from './spectator.js';
 
 // Per-player and world command methods are bound onto this prototype
@@ -100,6 +101,13 @@ export class DomRenderer {
         // perspective at construction time. No external trigger needed.
         this._perspectiveObserver = new ResizeObserver(() => updatePerspective(this));
         this._perspectiveObserver.observe(this.viewportEl);
+
+        // Wire per-renderer DOM-event listeners that need to live as
+        // long as the pane element. Attached here (not at module-load
+        // in weapons.js) so each renderer owns its own listener on
+        // its own element — when the pane is destroyed, the listener
+        // is GC'd with it.
+        wireWeaponEvents(this.weaponEl);
     }
 
     /**
