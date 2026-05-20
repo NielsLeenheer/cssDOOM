@@ -17,6 +17,7 @@ import { hasPowerup } from '../player/pickups.js';
 import { orchestrator } from '../../orchestrator.js';
 import { setEnemyState } from './enemies.js';
 import { recordKill } from '../sp-stats.js';
+import { lowerFloorsWithTag } from '../mechanics/floors.js';
 import * as renderer from '../../renderer/index.js';
 
 // ============================================================================
@@ -287,7 +288,11 @@ function checkBossDeath(lastBaron) {
     for (let i = 0, len = allThings.length; i < len; i++) {
         if (allThings[i].type === 3003 && !allThings[i].collected) return;
     }
-    renderer.lowerTaggedFloor(666);
+    // Game-side: mutate mapData so physics sees the new floor height.
+    // Renderer-side: fan a per-sector setFloorHeight to animate the
+    // visual drop. Each renderer's impl is paint-only.
+    const updates = lowerFloorsWithTag(666);
+    for (const u of updates) renderer.setFloorHeight(u.sectorIndex, u.height);
     // Source position: the dying boss is in the arena where the floor
     // lowers (E1M8 layout puts them in the same room). Good enough proxy
     // without needing to look up the tag-666 sector center.

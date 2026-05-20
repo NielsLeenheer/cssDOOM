@@ -80,7 +80,7 @@ export const setCrusherOffset = exported.setCrusherOffset;
 export const toggleSwitchState = exported.toggleSwitchState;
 
 // ── Surfaces ──────────────────────────────────────────────────────────────
-export const lowerTaggedFloor = exported.lowerTaggedFloor;
+export const setFloorHeight = exported.setFloorHeight;
 
 // ── Overlay commands re-exported for snapshot apply paths ────────────────
 // Most overlay commands (showLobby/showResults/setGameState) are only

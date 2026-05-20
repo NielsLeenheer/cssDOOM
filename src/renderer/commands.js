@@ -33,7 +33,7 @@ import * as lifts from './scene/mechanics/lifts.js';
 import * as crushers from './scene/mechanics/crushers.js';
 import * as scene from './scene/scene.js';
 import { toggleSwitchState } from './scene/mechanics/switches.js';
-import { lowerTaggedFloor } from './scene/surfaces/floors.js';
+import { setFloorHeight } from './scene/surfaces/floors.js';
 import * as effects from './hud/effects.js';
 import * as weapons from './hud/weapons.js';
 import { updateHud } from './hud/hud.js';
@@ -164,7 +164,9 @@ export const COMMANDS = {
     toggleSwitchState: { kind: 'world', impl: toggleSwitchState },
 
     // ── World: surfaces ───────────────────────────────────────────────────
-    lowerTaggedFloor: { kind: 'world', impl: lowerTaggedFloor },
+    // Paint-only — game-side mechanics owns the mapData mutation;
+    // this command animates the DOM for one sector per call.
+    setFloorHeight: { kind: 'world', impl: setFloorHeight },
 
     // ── World: lobby / intermission / results overlays ───────────────────
     // Stateful overlays. Every caller passes a complete payload —
