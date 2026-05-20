@@ -165,7 +165,7 @@ export class MasterConnection {
             // beginCoordinatedLoad so awaitAllReadyToPlay tracks the
             // latest load round.
             readyToPlay: false,
-            lastPong: 0,
+            lastFromPeer: 0,
             pingTimer: null,
             timeoutCheck: null,
             unsubscribe: null,
@@ -208,6 +208,13 @@ export class MasterConnection {
 
     _handle(session, msg) {
         if (!msg || typeof msg !== 'object') return;
+        // Any message from the peer is proof of life — symmetric with
+        // ClientConnection's lastFromMaster. Without this, a 60 Hz
+        // analog stream from the joiner doesn't refresh the liveness
+        // timer; if PONG happens to queue behind the analogs on the
+        // ordered data channel, master times out at PING_TIMEOUT_MS
+        // and tears the slot down even while traffic is flowing.
+        session.lastFromPeer = performance.now();
 
         if (msg.type === MSG.LOOKING) {
             if (this.paused) return;
@@ -216,12 +223,9 @@ export class MasterConnection {
             // Re-LOOKINGs from an already-alive peer don't re-fire onJoin.
             if (!session.alive) {
                 session.alive = true;
-                session.lastPong = performance.now();
                 this._startHeartbeat(session);
                 this.onJoin?.(payload, session.peerKey);
             }
-        } else if (msg.type === MSG.PONG) {
-            session.lastPong = performance.now();
         } else if (msg.type === MSG.READY) {
             // Client's RenderClient is now subscribed. Only fire onReady
             // the first time per session — a reconnect re-runs onJoin
@@ -384,7 +388,7 @@ export class MasterConnection {
             this._postTo(session, { type: MSG.PING, t: performance.now() });
         }, PING_INTERVAL_MS);
         session.timeoutCheck = setInterval(() => {
-            if (session.alive && performance.now() - session.lastPong > PING_TIMEOUT_MS) {
+            if (session.alive && performance.now() - session.lastFromPeer > PING_TIMEOUT_MS) {
                 this._handlePeerGone(session);
             }
         }, PING_INTERVAL_MS);
