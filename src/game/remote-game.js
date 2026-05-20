@@ -271,12 +271,36 @@ export class RemoteGame {
             });
         }
 
-        // 60Hz analog snapshot. Same gate.
+        // 60Hz analog snapshot. moveX/moveY/turn/run are persistent
+        // state on the receiver (latestAnalog is overwritten in place,
+        // not consumed), so if the snapshot is identical to the last
+        // one we sent the receiver already holds those values — the
+        // envelope is pure noise. turnDelta is a per-tick delta that
+        // master applies on read, so when it's non-zero we MUST send
+        // every tick or the rotation is lost. Dedup gate: skip iff
+        // turnDelta is 0 AND every field matches the last sent
+        // envelope. The transition "stops turning" (last had non-zero
+        // turnDelta, this one has 0) goes through because the
+        // envelopes differ — that single send overwrites the
+        // receiver's stale turnDelta to 0.
+        const lastSent = { moveX: NaN, moveY: NaN, turn: NaN, turnDelta: NaN, run: null };
         this._analogTimer = setInterval(() => {
             if (this._paused) return;
             this.orchestrator.collectInputs();
             const snapshot = inputs[this._mySlot];
             if (!snapshot) return;
+            const isDuplicateIdle = snapshot.turnDelta === 0
+                && snapshot.moveX     === lastSent.moveX
+                && snapshot.moveY     === lastSent.moveY
+                && snapshot.turn      === lastSent.turn
+                && lastSent.turnDelta === 0
+                && snapshot.run       === lastSent.run;
+            if (isDuplicateIdle) return;
+            lastSent.moveX     = snapshot.moveX;
+            lastSent.moveY     = snapshot.moveY;
+            lastSent.turn      = snapshot.turn;
+            lastSent.turnDelta = snapshot.turnDelta;
+            lastSent.run       = snapshot.run;
             this._connection.channel.send({
                 type: MSG.ANALOG,
                 slot: this._mySlot,
