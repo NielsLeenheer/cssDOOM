@@ -26,7 +26,7 @@ import { initCrushersState } from './mechanics/crushers.js';
 import { initThingsState } from './entities/things-init.js';
 import { initSpStats } from './sp-stats.js';
 import * as maps from '../shared/maps/index.js';
-import { applyPlayerStart, addPlayerThings } from './player/start.js';
+import { applyPlayerStart, addPlayerThings, broadcastPlayerSprites } from './player/start.js';
 import { orchestrator } from '../orchestrator.js';
 import * as renderer from '../renderer/index.js';
 
@@ -162,8 +162,11 @@ export class Level {
         await this.orchestrator.loadMap(name);
 
         // Game-side post-build: spatial grid (needs state.things),
-        // player thing entries (creates player billboards via renderer
-        // command), sound graph.
+        // player thing entries (state-only — pushes player entries
+        // into state.things for collision / damage / AI targeting;
+        // the per-renderer createPlayerSprite fan-out is the caller's
+        // job, fired via broadcastPlayerSprites after every receiving
+        // renderer's scene is built), sound graph.
         buildSpatialGrid();
         addPlayerThings();
         buildSectorAdjacency();
@@ -327,6 +330,11 @@ export async function swapLevel(name) {
         orchestrator,
     });
     await lvl.load();
+    // No remote-joiner await in this path (callers: attract, debug
+    // warp, match-restart fallback) — master's local renderers are
+    // already built by Level.load's awaited orchestrator.loadMap, so
+    // it's safe to fan the player billboards out now.
+    broadcastPlayerSprites();
     lvl.start();
     _setCurrentLevel(lvl);
     return lvl;

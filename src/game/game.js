@@ -23,6 +23,7 @@ import { GAME_STATE, getGameState, setGameState } from './game-state.js';
 import { resetMatch, startMatch, endMatch, onMatch, isMatchLobby } from './match.js';
 import { getMasterConnection } from '../network-host.js';
 import { spawnPlayer } from './player/spawn.js';
+import { broadcastPlayerSprites } from './player/start.js';
 import { onClaimChange, isSlotClaimedLocally } from '../input/claim-registry.js';
 import {
     getCarriedOverClaims,
@@ -216,6 +217,10 @@ export class Game {
         });
         this._subscribeLevel(this.level);
         await this.level.load();
+        // Local DM preload — no remote joiners to await; master's
+        // local renderers are built by Level.load's awaited
+        // orchestrator.loadMap, so safe to fan player billboards now.
+        broadcastPlayerSprites();
         this.level.start();
         _setCurrentLevel(this.level);
     }
@@ -421,6 +426,14 @@ export class Game {
                 mc.broadcastPlay();
             }
         }
+
+        // Fan the player billboards out NOW — every receiving
+        // renderer's scene is built (master's local renderers from
+        // Level.load's awaited orchestrator.loadMap; remote joiners
+        // confirmed by awaitAllReadyToPlay above). Doing this earlier
+        // would race the joiners' still-building scenes and drop the
+        // create on the floor.
+        broadcastPlayerSprites();
 
         this.level.start();
         this._transitionTo('PLAYING');

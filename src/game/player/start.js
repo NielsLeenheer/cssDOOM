@@ -1,23 +1,33 @@
 /**
- * Player setup at level load. Two phases, both called by Level.load:
+ * Player setup at level load. Three phases, called in order:
  *
- *   - applyPlayerStart(): runs BEFORE scene build. Sets each player's
+ *   - applyPlayerStart(): BEFORE scene build. Sets each player's
  *     x / y / angle / z / floorHeight from the map's start data.
  *     Single-player reads mapData.playerStart; deathmatch picks among
  *     type-11 things (DM starts) with the same fallback logic the
- *     map exporter laid out.
+ *     map exporter laid out. Called by Level.load.
  *
- *   - addPlayerThings(): runs AFTER scene build. Pushes each player's
- *     entry into state.things and fires renderer.createPlayerSprite
- *     for the billboard. Lets canMoveTo see the player as a collider
- *     (skipped via excludeThing for the moving player) and lets
- *     hitscan / projectile / AI code treat the player as a damageable
- *     target. Each entry's x/y is synced from player.x/y by
- *     movement.js after every position update.
+ *   - addPlayerThings(): AFTER scene build, still inside Level.load.
+ *     Pushes each player's entry into state.things so canMoveTo can
+ *     see the player as a collider (skipped via excludeThing for the
+ *     moving player), and so hitscan / projectile / AI code treats
+ *     the player as a damageable target. Each entry's x/y is synced
+ *     from player.x/y by movement.js after every position update.
+ *     Pure master-side simulation state; no renderer commands.
  *
- * Lives in src/game/ — both phases mutate state.* and the second
- * fires a renderer command. shared/maps/ is the map-data layer only;
- * these belong here.
+ *   - broadcastPlayerSprites(): AFTER every renderer's scene is
+ *     built (master's local renderers always; remote joiners only
+ *     after MSG.READY_TO_PLAY arrives). Fires
+ *     renderer.createPlayerSprite via the orchestrator world fan-out
+ *     so every pane gets the billboard <img>. Idempotent —
+ *     createPlayerSprite no-ops when the sprite already exists in
+ *     this renderer's sceneState. Called by the Level.load callers
+ *     (Game.beginPlay after awaitAllReadyToPlay, others immediately
+ *     after load) — NOT by Level.load itself, because Level doesn't
+ *     know whether the caller is waiting on remote joiners.
+ *
+ * Lives in src/game/ — every phase mutates state.* or fires renderer
+ * commands. shared/maps/ is the map-data layer only; these belong here.
  */
 
 import { PLAYER_RADIUS } from '../../shared/constants.js';
@@ -88,21 +98,14 @@ function applyDeathmatchStarts() {
 }
 
 /**
- * Push a single player's thing entry into state.things and create
- * their billboard sprite in every renderer. Idempotent — calling
- * twice for the same player is a no-op (re-uses the existing
- * thingRef).
- *
- * Lets physics.canMoveTo's solid-thing loop see the player as a
- * collider (skipped via excludeThing for the moving player), and
- * lets hitscan / projectile / AI code treat the player as a
- * damageable target. Each entry's x/y is synced from player.x/y by
- * movement.js after each position update.
+ * Push a single player's thing entry into state.things. Idempotent —
+ * calling twice for the same player no-ops (re-uses the existing
+ * thingRef). Pure master-side simulation state; the billboard sprite
+ * fan-out is handled by broadcastPlayerSprites once every receiving
+ * renderer's scene is built.
  */
-export function addPlayerThing(player) {
+function addPlayerThing(player) {
     if (player.thingRef) return;
-    const sector = getSectorAt(player.x, player.y);
-    const sectorIndex = sector?.sectorIndex;
     const thingRef = {
         kind: 'player',
         player,
@@ -122,9 +125,32 @@ export function addPlayerThing(player) {
     state.things.push(thingRef);
     player.thingRef = thingRef;
     player.thingIndex = thingIndex;
-    renderer.createPlayerSprite(thingIndex, player.index, player.x, player.y, player.floorHeight, sectorIndex);
 }
 
 export function addPlayerThings() {
     for (const player of state.players) addPlayerThing(player);
+}
+
+/**
+ * Fan createPlayerSprite for every player with a thingRef out to
+ * every renderer via the orchestrator world dispatch. Idempotent —
+ * createPlayerSprite no-ops at the receiver when the sprite already
+ * exists in the receiver's sceneState.thingDom.
+ *
+ * MUST run only after every receiving renderer's scene is built. For
+ * master's local renderers that's guaranteed by Level.load's
+ * `await orchestrator.loadMap(name)`. For remote joiners over the
+ * wire that's guaranteed by waiting on MSG.READY_TO_PLAY (master
+ * does this in Game.beginPlay via awaitAllReadyToPlay before
+ * calling this).
+ */
+export function broadcastPlayerSprites() {
+    for (const player of state.players) {
+        if (!player?.thingRef || player.thingIndex == null) continue;
+        const sectorIndex = getSectorAt(player.x, player.y)?.sectorIndex;
+        renderer.createPlayerSprite(
+            player.thingIndex, player.index,
+            player.x, player.y, player.floorHeight, sectorIndex,
+        );
+    }
 }
