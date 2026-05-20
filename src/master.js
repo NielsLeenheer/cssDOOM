@@ -27,9 +27,7 @@ import { updateCamera, updateHud } from './renderer/index.js';
 import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
-import { buildModeConfigFromUrl } from './game/mode-config.js';
-import { Game } from './game/game.js';
-import { App } from './app.js';
+import { app } from './app.js';
 import { hideInitialOverlay } from './renderer/overlays/overlay.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
@@ -370,16 +368,6 @@ export async function initMaster({ isKiosk = false } = {}) {
     // is display-only and doesn't claim slot 1 — master's local kbm-B /
     // gamepad must do that explicitly. (The carried-over-claims
     // snapshot fires on every match-reset; see lobby-state.js.)
-
-    // Pre-seed an App with a Game so `window.app.game` is inspectable
-    // from the dev console before App.start runs. App.start will tear
-    // this Game down and construct a fresh one via startLocalGame; the
-    // pre-seed is purely for the dev-console handle's continuity.
-    const modeConfig = buildModeConfigFromUrl();
-    const game = new Game(modeConfig);
-    const app = new App();
-    app.game = game;
-    window.app = app;
 
     // applyMode owns the cross-cutting "enter a mode" work that Game
     // doesn't replicate: state.gameMode/networkMode, body data

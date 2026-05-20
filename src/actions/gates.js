@@ -33,6 +33,7 @@ import { swapLevel } from '../game/level.js';
 import { countOccupied as countNetworkLobbyOccupied } from '../game/lobby-state.js';
 import * as A from '../input/actions.js';
 import { on } from '../input/event-bus.js';
+import { app } from '../app.js';
 
 const DM_RESPAWN_COOLDOWN_MS = 2000;
 const SP_RESTART_COOLDOWN_MS = 4000;
@@ -59,7 +60,7 @@ export function initGates() {
     // intermission count-up.
     const intermissionAdvance = () => {
         if (getGameState() !== GAME_STATE.INTERMISSION) return;
-        window.app.game.advance();
+        app.game.advance();
         return true;
     };
     on(A.FIRE_DOWN,     intermissionAdvance, { priority: GATE_PRIORITY.INTERMISSION });
@@ -74,7 +75,7 @@ export function initGates() {
     // switch set _pendingNextMap).
     on(A.FIRE_DOWN, () => {
         if (!isMatchEnded()) return;
-        window.app.game.restartMatch();
+        app.game.restartMatch();
         return true;
     }, { priority: GATE_PRIORITY.MATCH_END });
 
@@ -113,11 +114,11 @@ export function initGates() {
     // pane) → RenderClient posts MSG.READY_TO_PLAY → master awaits
     // all readies → master broadcasts MSG.PLAY → both sides start ticking.
     on(A.FIRE_DOWN, ({ slot }) => {
-        if (window.app?.game?.networkMode !== 'host') return;
+        if (app.game?.networkMode !== 'host') return;
         if (!isMatchLobby()) return;
         if (slot !== 0) return;
         if (countNetworkLobbyOccupied() < 2) return;
-        window.app.game.beginPlay();
+        app.game.beginPlay();
         return true;
     }, { priority: GATE_PRIORITY.NETWORK_START });
 
@@ -129,7 +130,7 @@ export function initGates() {
     // immediately fire or use.
     const tryClaim = (event) => {
         if (event.slot != null) return;             // already claimed → pass through
-        if (window.app?.game?.gameMode !== 'deathmatch') return;
+        if (app.game?.gameMode !== 'deathmatch') return;
         if (event.deviceId == null) return;
         if (isMatchEnded()) return;                  // match-end gate handles its own
         const claimed = tryClaimSlot(event.deviceId);
@@ -150,7 +151,7 @@ export function initGates() {
         if (slot == null) return;
         const player = state.players[slot];
         if (!player?.isDead) return;
-        const gameMode = window.app?.game?.gameMode;
+        const gameMode = app.game?.gameMode;
         const cooldown = gameMode === 'deathmatch'
             ? DM_RESPAWN_COOLDOWN_MS
             : SP_RESTART_COOLDOWN_MS;

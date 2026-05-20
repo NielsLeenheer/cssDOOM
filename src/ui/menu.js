@@ -9,6 +9,7 @@
 import { state } from '../game/state.js';
 import { currentMap, MAPS } from '../shared/maps/index.js';
 import { switchMode } from '../mode.js';
+import { app } from '../app.js';
 
 const menuLevelList = document.querySelector('.menu-level-list');
 const menuButton = document.getElementById('menu-button');
@@ -35,11 +36,8 @@ for (const name of MAPS) {
         // Route through app.startLocalGame so the held Game gets
         // properly torn down (Game.stop clears the intermission
         // overlay + onAdvance callback, hides results, etc.) and a
-        // fresh Game is constructed with the picked map as
-        // mapCursor. window.app is set in app.js boot before any
-        // UI/menu code runs; a missing app here is a boot-order bug
-        // that should crash loud, not fall back silently.
-        window.app.startLocalGame({
+        // fresh Game is constructed with the picked map as mapCursor.
+        app.startLocalGame({
             gameMode: state.gameMode,
             networkMode: state.networkMode,
             skillLevel: state.skillLevel ?? 1,
@@ -55,12 +53,11 @@ for (const name of MAPS) {
 
 // Skill buttons. Like the level picker, route through
 // app.startLocalGame so the held Game is reconstructed cleanly
-// rather than leaving stale state around. window.app is set in
-// app.js boot before any UI/menu code runs.
+// rather than leaving stale state around.
 document.querySelectorAll('.menu-skill').forEach(btn => {
     btn.addEventListener('click', () => {
         state.skillLevel = parseInt(btn.dataset.skill);
-        window.app.startLocalGame({
+        app.startLocalGame({
             gameMode: state.gameMode,
             networkMode: state.networkMode,
             skillLevel: state.skillLevel,
@@ -149,7 +146,7 @@ export function updateMenuSelection() {
  * response to toggleMenu and reads back from App when asked.
  */
 export function isMenuOpen() {
-    return window.app?._state === 'MENU';
+    return app._state === 'MENU';
 }
 
 export function toggleMenu(show) {
@@ -167,7 +164,7 @@ export function toggleMenu(show) {
         // App.openMenu transitions App into MENU (which flips
         // isMenuOpen) and pauses the held Game. App.openMenu also
         // records previousState so closeMenu knows where to return to.
-        window.app?.openMenu();
+        app.openMenu();
     } else {
         menuOverlay.classList.add('hiding');
         menuOverlay.addEventListener('transitionend', function onEnd() {
@@ -183,7 +180,7 @@ export function toggleMenu(show) {
         //   previousState='BOOT'    → no-op.
         // Fire-and-forget; closeMenu is async only for the ATTRACT
         // branch's startLocalGame.
-        window.app?.closeMenu();
+        app.closeMenu();
     }
 }
 

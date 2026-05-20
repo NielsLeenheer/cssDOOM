@@ -324,3 +324,12 @@ export class App {
         if (set) for (const h of set) h(payload);
     }
 }
+
+/**
+ * The single App instance for this window. Constructed at module-load
+ * time — App's constructor is field-defaults only (no DOM access, no
+ * state reads), so it's safe to evaluate before initMaster /
+ * initClientWindow have run. Modules that need to reach App or its
+ * held Game import this singleton directly.
+ */
+export const app = new App();

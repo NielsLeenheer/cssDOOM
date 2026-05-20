@@ -46,6 +46,7 @@ import {
 } from './game/lobby-state.js';
 import { openRoom, closeRoom } from './network-host.js';
 import { orchestrator } from './orchestrator.js';
+import { app } from './app.js';
 
 const MODE_STORAGE_KEY = 'cssdoom-game-mode';
 
@@ -217,11 +218,9 @@ export async function switchMode(name) {
     // reshape, audio reconfig, network signaling room, body data
     // attributes, state.players sizing) — Game doesn't replicate
     // those today.
-    // window.app is set in app.js's boot, before any UI / menu code
-    // can run. If it's missing here, that's a boot-order bug we want
-    // to surface with a real TypeError rather than mask with a
-    // fallback that constructs a Level outside Game's lifecycle.
-    await window.app.startLocalGame({
+    // The App singleton is constructed at app.js module-load time, so
+    // it's always available here — no defensive optional chain needed.
+    await app.startLocalGame({
         gameMode: preset.gameMode,
         networkMode: preset.networkMode,
         skillLevel: state.skillLevel ?? 1,

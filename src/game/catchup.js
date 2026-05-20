@@ -45,6 +45,7 @@ import { getCurrentTimerText } from './match.js';
 import { getCurrentLevel } from './level.js';
 import { GAME_STATE, getGameState } from './game-state.js';
 import { COMMANDS } from '../renderer/commands.js';
+import { app } from '../app.js';
 
 // ── Public API ─────────────────────────────────────────────────────────
 
@@ -227,7 +228,7 @@ function appendTimerCmd(out) {
 // ── Overlay section ────────────────────────────────────────────────────
 
 function appendOverlayCmds(out) {
-    const game = window.app?.game;
+    const game = app.game;
     if (!game) return;
     const gs = getGameState();
     if (gs === GAME_STATE.LOBBY) {

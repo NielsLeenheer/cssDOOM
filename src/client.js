@@ -13,7 +13,7 @@
  *     master; plays audio locally.
  */
 
-import { App } from './app.js';
+import { app } from './app.js';
 
 export async function initClientWindow({ roomCode = null } = {}) {
     // Boot-time window configuration. Both Local DM secondaries and
@@ -28,7 +28,5 @@ export async function initClientWindow({ roomCode = null } = {}) {
     document.body.classList.add('client-window');
     if (roomCode) document.body.classList.add('network-client');
 
-    const app = new App();
-    window.app = app;
     await app.joinRemoteGame(roomCode);
 }

@@ -665,8 +665,9 @@ export class Game {
 
     // ── Overlay payload getters ─────────────────────────────────────────
     // Game owns the source-of-truth state for each overlay; callers
-    // (Game's own subscribers + master.js's onReady catch-up via
-    // window.app.game) ask Game to build a fresh payload at fire time.
+    // (Game's own subscribers + the catch-up builder reaching through
+    // the App singleton's `game` field) ask Game to build a fresh
+    // payload at fire time.
 
     /** Scoreboard payload for `showResults`. winnerIndex defaults to
      *  -1 (which the scoreboard renders as "TIE") if state.match isn't
