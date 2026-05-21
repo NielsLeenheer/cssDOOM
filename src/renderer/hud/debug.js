@@ -10,14 +10,12 @@ import { EYE_HEIGHT } from '../../shared/constants.js';
 import { THING_NAMES } from '../scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../../game/physics.js';
 import { updateCamera } from '../index.js';
-import { mapData, currentMap, getNextMap } from '../../shared/maps/index.js';
+import { mapData, currentMap } from '../../shared/maps/index.js';
 import { swapLevel } from '../../game/level.js';
 import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { endMatch } from '../../game/match.js';
 import { enterAttract } from '../../game/attract.js';
-import { captureSpStats } from '../../game/sp-stats.js';
-import { GAME_STATE, setGameState } from '../../game/game-state.js';
-import { orchestrator } from '../../orchestrator.js';
+import { app } from '../../app.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 
@@ -392,28 +390,16 @@ export function initDebugMenu() {
     attractBtn.addEventListener('click', () => enterAttract());
     details.appendChild(attractBtn);
 
-    // SP intermission button — shows the level-finish stats screen so we
-    // can inspect it without having to find an exit.
-    const intermissionBtn = document.createElement('button');
-    intermissionBtn.type = 'button';
-    intermissionBtn.textContent = 'Show intermission';
-    intermissionBtn.style.cssText = buttonStyle;
-    intermissionBtn.addEventListener('click', () => {
-        // Drive the same flow Game._onLevelComplete uses: flip the
-        // window state so CSS shows the overlay, then dispatch the
-        // payload-carrying renderer command. Dismissal goes through
-        // gates.js → Game.advance the same way as a real exit — but
-        // since debug.js bypasses _onLevelComplete, _pendingNextMap
-        // isn't set and advance() won't load the next map. (Same
-        // limitation as before this refactor.)
-        setGameState(GAME_STATE.INTERMISSION);
-        orchestrator.showIntermission({
-            nextMap: getNextMap(),
-            mapName: currentMap,
-            stats: captureSpStats(),
-        });
-    });
-    details.appendChild(intermissionBtn);
+    // End-level button — fires the same level-complete event the
+    // exit switch fires, so SP gets the intermission screen and DM
+    // gets the end-match scoreboard. Dismissal then advances the
+    // same way the real exit-switch flow does.
+    const endLevelBtn = document.createElement('button');
+    endLevelBtn.type = 'button';
+    endLevelBtn.textContent = 'End level';
+    endLevelBtn.style.cssText = buttonStyle;
+    endLevelBtn.addEventListener('click', () => app.game?.endCurrentLevel());
+    details.appendChild(endLevelBtn);
 
     document.body.appendChild(details);
 }

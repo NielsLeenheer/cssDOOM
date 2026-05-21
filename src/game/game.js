@@ -627,6 +627,20 @@ export class Game {
      * subsequent Level is constructed through `_subscribeLevel` and
      * its level-complete reaches this handler.
      */
+    /**
+     * Trigger level-complete via the same path the exit-switch press
+     * uses. SP gets the intermission overlay; DM ends the match.
+     * Used by the debug panel's "End level" button — same flow as a
+     * real exit, no debug-specific shortcuts.
+     */
+    endCurrentLevel() {
+        this.level?._emit('level-complete', {
+            nextMap: getNextMap(),
+            secret: false,
+            slot: 0,
+        });
+    }
+
     _onLevelComplete(payload) {
         // Stash next-map so the post-overlay advance path (Game.advance
         // for SP, Game.restartMatch for DM) knows where to go. Carries
