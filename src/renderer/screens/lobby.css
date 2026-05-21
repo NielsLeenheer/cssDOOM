@@ -213,6 +213,23 @@ body.network-client .network-lobby-aside { display: none; }
 
 .network-invite-qr:empty { display: none; }
 
+@media (max-width: 720px) {
+    .network-invite {
+        flex-direction: row;
+        gap: 24px;
+        justify-content: center;
+    }
+    
+    .network-invite-row {
+        justify-content: center;
+    }
+
+    .network-invite-qr {
+        width: 96px;
+        height: 96px;
+    }
+}
+
 /* Per-pane action prompt ---------------------------------------------
    Text content is written by the lobby renderer impl (lobby.js's
    renderNetworkLobby): empty until ≥ 2 slots are occupied, then
