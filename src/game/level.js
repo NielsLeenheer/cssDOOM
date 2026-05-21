@@ -98,17 +98,16 @@ export class Level {
         // They need this event so master's beginCoordinatedLoad
         // primes the handshake before their cmd-world loadMap arrives.
         //
-        // The showLevelTransition fade is still gated on
-        // !isInitialLoad — there's no scene to fade FROM on the very
-        // first load.
+        // The fade-in is gated on !isInitialLoad — there's no scene
+        // to fade FROM on the very first load. The orchestrator's
+        // showLevelTransition is idempotent: if a caller (Game.advance
+        // covering intermission teardown, Game.beginPlay covering
+        // lobby teardown) already raised the cover, this await
+        // resolves immediately because each pane's impl returns an
+        // already-resolved promise when it's already visible.
         _emitLevelEvent('changing', { name });
         if (!isInitialLoad) {
-            // Per-pane fade in. Each pane's `.pane-transition` covers
-            // its own area while the scene rebuild runs hidden. Wait
-            // the CSS fade-in duration so the disruptive part of the
-            // load lands on fully covered panes.
-            this.orchestrator.showLevelTransition();
-            await new Promise(r => setTimeout(r, 600));
+            await this.orchestrator.showLevelTransition();
         }
 
         // Fetch + enrich mapData. Mutates `maps.mapData` and
@@ -184,9 +183,11 @@ export class Level {
             for (const p of state.players) p.z = p.floorHeight + EYE_HEIGHT;
         }, 600);
 
-        if (!isInitialLoad) {
-            this.orchestrator.hideLevelTransition();
-        }
+        // Hide unconditionally — covers Level.load's own show (above)
+        // and any caller-raised cover. Each pane's impl no-ops when
+        // the cover wasn't visible, so this is safe on every path
+        // including the truly-initial-load case.
+        this.orchestrator.hideLevelTransition();
 
         // Tell master's broadcast layer that the scene is rebuilt and
         // it's safe to accept client reconnections again. Fires on

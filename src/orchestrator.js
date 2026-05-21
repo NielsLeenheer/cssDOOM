@@ -561,11 +561,19 @@ for (const name of Object.keys(PER_PANE_COMMANDS)) {
 // own orchestrator then iterates its own targets). AudioRenderer has
 // no world commands today, but the optional-chaining handles any kind
 // that doesn't expose a particular method.
+//
+// Returns Promise.all of every target's call so commands with async
+// impls (loadMap's scene rebuild, level-transition's fade-complete
+// promise) can be `await`-ed by callers. Synchronous impls return
+// undefined, which Promise.all treats as instantly fulfilled — so
+// fire-and-forget commands incur no measurable overhead.
 for (const name of Object.keys(WORLD_COMMANDS)) {
     Orchestrator.prototype[name] = function (...args) {
+        const promises = [];
         for (const t of this.targets) {
-            t[name]?.(...args);
+            promises.push(t[name]?.(...args));
         }
+        return Promise.all(promises);
     };
 }
 
@@ -584,29 +592,5 @@ Orchestrator.prototype.playSound = function (name, opts) {
         else if (t.kind === 'sink') t.forwardWorld('playSound', [name, opts]);
     }
 };
-
-/**
- * loadMap is a world command — every target receives it — but unlike
- * the generic fan-out we need to AWAIT every local renderer's scene
- * build so callers (Level.load) can synchronize on "all panes built."
- * Each DomRenderer's loadMap returns a Promise (buildScene is async);
- * each RenderSink's loadMap returns undefined (the wire envelope is
- * fire-and-forget). Promise.all accepts non-Promise values
- * transparently, so we await DomRenderers and ignore Sinks — joiner
- * completion is signalled separately via MSG.READY_TO_PLAY, posted
- * by the joiner's RenderClient after its local scene rebuild resolves.
- *
- * Assignment is placed AFTER the generic world-command binding loop
- * (which unconditionally writes Orchestrator.prototype.loadMap from
- * WORLD_COMMANDS) so this explicit version wins.
- */
-Orchestrator.prototype.loadMap = function (name) {
-    const promises = [];
-    for (const t of this.targets) {
-        promises.push(t.loadMap?.(name));
-    }
-    return Promise.all(promises);
-};
-
 
 export const orchestrator = new Orchestrator();

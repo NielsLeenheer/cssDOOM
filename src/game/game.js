@@ -385,9 +385,23 @@ export class Game {
      * continue to find the right Level instance.
      */
     async beginPlay() {
+        const needsLoad = !this.level;
+
+        // Raise the per-pane fade-to-black BEFORE hiding the lobby so
+        // the not-yet-loaded scene isn't briefly visible during the
+        // handoff. Skipped when there's nothing to load (Local DM
+        // preload path — the loaded scene is already visible behind
+        // the lobby panel, so the lobby hide is the cover).
+        // `orchestrator.showLevelTransition()` is idempotent across
+        // the advance → beginPlay → Level.load chain — once the cover
+        // is up, subsequent awaits resolve immediately.
+        if (needsLoad) {
+            await orchestrator.showLevelTransition();
+        }
+
         orchestrator.hideLobby();
 
-        if (!this.level) {
+        if (needsLoad) {
             // Network DM / fallback (preload missed for some reason):
             // construct + load now. LOBBY → LOADING → PLAYING.
             this._transitionTo('LOADING');
@@ -550,6 +564,15 @@ export class Game {
         if (getGameState() === GAME_STATE.INTERMISSION) {
             setGameState(GAME_STATE.ACTIVE);
         }
+
+        // Raise the per-pane fade-to-black BEFORE hiding intermission,
+        // so the finished level isn't briefly visible between the
+        // intermission going away and the next level's load-fade
+        // kicking in. The orchestrator's showLevelTransition is
+        // idempotent, so the later calls from beginPlay → Level.load
+        // hit the already-visible early-return and resolve immediately.
+        await orchestrator.showLevelTransition();
+
         orchestrator.hideIntermission();
         if (this._pendingNextMap) {
             this.mapCursor = this._pendingNextMap;
