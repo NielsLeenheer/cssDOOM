@@ -503,12 +503,29 @@ body[data-game-mode="deathmatch"]:not(:has(.pane-attract.active)) .pane[data-cla
     filter: brightness(0.3);
 }
 
-/* Hide HUD numbers in any non-active lobby state — there's no player
-   stats to show until the match actually starts. */
+/* Hide the status bar in any non-active lobby state — there's no
+   player stats to show until the match actually starts. Slides the
+   bar off-screen the same way the overlay-active rule does (single
+   shared mechanism: change `bottom`, anchored UI follows). */
 body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .hud .status,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .hud .status,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
-    visibility: hidden;
+    bottom: calc(-1 * var(--status-rows) * 32px * var(--scale));
+}
+
+/* Match the bar hide with a full weapon hide so the weapon doesn't
+   peek above the slid-down bar (the bar moves down by its own height,
+   the weapon needs the extra `110%` translate to clear the viewport).
+   Same recipe as the pane-attract weapon hide a few hundred lines
+   below — `translate` (not `transform`) so the bob keyframes keep
+   writing transform, and `animation-play-state: paused` so the
+   weapon freezes at its current bob frame instead of snapping
+   to keyframe 0. */
+body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .weapon,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .weapon,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .weapon {
+    animation-play-state: paused !important;
+    translate: 0 110%;
 }
 
 
