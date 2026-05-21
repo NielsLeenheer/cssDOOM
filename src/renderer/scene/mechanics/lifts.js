@@ -28,14 +28,18 @@ export function buildLift(ctx, lift) {
         }
     }
 
-    // Create shaft walls. The wall spans from the adjacent sector's floor
-    // up to the lift's upper height — covering everything that's visible
-    // from outside the lift footprint. Without using neighborFloor here,
-    // one-way lifts (e.g. E1M1's imp platform, type 36) whose lowerHeight
-    // sits a few units above the adjacent floor would leave a see-through
-    // sliver between the wall bottom and the surrounding floor.
+    // Create shaft walls. The wall normally spans the lift's travel range
+    // (lowerHeight..upperHeight). For one-way lifts (e.g. E1M1's imp
+    // platform, type 36) whose `lowerHeight` sits a few units above the
+    // adjacent floor, extend down to `neighborFloor` to close the gap.
+    // Only extend — never raise the bottom above lowerHeight, or the
+    // static shaft walls on the entry-corridor side (where neighborFloor
+    // equals upperHeight) collapse to zero height and the shaft becomes
+    // see-through when the platform is lowered.
     for (const shaftWall of lift.shaftWalls) {
-        const bottom = shaftWall.neighborFloor ?? lift.lowerHeight;
+        const bottom = shaftWall.neighborFloor !== undefined
+            ? Math.min(shaftWall.neighborFloor, lift.lowerHeight)
+            : lift.lowerHeight;
         const el = createWallElement(shaftWall, bottom, lift.upperHeight);
         if (!el) continue;
 
