@@ -73,7 +73,10 @@ document.querySelectorAll('.menu-skill').forEach(btn => {
 document.querySelectorAll('.menu-mode').forEach(btn => {
     btn.addEventListener('click', () => {
         const mode = btn.dataset.mode;
-        if (mode === currentModeName()) return;
+        if (mode === currentModeName()) {
+            toggleMenu(false);
+            return;
+        }
         switchMode(mode);
         updateMenuSelection();
         toggleMenu(false);
@@ -189,5 +192,7 @@ menuButton.addEventListener('click', () => {
 });
 
 menuOverlay.addEventListener('click', (e) => {
-    if (e.target === menuOverlay) toggleMenu(false);
+    if (!e.target.closest('#menu-content') && !e.target.closest('#menu-about')) {
+        toggleMenu(false);
+    }
 });
