@@ -111,11 +111,27 @@ export function killEnemy(renderer, thingIndex, thingType, instant = false) {
 // client run independently.
 const PLAYER_ATTACK_DURATION_MS = 600;
 
-export function playPlayerAttack(renderer, thingIndex) {
+// The attack frames are front-only, so playing them when the viewer
+// isn't roughly in front of the shooter makes the shooter look like
+// they're aiming at the viewer regardless of where they're actually
+// pointing. Only swap to the attack pose when the viewer falls inside
+// the shooter's front bucket of the 8-way rotation table — same
+// bucketing as updateEnemyRotation so the threshold matches the walk
+// sprite's front view (±22.5°).
+export function playPlayerAttack(renderer, thingIndex, shooter) {
     const layout = SPRITE_LAYOUT[-1];
     if (!layout) return;
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData?.sprite) return;
+
+    const viewer = renderer.state.camera;
+    if (!viewer || shooter === undefined) return;
+    const angleToViewer = Math.atan2(viewer.y - shooter.y, viewer.x - shooter.x);
+    let relativeAngle = angleToViewer - shooter.facing;
+    relativeAngle = ((relativeAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+    const rotationIndex = (Math.floor((relativeAngle + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
+    if (rotationIndex !== 1) return;
+
     setSpriteFrame(domData.sprite, layout.atkRow, layout.atkFrames, 1);
     setSpriteState(domData.sprite, 'attacking');
 

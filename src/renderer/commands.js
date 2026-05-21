@@ -156,7 +156,18 @@ export const COMMANDS = {
     // than an undefined entry.
     createPlayerSprite: { kind: 'world', impl: sprites.createPlayerSprite },
     createCorpse: { kind: 'world', impl: sprites.createCorpse },
-    playPlayerAttack: { kind: 'world', impl: sprites.playPlayerAttack },
+    // Strip the shooter Player object — playPlayerAttack only needs
+    // x/y/facing to decide whether this viewer sees the front-facing
+    // attack pose, and the raw Player carries cyclic refs that
+    // structured-clone / JSON.stringify choke on.
+    playPlayerAttack: {
+        kind: 'world',
+        impl: sprites.playPlayerAttack,
+        serialize: (thingIndex, shooter) => [
+            thingIndex,
+            { x: shooter.x, y: shooter.y, facing: shooter.facing },
+        ],
+    },
 
     // ── World: mechanics state ────────────────────────────────────────────
     setDoorState: { kind: 'world', impl: doors.setDoorState },

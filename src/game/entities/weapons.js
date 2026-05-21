@@ -99,9 +99,19 @@ export function fireWeapon(player) {
 
     // Trigger the attack pose on this player's billboard sprite so the
     // opposing player sees them firing (front-facing PLAYE/F frames, row
-    // 5 of the PLAY sheet). The renderer auto-returns to walk after the
-    // animation duration.
-    if (player.thingIndex >= 0) renderer.playPlayerAttack(player.thingIndex);
+    // 5 of the PLAY sheet). Each renderer decides per-viewer whether to
+    // show the attack pose based on its viewing angle against the
+    // shooter's facing; renderers off to the side keep the walk sprite.
+    // π/2 + player.angle converts north-convention (player.angle) to the
+    // east-convention thing-facing the renderer's atan2 math expects,
+    // matching movement.js's thingRef.facing write.
+    if (player.thingIndex >= 0) {
+        renderer.playPlayerAttack(player.thingIndex, {
+            x: player.x,
+            y: player.y,
+            facing: Math.PI / 2 + player.angle,
+        });
+    }
 
     // Perform hitscan hit detection for this shot
     checkWeaponHit(player);
