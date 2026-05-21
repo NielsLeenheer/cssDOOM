@@ -17,7 +17,6 @@ import { EYE_HEIGHT } from '../shared/constants.js';
 import { state } from './state.js';
 import { updateGame } from './index.js';
 import { transitionToLevel, resetGameState } from './player/damage.js';
-import { showLevelTransition, hideLevelTransition } from '../renderer/overlays/overlay.js';
 import { buildSectorAdjacency } from './sound-propagation.js';
 import { clearSpatialGrid, buildSpatialGrid } from './spatial-grid.js';
 import { initDoorsState } from './mechanics/doors.js';
@@ -104,7 +103,12 @@ export class Level {
         // first load.
         _emitLevelEvent('changing', { name });
         if (!isInitialLoad) {
-            await showLevelTransition();
+            // Per-pane fade in. Each pane's `.pane-transition` covers
+            // its own area while the scene rebuild runs hidden. Wait
+            // the CSS fade-in duration so the disruptive part of the
+            // load lands on fully covered panes.
+            this.orchestrator.showLevelTransition();
+            await new Promise(r => setTimeout(r, 600));
         }
 
         // Fetch + enrich mapData. Mutates `maps.mapData` and
@@ -181,7 +185,7 @@ export class Level {
         }, 600);
 
         if (!isInitialLoad) {
-            hideLevelTransition();
+            this.orchestrator.hideLevelTransition();
         }
 
         // Tell master's broadcast layer that the scene is rebuilt and

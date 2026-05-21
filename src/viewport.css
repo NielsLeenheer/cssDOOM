@@ -211,7 +211,9 @@ body.client-window .pane {
 }
 
 /* ==========================================================================
-   Loading overlay — global, fades out to reveal the scene
+   Initial boot splash — global, shows the DOOM logo until App.start
+   reveals the scene by removing the `.visible` class. Level-transition
+   fades are per-pane (see src/renderer/hud/level-transition.css).
    ========================================================================== */
 
 #loading-overlay {
@@ -230,15 +232,6 @@ body.client-window .pane {
     &.visible {
         opacity: 1;
         transition: none;
-    }
-
-    &.level-transition {
-        background-image: none;
-        transition: opacity 0.6s ease-out;
-
-        &.visible {
-            transition: opacity 0.6s ease-in;
-        }
     }
 }
 

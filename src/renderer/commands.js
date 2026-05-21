@@ -44,6 +44,7 @@ import { renderResults, clearResults } from './screens/scoreboard.js';
 import { showLobby, hideLobby } from './screens/lobby.js';
 import { showAttract, hideAttract } from './screens/attract.js';
 import { showTimer } from './hud/match-timer.js';
+import { showLevelTransition, hideLevelTransition } from './hud/level-transition.js';
 
 // Camera reads many fields off the player; strip to a plain transform
 // before going over the transport.
@@ -192,6 +193,12 @@ export const COMMANDS = {
     showAttract:      { kind: 'world', impl: showAttract },
     hideAttract:      { kind: 'world', impl: hideAttract },
     showTimer:        { kind: 'world', impl: showTimer },
+    // Per-pane level-transition fade. Fired by Level.load before /
+    // after the scene rebuild so each pane covers itself for the
+    // disruptive part of the load — no more shared body-level
+    // overlay.
+    showLevelTransition: { kind: 'world', impl: showLevelTransition },
+    hideLevelTransition: { kind: 'world', impl: hideLevelTransition },
 };
 
 export const PER_PANE_COMMANDS = Object.fromEntries(

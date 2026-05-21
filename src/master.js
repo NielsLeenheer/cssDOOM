@@ -28,7 +28,7 @@ import { domRendererManager } from './renderer/dom-renderer-manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { app } from './app.js';
-import { hideInitialOverlay } from './renderer/overlays/overlay.js';
+import { hideInitialOverlay } from './ui/initial-splash.js';
 import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';

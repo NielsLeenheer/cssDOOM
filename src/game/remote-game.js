@@ -35,8 +35,8 @@ import * as A from '../input/actions.js';
 import { isAttractActive } from './attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
-import { hideInitialOverlay } from '../renderer/overlays/overlay.js';
-import { ensureDisconnectedOverlay } from '../renderer/overlays/disconnected-overlay.js';
+import { hideInitialOverlay } from '../ui/initial-splash.js';
+import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyCatchupCmds } from '../game/catchup.js';
 
 // 60Hz analog snapshot push (matches master's game loop cadence).

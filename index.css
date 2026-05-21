@@ -24,4 +24,5 @@
 @import url('src/renderer/screens/lobby.css');
 @import url('src/ui/spectator.css');
 @import url('src/renderer/hud/touch-controls.css');
+@import url('src/renderer/hud/level-transition.css');
 @import url('src/ui/help.css');

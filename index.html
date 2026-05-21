@@ -212,6 +212,11 @@
                     </aside>
                 </div>
             </div>
+            <!-- Per-pane level transition fade — covers this pane during
+                 scene rebuild. Managed by src/renderer/hud/level-transition.js;
+                 fired via orchestrator.showLevelTransition / hideLevelTransition
+                 world commands from game/level.js's Level.load. -->
+            <div class="pane-transition"></div>
         </div>
     </template>
 

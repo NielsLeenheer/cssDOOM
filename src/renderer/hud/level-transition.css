@@ -1,0 +1,20 @@
+/* Per-pane level transition overlay — solid black fade that covers
+   this pane during scene rebuild. Sized absolutely against the pane
+   (NOT fixed against the viewport) so a per-pane rebuild covers only
+   its own pane. Sits at high z-index above other in-pane overlays so
+   the fade isn't tinted by them. */
+
+.pane-transition {
+    position: absolute;
+    inset: 0;
+    background: black;
+    z-index: 10000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s ease-out;
+}
+
+.pane-transition.visible {
+    opacity: 1;
+    transition: opacity 0.6s ease-in;
+}
