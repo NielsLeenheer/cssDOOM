@@ -81,6 +81,10 @@ export function buildWalls(ctx) {
         wallElement.style.setProperty('--floor-z', wall.bottomHeight);
         wallElement.style.setProperty('--ceiling-z', wall.topHeight);
 
+        // ML_DONTPEGBOTTOM on a two-sided middle texture pins it to the
+        // bottom of the allowable window instead of the default top.
+        if (wall.isUnpegged) wallElement.classList.add('unpegged');
+
         wallElement.dataset.texture = textureName;
         wallElement.style.backgroundImage = `url('/assets/textures/${textureName}.png')`;
         wallElement.style.setProperty('--texture-offset-x', wall.xOffset);
