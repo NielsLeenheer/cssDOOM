@@ -216,6 +216,16 @@ body.client-window #menu-button:hover { filter: none; }
     }
 }
 
+/* Local DM needs two input devices. When touch controls are active —
+   same `pointer: coarse` gate that reveals #touch-controls in
+   src/renderer/hud/touch-controls.css — touch feeds only one player
+   and there's no second touch overlay, so hide the Deathmatch option. */
+@media (pointer: coarse) {
+    .menu-mode[data-mode="deathmatch"] {
+        display: none;
+    }
+}
+
 /* Network actions — same visual treatment as mode buttons, but they're
    one-shot actions (start a new room / open join prompt) rather than
    persistent selections, so no .active state and no skull cursor. */
