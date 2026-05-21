@@ -81,9 +81,13 @@ body.spectator .viewport::after {
 }
 
 body.spectator .status {
-    transform: translateY(100%);
+    /* Match the overlay-active hide rule in hud.css: drive `bottom`
+       (a layout-affecting inset) instead of `transform`, so anchored
+       consumers (.weapon, touch controls) follow via `anchor(top)`.
+       `var(--status-rows)` is resolved upstream by pane-width
+       container queries on `.hud`. */
+    bottom: calc(-1 * var(--status-rows) * 32px * var(--scale));
     pointer-events: none;
-    transition-delay: 0s;
 }
 
 body.spectator .weapon {

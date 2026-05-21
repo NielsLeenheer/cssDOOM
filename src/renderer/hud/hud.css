@@ -13,6 +13,15 @@
 
 .hud {
     --scale: 3;
+    /* Status bar wrapped-row count. Each row is `32px * var(--scale)`
+       tall, so the bar's total height is
+       `var(--status-rows) * 32px * var(--scale)`. Driven by pane width
+       below — CSS can't query a content-sized element's block-size
+       directly (size containment forbids content-driven sizing, and
+       `container-type: block-size` doesn't exist), so we enumerate the
+       practical breakpoints. Tighter thresholds only matter below
+       desktop side-by-side / phone widths anyway. */
+    --status-rows: 1;
 
     position: absolute;
     inset: 0;
@@ -23,6 +32,12 @@
 @container pane (max-width: 960px) {
     .hud { --scale: 2; }
 }
+
+/* Below 640px the section row (sum 640px at --scale: 2) no longer fits,
+   so flex-wrap kicks in. Two-row layout holds down to ~354px (the point
+   where the next section can no longer fit on row 2). */
+@container pane (max-width: 640px) { .hud { --status-rows: 2; } }
+@container pane (max-width: 354px) { .hud { --status-rows: 3; } }
 
 /* ========================================================================
    Status Bar — flex container of independent sections
@@ -831,8 +846,8 @@ body:has(.pane-attract.active) #menu-button {
     display: none;
 }
 
-body:has(.pane-attract.active) .status {
-    bottom: calc(-32px * var(--scale));
+body:has(.pane-attract.active, .pane-win.active, .pane-intermission.active, .pane-network-lobby.active) .status {
+    bottom: calc(-1 * var(--status-rows) * 32px * var(--scale));
 }
 
 /* Weapon's anchor only drops it by the HUD's height — not enough to
