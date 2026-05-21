@@ -63,7 +63,12 @@ body.kiosk #ui-buttons {
     max-width: 600px;
     width: 90%;
     font-family: 'STCFN', monospace;
-    color: #ccc;
+    /* STCFN only has uppercase glyphs (ASCII 33-95 + 'y'). Force the
+       prose text uppercase so lowercase letters don't fall through to
+       the monospace fallback. */
+    text-transform: uppercase;
+    font-palette: --stcfn-white;
+    color: #ccc; /* non-COLR fallback */
 
     & table {
         width: 100%;
@@ -86,17 +91,18 @@ body.kiosk #ui-buttons {
 kbd {
     display: inline-block;
     background: #222;
-    box-shadow: 
-        #000 0 2px 0 0px, 
-        #000 0 -2px 0 0px, 
-        #000 2px 0 0 0px, 
-        #000 -2px 0 0 0px, 
+    box-shadow:
+        #000 0 2px 0 0px,
+        #000 0 -2px 0 0px,
+        #000 2px 0 0 0px,
+        #000 -2px 0 0 0px,
         inset #333 -2px -2px 0 0;
-    
+
     padding: 5px 10px;
     font-family: 'STCFN', monospace;
+    font-palette: --stcfn-white;
     font-size: 14px;
-    color: #fff;
+    color: #fff; /* non-COLR fallback */
     min-width: 20px;
     text-align: center;
 }
