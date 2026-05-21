@@ -7,9 +7,15 @@
     margin-left: calc(var(--w) * var(--scale) * -0.5px);
     /* `bottom` transition lets the weapon ride down with the HUD bar
        when it slides off-screen — `bottom: anchor(top)` (set below
-       under @supports) re-resolves as .status moves. transform
-       transition is retained for death/switch slides. */
-    transition: bottom 0.4s ease-in-out, transform 0.3s ease-in 0.8s;
+       under @supports) re-resolves as .status moves. `translate` is
+       used for hide states (overlay-active, spectator, death) so it
+       doesn't collide with the `transform`-driven weapon-bob /
+       weapon-switch keyframes — the bob can keep writing transform
+       while the hide writes translate. Both transitions use the same
+       0.4s ease-in-out so the bar and weapon slide together. */
+    transition:
+        bottom 0.4s ease-in-out,
+        translate 0.4s ease-in-out;
     width: calc(var(--w) * var(--scale) * 1px);
     height: calc(var(--h) * var(--scale) * 1px);
     background-size: calc(var(--w) * var(--frames) * var(--scale) * 1px) calc(var(--h) * var(--scale) * 1px);
@@ -60,8 +66,11 @@
 /* Bob is always on the weapon (when not firing/switching) — paused by
    default, runs only while moving. Pausing freezes at the current
    frame, so stopping mid-stride no longer snaps the hand back to its
-   default position. Same pattern as the head-bob in camera.css. */
-body:not(.spectator) .renderer .weapon:not(.firing):not(.switching) {
+   default position. Same pattern as the head-bob in camera.css.
+   Bob stays applied in spectator (just never runs), so toggling
+   spectator doesn't remove the animation and snap the weapon's
+   transform back to none mid-slide. */
+.renderer .weapon:not(.firing):not(.switching) {
     animation: weapon-bob 1.4s linear infinite;
     animation-play-state: paused;
 }
@@ -90,7 +99,11 @@ body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
    ======================================================================== */
 
 .renderer.dead .weapon {
-    transform: translateY(110%);
+    /* `translate` (not `transform`) so the weapon-bob keyframes can
+       keep writing transform — animations override declared transform
+       values in the cascade, but `translate` is a separate property
+       and isn't touched by the bob keyframes. */
+    translate: 0 110%;
 }
 
 /* ========================================================================

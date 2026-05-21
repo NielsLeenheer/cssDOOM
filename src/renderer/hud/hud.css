@@ -851,18 +851,20 @@ body:has(.pane-attract.active, .pane-win.active, .pane-intermission.active, .pan
 }
 
 /* Weapon's anchor only drops it by the HUD's height — not enough to
-   clear the screen. Pair the slide-down with translateY(110%) so the
-   weapon sits fully off-screen during attract. weapon-bob is suppressed
-   here because its keyframes set transform absolutely and would
-   override the hide translate. The transform's existing 0.8s delay +
-   0.3s ease-in (declared on .weapon) staggers it behind the bar — bar
-   slides first, weapon follows. */
+   clear the screen. Pair the slide-down with `translate: 0 110%` so
+   the weapon sits fully off-screen during attract. weapon-bob is
+   *paused* here (not removed) so resuming doesn't snap the hand back
+   to keyframe 0 — it picks up from wherever it stopped. `translate`
+   is on a separate property than the bob's `transform`, so the two
+   no longer fight. The bar's bottom transition + the weapon's
+   translate transition (0.8s delay + 0.3s ease-in, declared on
+   `.weapon`) stagger the slide — bar first, weapon follows. */
 body:has(.pane-attract.active) .weapon {
-    /* !important needed because the weapon-bob rule has higher
-       specificity (body:not(.spectator) .renderer .weapon:not(.firing):not(.switching))
-       and its animation keyframes set transform absolutely. */
-    animation: none !important;
-    transform: translateY(110%);
+    /* !important needed because the running rule
+       (body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching))
+       has higher specificity. */
+    animation-play-state: paused !important;
+    translate: 0 110%;
 }
 
 

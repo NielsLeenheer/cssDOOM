@@ -91,9 +91,14 @@ body.spectator .status {
 }
 
 body.spectator .weapon {
-    transform: translateY(calc(100% + 100px));
+    /* `translate` (not `transform`) so the weapon-bob keyframes can
+       continue to write transform without collision — same pattern
+       as the overlay-active and dead hide rules. Bob isn't applied
+       in spectator (the `body:not(.spectator)` selector in
+       weapons.css excludes it), so no `animation-play-state` needed
+       here. */
+    translate: 0 calc(100% + 100px);
     pointer-events: none;
-    transition-delay: 0s;
 }
 
 /* Player container — shared positioning for marker, sprite, and shadow */
