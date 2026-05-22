@@ -256,6 +256,10 @@ body.client-window .pane {
     color: #ccc; /* non-COLR fallback */
     line-height: 1.5;
     padding: 0 32px;
+    /* Respect `\n` in the status string so callers can wrap a
+       header / detail pair (CONNECTION FAILED\nCHECK ROOM CODE) onto
+       two lines without HTML. */
+    white-space: pre-line;
 }
 
 /* Kiosk: the black splash backdrop spans both monitors (full top half

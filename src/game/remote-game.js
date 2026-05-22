@@ -113,14 +113,14 @@ export class RemoteGame {
                     lastErr = err;
                     console.warn(`[remote-game] connect attempt ${attempt + 1} failed:`, err.message ?? err);
                     if (attempt < CONNECT_RETRIES - 1) {
-                        setLoadingStatus(`CONNECTION FAILED — RETRYING (${attempt + 2} / ${CONNECT_RETRIES})`);
+                        setLoadingStatus(`CONNECTION FAILED\nRETRYING ${attempt + 2} / ${CONNECT_RETRIES}`);
                         await new Promise(r => setTimeout(r, CONNECT_RETRY_DELAY_MS));
                     }
                 }
             }
             if (!this._transport) {
                 console.error('[remote-game] giving up after retries:', lastErr);
-                setLoadingStatus(`CONNECTION FAILED — CHECK ROOM CODE AND TRY AGAIN`);
+                setLoadingStatus(`CONNECTION FAILED\nCHECK ROOM CODE AND TRY AGAIN`);
                 this._setState('FAILED');
                 this._emit('connection-failed', { error: lastErr });
                 this._emit('game-ended', { reason: 'connect-failed' });
