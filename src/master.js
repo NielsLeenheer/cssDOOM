@@ -41,7 +41,7 @@ import { BroadcastChannelTransport } from './transport/transport.js';
 import { BROADCAST_CHANNEL_NAME } from './transport/protocol.js';
 import { initMasterConnection } from './network-host.js';
 import { setNetworkSlotOccupant } from './game/lobby-state.js';
-import { initRemoteInput, applyRemoteInput } from './input/remote.js';
+import { applyRemoteInput, clearRemoteSlot } from './input/remote.js';
 import { ensureMatchSize } from './game/match.js';
 import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
@@ -300,6 +300,11 @@ function setupMasterBroadcast() {
             // forgets the peer after unbindRemoteSlot, and we need
             // the slot index to clear its row in the network lobby UI.
             const slot = orchestrator.currentRemoteSlot(peerKey);
+            // Zero this slot's cached analog snapshot so the departed
+            // peer's last movement values don't bleed into a rebound
+            // slot (next peer to take it, or the host's local roster
+            // reclaiming it). No-op if the slot never received ANALOG.
+            if (slot != null) clearRemoteSlot(slot);
             // After the unbind's grace expires, the slot's restored
             // local DomRenderer is brand-new — every pickup
             // uncollected, every enemy alive, no player billboards,
@@ -379,11 +384,8 @@ export async function initMaster({ isKiosk = false } = {}) {
     initKeyboardMouse();
     initTouchInput();
     initGamepadInput();
-    // Register a slot-1 input provider that's driven by remote input
-    // events forwarded from a connected client. Provider stays registered
-    // even when no client is connected — it just contributes zeros until
-    // events arrive.
-    initRemoteInput();
+    // Remote input providers are registered lazily per slot on the first
+    // ANALOG envelope from each peer — see [./input/remote.js](./input/remote.js).
 
     // Lobby controller — manages the press-to-claim UX, watches input
     // claims to drive the join-prompt overlay, and auto-starts the
