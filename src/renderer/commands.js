@@ -7,7 +7,7 @@
  *                       to a target by paneIndex; world methods invoke the
  *                       local impl + broadcast to all sinks).
  *   - DomRenderer    — per-pane methods baked against `this.paneIndex`.
- *   - RenderSink     — per-pane methods serialize args and post envelopes.
+ *   - RenderSink     — per-pane methods post args verbatim to the wire.
  *   - renderer/index — flat-namespace re-exports for backward compat.
  *
  * Adding a new command becomes one entry in COMMANDS. Forgetting to wire
@@ -17,14 +17,20 @@
  * Two kinds:
  *
  *   `per-pane`  — addressed to one pane. impl signature is
- *                 (renderer, ...args). For RenderSink, an optional
- *                 `serialize(...args)` strips non-cloneable refs (player
- *                 objects, etc.) before postMessage; defaults to identity.
+ *                 (renderer, ...args). Callers pass wire-safe args
+ *                 already in the right shape — orchestrator and
+ *                 RenderSink pass them through without rewriting.
  *
  *   `world`     — addressed to every pane in every window. impl signature
  *                 is (renderer, ...args). The orchestrator iterates all
  *                 targets: each local DomRenderer runs impl(self, ...args);
  *                 each RenderSink forwards to its joiner over the wire.
+ *
+ * Callers carry the shape responsibility — the registry doesn't strip
+ * Player or thing objects. See e.g. master.js / game/level.js for what
+ * `updateCamera` / `updateHud` payloads look like; the impls
+ * (`renderer/scene/camera.js`, `renderer/hud/hud.js`, etc.) document
+ * the fields they read.
  */
 
 import * as sprites from './scene/entities/sprites.js';
@@ -46,56 +52,14 @@ import { showAttract, hideAttract } from './screens/attract.js';
 import { showTimer } from './hud/match-timer.js';
 import { showLevelTransition, hideLevelTransition } from './hud/level-transition.js';
 
-// Camera reads many fields off the player; strip to a plain transform
-// before going over the transport.
-const stripCameraTransform = (player) => [{
-    x: player.x,
-    y: player.y,
-    z: player.z,
-    angle: player.angle,
-    floorHeight: player.floorHeight ?? 0,
-    isFiring: player.isFiring,
-}];
-
-// HUD-relevant subset of the player. ownedWeapons goes on the wire as
-// an Array because JSON.stringify (used by WebRTCDataChannelTransport)
-// reduces a Set to `{}`; the Local-DM BroadcastChannel preserves Set
-// via structured clone, but for parity we send Array on both transports
-// and `updateHud` re-Sets it on entry.
-const stripHudData = (player) => [{
-    currentWeapon: player.currentWeapon,
-    ammo: { ...player.ammo },
-    maxAmmo: { ...player.maxAmmo },
-    health: player.health,
-    armor: player.armor,
-    ownedWeapons: [...player.ownedWeapons],
-    collectedKeys: [...player.collectedKeys],
-    score: player.score,
-}];
-
-// Enemy rotation runs every frame for every visible enemy and every
-// viewer. The impl only reads enemy.{x,y,facing} and viewer.{x,y}; the
-// raw enemy / Player objects contain cyclic refs (ai.target, thingRef)
-// and Set fields that JSON.stringify can't cleanly serialize. Strip to
-// just what the renderer needs.
-const stripEnemyRotation = (thingIndex, enemy, viewers) => [
-    thingIndex,
-    { x: enemy.x, y: enemy.y, facing: enemy.facing },
-    viewers.map(p => ({ x: p.x, y: p.y })),
-];
-
 export const COMMANDS = {
     // ── Per-player: camera & HUD ──────────────────────────────────────────
     // updateCamera fans to every target at the matching playerIndex:
     // the local DomRenderer transforms its scene; the local
     // AudioRenderer (audio.js) updates its listener position so the
     // next playSound math reflects the new viewpoint.
-    updateCamera: {
-        kind: 'per-pane',
-        impl: updateCamera,
-        serialize: stripCameraTransform,
-    },
-    updateHud: { kind: 'per-pane', impl: updateHud, serialize: stripHudData },
+    updateCamera: { kind: 'per-pane', impl: updateCamera },
+    updateHud: { kind: 'per-pane', impl: updateHud },
 
     // ── Per-player: effects ───────────────────────────────────────────────
     triggerFlash: { kind: 'per-pane', impl: effects.triggerFlash },
@@ -122,22 +86,19 @@ export const COMMANDS = {
     hidePaused: { kind: 'per-pane', impl: (renderer) => renderer.rendererEl.classList.remove('paused') },
 
     // ── World: per-renderer map load ──────────────────────────────────────
-    // Impl lives in scene.js. The auto-binding at the bottom of this file
-    // wires DomRenderer.prototype.loadMap → impl(this, name) and
-    // RenderSink.prototype.loadMap → forwardWorld('loadMap', [name]).
-    // Orchestrator.prototype.loadMap has a custom override in
-    // orchestrator.js that returns Promise.all of per-target results so
-    // callers can await every local renderer's build. No serialize (name
-    // is wire-safe). No mirror needed — loadMap rebuilds the scene from
-    // scratch on each renderer; subsequent updateCamera /
-    // updateThingPosition dispatches populate per-renderer state.
+    // Impl is async (buildScene awaits) — the orchestrator's generic
+    // world dispatch returns Promise.all of every target's call so
+    // callers (Level.load) can await every local renderer's build. No
+    // mirror needed — loadMap rebuilds the scene from scratch on each
+    // renderer; subsequent updateCamera / updateThingPosition dispatches
+    // populate per-renderer state.
     loadMap: { kind: 'world', impl: scene.loadMap },
 
     // ── World: enemies / things / projectiles / effects ───────────────────
     setEnemyState: { kind: 'world', impl: sprites.setEnemyState },
     resetEnemy: { kind: 'world', impl: sprites.resetEnemy },
     killEnemy: { kind: 'world', impl: sprites.killEnemy },
-    updateEnemyRotation: { kind: 'world', impl: sprites.updateEnemyRotation, serialize: stripEnemyRotation },
+    updateEnemyRotation: { kind: 'world', impl: sprites.updateEnemyRotation },
     updateThingPosition: { kind: 'world', impl: sprites.updateThingPosition },
     reparentThingToSector: { kind: 'world', impl: sprites.reparentThingToSector },
     collectItem: { kind: 'world', impl: sprites.collectItem },
@@ -156,18 +117,7 @@ export const COMMANDS = {
     // than an undefined entry.
     createPlayerSprite: { kind: 'world', impl: sprites.createPlayerSprite },
     createCorpse: { kind: 'world', impl: sprites.createCorpse },
-    // Strip the shooter Player object — playPlayerAttack only needs
-    // x/y/facing to decide whether this viewer sees the front-facing
-    // attack pose, and the raw Player carries cyclic refs that
-    // structured-clone / JSON.stringify choke on.
-    playPlayerAttack: {
-        kind: 'world',
-        impl: sprites.playPlayerAttack,
-        serialize: (thingIndex, shooter) => [
-            thingIndex,
-            { x: shooter.x, y: shooter.y, facing: shooter.facing },
-        ],
-    },
+    playPlayerAttack: { kind: 'world', impl: sprites.playPlayerAttack },
 
     // ── World: mechanics state ────────────────────────────────────────────
     setDoorState: { kind: 'world', impl: doors.setDoorState },
@@ -246,19 +196,19 @@ for (const [name, { impl }] of Object.entries(WORLD_COMMANDS)) {
     };
 }
 
-// RenderSink: each command method serializes its args (via the
-// optional `serialize` to strip non-cloneable refs like player
-// objects) and posts a wire envelope. Per-pane envelopes carry
-// `target: paneIndex`; world envelopes don't.
-for (const [name, { serialize }] of Object.entries(PER_PANE_COMMANDS)) {
+// RenderSink: each command method posts its args verbatim to the
+// joiner's wire envelope. Per-pane envelopes carry `target: paneIndex`;
+// world envelopes don't. Wire-shape construction happens at the call
+// site — RenderSink trusts that whatever the caller passed is
+// `structured-clone` / `JSON.stringify` safe (no cyclic refs, no Set
+// fields, etc.).
+for (const name of Object.keys(PER_PANE_COMMANDS)) {
     RenderSink.prototype[name] = function (...args) {
-        const wireArgs = serialize ? serialize(...args) : args;
-        this._post(name, wireArgs);
+        this._post(name, args);
     };
 }
-for (const [name, { serialize }] of Object.entries(WORLD_COMMANDS)) {
+for (const name of Object.keys(WORLD_COMMANDS)) {
     RenderSink.prototype[name] = function (...args) {
-        const wireArgs = serialize ? serialize(...args) : args;
-        this.forwardWorld(name, wireArgs);
+        this.forwardWorld(name, args);
     };
 }

@@ -77,10 +77,28 @@ function renderAllActivePanes() {
         // fan-out (and on Network DM, the per-frame wire envelope per
         // slot) when nothing changed.
         if (player._hudDirty) {
-            updateHud(player, player.viewportIndex);
+            updateHud(player.viewportIndex, {
+                currentWeapon: player.currentWeapon,
+                ammo: { ...player.ammo },
+                maxAmmo: { ...player.maxAmmo },
+                health: player.health,
+                armor: player.armor,
+                // Sets don't survive JSON.stringify, so normalize to
+                // Array on the wire. hud.js re-Sets on entry.
+                ownedWeapons: [...player.ownedWeapons],
+                collectedKeys: [...player.collectedKeys],
+                score: player.score,
+            });
             player._hudDirty = false;
         }
-        updateCamera(player, player.viewportIndex);
+        updateCamera(player.viewportIndex, {
+            x: player.x,
+            y: player.y,
+            z: player.z,
+            angle: player.angle,
+            floorHeight: player.floorHeight ?? 0,
+            isFiring: player.isFiring,
+        });
     }
 }
 
@@ -109,7 +127,14 @@ function gameLoop(timestamp) {
     // death-cam view at their corpse until they fire to respawn.
     if (state.players.every(p => p.isDead)) {
         for (const player of state.players) {
-            updateCamera(player, player.viewportIndex);
+            updateCamera(player.viewportIndex, {
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                angle: player.angle,
+                floorHeight: player.floorHeight ?? 0,
+                isFiring: player.isFiring,
+            });
         }
         requestAnimationFrame(gameLoop);
         return;

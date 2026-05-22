@@ -44,7 +44,6 @@ import { getFloorHeightAt, getSectorAt } from './physics.js';
 import { getCurrentTimerText } from './match.js';
 import { getCurrentLevel } from './level.js';
 import { GAME_STATE, getGameState } from './game-state.js';
-import { COMMANDS } from '../renderer/commands.js';
 import { app } from '../app.js';
 
 // ── Public API ─────────────────────────────────────────────────────────
@@ -246,16 +245,30 @@ function appendPerPaneCmds(out, slot) {
     const player = state.players[slot];
     if (!player) return;
 
-    // HUD digits. Goes through the registry's serializer to strip
-    // the player object to the wire-safe subset (ammo, health,
-    // weapons, …) — same shape the runtime updateHud receives.
-    const hudArgs = COMMANDS.updateHud.serialize(player);
-    out.push({ name: 'updateHud', args: [hudArgs] });
+    // HUD digits — same wire-safe subset the runtime updateHud receives.
+    // Sets become Arrays so JSON.stringify reproduces the values;
+    // hud.js re-Sets on entry.
+    out.push({ name: 'updateHud', args: [[{
+        currentWeapon: player.currentWeapon,
+        ammo: { ...player.ammo },
+        maxAmmo: { ...player.maxAmmo },
+        health: player.health,
+        armor: player.armor,
+        ownedWeapons: [...player.ownedWeapons],
+        collectedKeys: [...player.collectedKeys],
+        score: player.score,
+    }]] });
 
     // Camera transform so the pane's first paint is at the player's
     // actual position, not at-origin.
-    const camArgs = COMMANDS.updateCamera.serialize(player);
-    out.push({ name: 'updateCamera', args: [camArgs] });
+    out.push({ name: 'updateCamera', args: [[{
+        x: player.x,
+        y: player.y,
+        z: player.z,
+        angle: player.angle,
+        floorHeight: player.floorHeight ?? 0,
+        isFiring: player.isFiring,
+    }]] });
 
     // Current weapon sprite + fire-rate timing.
     const weapon = WEAPONS[player.currentWeapon];

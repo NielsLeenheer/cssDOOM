@@ -171,7 +171,11 @@ function updateLocation(player, deltaTime, input) {
             // (no-op in DM / repeat enters / non-secret sectors).
             recordSectorEnter(sector.sectorIndex);
         }
-        renderer.updateEnemyRotation(player.thingIndex, player.thingRef, state.players);
+        renderer.updateEnemyRotation(
+            player.thingIndex,
+            { x: player.thingRef.x, y: player.thingRef.y, facing: player.thingRef.facing },
+            state.players.map(p => ({ x: p.x, y: p.y })),
+        );
     }
 }
 

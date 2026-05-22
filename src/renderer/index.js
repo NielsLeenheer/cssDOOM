@@ -5,9 +5,12 @@
  * iterates render targets and dispatches to every renderer whose
  * `playerIndex` matches (mirror SP has two renderers sharing playerIndex
  * 0; Network DM has a RenderSink at each remote player's slot). World
- * commands take `(...args)`. updateCamera/updateHud accept the legacy
- * `(player, playerIndex?)` shape with playerIndex falling back to
- * `player.viewportIndex` (callers like debug.js / teleporters.js omit it).
+ * commands take `(...args)`.
+ *
+ * Callers build the payload in the right shape at the call site — the
+ * orchestrator passes it through unchanged. See each command's impl
+ * for the fields it reads (e.g. `updateCamera` impl in
+ * `scene/camera.js` reads `x, y, z, angle, floorHeight, isFiring`).
  *
  * All re-exports are generated from the command registry
  * ([commands.js](commands.js)). Adding a renderer command is one entry
@@ -26,14 +29,6 @@ for (const [name, { kind }] of Object.entries(COMMANDS)) {
         exported[name] = (...args) => orchestrator[name](...args);
     }
 }
-
-// updateCamera / updateHud public signature is `(player, playerIndex?)`,
-// with playerIndex defaulting to `player.viewportIndex`. Override the
-// generated wrappers to match.
-exported.updateCamera = (player, playerIndex) =>
-    orchestrator.updateCamera(playerIndex ?? player.viewportIndex, player);
-exported.updateHud = (player, playerIndex) =>
-    orchestrator.updateHud(playerIndex ?? player.viewportIndex, player);
 
 // ── Camera & HUD ──────────────────────────────────────────────────────────
 export const updateCamera = exported.updateCamera;

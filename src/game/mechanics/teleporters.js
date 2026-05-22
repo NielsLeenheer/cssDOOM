@@ -95,7 +95,14 @@ export function checkTeleporters() {
 
                 // Update the moving player's camera immediately so there's no
                 // frame of the old position.
-                renderer.updateCamera(player);
+                renderer.updateCamera(player.viewportIndex, {
+                    x: player.x,
+                    y: player.y,
+                    z: player.z,
+                    angle: player.angle,
+                    floorHeight: player.floorHeight ?? 0,
+                    isFiring: player.isFiring,
+                });
 
                 // Disable one-shot teleporters
                 if (tp.oneShot) tp.used = true;

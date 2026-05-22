@@ -153,7 +153,14 @@ export class Level {
         // never state.players directly — so this priming step is what
         // makes the warmup land correct values.
         for (const player of state.players) {
-            renderer.updateCamera(player, player.viewportIndex);
+            renderer.updateCamera(player.viewportIndex, {
+                x: player.x,
+                y: player.y,
+                z: player.z,
+                angle: player.angle,
+                floorHeight: player.floorHeight ?? 0,
+                isFiring: player.isFiring,
+            });
         }
 
         // Fan the load to every render target. Each local DomRenderer

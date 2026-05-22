@@ -38,7 +38,14 @@ window.teleport = (positionX, positionY, angleDegrees) => {
     if (angleDegrees !== undefined) player.angle = angleDegrees * Math.PI / 180;
     player.floorHeight = getFloorHeightAt(player.x, player.y);
     player.z = player.floorHeight + EYE_HEIGHT;
-    updateCamera(player);
+    updateCamera(player.viewportIndex, {
+        x: player.x,
+        y: player.y,
+        z: player.z,
+        angle: player.angle,
+        floorHeight: player.floorHeight ?? 0,
+        isFiring: player.isFiring,
+    });
 };
 
 window.save = function (slot = 0) {
@@ -67,7 +74,14 @@ window.load = async function (slot = 0) {
     player.angle = data.angle;
     player.floorHeight = getFloorHeightAt(player.x, player.y);
     player.z = player.floorHeight + EYE_HEIGHT;
-    updateCamera(player);
+    updateCamera(player.viewportIndex, {
+        x: player.x,
+        y: player.y,
+        z: player.z,
+        angle: player.angle,
+        floorHeight: player.floorHeight ?? 0,
+        isFiring: player.isFiring,
+    });
     console.log(`Loaded slot ${slot}: ${data.map} (${Math.round(data.x)}, ${Math.round(data.y)})`);
 };
 

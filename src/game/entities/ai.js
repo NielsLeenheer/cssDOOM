@@ -550,6 +550,10 @@ export function updateAllEnemies(deltaTime) {
         if (nearestDistSq > maxRenderDistSq) continue;
 
         updateSingleEnemy(index, thing, deltaTime, currentTime);
-        renderer.updateEnemyRotation(index, thing, state.players);
+        renderer.updateEnemyRotation(
+            index,
+            { x: thing.x, y: thing.y, facing: thing.facing },
+            state.players.map(p => ({ x: p.x, y: p.y })),
+        );
     }
 }
