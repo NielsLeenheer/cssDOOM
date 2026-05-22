@@ -402,8 +402,9 @@ export function createPlayerSprite(renderer, thingIndex, playerIndex, x, y, floo
 }
 
 // Map player index → corpse sprite suffix. Mirror the DM color choice in
-// enemies.css: P0 = green default (no suffix), P1 = red.
-const PLAYER_CORPSE_VARIANT = ['', '-red'];
+// enemies.css: P0 = green default (no suffix), P1 = red, P2 = indigo,
+// P3 = brown.
+const PLAYER_CORPSE_VARIANT = ['', '-red', '-indigo', '-brown'];
 
 /**
  * Spawns a player corpse at the given position in this renderer's scene

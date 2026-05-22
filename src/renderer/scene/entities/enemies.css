@@ -75,10 +75,17 @@ body.all-enemies-shadow .enemy .sprite {
 
 /* DM color variants — the WAD only ships green; extract-graphics.js applies
    DOOM's translation tables at build time to produce -indigo / -brown / -red
-   variants. P0 stays green; P1 is red — highest contrast against the
-   default green so the opposing player reads at speed and at distance. */
+   variants. P0 stays green; P1 is red (the highest-contrast pairing for
+   2P split-screen, kept for muscle memory). P2 and P3 fill out the four-
+   slot Network DM lineup with indigo and brown. */
 .enemy.player[data-player-index="1"] .sprite[data-type="player"] {
     background-image: url('/assets/sprites/sheets/PLAY-red.png');
+}
+.enemy.player[data-player-index="2"] .sprite[data-type="player"] {
+    background-image: url('/assets/sprites/sheets/PLAY-indigo.png');
+}
+.enemy.player[data-player-index="3"] .sprite[data-type="player"] {
+    background-image: url('/assets/sprites/sheets/PLAY-brown.png');
 }
 
 .enemy.player {
@@ -118,7 +125,9 @@ body.all-enemies-shadow .enemy .sprite {
 /* Hide each player's own sprite in their own pane — you don't want to see
    your own body floating in your own first-person view. */
 .pane[data-player="0"] .enemy.player[data-player-index="0"],
-.pane[data-player="1"] .enemy.player[data-player-index="1"] {
+.pane[data-player="1"] .enemy.player[data-player-index="1"],
+.pane[data-player="2"] .enemy.player[data-player-index="2"],
+.pane[data-player="3"] .enemy.player[data-player-index="3"] {
     display: none;
 }
 
