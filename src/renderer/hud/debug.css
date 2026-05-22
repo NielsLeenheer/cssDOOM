@@ -1,0 +1,32 @@
+/* ========================================================================
+   Debug Menu — developer affordance, not part of the in-game UI.
+   Companion to src/renderer/hud/debug.js (which builds the menu's
+   contents and wires its toggles). Lives at the top-left of the
+   window, above the cssDOOM logo button.
+   ======================================================================== */
+
+#debug-menu {
+    position: fixed;
+    top: 58px;
+    left: 12px;
+    z-index: 999;
+    font-family: monospace;
+    font-size: 12px;
+    color: #aaa;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 4px 8px;
+    border: 1px solid #444;
+    cursor: default;
+
+    & summary {
+        cursor: pointer;
+        user-select: none;
+    }
+
+    & label {
+        display: block;
+        padding: 2px 0;
+        cursor: pointer;
+        user-select: none;
+    }
+}
