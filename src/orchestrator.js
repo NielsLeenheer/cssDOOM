@@ -230,8 +230,19 @@ class Orchestrator {
      * Return the slot the snapshot provider should advertise to a joining
      * client. Reuses the slot already bound to this peer if there is one
      * (a duplicate LOOKING retry from an already-alive peer, including a
-     * mid-grace reconnect); otherwise allocates the lowest free remote
-     * slot. Returns null if no slot is free.
+     * mid-grace reconnect); otherwise allocates the lowest slot not
+     * referenced by ANY binding — current or in-grace. Returns null if
+     * none free.
+     *
+     * Reserving in-grace bindings (not just `_occupiedRemoteSlots`) is
+     * load-bearing: `unbindRemoteSlot` clears the slot from
+     * `_occupiedRemoteSlots` immediately but keeps the binding around
+     * for the RECONNECT_GRACE_MS window. Without the binding-reservation
+     * here, a transient liveness blip on peer X frees slot N, a new peer
+     * Y arrives during the grace and gets handed N, the
+     * "different peer mid-grace on this slot" branch in bindRemoteSlot
+     * silently wipes X's binding — so when X recovers it allocates the
+     * next free slot instead of returning to N.
      *
      * Pure allocation — no binding happens here. The actual swap occurs
      * in `bindRemoteSlot` once the peer answers with JOIN.
@@ -239,8 +250,10 @@ class Orchestrator {
     nextOrCurrentRemoteSlot(peerKey) {
         const existing = this._remoteBindings.get(peerKey);
         if (existing) return existing.slot;
+        const reserved = new Set();
+        for (const b of this._remoteBindings.values()) reserved.add(b.slot);
         for (let i = this._minRemoteSlot; i < MAX_SLOTS; i++) {
-            if (!this._occupiedRemoteSlots.has(i)) return i;
+            if (!reserved.has(i)) return i;
         }
         return null;
     }
