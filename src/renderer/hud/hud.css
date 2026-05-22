@@ -503,32 +503,6 @@ body[data-game-mode="deathmatch"]:not(:has(.pane-attract.active)) .pane[data-cla
     filter: brightness(0.3);
 }
 
-/* Hide the status bar in any non-active lobby state — there's no
-   player stats to show until the match actually starts. Slides the
-   bar off-screen the same way the overlay-active rule does (single
-   shared mechanism: change `bottom`, anchored UI follows). */
-body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .hud .status,
-body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .hud .status,
-body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .hud .status {
-    bottom: calc(-1 * var(--status-rows) * 32px * var(--scale));
-}
-
-/* Match the bar hide with a full weapon hide so the weapon doesn't
-   peek above the slid-down bar (the bar moves down by its own height,
-   the weapon needs the extra `110%` translate to clear the viewport).
-   Same recipe as the pane-attract weapon hide a few hundred lines
-   below — `translate` (not `transform`) so the bob keyframes keep
-   writing transform, and `animation-play-state: paused` so the
-   weapon freezes at its current bob frame instead of snapping
-   to keyframe 0. */
-body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .weapon,
-body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .weapon,
-body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .weapon {
-    animation-play-state: paused !important;
-    translate: 0 110%;
-}
-
-
 /* ========================================================================
    Deathmatch end-of-match scoreboard (per-pane FRAGS counter lives in
    the HUD bar). The `.pane-win` shell is empty until match.js populates
@@ -848,38 +822,54 @@ body[data-game-mode="deathmatch"] .pane-timer:not(:empty) {
     display: flex;
 }
 
-/* Hide HUD chrome (and the cssDOOM logo button) behind the attract
-   overlay. The big M_DOOM splash in .pane-attract carries the branding
-   now, so the tiny corner button would just clutter the idle screen.
-   The status bar itself slides down (via the .status rule below)
-   instead of disappearing instantly — the weapon and touch controls
-   follow via their `--status` anchor.
-   `:has()` keys off any pane having the active attract overlay —
-   matches the body once attract is showing anywhere in the window,
-   so window-scoped UI hides regardless of split-screen layout. */
+/* Hide window-scoped chrome (cssDOOM logo, button cluster, menu
+   button) behind the attract overlay — the M_DOOM splash in
+   .pane-attract carries the branding now, so the corner button would
+   just clutter the idle screen. */
 body:has(.pane-attract.active) #spectator,
 body:has(.pane-attract.active) #ui-buttons,
 body:has(.pane-attract.active) #menu-button {
     display: none;
 }
 
-body:has(.pane-attract.active, .pane-win.active, .pane-intermission.active, .pane-network-lobby.active) .status {
+/* ========================================================================
+   Status bar + weapon hide
+
+   One shared mechanism for every "bar should be off-screen" state:
+   - Window-scoped full-pane overlays (attract / win / intermission /
+     network-lobby) — keyed via `:has()` on the active overlay.
+   - Per-pane Local DM lobby claim states (prompting / ready / waiting)
+     — keyed via `data-claim-state` on the pane.
+   - Spectator mode — keyed on `body.spectator`.
+
+   Bar slides off by its own (possibly-wrapped) height via the
+   `--status-rows` row count resolved upstream by `@container pane`
+   queries. The weapon needs an additional `110%` translate to clear
+   the viewport because its anchor only drops it by the bar's height
+   — not enough on its own. `translate` (not `transform`) so the
+   weapon-bob keyframes keep writing transform without collision;
+   `animation-play-state: paused` so resuming bob picks up at the
+   frozen frame instead of snapping to keyframe 0. The `!important`
+   beats the running rule
+   (`body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching)`)
+   which has higher specificity. The weapon hide is opt-in per state
+   — full-pane overlays (win / intermission / network-lobby) cover
+   the weapon visually, so it doesn't need to slide there.
+   ======================================================================== */
+
+body:has(.pane-attract.active, .pane-win.active, .pane-intermission.active, .pane-network-lobby.active) .status,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .status,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .status,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .status,
+body.spectator .status {
     bottom: calc(-1 * var(--status-rows) * 32px * var(--scale));
 }
 
-/* Weapon's anchor only drops it by the HUD's height — not enough to
-   clear the screen. Pair the slide-down with `translate: 0 110%` so
-   the weapon sits fully off-screen during attract. weapon-bob is
-   *paused* here (not removed) so resuming doesn't snap the hand back
-   to keyframe 0 — it picks up from wherever it stopped. `translate`
-   is on a separate property than the bob's `transform`, so the two
-   no longer fight. The bar's bottom transition + the weapon's
-   translate transition (0.8s delay + 0.3s ease-in, declared on
-   `.weapon`) stagger the slide — bar first, weapon follows. */
-body:has(.pane-attract.active) .weapon {
-    /* !important needed because the running rule
-       (body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching))
-       has higher specificity. */
+body:has(.pane-attract.active) .weapon,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .weapon,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .weapon,
+body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .weapon,
+body.spectator .weapon {
     animation-play-state: paused !important;
     translate: 0 110%;
 }

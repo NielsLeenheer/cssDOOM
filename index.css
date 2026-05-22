@@ -18,6 +18,7 @@
 @import url('src/renderer/scene/entities/decorations.css');
 @import url('src/renderer/scene/entities/player.css');
 @import url('src/renderer/scene/camera.css');
+@import url('src/renderer/scene/spectator.css');
 @import url('src/renderer/hud/weapons.css');
 @import url('src/renderer/hud/hud.css');
 @import url('src/renderer/hud/debug.css');

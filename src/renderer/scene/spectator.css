@@ -1,0 +1,218 @@
+/* ========================================================================
+   Spectator Mode — renderer-side rules.
+
+   Drives how the scene + HUD render when `body.spectator` is set:
+   top-down or follow-mode camera transforms, in-scene player marker /
+   sprite / shadow, HUD bar + weapon hide, ceiling cull, etc.
+
+   Companion to src/renderer/spectator.js. The UI chrome that LIVES
+   OUTSIDE the pane (buttons, controls overlay, aim line) stays in
+   src/ui/spectator.css — that file owns nothing inside the renderer
+   subtree.
+   ======================================================================== */
+
+/* Custom-property declarations — used by the scene transforms below. */
+
+@property --spectator-offset-x {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
+@property --spectator-offset-y {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
+@property --spectator-height {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 3000;
+}
+
+@property --spectator-angle {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
+@property --follow-height {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 300;
+}
+
+@property --player-floor {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
+/* Top-down spectator mode: camera looks down at the map */
+body.spectator:not(.follow-mode) .scene {
+    translate: 0 0 var(--perspective);
+    rotate: x -70deg;
+    transform:
+        rotateY(calc(var(--spectator-angle) * 1rad))
+        translate3d(
+            calc((var(--player-x) + var(--spectator-offset-x)) * -1px),
+            calc(var(--spectator-height) * 1px),
+            calc((var(--player-y) + var(--spectator-offset-y)) * 1px)
+        );
+    transition: none;
+}
+
+/* Follow mode: camera behind the player using sin/cos */
+body.spectator.follow-mode .scene {
+    --follow-dist: calc(var(--follow-height) * 0.7);
+    translate: 0 10vh var(--perspective);
+    rotate: x -55deg;
+    transform:
+        rotateY(calc(var(--player-angle) * -1rad))
+        translate3d(
+            calc((var(--player-x) + sin(calc(var(--player-angle) * 1rad)) * var(--follow-dist)) * -1px),
+            calc((var(--follow-height) + var(--player-floor)) * 1px),
+            calc((var(--player-y) - cos(calc(var(--player-angle) * 1rad)) * var(--follow-dist)) * 1px)
+        );
+    transition: none;
+}
+
+/* In follow mode, billboard player sprite toward player angle instead of spectator angle */
+body.spectator.follow-mode #player > .sprite {
+    transform:
+        translateX(-50%)
+        rotateY(calc(var(--player-angle) * 1rad))
+        scaleX(var(--mirror, 1));
+}
+
+body.spectator .viewport::after {
+    opacity: 1;
+    transition: opacity 1.5s;
+}
+
+/* Bar + weapon hide for spectator mode lives in hud.css alongside
+   the other "hidden HUD" states (overlay-active, lobby claim states).
+   Single source for the slide values + selector behavior. */
+
+/* Player container — shared positioning for marker, sprite, and shadow */
+#player {
+    display: none;
+    top: 0; left: 0; width: 0; height: 0;
+    backface-visibility: visible !important;
+
+    /* Position from raw DOOM coordinates (DOOM→CSS: X=X, Y=−Z, height=−Y) */
+    transform:
+        translate3d(
+            calc(var(--player-x) * 1px),
+            calc(var(--player-floor) * -1px),
+            calc(var(--player-y) * -1px)
+        );
+}
+
+body.spectator #player {
+    display: block;
+}
+
+body.spectator #player > .sprite {
+    animation: sprite-cycle calc(var(--frames) * 150ms) steps(var(--frames)) infinite paused;
+    opacity: 1;
+    transition: opacity 1s ease 0.5s;
+
+    @starting-style {
+        opacity: 0;
+    }
+}
+
+body.spectator #player > .marker {
+    opacity: 0.4;
+
+    @starting-style {
+        opacity: 0;
+    }
+}
+
+/* Player marker — FOV arc */
+#player > .marker {
+    --marker-color: #fff;
+
+    width: 80px;
+    height: 80px;
+    margin: -50px 0 0 -40px;
+    opacity: 0;
+    border-radius: 50%;
+    backface-visibility: visible !important;
+    transition: opacity 1s ease 0.5s;
+
+    transform:
+        translateY(-10px)
+        rotateX(90deg)
+        rotateZ(calc(var(--player-angle) * -1rad));
+
+    /* 90° arc centered at top (player facing direction) */
+    background: conic-gradient(
+        from -45deg,
+        var(--marker-color) 0deg,
+        var(--marker-color) 90deg,
+        transparent 90deg
+    );
+
+    /* Cut out center to make it an arc line */
+    -webkit-mask: radial-gradient(circle, transparent 60%, black 63%);
+    mask: radial-gradient(circle, transparent 60%, black 63%);
+
+    filter: drop-shadow(0 0 8px var(--marker-color));
+}
+
+#player > .marker.firing {
+    --marker-color: #ff8800;
+}
+
+/* Player sprite — billboard toward spectator camera */
+#player > .sprite {
+    opacity: 0;
+    transition: opacity 0.3s ease 0s;
+    bottom: 0;
+    backface-visibility: visible !important;
+    transform-origin: 50% 100%;
+    transform:
+        translateX(-50%)
+        rotateY(calc(var(--spectator-angle, 0) * -1rad))
+        scaleX(var(--mirror, 1));
+
+    background-image: url('/assets/sprites/sheets/PLAY.png');
+    /* PLAY.png cell layout (matches enemies.css's .sprite[data-type="player"]):
+       51 × 56 cells, 7 columns × 7 rows. Rows 0-4 are walk poses; rows 5-6
+       (attack / death) aren't used in spectator. Cell width is 51 not 45
+       because death gibs widen the cell across the whole sheet. */
+    --w: 51; --h: 56; --cols: 7; --frames: 4; --rows: 7;
+    animation-play-state: paused;
+    animation-duration: calc(var(--frames) * 150ms);
+}
+
+.renderer.moving #player > .sprite {
+    animation-play-state: running, running;
+}
+
+/* Player shadow */
+#player::before {
+    content: '';
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    margin: -16px 0 0 -16px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 50%;
+    transform: rotateX(90deg);
+    backface-visibility: visible !important;
+    filter: blur(4px);
+}
+
+
+body.spectator .scene :not(.sector, .ceiling) {
+    backface-visibility: visible;
+}
+
+body.spectator .scene .ceiling {
+    display: none;
+}
