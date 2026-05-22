@@ -235,6 +235,29 @@ body.client-window .pane {
     }
 }
 
+/* Joiner connection status, painted under the DOOM logo while the
+   WebRTC handshake runs / fails. Empty during initial boot; populated
+   by RemoteGame.start with phase text (CONNECTING / WAITING FOR HOST /
+   CONNECTION FAILED). Kept inside #loading-overlay so it fades out
+   with the splash when the joiner finishes booting.
+
+   Positioned at vertical center + the logo's half-height
+   (40 source px × 4 / 2 = 80 px at scale 1) + a small gap, so it
+   sits just under the logo at every scale. */
+#loading-status {
+    position: absolute;
+    top: calc(50% + 110px * var(--screen-scale, 1));
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-family: 'STCFN', monospace;
+    font-palette: --stcfn-white;
+    font-size: calc(18px * var(--screen-scale, 1));
+    color: #ccc; /* non-COLR fallback */
+    line-height: 1.5;
+    padding: 0 32px;
+}
+
 /* Kiosk: the black splash backdrop spans both monitors (full top half
    of the 3840×2160 capture) so neither screen is dark + uncovered
    during load, but the M_DOOM logo itself is offset so it lands

@@ -35,7 +35,7 @@ import * as A from '../input/actions.js';
 import { isAttractActive } from './attract.js';
 import { spectatorActive } from '../ui/spectator.js';
 import { applyMode } from '../mode.js';
-import { hideInitialOverlay } from '../ui/initial-splash.js';
+import { hideInitialOverlay, setLoadingStatus } from '../ui/initial-splash.js';
 import { ensureDisconnectedOverlay } from '../ui/disconnected-overlay.js';
 import { applyCatchupCmds } from '../game/catchup.js';
 
@@ -95,31 +95,38 @@ export class RemoteGame {
             !this.roomCode || document.body.classList.contains('network-client'),
             '[remote-game] expected body.network-client for Network DM joiner',
         );
+        // Mid-session disconnect uses this overlay (red banner over a
+        // built scene). The initial-connect status, by contrast, paints
+        // inside the still-visible #loading-overlay via setLoadingStatus
+        // so the user sees what's happening under the DOOM logo
+        // (loading-overlay sits at z-index 10000, above this red banner).
         this._overlay = ensureDisconnectedOverlay();
 
         if (this.roomCode) {
-            this._overlay.classList.add('visible');
+            setLoadingStatus(`CONNECTING TO ROOM ${this.roomCode}`);
             let lastErr = null;
             for (let attempt = 0; attempt < CONNECT_RETRIES; attempt++) {
                 try {
                     this._transport = await connectToNetworkRoom({ roomCode: this.roomCode });
-                    this._overlay.classList.remove('visible');
                     break;
                 } catch (err) {
                     lastErr = err;
                     console.warn(`[remote-game] connect attempt ${attempt + 1} failed:`, err.message ?? err);
                     if (attempt < CONNECT_RETRIES - 1) {
+                        setLoadingStatus(`CONNECTION FAILED — RETRYING (${attempt + 2} / ${CONNECT_RETRIES})`);
                         await new Promise(r => setTimeout(r, CONNECT_RETRY_DELAY_MS));
                     }
                 }
             }
             if (!this._transport) {
                 console.error('[remote-game] giving up after retries:', lastErr);
+                setLoadingStatus(`CONNECTION FAILED — CHECK ROOM CODE AND TRY AGAIN`);
                 this._setState('FAILED');
                 this._emit('connection-failed', { error: lastErr });
                 this._emit('game-ended', { reason: 'connect-failed' });
                 return;
             }
+            setLoadingStatus('WAITING FOR HOST');
         }
 
         this._connection = new ClientConnection({
