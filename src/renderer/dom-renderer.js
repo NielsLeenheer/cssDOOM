@@ -239,7 +239,19 @@ export function ensureThing(state, thingIndex) {
     let thing = state.things[thingIndex];
     if (!thing) {
         thing = state.things[thingIndex] = {
-            x: 0, y: 0, floorHeight: 0, collected: false,
+            // x / y intentionally left undefined. Movable things
+            // (players, enemies, projectiles) populate them via
+            // createPlayerSprite or updateThingPosition. Static things
+            // (pickups, decorations) never do — leaving these undefined
+            // lets the culler's `gameEntry?.x !== undefined ? ... : t.x`
+            // fallback use the spawn-time t.x/t.y from thingContainers,
+            // which is correct for static things. Without this, a
+            // collected pickup's ensureThing call (in collectItem) would
+            // baseline x=0,y=0 and the culler would treat the pickup as
+            // located at world origin after uncollect, distance-culling
+            // it from anywhere on the map.
+            floorHeight: 0,
+            collected: false,
         };
     }
     return thing;

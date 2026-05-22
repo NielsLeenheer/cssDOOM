@@ -392,9 +392,11 @@ export function updateCulling(renderer, worldThings, spectatorActive, collectSta
         // the current position from renderer.state.things — t.x/t.y are
         // spawn-time values and would let a fast-moving DM player drift
         // outside their opponent's culling frustum even when standing in
-        // plain view.
-        const tx = gameEntry ? gameEntry.x : t.x;
-        const ty = gameEntry ? gameEntry.y : t.y;
+        // plain view. Static things (pickups, decorations) never have
+        // gameEntry.x populated (no updateThingPosition for them), so
+        // fall back to t.x/t.y — the spawn position is correct.
+        const tx = gameEntry?.x !== undefined ? gameEntry.x : t.x;
+        const ty = gameEntry?.y !== undefined ? gameEntry.y : t.y;
         const relX = tx - playerX;
         const relY = ty - playerY;
         let hide = false;
