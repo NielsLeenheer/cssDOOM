@@ -166,6 +166,31 @@ body.network-client .network-lobby-aside { display: none; }
     image-rendering: pixelated;
 }
 
+/* Self-identification — a right-pointing chevron to the left of the
+   row that matches this pane's player. Pane carries data-player=N;
+   slot row carries data-slot=N. The match between the two is "the
+   row representing this pane's player." Static selector list covers
+   MAX_SLOTS (4); adding remote slots would extend here. Every row
+   gets an invisible placeholder ::before so they stay aligned whether
+   the cursor is shown or not. */
+.network-slot::before {
+    content: '>>';
+    flex-shrink: 0;
+    width: 36px;
+    font-size: 1.5em;
+    line-height: 1;
+    text-align: right;
+    color: #fff;
+    visibility: hidden;
+}
+
+.pane[data-player="0"] .pane-network-lobby .network-slot[data-slot="0"]::before,
+.pane[data-player="1"] .pane-network-lobby .network-slot[data-slot="1"]::before,
+.pane[data-player="2"] .pane-network-lobby .network-slot[data-slot="2"]::before,
+.pane[data-player="3"] .pane-network-lobby .network-slot[data-slot="3"]::before {
+    visibility: visible;
+}
+
 /* Invite section ----------------------------------------------------- */
 
 .network-invite {
