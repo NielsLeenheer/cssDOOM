@@ -219,6 +219,16 @@ export class MasterConnection {
         if (msg.type === MSG.LOOKING) {
             if (this.paused) return;
             const payload = this.snapshotProvider ? this.snapshotProvider(session.peerKey) : {};
+            // No slot available — kiosk DM with both remote slots
+            // already filled, or a tighter mode-specific cap. Refuse
+            // terminally instead of ACKing; the joiner will surface
+            // the reason and stop retrying. Drop the session entirely
+            // so the heartbeat / onJoin path never fires.
+            if (payload.slotIndex == null) {
+                this._postTo(session, { type: MSG.REFUSED, reason: 'room-full' });
+                this.removePeer(session.peerKey);
+                return;
+            }
             this._postTo(session, { type: MSG.ACK, payload });
             // Re-LOOKINGs from an already-alive peer don't re-fire onJoin.
             if (!session.alive) {
@@ -457,14 +467,19 @@ export class MasterConnection {
  *   Master sent the catchup envelope (after our READY). Handler
  *   should apply the carried command list to reach master's
  *   current state — see src/game/catchup.js::applyCatchupCmds.
+ * @param {(reason: string) => void} [options.onRefused]
+ *   Master terminally refused the join (no slot available, etc.). The
+ *   transport will close shortly after; callers should transition to
+ *   FAILED, surface `reason` to the user, and stop retrying.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup } = {}) {
+    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup, onRefused } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
         this.onPlay = onPlay;
         this.onCatchup = onCatchup;
+        this.onRefused = onRefused;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -506,6 +521,16 @@ export class ClientConnection extends PeerConnectionBase {
             this.onPlay?.();
         } else if (msg.type === MSG.CATCHUP) {
             this.onCatchup?.(msg.cmds);
+        } else if (msg.type === MSG.REFUSED) {
+            // Stop the LOOKING retry loop — master has terminally
+            // refused this join, no amount of re-asking will get a
+            // slot. The transport will close on its own; the caller's
+            // handler surfaces the reason and transitions to FAILED.
+            if (this._lookingTimer) {
+                clearInterval(this._lookingTimer);
+                this._lookingTimer = null;
+            }
+            this.onRefused?.(msg.reason);
         }
     }
 

@@ -44,6 +44,27 @@
 
 const MAX_REMOTES = 3; // master in slot 0, remotes in slots 1..3
 
+/**
+ * Build a "refused upgrade" WebSocket response: accept the upgrade so
+ * the browser surfaces the message instead of a generic non-101 error,
+ * send a typed `{ type: 'refused', reason }` envelope, and close
+ * cleanly. Caller's connectToNetworkRoom reads `reason` to show a
+ * specific status ("ROOM IS FULL" / "ROOM NOT FOUND") instead of the
+ * generic timeout.
+ *
+ * `reason` is a stable string the client switches on; current values
+ * are 'room-full' and 'room-not-found'.
+ */
+function refuseRemoteUpgrade(reason) {
+    const pair = new WebSocketPair();
+    const [client, server] = [pair[0], pair[1]];
+    server.accept();
+    server.send(JSON.stringify({ type: 'refused', reason }));
+    // 1000 = normal closure; the typed message is the actual signal.
+    server.close(1000, reason);
+    return new Response(null, { status: 101, webSocket: client });
+}
+
 export class RoomDO {
     constructor(state, env) {
         this.state = state;
@@ -100,11 +121,19 @@ export class RoomDO {
     }
 
     connectRemote() {
+        // Refusal cases (no master, room full) upgrade the WebSocket
+        // ANYWAY, send a typed reason message, and close cleanly. The
+        // browser's WebSocket API doesn't surface HTTP status codes on
+        // failed upgrades — returning 404/409 directly leaves the
+        // client unable to distinguish "room doesn't exist" /
+        // "room full" from a generic transport failure. Upgrading +
+        // typed-close lets connectToNetworkRoom report the specific
+        // reason in the joiner's UI.
         if (!this.master) {
-            return new Response('room does not exist or has expired', { status: 404 });
+            return refuseRemoteUpgrade('room-not-found');
         }
         if (this.remotes.size >= MAX_REMOTES) {
-            return new Response('room is full', { status: 409 });
+            return refuseRemoteUpgrade('room-full');
         }
 
         const peerId = this.nextPeerId++;

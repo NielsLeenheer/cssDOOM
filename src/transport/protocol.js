@@ -91,6 +91,14 @@ export const MSG = {
     // joiner's own per-pane state (HUD, camera, weapon, dead flag).
     // See src/game/catchup.js.
     CATCHUP: 'catchup',
+    // Master → client: terminal refusal. Sent in place of ACK when
+    // master has no slot to give the joiner — e.g. kiosk DM with both
+    // remote slots already filled. Carries `reason` (currently always
+    // 'room-full') so the joiner can show a specific status and stop
+    // retrying. Distinct from the signaling-layer `refused` envelope:
+    // that one fires before WebRTC; this one fires after the data
+    // channel is open and the joiner is in handshake.
+    REFUSED: 'refused',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

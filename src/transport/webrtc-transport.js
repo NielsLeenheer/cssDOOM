@@ -253,6 +253,17 @@ export async function connectToNetworkRoom({
                     // We're connected to the room. Waiting for master's offer.
                     break;
 
+                case 'refused':
+                    // Worker refused the upgrade (room full, room not
+                    // found). Bubble the reason up so RemoteGame can
+                    // show a specific status and skip retries — these
+                    // failures aren't transient.
+                    fail(Object.assign(
+                        new Error(`signaling refused: ${msg.reason}`),
+                        { code: msg.reason },
+                    ));
+                    return;
+
                 case 'offer':
                     try {
                         await pc.setRemoteDescription({ type: 'offer', sdp: msg.sdp });

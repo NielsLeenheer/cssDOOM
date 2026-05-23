@@ -52,6 +52,24 @@ const NON_FORWARDED_ACTIONS = new Set([A.MENU_TOGGLE, A.KBM_SWAP]);
 const CONNECT_RETRIES = 5;
 const CONNECT_RETRY_DELAY_MS = 2000;
 
+/**
+ * Pick the splash text for a terminal join failure. Worker refusals
+ * (`room-full`, `room-not-found`) carry a stable code on the thrown
+ * error — surface those specifically so the user sees why they can't
+ * join. Anything else falls back to the generic check-the-code prompt
+ * since the actual cause (ICE failure, dropped signaling, etc.) isn't
+ * actionable in a splash-text message.
+ */
+function messageForFailure(err, roomCode) {
+    if (err?.code === 'room-full') {
+        return `ROOM ${roomCode} IS FULL`;
+    }
+    if (err?.code === 'room-not-found') {
+        return `ROOM ${roomCode} NOT FOUND`;
+    }
+    return `CONNECTION FAILED\nCHECK ROOM CODE AND TRY AGAIN`;
+}
+
 export class RemoteGame {
     constructor({ roomCode, orchestrator }) {
         // Normalize to uppercase so the splash text matches what the
@@ -116,6 +134,10 @@ export class RemoteGame {
                 } catch (err) {
                     lastErr = err;
                     console.warn(`[remote-game] connect attempt ${attempt + 1} failed:`, err.message ?? err);
+                    // Worker refusals (room full, room not found) are
+                    // not transient — no point retrying. Show the
+                    // specific reason and abort the loop.
+                    if (err?.code === 'room-full' || err?.code === 'room-not-found') break;
                     if (attempt < CONNECT_RETRIES - 1) {
                         setLoadingStatus(`CONNECTION FAILED\nRETRYING ${attempt + 2} / ${CONNECT_RETRIES}`);
                         await new Promise(r => setTimeout(r, CONNECT_RETRY_DELAY_MS));
@@ -124,7 +146,7 @@ export class RemoteGame {
             }
             if (!this._transport) {
                 console.error('[remote-game] giving up after retries:', lastErr);
-                setLoadingStatus(`CONNECTION FAILED\nCHECK ROOM CODE AND TRY AGAIN`);
+                setLoadingStatus(messageForFailure(lastErr, this.roomCode));
                 this._setState('FAILED');
                 this._emit('connection-failed', { error: lastErr });
                 this._emit('game-ended', { reason: 'connect-failed' });
@@ -166,13 +188,19 @@ export class RemoteGame {
                 const renderer = this.orchestrator.findTarget(this._mySlot, 'dom');
                 applyCatchupCmds(renderer, cmds);
             },
+            // Master refused the join (typically no remote slot
+            // available — kiosk DM full). Show the reason, tear down
+            // the transport, transition to FAILED. No retry — the
+            // refusal is terminal until a remote leaves.
+            onRefused: (reason) => this._onRefused(reason),
         });
 
         domRendererManager.startCullingLoop({
             isAttract: isAttractActive,
             getSpectatorActive: () => spectatorActive,
         });
-        hideInitialOverlay();
+        // Splash stays up until _onAck finishes building the scene —
+        // see the hideInitialOverlay() call at the end of _onAck.
     }
 
     /**
@@ -224,6 +252,14 @@ export class RemoteGame {
         }
 
         this._wireUp();
+
+        // Scene is built, RenderClient is subscribed — safe to reveal
+        // the pane behind the splash. Done HERE (after loadMap awaits)
+        // rather than synchronously after transport-open in start() so
+        // a master-side MSG.REFUSED arriving instead of ACK never has
+        // to chase the splash back up: the splash simply stays visible
+        // through the failure and _onRefused just paints over it.
+        hideInitialOverlay();
 
         this._setState('CONNECTED');
         this._emit('connected', { slot: slotIndex });
@@ -341,6 +377,25 @@ export class RemoteGame {
         if (this.roomCode) {
             setTimeout(() => location.reload(), 2000);
         }
+    }
+
+    /**
+     * Master terminally refused the join (no slot available). Drop the
+     * transport, show the reason on the splash, and transition to
+     * FAILED. No auto-reload — the refusal isn't transient, so retrying
+     * would just re-trigger the refusal in a loop.
+     */
+    _onRefused(reason) {
+        console.log('[remote-game] master refused:', reason);
+        // Splash is still up — _onAck (which would have hidden it)
+        // never ran. Just repaint the status text over it.
+        setLoadingStatus(messageForFailure({ code: reason }, this.roomCode));
+        try { this._transport?.close(); } catch {}
+        this._transport = null;
+        this._connection?.close?.();
+        this._setState('FAILED');
+        this._emit('connection-failed', { reason });
+        this._emit('game-ended', { reason: 'refused' });
     }
 
     /**
