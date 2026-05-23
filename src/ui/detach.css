@@ -1,0 +1,14 @@
+/* Detach button — opens a secondary window that mirrors player 1's view.
+   This affordance specifically opens a same-machine secondary; Network DM
+   remotes connect via their own URL. Hidden unless we're in Local DM
+   (deathmatch + standalone — the secondary window has networkMode=client
+   so it's already excluded by the standalone filter), not fullscreen,
+   and don't already have a client bound to a slot. Also hidden on
+   touch (no popup windows there). */
+#detach-button { display: none; }
+body[data-game-mode="deathmatch"][data-network-mode="standalone"]:not(.fullscreen):not(:has(.pane[data-active="false"])) #detach-button {
+    display: block;
+}
+@media (pointer: coarse) {
+    #detach-button { display: none !important; }
+}

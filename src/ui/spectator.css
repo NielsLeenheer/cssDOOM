@@ -33,7 +33,7 @@ body.spectator.follow-mode #aim-line {
 /* ========================================================================
    Spectator Button
    Layout (size, position, hover) is handled by the shared #ui-buttons
-   cluster in help.css — only the active-state highlight lives here.
+   cluster in buttons.css — only the active-state highlight lives here.
    ======================================================================== */
 
 body.spectator #spectator-button img {

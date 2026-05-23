@@ -27,4 +27,6 @@
 @import url('src/ui/spectator.css');
 @import url('src/renderer/hud/touch-controls.css');
 @import url('src/renderer/hud/level-transition.css');
+@import url('src/ui/buttons.css');
 @import url('src/ui/help.css');
+@import url('src/ui/detach.css');

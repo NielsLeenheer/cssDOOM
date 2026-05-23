@@ -1,0 +1,51 @@
+/* ========================================================================
+   Top-right UI button cluster (fullscreen, help, spectator, detach)
+   Flex row anchored to the top-right corner. Hidden buttons (e.g. the
+   spectator button in DM) collapse out and the others slide in to fill
+   the slot — no per-button offsets to maintain. Per-button visibility
+   rules live alongside the button they govern (detach in detach.css,
+   touch-hides for help/fullscreen below).
+   ======================================================================== */
+
+#ui-buttons {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    right: calc(12px + env(safe-area-inset-right, 0px));
+    z-index: 999;
+    display: flex;
+    gap: 6px;
+    pointer-events: none; /* children re-enable */
+}
+
+/* Kiosk layout — pin the cluster to the right edge of the top-left
+   monitor (50vw + 12px gutter) so all buttons sit on one physical 1080p
+   display instead of straddling the bezel between the two screens. */
+body.kiosk #ui-buttons {
+    right: calc(50vw + 12px);
+}
+
+#ui-buttons > button {
+    width: 38px;
+    height: 38px;
+    background: none;
+    border: none;
+    padding: 4px;
+    cursor: pointer;
+    transition: filter 0.15s;
+    pointer-events: auto;
+
+    & img {
+        width: 100%;
+        height: 100%;
+        filter: invert(0.55);
+        transition: filter 0.15s;
+    }
+
+    &:hover img { filter: invert(1); }
+}
+
+/* Hide help + fullscreen on touch devices (no keyboard to reference,
+   browser handles fullscreen via the system UI). */
+@media (pointer: coarse) {
+    #help-button, #fullscreen-button { display: none; }
+}
