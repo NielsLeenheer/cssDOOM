@@ -30,7 +30,8 @@
         animation: sprite-stop 600ms steps(calc(var(--frames) - 1)) forwards;
     }
 
-    &[data-state="dead"] {
+    &[data-state="dead"],
+    &[data-state="gibbing"] {
         animation: sprite-stop calc(var(--frames) * 100ms) steps(calc(var(--frames) - 1)) forwards;
     }
 }

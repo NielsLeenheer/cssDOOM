@@ -227,9 +227,16 @@ export function damageEnemy(target, damage, source) {
     const thingIndex = state.things.indexOf(target);
 
     if (target.hp <= 0) {
-        // Target killed
+        // Target killed. DOOM's extreme-death rule: a hit that pushes
+        // HP below -spawnhealth gibs the body (rocket / BFG overkill).
+        // killEnemy ignores `gib` for types whose SPRITE_LAYOUT has no
+        // xdeath row (Demon, Spectre, Baron, Barrel), so it's safe to
+        // always compute and pass. Persist on the thing so catchup
+        // can re-emit the right death variant to late joiners.
+        const gib = target.hp <= -target.maxHp;
         target.collected = true;
-        renderer.killEnemy(thingIndex, target.type);
+        target.gibbed = gib;
+        renderer.killEnemy(thingIndex, target.type, false, gib);
         recordKill(target);
 
         if (target.type === 2035) {

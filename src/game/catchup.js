@@ -161,8 +161,10 @@ function appendThingCmds(out) {
             // Discriminate "dead enemy" (killEnemy path) from
             // "collected pickup" (collectItem path). Barrels go down
             // the killEnemy path so their explosion-corpse renders.
+            // Pass `gibbed` through so a joiner arriving after a
+            // rocket-kill sees the gib pile, not the normal corpse.
             if (ENEMIES.has(t.type) || t.type === 2035) {
-                killTuples.push([gameId, t.type, true]);
+                killTuples.push([gameId, t.type, true, t.gibbed === true]);
             } else if (PICKUPS.has(t.type)) {
                 collectTuples.push([gameId]);
             }
@@ -211,7 +213,7 @@ function appendCrusherCmds(out) {
 function appendCorpseCmds(out) {
     if (!state.deathCorpses.length) return;
     const tuples = state.deathCorpses.map(c => [
-        c.x, c.y, c.floorHeight, c.sectorIndex, c.playerIndex,
+        c.x, c.y, c.floorHeight, c.sectorIndex, c.playerIndex, c.gib === true,
     ]);
     out.push({ name: 'createCorpse', args: tuples });
 }

@@ -38,11 +38,42 @@ import { clearMovingState } from '../movement.js';
  * fully depleted and armorType resets to 0.
  */
 export function damagePlayer(player, damageAmount, attacker = null) {
-    if (player.isDead) return;
     if (player.powerups.invulnerability) return;
 
     // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() — skill 1 halves damage
     if (state.skillLevel === 1) damageAmount >>= 1;
+
+    // Damage on an already-dead player has one job: see if the
+    // additional damage pushes the corpse past the gib threshold and
+    // upgrade the death animation if so. DOOM's P_DamageMobj is
+    // re-entrant the same way — rocket direct hit kills with
+    // -60 hp, then radius splash adds -128, dropping to -188 ≤
+    // -spawnhealth(100), and the body explodes. Without this, our
+    // splash silently no-ops on the freshly-dead player and gib
+    // never triggers.
+    if (player.isDead) {
+        if (!player.thingRef) return;
+        if (player.thingRef.gibbed) return;
+        // We zeroed player.health to 0 at the moment of death so the
+        // HUD doesn't show negative numbers — track accumulated
+        // post-death damage on the thingRef instead so we can check
+        // the gib threshold against the true overkill total.
+        const postDeath = (player.thingRef.postDeathDamage ?? 0) + damageAmount;
+        player.thingRef.postDeathDamage = postDeath;
+        // Gib threshold = -spawnhealth. The thingRef remembers
+        // `deathOverkill` (negative health at the moment of death);
+        // total overkill past zero is deathOverkill + postDeath.
+        const totalOverkill = (player.thingRef.deathOverkill ?? 0) + postDeath;
+        if (totalOverkill >= 100 && player.thingIndex >= 0) {
+            player.thingRef.gibbed = true;
+            // Re-fire killEnemy with gib=true so the live sprite swaps
+            // from the normal death row to the xdeath row mid-animation.
+            // The corpse spawn at 1400ms reads back gibbed via the
+            // captured thingRef and picks PLAYW0.
+            renderer.killEnemy(player.thingIndex, -1, false, true);
+        }
+        return;
+    }
 
     // Armor absorption depends on armor type: green (1) = 1/3, blue (2) = 1/2
     if (player.armorType) {
@@ -70,6 +101,13 @@ export function damagePlayer(player, damageAmount, attacker = null) {
     orchestrator.playSound('DSPLPAIN', { x: player.x, y: player.y });
 
     if (player.health <= 0) {
+        // Match DOOM's extreme-death (gib/xdeath) trigger: cumulative
+        // damage that drives health below -spawnhealth (default 100)
+        // explodes the body. Captured below as `deathOverkill` so a
+        // follow-up post-death damagePlayer call (rocket splash after
+        // direct hit) can pick up where this left off.
+        const overkill = -player.health; // positive
+        const gib = overkill >= 100;
         player.health = 0;
         player.isDead = true;
         player.deathTime = performance.now();
@@ -81,16 +119,24 @@ export function damagePlayer(player, damageAmount, attacker = null) {
         awardFrag(player, attacker);
         // Mark this player's thing entry collected so AI ignores them,
         // PvP collision lets the other player walk through, and hitscan /
-        // projectile loops skip the now-defunct live entry.
-        if (player.thingRef) player.thingRef.collected = true;
+        // projectile loops skip the now-defunct live entry. Persist the
+        // initial gib status + overkill so a subsequent splash damage
+        // can re-evaluate the threshold against cumulative overkill.
+        if (player.thingRef) {
+            player.thingRef.collected = true;
+            player.thingRef.gibbed = gib;
+            player.thingRef.deathOverkill = overkill;
+            player.thingRef.postDeathDamage = 0;
+        }
         if (player.thingIndex >= 0) {
             // Stop the walk cycle and play the death animation on the live
-            // sprite (PLAYH→PLAYN, row 6 of the sheet). After the animation
-            // finishes, hide the live sprite and place a static corpse
-            // decoration at the death point so the body persists when the
-            // player respawns elsewhere.
+            // sprite — row 10 (PLAYH→PLAYN, 7 frames) for a normal kill,
+            // row 11 (PLAYO→PLAYW, 9 frames) for a gib. After the
+            // animation finishes, hide the live sprite and place a
+            // static corpse decoration at the death point so the body
+            // persists when the player respawns elsewhere.
             renderer.setThingMoving(player.thingIndex, false);
-            renderer.killEnemy(player.thingIndex, -1);
+            renderer.killEnemy(player.thingIndex, -1, false, gib);
 
             const deathX = player.x;
             const deathY = player.y;
@@ -98,16 +144,25 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             const deathSectorIndex = getSectorAt(deathX, deathY)?.sectorIndex;
             const playerIndex = player.index;
             const thingIndex = player.thingIndex;
-            // 7 frames × 200ms (matches the player-specific override in
-            // enemies.css — slower than the enemy death animation).
+            // Capture thingRef by closure so we can read the final
+            // gib status at corpse-spawn time — splash damage arriving
+            // ~0ms after the direct hit may have upgraded `gibbed`
+            // between now and the timeout firing.
+            const thingRefAtDeath = player.thingRef;
+            // 7 normal frames × 200ms (matches the player-specific
+            // override in enemies.css). Gib has 9 frames at the same
+            // pace — we keep one 1400ms timeout for the corpse swap;
+            // the extra two gib frames overlap the corpse for ~400ms,
+            // which reads as "the gibs settle into the pile."
             setTimeout(() => {
+                const isGib = thingRefAtDeath?.gibbed === true;
                 renderer.collectItem(thingIndex);
-                renderer.createCorpse(deathX, deathY, deathFloor, deathSectorIndex, playerIndex);
+                renderer.createCorpse(deathX, deathY, deathFloor, deathSectorIndex, playerIndex, isGib);
                 // Remember the corpse so the world snapshot sent to a
                 // reconnecting / late-joining client can re-emit it.
                 state.deathCorpses.push({
                     x: deathX, y: deathY, floorHeight: deathFloor,
-                    sectorIndex: deathSectorIndex, playerIndex,
+                    sectorIndex: deathSectorIndex, playerIndex, gib: isGib,
                 });
             }, 1400);
         }

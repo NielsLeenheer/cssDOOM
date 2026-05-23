@@ -1,31 +1,33 @@
 /* ========================================================================
    Enemies — combined sprite sheets (walk + attack + death in one image)
-   Rows 0-4: walk rotations (mirrored 6-8 via scaleX(-1) set by JS)
-   Row 5: attack (front-facing)
-   Row 6: death
+   Rows  0-4   walk rotations    (mirrored 6-8 via scaleX(-1) set by JS)
+   Rows  5-9   attack rotations  (same mirror scheme)
+   Row   10    death             (front-facing)
+   Row   11    xdeath / gib      (front-facing, gibbable enemies only —
+                                  Baron and Demon stay at 11 rows)
    --cols = total columns in sheet (max frames across all states)
    --frames = frames in current animation (walk by default)
-   JS sets --heading and --frames when switching to attack/death
+   JS sets --heading and --frames when switching to attack/death/xdeath
    ======================================================================== */
 
 .sprite[data-type="zombieman"] {
     background-image: url('/assets/sprites/sheets/POSS.png');
-    --w: 48; --h: 55; --cols: 5; --frames: 2; --rows: 7;
+    --w: 57; --h: 61; --cols: 7; --frames: 2; --rows: 12;
 }
 
 .sprite[data-type="shotgun-guy"] {
     background-image: url('/assets/sprites/sheets/SPOS.png');
-    --w: 52; --h: 60; --cols: 5; --frames: 2; --rows: 7;
+    --w: 57; --h: 61; --cols: 7; --frames: 2; --rows: 12;
 }
 
 .sprite[data-type="imp"] {
     background-image: url('/assets/sprites/sheets/TROO.png');
-    --w: 58; --h: 62; --cols: 5; --frames: 2; --rows: 7;
+    --w: 59; --h: 62; --cols: 7; --frames: 2; --rows: 12;
 }
 
 .sprite[data-type="demon"] {
     background-image: url('/assets/sprites/sheets/SARG.png');
-    --w: 64; --h: 59; --cols: 6; --frames: 2; --rows: 7;
+    --w: 70; --h: 59; --cols: 6; --frames: 2; --rows: 11;
 }
 
 /* Spectre: invisible Demon variant — same sprites with SVG fuzz displacement.
@@ -33,7 +35,7 @@
    Uses animated feTurbulence → feDisplacementMap → feColorMatrix (see #fuzz in index.html) */
 .sprite[data-type="spectre"] {
     background-image: url('/assets/sprites/sheets/SARG.png');
-    --w: 64; --h: 59; --cols: 6; --frames: 2; --rows: 7;
+    --w: 70; --h: 59; --cols: 6; --frames: 2; --rows: 11;
     filter: url(#fuzz);
     opacity: 0.35;
 
@@ -42,7 +44,7 @@
 
 .sprite[data-type="baron"] {
     background-image: url('/assets/sprites/sheets/BOSS.png');
-    --w: 69; --h: 74; --cols: 7; --frames: 2; --rows: 7;
+    --w: 69; --h: 74; --cols: 7; --frames: 2; --rows: 11;
 }
 
 body.all-enemies-shadow .enemy .sprite {
@@ -58,10 +60,11 @@ body.all-enemies-shadow .enemy .sprite {
 
 .sprite[data-type="player"] {
     background-image: url('/assets/sprites/sheets/PLAY.png');
-    /* Sheet now matches the enemy layout: rows 0-4 walk, row 5 attack
-       (PLAY E1/F1, 2 frames), row 6 death (PLAY H0..N0, 7 frames).
-       Cell size = max across all frames (death gibs widen the cell). */
-    --w: 51; --h: 56; --cols: 7; --frames: 4; --rows: 7;
+    /* Sheet matches the gibbable-enemy layout: rows 0-4 walk, rows 5-9
+       attack rotations (PLAY E/F per rotation), row 10 death (PLAY H0..N0,
+       7 frames), row 11 xdeath/gib (PLAY O0..W0, 9 frames). Cell size =
+       max across all frames (death gibs widen the cell). */
+    --w: 57; --h: 59; --cols: 9; --frames: 4; --rows: 12;
     /* Walk cycle pauses by default — only animates while the represented
        player is moving. The `.moving` class on the .enemy.player container
        is toggled by movement.js via renderer.setThingMoving each time the
@@ -100,17 +103,23 @@ body.all-enemies-shadow .enemy .sprite {
    `sprite-stop` keyframes) and need to run regardless of whether the
    player happens to be moving — otherwise the default
    animation-play-state:paused on .sprite[data-type="player"] freezes
-   them mid-animation. */
+   them mid-animation. Gib (xdeath) shares the same one-shot treatment
+   as normal death. */
 .sprite[data-type="player"][data-state="attacking"],
-.sprite[data-type="player"][data-state="dead"] {
+.sprite[data-type="player"][data-state="dead"],
+.sprite[data-type="player"][data-state="gibbing"] {
     animation-play-state: running;
 }
 
 /* Slower, more cinematic death sequence for the player than for enemies.
    The shared sprite-stop rule uses 100 ms/frame; player gets 200 ms/frame
    so the fall reads at a glance. damage.js's setTimeout for hiding the
-   live sprite + spawning the static corpse is kept in sync below. */
-.sprite[data-type="player"][data-state="dead"] {
+   live sprite + spawning the static corpse is kept in sync below. The
+   gib animation has more frames (9 vs 7) but plays at the same per-frame
+   pace — the extra 400ms overlaps the corpse swap, which reads as the
+   gibs settling. */
+.sprite[data-type="player"][data-state="dead"],
+.sprite[data-type="player"][data-state="gibbing"] {
     animation-duration: calc(var(--frames) * 200ms);
 }
 

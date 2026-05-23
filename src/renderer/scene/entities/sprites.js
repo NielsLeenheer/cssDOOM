@@ -22,18 +22,44 @@ import { ensureThing } from '../../dom-renderer.js';
 // Sprite Sheet Layout
 // ============================================================================
 
-// Combined sprite sheet layout: walk rows (0-4), attack row (5), death row (6)
-// Maps thing type → { atkRow, atkFrames, dieRow, dieFrames, walkFrames }
+// Combined sprite sheet layout per thing type. See enemies.css for the
+// row plan; the runtime needs to know per-state row indices + frame
+// counts to drive --heading and --frames on the .sprite element.
+//
+//   walkRowBase  = first row of the walk rotations (rotations 1..5 fill
+//                  walkRowBase..walkRowBase+4); always 0.
+//   atkRowBase   = first row of the attack rotations; -1 if the type has
+//                  no attack state (barrel).
+//   walkFrames / atkFrames = frame count per row for animation cycles.
+//   dieRow       = single front-only death row.
+//   xdieRow      = single front-only gib/xdeath row; -1 if the type has
+//                  no extreme death (SARG/Spectre/Baron/Barrel).
+//
+// Barrel keeps the legacy two-row layout (idle + explode) — it never had
+// rotations or attack frames.
 const SPRITE_LAYOUT = {
-    3004: { atkRow: 5, atkFrames: 2, dieRow: 6, dieFrames: 5, walkFrames: 2 }, // Zombieman
-    9:    { atkRow: 5, atkFrames: 2, dieRow: 6, dieFrames: 5, walkFrames: 2 }, // Shotgun Guy
-    3001: { atkRow: 5, atkFrames: 3, dieRow: 6, dieFrames: 5, walkFrames: 2 }, // Imp
-    3002: { atkRow: 5, atkFrames: 3, dieRow: 6, dieFrames: 6, walkFrames: 2 }, // Demon
-    58:   { atkRow: 5, atkFrames: 3, dieRow: 6, dieFrames: 6, walkFrames: 2 }, // Spectre (same as Demon)
-    3003: { atkRow: 5, atkFrames: 3, dieRow: 6, dieFrames: 7, walkFrames: 2 }, // Baron
-    2035: { atkRow: -1, atkFrames: 0, dieRow: 1, dieFrames: 5, walkFrames: 2 }, // Barrel
-    [-1]: { atkRow: 5, atkFrames: 2, dieRow: 6, dieFrames: 7, walkFrames: 4 }, // Player (kind:'player', type:-1)
+    3004: { atkRowBase: 5, atkFrames: 2, dieRow: 10, dieFrames: 5, xdieRow: 11, xdieFrames: 7, walkFrames: 2 }, // Zombieman
+    9:    { atkRowBase: 5, atkFrames: 2, dieRow: 10, dieFrames: 5, xdieRow: 11, xdieFrames: 7, walkFrames: 2 }, // Shotgun Guy
+    3001: { atkRowBase: 5, atkFrames: 3, dieRow: 10, dieFrames: 5, xdieRow: 11, xdieFrames: 7, walkFrames: 2 }, // Imp
+    3002: { atkRowBase: 5, atkFrames: 3, dieRow: 10, dieFrames: 6, xdieRow: -1, xdieFrames: 0, walkFrames: 2 }, // Demon — no gib
+    58:   { atkRowBase: 5, atkFrames: 3, dieRow: 10, dieFrames: 6, xdieRow: -1, xdieFrames: 0, walkFrames: 2 }, // Spectre — no gib
+    3003: { atkRowBase: 5, atkFrames: 3, dieRow: 10, dieFrames: 7, xdieRow: -1, xdieFrames: 0, walkFrames: 2 }, // Baron — no gib (canonical DOOM)
+    2035: { atkRowBase: -1, atkFrames: 0, dieRow: 1, dieFrames: 5, xdieRow: -1, xdieFrames: 0, walkFrames: 2 }, // Barrel (2-row sheet, dieRow=1)
+    [-1]: { atkRowBase: 5, atkFrames: 2, dieRow: 10, dieFrames: 7, xdieRow: 11, xdieFrames: 9, walkFrames: 4 }, // Player (kind:'player', type:-1)
 };
+
+/**
+ * Pick the sprite-sheet row + mirror scale for a given DOOM rotation index
+ * (1..8). Rotations 1..5 map to rows base..base+4 at scale 1; 6..8 reuse
+ * rows base+3..base+1 mirrored via scaleX(-1). Used by both walk and
+ * attack rotation handling.
+ */
+function rotationToHeading(rotationIndex, rowBase) {
+    if (rotationIndex <= 5) {
+        return { sheetRow: rowBase + rotationIndex - 1, mirror: 1 };
+    }
+    return { sheetRow: rowBase + (9 - rotationIndex), mirror: -1 };
+}
 
 // ============================================================================
 // Low-level helpers (internal)
@@ -59,8 +85,11 @@ function setSpriteState(sprite, newState) {
 
 /**
  * Updates the sprite visuals for an enemy AI state change. Maps the state
- * to the correct sprite sheet row, frame count, and animation mode in
- * this renderer's pane.
+ * to the correct sprite sheet row range, frame count, and animation mode
+ * in this renderer's pane. `attacking` enters the attack rotation block;
+ * the next updateEnemyRotation tick refreshes --heading against the new
+ * row base so the attack pose tracks the viewer angle, same as walk.
+ * Reset to walk frames on any other non-dead state.
  */
 export function setEnemyState(renderer, thingIndex, thingType, newState) {
     const layout = SPRITE_LAYOUT[thingType];
@@ -69,10 +98,17 @@ export function setEnemyState(renderer, thingIndex, thingType, newState) {
 
     if (newState === 'attacking') {
         setSpriteState(domData.sprite, 'attacking');
-        setSpriteFrame(domData.sprite, layout.atkRow, layout.atkFrames, 1);
+        setSpriteFrame(domData.sprite, undefined, layout.atkFrames, undefined);
+        // Force the next updateEnemyRotation tick to recompute --heading
+        // against the new rowBase (atkRowBase instead of 0). Without
+        // this the cached previous walk row would persist for a frame.
+        domData._lastHeading = undefined;
+        domData._lastMirror = undefined;
     } else if (newState !== 'dead') {
         setSpriteState(domData.sprite, null);
         setSpriteFrame(domData.sprite, undefined, layout.walkFrames);
+        domData._lastHeading = undefined;
+        domData._lastMirror = undefined;
     }
 }
 
@@ -85,7 +121,7 @@ export function setEnemyState(renderer, thingIndex, thingType, newState) {
  * animation-delay past the duration leaves the sprite on its end keyframe,
  * surviving the cull system's display:none → block flips.
  */
-export function killEnemy(renderer, thingIndex, thingType, instant = false) {
+export function killEnemy(renderer, thingIndex, thingType, instant = false, gib = false) {
     // Per-renderer world-view state — match what the mirror does on
     // the singleton. `collected` is the catch-all "skip this thing"
     // flag the culler reads (pickups + dead things alike). Set
@@ -100,8 +136,16 @@ export function killEnemy(renderer, thingIndex, thingType, instant = false) {
     domData.element.classList.add('dead');
     if (!domData.sprite) return;
     domData.sprite.style.animationDelay = instant ? '-10s' : '';
-    setSpriteFrame(domData.sprite, layout.dieRow, layout.dieFrames, 1);
-    setSpriteState(domData.sprite, 'dead');
+    // Pick the xdeath row if this type has one AND the caller asked
+    // for it; otherwise fall back to the normal death row. Baron and
+    // Demon have no gib in DOOM, so even a rocket leaves the normal
+    // corpse — preserve that authenticity rather than synthesizing
+    // a gib for them.
+    const useGib = gib && layout.xdieRow >= 0;
+    const row = useGib ? layout.xdieRow : layout.dieRow;
+    const frames = useGib ? layout.xdieFrames : layout.dieFrames;
+    setSpriteFrame(domData.sprite, row, frames, 1);
+    setSpriteState(domData.sprite, useGib ? 'gibbing' : 'dead');
 }
 
 // Player attack animation — when this player fires their weapon, the
@@ -124,16 +168,15 @@ export function playPlayerAttack(renderer, thingIndex, shooter) {
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData?.sprite) return;
 
-    const viewer = renderer.state.camera;
-    if (!viewer || shooter === undefined) return;
-    const angleToViewer = Math.atan2(viewer.y - shooter.y, viewer.x - shooter.x);
-    let relativeAngle = angleToViewer - shooter.facing;
-    relativeAngle = ((relativeAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    const rotationIndex = (Math.floor((relativeAngle + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
-    if (rotationIndex !== 1) return;
-
-    setSpriteFrame(domData.sprite, layout.atkRow, layout.atkFrames, 1);
+    // Switch to attack frame count + clear rotation cache so the very
+    // next updateEnemyRotation tick rewrites --heading against the
+    // attack row base. No more "front-bucket only" gate — we ship all
+    // 5 attack rotations now, so the shooter looks correct from every
+    // viewer angle.
+    setSpriteFrame(domData.sprite, undefined, layout.atkFrames, undefined);
     setSpriteState(domData.sprite, 'attacking');
+    domData._lastHeading = undefined;
+    domData._lastMirror = undefined;
 
     let timers = renderer._playerAttackTimers;
     if (!timers) {
@@ -144,14 +187,15 @@ export function playPlayerAttack(renderer, thingIndex, shooter) {
     if (prev) clearTimeout(prev);
     timers.set(thingIndex, setTimeout(() => {
         // Return to walk cycle. Clear the rotation-cache fields so the
-        // next updateEnemyRotation tick rewrites --heading: without this,
-        // the sprite would stay on row 5 (attack) and the walk cycle
-        // would animate through PLAYE, PLAYF, blank, blank — visible as
-        // a flicker / "disappearing" sprite.
+        // next updateEnemyRotation tick rewrites --heading: without this
+        // the sprite would stay on its current attack row and the walk
+        // cycle would animate through PLAYE, PLAYF, blank, blank —
+        // visible as a flicker / "disappearing" sprite.
         const after = renderer.sceneState.thingDom.get(thingIndex);
         if (!after?.sprite) return;
         // Don't override the dead state (player died mid-attack-anim).
-        if (after.sprite.dataset.state === 'dead') return;
+        if (after.sprite.dataset.state === 'dead'
+            || after.sprite.dataset.state === 'gibbing') return;
         setSpriteState(after.sprite, null);
         setSpriteFrame(after.sprite, undefined, layout.walkFrames);
         after._lastHeading = undefined;
@@ -175,8 +219,17 @@ export function updateEnemyRotation(renderer, thingIndex, enemy, viewers) {
     if (!player) return;
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData?.sprite) return;
-    // Skip rotation updates for attack/death states (front-facing only)
-    if (domData.sprite.dataset.state) return;
+    // Death and gib are single front-only rows — no rotation tracking
+    // (the corpse / gib pile doesn't pivot as the viewer walks around).
+    const spriteState = domData.sprite.dataset.state;
+    if (spriteState === 'dead' || spriteState === 'gibbing') return;
+
+    // Choose the row-block base for the current state. Walk uses rows
+    // 0..4; attack uses rows atkRowBase..atkRowBase+4 (both rotation
+    // blocks follow the same mirror scheme for rotations 6..8).
+    const layout = SPRITE_LAYOUT[enemy?.type ?? -1] ?? SPRITE_LAYOUT[-1];
+    const rowBase = spriteState === 'attacking' ? layout.atkRowBase : 0;
+    if (rowBase < 0) return; // no rotation rows configured (barrel)
 
     const angleToPlayer = Math.atan2(
         player.y - enemy.y,
@@ -187,21 +240,13 @@ export function updateEnemyRotation(renderer, thingIndex, enemy, viewers) {
     relativeAngle = ((relativeAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
 
     const rotationIndex = (Math.floor((relativeAngle + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
-
-    let sheetRow, mirrorScale;
-    if (rotationIndex <= 5) {
-        sheetRow = rotationIndex - 1;
-        mirrorScale = 1;
-    } else {
-        sheetRow = 9 - rotationIndex;
-        mirrorScale = -1;
-    }
+    const { sheetRow, mirror } = rotationToHeading(rotationIndex, rowBase);
 
     // Cache on domData to avoid redundant CSS updates (per-pane)
-    if (domData._lastHeading !== sheetRow || domData._lastMirror !== mirrorScale) {
+    if (domData._lastHeading !== sheetRow || domData._lastMirror !== mirror) {
         domData._lastHeading = sheetRow;
-        domData._lastMirror = mirrorScale;
-        setSpriteFrame(domData.sprite, sheetRow, undefined, mirrorScale);
+        domData._lastMirror = mirror;
+        setSpriteFrame(domData.sprite, sheetRow, undefined, mirror);
     }
 }
 
@@ -218,8 +263,8 @@ export function resetEnemy(renderer, thingIndex, thingType, x, y, floorHeight) {
         }
     }
     // Force the next updateEnemyRotation tick to rewrite --heading:
-    // killEnemy left it on the death row (6), which would otherwise
-    // stick if the post-respawn rotation matches the cached value.
+    // killEnemy left it on the death row, which would otherwise stick
+    // if the post-respawn rotation happens to match the cached value.
     domData._lastHeading = undefined;
     domData._lastMirror = undefined;
     domData.element.style.setProperty('--x', x);
@@ -408,15 +453,19 @@ const PLAYER_CORPSE_VARIANT = ['', '-red', '-indigo', '-brown'];
 
 /**
  * Spawns a player corpse at the given position in this renderer's scene
- * tree. Static decoration (single PLAYN0 sprite, billboarded to face the
- * viewer) — doesn't enter state.things, has no game-state interaction.
- * Persists for the rest of the match; cleared on next renderer.clear().
+ * tree. Static decoration (single PLAYN0 / PLAYW0 sprite, billboarded to
+ * face the viewer) — doesn't enter state.things, has no game-state
+ * interaction. Persists for the rest of the match; cleared on next
+ * renderer.clear().
  *
  * `playerIndex` selects the recolored variant so a red player drops a red
- * corpse instead of reverting to the default green sprite.
+ * corpse instead of reverting to the default green sprite. `gib=true`
+ * uses the PLAYW0 (gib pile) sprite instead of PLAYN0 — the visual
+ * residue of an extreme/xdeath kill (rocket etc.).
  */
-export function createCorpse(renderer, x, y, floorHeight, sectorIndex, playerIndex = 0) {
+export function createCorpse(renderer, x, y, floorHeight, sectorIndex, playerIndex = 0, gib = false) {
     const variant = PLAYER_CORPSE_VARIANT[playerIndex] ?? '';
+    const base = gib ? 'PLAYW0' : 'PLAYN0';
     const container = document.createElement('div');
     container.className = 'decoration corpse';
     container.style.setProperty('--x', x);
@@ -424,7 +473,7 @@ export function createCorpse(renderer, x, y, floorHeight, sectorIndex, playerInd
     container.style.setProperty('--floor-z', floorHeight);
 
     const img = document.createElement('img');
-    img.src = `/assets/sprites/PLAYN0${variant}.png`;
+    img.src = `/assets/sprites/${base}${variant}.png`;
     img.draggable = false;
     container.appendChild(img);
 
