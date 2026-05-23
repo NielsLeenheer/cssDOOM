@@ -172,7 +172,14 @@ export async function connectToNetworkRoom({
     iceServers = null,
 } = {}) {
     const resolvedIceServers = iceServers ?? await fetchIceServers();
-    const wsUrl = `${signalingUrl}?room=${encodeURIComponent(roomCode)}&role=join`;
+    // Normalize at the transport boundary — every entry point that
+    // produces a roomCode (URL ?join=, QR scan, typed input) flows
+    // through here on its way to the signaling WS, so doing it once
+    // means callers can stop remembering. The host's signaling room
+    // is always registered uppercase (generated alphabet + ?server
+    // uppercases in app.js), so a joiner typing `?join=abcd` would
+    // otherwise hit a 404 against an `ABCD` room.
+    const wsUrl = `${signalingUrl}?room=${encodeURIComponent(roomCode.toUpperCase())}&role=join`;
     const ws = new WebSocket(wsUrl);
 
     return new Promise((resolve, reject) => {
@@ -327,7 +334,13 @@ export function listenForNetworkClients({
     const iceServersPromise = iceServers != null
         ? Promise.resolve(iceServers)
         : fetchIceServers();
-    const wsUrl = `${signalingUrl}?room=${encodeURIComponent(roomCode)}&role=master`;
+    // Normalize at the transport boundary — see the matching comment
+    // in connectToNetworkRoom. setActiveRoomCode in network-host.js
+    // already uppercases the ?server= URL parameter, and
+    // generateRoomCode picks from an uppercase-only alphabet, so
+    // realistically the inbound code is already uppercase here. Belt-
+    // and-suspenders against a future caller that bypasses those.
+    const wsUrl = `${signalingUrl}?room=${encodeURIComponent(roomCode.toUpperCase())}&role=master`;
 
     // peerId → { pc, dc, pendingIce, transportResolved }
     const peers = new Map();

@@ -54,7 +54,11 @@ const CONNECT_RETRY_DELAY_MS = 2000;
 
 export class RemoteGame {
     constructor({ roomCode, orchestrator }) {
-        this.roomCode = roomCode;
+        // Normalize to uppercase so the splash text matches what the
+        // transport actually sends (uppercased there too). A user
+        // typing ?join=abcd would otherwise see "CONNECTING TO ROOM
+        // abcd" while the WS resolves against `ABCD`.
+        this.roomCode = roomCode ? roomCode.toUpperCase() : roomCode;
         this.orchestrator = orchestrator;
 
         this._state = 'CONNECTING';
