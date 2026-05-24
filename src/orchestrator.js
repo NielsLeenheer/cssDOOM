@@ -258,6 +258,34 @@ class Orchestrator {
         return null;
     }
 
+    /**
+     * Reserve a remote slot for a peer that isn't ready to bind yet —
+     * the mid-match-join case where the joiner connects but has to
+     * wait for the next lobby phase before getting a player. The
+     * placeholder entry in `_remoteBindings` makes the slot count as
+     * taken so `nextOrCurrentRemoteSlot` won't hand it out to another
+     * peer racing in during the wait. No sink, no savedDom, no audio
+     * config — just the slot. When the joiner is later promoted at
+     * lobby-open, `bindRemoteSlot` replaces this entry with the real
+     * binding (its `previous` lookup transparently handles the
+     * upgrade).
+     *
+     * Idempotent — re-reserving the same peer is a no-op so the
+     * snapshotProvider can call this on every LOOKING retry without
+     * worrying about duplicate state.
+     */
+    reserveRemoteSlot(slot, peerKey) {
+        if (this._remoteBindings.has(peerKey)) return;
+        this._remoteBindings.set(peerKey, {
+            slot,
+            sink: null,
+            savedDom: null,
+            unbindGraceTimer: null,
+            suppressAudio: false,
+            reserved: true,
+        });
+    }
+
     /** Returns the slot bound to the given peerKey, or null. */
     currentRemoteSlot(peerKey) {
         return this._remoteBindings.get(peerKey)?.slot ?? null;

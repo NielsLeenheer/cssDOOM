@@ -99,6 +99,15 @@ export const MSG = {
     // that one fires before WebRTC; this one fires after the data
     // channel is open and the joiner is in handshake.
     REFUSED: 'refused',
+    // Master → client: "I see you but I'm not ready to seat you yet."
+    // Sent in place of ACK when master is mid-match — the joiner has
+    // to wait for the next lobby phase to start before they can be
+    // assigned a slot. Joiner shows a "waiting" status and the
+    // existing LOOKING retry timer keeps polling; once master returns
+    // to LOBBY, the next LOOKING gets a real ACK and the joiner
+    // bootstraps normally. No payload — the joiner's UI doesn't need
+    // any per-master detail to render the wait.
+    WAIT: 'wait',
 };
 
 // Heartbeat: master pings every PING_INTERVAL_MS; if no pong arrives within

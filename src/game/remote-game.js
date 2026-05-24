@@ -193,6 +193,11 @@ export class RemoteGame {
             // the transport, transition to FAILED. No retry — the
             // refusal is terminal until a remote leaves.
             onRefused: (reason) => this._onRefused(reason),
+            // Master saw the LOOKING but isn't ready to seat us yet
+            // (mid-match). Show a waiting message; ClientConnection's
+            // LOOKING retry keeps polling. Once master returns to
+            // LOBBY the next retry gets ACK and _onAck runs normally.
+            onWait: () => setLoadingStatus('WAITING FOR CURRENT GAME TO END'),
         });
 
         domRendererManager.startCullingLoop({

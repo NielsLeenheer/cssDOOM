@@ -219,6 +219,15 @@ export class MasterConnection {
         if (msg.type === MSG.LOOKING) {
             if (this.paused) return;
             const payload = this.snapshotProvider ? this.snapshotProvider(session.peerKey) : {};
+            // Mid-match (or any non-lobby state where slot assignment
+            // shouldn't happen yet) — tell the joiner to wait. The
+            // peer session stays not-alive; the existing LOOKING retry
+            // keeps polling, and once master returns to LOBBY the
+            // next LOOKING will get a real ACK.
+            if (payload.wait) {
+                this._postTo(session, { type: MSG.WAIT });
+                return;
+            }
             // No slot available — kiosk DM with both remote slots
             // already filled, or a tighter mode-specific cap. Refuse
             // terminally instead of ACKing; the joiner will surface
@@ -471,15 +480,22 @@ export class MasterConnection {
  *   Master terminally refused the join (no slot available, etc.). The
  *   transport will close shortly after; callers should transition to
  *   FAILED, surface `reason` to the user, and stop retrying.
+ * @param {() => void} [options.onWait]
+ *   Master sees us but isn't ready to seat us yet (mid-match). The
+ *   LOOKING retry timer keeps polling automatically; this callback is
+ *   purely for UI ("WAITING FOR CURRENT GAME TO END…"). Fires on
+ *   every WAIT response so the splash stays current if a transient
+ *   state flip happened.
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup, onRefused } = {}) {
+    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup, onRefused, onWait } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
         this.onPlay = onPlay;
         this.onCatchup = onCatchup;
         this.onRefused = onRefused;
+        this.onWait = onWait;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -531,6 +547,11 @@ export class ClientConnection extends PeerConnectionBase {
                 this._lookingTimer = null;
             }
             this.onRefused?.(msg.reason);
+        } else if (msg.type === MSG.WAIT) {
+            // Master isn't ready to seat us yet (mid-match). Leave the
+            // LOOKING retry running so we re-poll automatically; the
+            // callback is just for the splash text.
+            this.onWait?.();
         }
     }
 

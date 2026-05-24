@@ -21,6 +21,7 @@
  */
 
 import { state } from './game/state.js';
+import { GAME_STATE, getGameState } from './game/game-state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
 import { updateCamera, updateHud } from './renderer/index.js';
@@ -203,18 +204,55 @@ function setupMasterBroadcast() {
     });
 
     masterConnection = initMasterConnection({
-        snapshotProvider: (peerKey) => ({
-            gameMode: state.gameMode,
-            // Only advertise a level if one is actually loaded. Without
-            // this gate, a master that entered Network DM via menu from
-            // another mode keeps `currentMap` set to the old level and
-            // joiners would loadMap on it during the lobby phase (and
-            // render the stale world instead of the lobby UI). Once the
-            // host fires the match start, the Level registry populates
-            // and joiners then arrive into the live level.
-            level: getCurrentLevel() ? (pendingLevel ?? currentMap) : null,
-            slotIndex: orchestrator.nextOrCurrentRemoteSlot(peerKey),
-        }),
+        snapshotProvider: (peerKey) => {
+            // Local DM secondary always gets a full payload — it lives
+            // outside the wait/reserve flow (single peer, always one
+            // slot, always lobby-eligible since Local DM doesn't have
+            // the same mid-match wait semantics).
+            if (peerKey === 'local') {
+                return {
+                    gameMode: state.gameMode,
+                    level: getCurrentLevel() ? (pendingLevel ?? currentMap) : null,
+                    slotIndex: orchestrator.nextOrCurrentRemoteSlot(peerKey),
+                };
+            }
+
+            // Allocate (or reuse) a slot on the first LOOKING and hold
+            // onto it via orchestrator.reserveRemoteSlot. Doing the
+            // reservation NOW — even in mid-match where the joiner
+            // will be told to wait — means peers queue in connection
+            // order rather than racing the LOOKING retry timer when
+            // the next lobby phase opens. Returning slotIndex:null
+            // here (allocator exhausted) is the cue MasterConnection
+            // uses to send MSG.REFUSED room-full to overflow peers.
+            const slot = orchestrator.nextOrCurrentRemoteSlot(peerKey);
+            if (slot == null) return {}; // → REFUSED
+
+            const inLobby = getGameState() === GAME_STATE.LOBBY;
+            if (!inLobby) {
+                // Mid-match — reserve the slot but signal the joiner
+                // to wait. When master returns to LOBBY, the joiner's
+                // next LOOKING retry falls through to the full-payload
+                // branch below; bindRemoteSlot upgrades the reservation
+                // into a real binding (its `previous` lookup picks
+                // up the placeholder entry and replaces it).
+                orchestrator.reserveRemoteSlot(slot, peerKey);
+                return { wait: true, slotIndex: slot };
+            }
+
+            return {
+                gameMode: state.gameMode,
+                // Only advertise a level if one is actually loaded. Without
+                // this gate, a master that entered Network DM via menu from
+                // another mode keeps `currentMap` set to the old level and
+                // joiners would loadMap on it during the lobby phase (and
+                // render the stale world instead of the lobby UI). Once the
+                // host fires the match start, the Level registry populates
+                // and joiners then arrive into the live level.
+                level: getCurrentLevel() ? (pendingLevel ?? currentMap) : null,
+                slotIndex: slot,
+            };
+        },
         onRemoteInput: (msg, _peerKey) => applyRemoteInput(msg),
         onJoin: (payload, peerKey) => {
             const slot = payload.slotIndex;
