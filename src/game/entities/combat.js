@@ -270,11 +270,23 @@ export function damageEnemy(target, damage, source) {
                 setEnemyState(thingIndex, target, 'pain');
             }
 
-            // Infighting retarget: if the source is another enemy (not a Player,
-            // not self-damage, not null), and the target isn't locked on a chase
-            // target (threshold === 0), retarget to the attacker.
-            if (source && !(source instanceof Player) && source !== target
-                && target.ai.threshold <= 0) {
+            // Retarget on damage: any non-self attacker of a different type
+            // becomes the new chase target if the lock threshold has cooled.
+            // Covers both infighting (enemy hit by another enemy of a
+            // different type — preserves the "monsters in-fight" feature)
+            // and the player "fight back" case (enemy hit by a player turns
+            // on that player).
+            //
+            // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() lines ~770-790
+            // Accuracy: Exact — DOOM sets target->target = source for any
+            // attacker of a different type once threshold expires, with no
+            // special-case for player sources. The prior code excluded
+            // Player sources entirely, which let a player shoot a chasing
+            // enemy in the back without ever drawing aggro — also masked
+            // AI-targeting issues for mid-match joiners whose arrival
+            // never disturbs already-locked enemies.
+            if (source && source !== target && target.ai.threshold <= 0
+                && (source instanceof Player || source.type !== target.type)) {
                 target.ai.target = source;
                 target.ai.threshold = INFIGHTING_THRESHOLD;
             }
