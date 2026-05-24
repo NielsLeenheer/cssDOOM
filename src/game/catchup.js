@@ -116,16 +116,28 @@ function appendWorldCmds(out) {
 }
 
 /**
- * Each live player's billboard, addressed by the thingIndex assigned
- * in addPlayerThings. createPlayerSprite is idempotent — no-op when
- * the sprite already exists in the receiver's sceneState, so panes
- * that already have the billboard are not disturbed.
+ * Each player's billboard, addressed by the thingIndex assigned in
+ * addPlayerThings. createPlayerSprite is idempotent — no-op when the
+ * sprite already exists in the receiver's sceneState, so panes that
+ * already have the billboard are not disturbed.
+ *
+ * Dead players still need the createPlayerSprite call so the joiner's
+ * sceneState has a DOM entry at thingIndex — without it, the eventual
+ * uncollectItem / resetEnemy fired by spawnPlayer on respawn has
+ * nothing to act on and the player stays invisible. To match the
+ * world's actual state, follow up with killEnemy + collectItem so the
+ * live sprite is hidden in the joiner's pane. The persistent corpse
+ * decoration rides separately through appendCorpseCmds, so a refresh
+ * after the 1.4s death-animation timeout sees the corpse but not a
+ * resurrected alive sprite at the death point.
  */
 function appendPlayerSpriteCmds(out) {
-    const tuples = [];
+    const createTuples = [];
+    const killTuples = [];
+    const collectTuples = [];
     for (const player of state.players) {
         if (!player?.thingRef || player.thingIndex == null) continue;
-        tuples.push([
+        createTuples.push([
             player.thingIndex,
             player.index,
             player.x,
@@ -133,8 +145,17 @@ function appendPlayerSpriteCmds(out) {
             player.floorHeight,
             getSectorAt(player.x, player.y)?.sectorIndex,
         ]);
+        if (player.isDead) {
+            // type=-1 mirrors damage.js's killEnemy call for a player
+            // death; gibbed pulled off the thingRef so the catchup
+            // sees the same overkill state the death animation used.
+            killTuples.push([player.thingIndex, -1, true, player.thingRef.gibbed === true]);
+            collectTuples.push([player.thingIndex]);
+        }
     }
-    if (tuples.length) out.push({ name: 'createPlayerSprite', args: tuples });
+    if (createTuples.length) out.push({ name: 'createPlayerSprite', args: createTuples });
+    if (killTuples.length)   out.push({ name: 'killEnemy',          args: killTuples });
+    if (collectTuples.length) out.push({ name: 'collectItem',       args: collectTuples });
 }
 
 function appendThingCmds(out) {
