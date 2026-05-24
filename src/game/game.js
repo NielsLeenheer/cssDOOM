@@ -441,12 +441,29 @@ export class Game {
             }
         }
 
+        // DM: pick a DM start (type-11 thing), reset stats to DM
+        // defaults, fire spawn-fog + DSTELEPT for each player. Done
+        // HERE (right when the match actually begins) rather than at
+        // restartMatch time so the teleport sound + visual don't
+        // leak into the network-lobby phase that comes between match
+        // end and the host's next fire-to-start. SP isn't covered —
+        // Level.load's applyPlayerStart already positions the lone
+        // player at the map's PLAYER START and SP has no spawn-fog
+        // convention.
+        if (this.gameMode === 'deathmatch') {
+            for (const player of this.roster) {
+                if (player) spawnPlayer(player);
+            }
+        }
+
         // Fan the player billboards out NOW — every receiving
         // renderer's scene is built (master's local renderers from
         // Level.load's awaited orchestrator.loadMap; remote joiners
         // confirmed by awaitAllReadyToPlay above). Doing this earlier
         // would race the joiners' still-building scenes and drop the
-        // create on the floor.
+        // create on the floor. spawnPlayer above already updated each
+        // player's x/y/floorHeight so the sprite spawns at the DM
+        // start, not the Level.load PLAYER START fallback.
         broadcastPlayerSprites();
 
         this.level.start();
@@ -530,14 +547,14 @@ export class Game {
         this.level.start();
         _setCurrentLevel(this.level);
 
-        // Level.load's clearSceneState clears isDead+powerups but
-        // doesn't reset HP / weapons / ammo / keys. spawnPlayer
-        // does the full reset to DM defaults + picks a DM start
-        // avoiding nearby players. Apply to every roster slot so
-        // dead and damaged players both come back fresh.
-        for (const player of this.roster) {
-            if (player) spawnPlayer(player);
-        }
+        // DM spawn (full stat reset + DM start pick + teleport fog
+        // + DSTELEPT) is deferred to beginPlay so the audio/visual
+        // doesn't fire during the lobby phase between matches.
+        // Level.load above already cleared state.things and
+        // re-positioned players at PLAYER START via applyPlayerStart,
+        // which is enough world state for the lobby UI to sit over;
+        // beginPlay's DM-spawn loop handles the proper DM-start
+        // reposition + stat reset when the host fires to begin.
 
         // On kiosk where claims persist across matches, all slots
         // are typically still claimed when the new lobby opens. The
