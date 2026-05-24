@@ -138,12 +138,26 @@ export class RemoteGame {
                 } catch (err) {
                     lastErr = err;
                     console.warn(`[remote-game] connect attempt ${attempt + 1} failed:`, err.message ?? err);
-                    // Worker refusals (room full, room not found) are
-                    // not transient — no point retrying. Show the
-                    // specific reason and abort the loop.
-                    if (err?.code === 'room-full' || err?.code === 'room-not-found') break;
+                    // `room-full` is terminal — the room exists, all
+                    // seats are taken, retrying won't change that until
+                    // someone leaves. `room-not-found` IS transient,
+                    // though: when the host refreshes mid-session the
+                    // worker's Durable Object briefly forgets the room
+                    // until the new host page reopens its WS. Retry
+                    // through the normal window so connected joiners
+                    // can recover from a host reload; a genuine wrong
+                    // code just falls through to the same terminal
+                    // splash after the retries exhaust.
+                    if (err?.code === 'room-full') break;
                     if (attempt < CONNECT_RETRIES - 1) {
-                        setLoadingStatus(`CONNECTION FAILED\nRETRYING ${attempt + 2} / ${CONNECT_RETRIES}`);
+                        // First couple of attempts are normal — a host
+                        // refresh or signaling blip resolves inside
+                        // ~4s, so don't alarm the user with "CONNECTION
+                        // FAILED" yet. Only escalate once we're past
+                        // the silent retry window.
+                        if (attempt >= 1) {
+                            setLoadingStatus('CONNECTION FAILED\nRETRYING...');
+                        }
                         await new Promise(r => setTimeout(r, CONNECT_RETRY_DELAY_MS));
                     }
                 }
