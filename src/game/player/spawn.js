@@ -18,6 +18,7 @@ import { getFloorHeightAt, getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
 import * as renderer from '../../renderer/index.js';
 import { getCurrentLevel } from '../level.js';
+import { addPlayerThing } from './start.js';
 
 // Don't spawn a player within this distance of any living player. Picked
 // to be a generous safety radius — about 4× player radius so the spawning
@@ -63,6 +64,22 @@ export function spawnPlayer(player) {
     player.isDead = false;
     player.deathTime = 0;
     player._hudDirty = true;
+
+    // Mid-match joiner path: the player was created by ensurePlayerCount
+    // after Level.load already ran, so they have no thing entry and no
+    // sprite in any pane. Create both now — addPlayerThing pushes into
+    // state.things; createPlayerSprite fans out via the world dispatch
+    // so every existing renderer (master locals + already-connected
+    // sinks) materialises the billboard. Both are idempotent at the
+    // receiver, so the reposition/uncollect blocks below remain safe.
+    if (!player.thingRef) {
+        addPlayerThing(player);
+        const sectorIndex = getSectorAt(player.x, player.y)?.sectorIndex;
+        renderer.createPlayerSprite(
+            player.thingIndex, player.index,
+            player.x, player.y, player.floorHeight, sectorIndex,
+        );
+    }
 
     // Reactivate the player's thing entry: collisions / AI / hitscan see
     // them again; sprite is visible at the new position.

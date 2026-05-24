@@ -104,7 +104,7 @@ function applyDeathmatchStarts() {
  * fan-out is handled by broadcastPlayerSprites once every receiving
  * renderer's scene is built.
  */
-function addPlayerThing(player) {
+export function addPlayerThing(player) {
     if (player.thingRef) return;
     const thingRef = {
         kind: 'player',

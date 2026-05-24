@@ -46,6 +46,7 @@ import { applyRemoteInput, clearRemoteSlot } from './input/remote.js';
 import { ensureMatchSize } from './game/match.js';
 import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
+import { config } from '../config.js';
 
 
 // ── Debug toggle ───────────────────────────────────────────────────────
@@ -254,7 +255,7 @@ function setupMasterBroadcast() {
             if (slot == null) return {}; // → REFUSED
 
             const inLobby = getGameState() === GAME_STATE.LOBBY;
-            if (!inLobby && !isReattach) {
+            if (!inLobby && !isReattach && !config.network.allowMidGameJoin) {
                 // Mid-match new joiner — reserve the slot but signal
                 // the joiner to wait. When master returns to LOBBY,
                 // the joiner's next LOOKING retry falls through to the
@@ -266,6 +267,9 @@ function setupMasterBroadcast() {
                 // immediately: their old binding is still in
                 // _remoteBindings (within RECONNECT_GRACE_MS), so we
                 // want them seated again without a lobby-cycle wait.
+                // The allowMidGameJoin config flag bypasses this gate
+                // entirely — the full-payload branch below seats and
+                // spawns the joiner into the running match.
                 orchestrator.reserveRemoteSlot(slot, key);
                 return { wait: true, slotIndex: slot };
             }
@@ -359,17 +363,21 @@ function setupMasterBroadcast() {
             // fresh AudioRenderer for the new slot if needed
             // (suppressed slots get filtered out inside the rebuild).
             orchestrator.configureAudio([...state.players.keys()]);
-            // If this slot's player is currently marked dead (typically
-            // because the previous peer here disconnected — onLeave
-            // flags isDead so the abandoned slot drops out of the
-            // visible world), respawn them now. Without this, the
-            // gameLoop's "every player dead → freeze world" gate stays
-            // engaged whenever the host happens to also be dead, and
-            // the joiner sees nothing until the host fires-to-respawn.
-            // Only meaningful once a match is live (level loaded);
-            // pre-match the lobby still controls slot assignment.
+            // Spawn the slot's player into the live world when either:
+            //   - they're marked dead (the previous peer here
+            //     disconnected and onLeave flagged isDead so the
+            //     abandoned slot dropped out of the visible world), or
+            //   - they have no thingRef yet (a fresh mid-match joiner
+            //     under config.network.allowMidGameJoin — ensurePlayerCount
+            //     just created a Player but hasn't placed it).
+            // Without this, the gameLoop's "every player dead → freeze
+            // world" gate stays engaged whenever the host happens to
+            // also be dead, and the joiner sees nothing until the host
+            // fires-to-respawn. Only meaningful once a match is live
+            // (level loaded); pre-match the lobby still controls slot
+            // assignment.
             const player = state.players[slot];
-            if (player && player.isDead && getCurrentLevel()) {
+            if (player && getCurrentLevel() && (player.isDead || !player.thingRef)) {
                 spawnPlayer(player);
             }
         },
