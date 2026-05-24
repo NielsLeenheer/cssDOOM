@@ -313,23 +313,45 @@ export function findVisibleTargetForEnemy(enemy) {
  * findVisibleTargetForEnemy and resets the lock threshold.
  *
  * Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines ~470-490
- * Accuracy: Exact — same "target dead → threshold=0 → P_LookForPlayers" flow.
+ * Accuracy: Exact — target dead → P_LookForPlayers; if it returns false
+ * (no visible player) the enemy goes back to its spawn state (A_Look /
+ * idle). Returns null in that case so the caller can short-circuit the
+ * frame and let idle's losTimer scan run on the next tick.
  */
-function resolveTarget(enemy, deltaTime) {
+function resolveTarget(enemy, deltaTime, thingIndex) {
     const enemyAI = enemy.ai;
 
-    if (enemyAI.target instanceof Player) {
-        // Player target — re-acquire if they died (DM scenario; SP is gated
-        // upstream so this only fires when one of N players dies).
-        if (enemyAI.target.isDead) {
-            enemyAI.target = findVisibleTargetForEnemy(enemy);
-            enemyAI.threshold = 0;
-        }
-    } else {
-        // Infighting target (another enemy) — check if it's still alive
-        if (enemyAI.target.collected || enemyAI.target.hp <= 0) {
-            enemyAI.target = findVisibleTargetForEnemy(enemy);
-            enemyAI.threshold = 0;
+    const playerTarget = enemyAI.target instanceof Player;
+    const targetGone = playerTarget
+        ? enemyAI.target.isDead
+        : (enemyAI.target.collected || enemyAI.target.hp <= 0);
+
+    if (targetGone) {
+        // findVisibleTargetForEnemy returns its bestAny fallback (nearest
+        // player by distance, no LOS) when nothing is in sight. Committing
+        // to that fallback leaves the enemy in 'chasing' state walking
+        // toward a player it can't actually see — the visible symptom is
+        // a passive-looking enemy that never attacks. Re-check LOS here
+        // and drop back to idle if there's no visible target, matching
+        // DOOM's A_Chase → P_LookForPlayers(false) → P_SetMobjState(actor,
+        // info->spawnstate) flow.
+        //
+        // Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines ~470-490
+        // and linuxdoom-1.10/p_enemy.c:P_LookForPlayers() (the visibility
+        // gate inside the look loop).
+        const newTarget = findVisibleTargetForEnemy(enemy);
+        const isVisible = newTarget
+            && hasLineOfSight(enemy.x, enemy.y, newTarget.x, newTarget.y);
+        // Refresh enemyAI.target either way so subsequent ticks don't
+        // re-trigger this branch on the same stale dead reference. When
+        // no living player exists at all (rare; AI is gated upstream when
+        // every player is dead) state.players[0] is a safe sentinel — it
+        // never gets read because we return null below.
+        enemyAI.target = newTarget ?? state.players[0];
+        enemyAI.threshold = 0;
+        if (!isVisible) {
+            setEnemyState(thingIndex, enemy, 'idle');
+            return null;
         }
     }
 
@@ -354,7 +376,13 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
     enemyAI.stateTime += deltaTime;
 
     // Resolve who the enemy is targeting (player or another enemy via infighting)
-    const targetPos = resolveTarget(enemy, deltaTime);
+    const targetPos = resolveTarget(enemy, deltaTime, thingIndex);
+    if (!targetPos) {
+        // Target died and nobody else is visible — resolveTarget already
+        // transitioned us to idle. Skip this frame's state machine; the
+        // idle losTimer scan runs naturally on the next tick.
+        return;
+    }
     const deltaX = targetPos.x - enemy.x;
     const deltaY = targetPos.y - enemy.y;
     const distSqToTarget = deltaX * deltaX + deltaY * deltaY;
