@@ -203,8 +203,29 @@ function setupMasterBroadcast() {
         masterConnection?.resumeAfterLevelLoad();
     });
 
+    // Use cid (the URL-derived stable identity) as the orchestrator
+    // binding key for Network DM remotes; fall back to peerKey for
+    // Local DM secondary ('local') and for any client that didn't
+    // send a cid. Centralised here so all orchestrator calls speak
+    // the same identity scheme.
+    const bindingKey = (peerKey, cid) => cid ?? peerKey;
+
+    // Two-stage grace for Network DM disconnects:
+    //   - ALIVE_GRACE_MS: keep the player alive in-world during a brief
+    //     blip (page reload, momentary signal loss). If the same cid
+    //     reattaches inside this window, no death and no respawn — the
+    //     match just continues.
+    //   - BINDING_GRACE_MS: after the alive grace expires the player
+    //     dies, but their cid → slot reservation lingers so a later
+    //     reattach reclaims the same slot and respawns there. Past
+    //     this point the cid is forgotten and a reconnect is treated
+    //     as a brand-new joiner.
+    const ALIVE_GRACE_MS = 1000;
+    const BINDING_GRACE_MS = 30000;
+    const aliveGraceTimers = new Map(); // cid → timeoutId
+
     masterConnection = initMasterConnection({
-        snapshotProvider: (peerKey) => {
+        snapshotProvider: (peerKey, cid) => {
             // Local DM secondary always gets a full payload — it lives
             // outside the wait/reserve flow (single peer, always one
             // slot, always lobby-eligible since Local DM doesn't have
@@ -217,6 +238,7 @@ function setupMasterBroadcast() {
                 };
             }
 
+            const key = bindingKey(peerKey, cid);
             // Allocate (or reuse) a slot on the first LOOKING and hold
             // onto it via orchestrator.reserveRemoteSlot. Doing the
             // reservation NOW — even in mid-match where the joiner
@@ -225,18 +247,26 @@ function setupMasterBroadcast() {
             // the next lobby phase opens. Returning slotIndex:null
             // here (allocator exhausted) is the cue MasterConnection
             // uses to send MSG.REFUSED room-full to overflow peers.
-            const slot = orchestrator.nextOrCurrentRemoteSlot(peerKey);
+            // Keyed by `cid` so a refreshing joiner (signaling peerId
+            // churns but URL cid persists) finds their previous slot.
+            const isReattach = orchestrator.isBoundRemoteSlot(key);
+            const slot = orchestrator.nextOrCurrentRemoteSlot(key);
             if (slot == null) return {}; // → REFUSED
 
             const inLobby = getGameState() === GAME_STATE.LOBBY;
-            if (!inLobby) {
-                // Mid-match — reserve the slot but signal the joiner
-                // to wait. When master returns to LOBBY, the joiner's
-                // next LOOKING retry falls through to the full-payload
-                // branch below; bindRemoteSlot upgrades the reservation
-                // into a real binding (its `previous` lookup picks
-                // up the placeholder entry and replaces it).
-                orchestrator.reserveRemoteSlot(slot, peerKey);
+            if (!inLobby && !isReattach) {
+                // Mid-match new joiner — reserve the slot but signal
+                // the joiner to wait. When master returns to LOBBY,
+                // the joiner's next LOOKING retry falls through to the
+                // full-payload branch below; bindRemoteSlot upgrades
+                // the reservation into a real binding (its `previous`
+                // lookup picks up the placeholder entry and replaces
+                // it). The isReattach guard lets a refreshing
+                // already-active joiner bypass this and re-ACK
+                // immediately: their old binding is still in
+                // _remoteBindings (within RECONNECT_GRACE_MS), so we
+                // want them seated again without a lobby-cycle wait.
+                orchestrator.reserveRemoteSlot(slot, key);
                 return { wait: true, slotIndex: slot };
             }
 
@@ -254,11 +284,20 @@ function setupMasterBroadcast() {
             };
         },
         onRemoteInput: (msg, _peerKey) => applyRemoteInput(msg),
-        onJoin: (payload, peerKey) => {
+        onJoin: (payload, peerKey, cid) => {
             const slot = payload.slotIndex;
             if (slot == null) {
                 console.warn('[broadcast] client join refused — no free slots');
                 return;
+            }
+            const key = bindingKey(peerKey, cid);
+            // Cancel any pending alive-grace death for this cid — the
+            // peer reattached inside the window, so the player should
+            // keep walking instead of dying + respawning.
+            const pendingDeath = aliveGraceTimers.get(key);
+            if (pendingDeath != null) {
+                clearTimeout(pendingDeath);
+                aliveGraceTimers.delete(key);
             }
             // Don't mark slot as externally claimed: the Local DM secondary
             // is display-only, master's local kbm-B / gamepad must still
@@ -270,7 +309,7 @@ function setupMasterBroadcast() {
             // Default false matches Local DM (secondary calls
             // setAudioEnabled(false), so master keeps playing both slots).
             const suppressAudio = masterConnection.playsAudioLocallyFor(peerKey);
-            orchestrator.bindRemoteSlot(slot, transport, peerKey, { suppressAudio });
+            orchestrator.bindRemoteSlot(slot, transport, key, { suppressAudio });
             // Mirror the connection into the network lobby UI when we're
             // in network mode and this is an actual remote (not the
             // Local DM 'local' BroadcastChannel peer).
@@ -281,11 +320,12 @@ function setupMasterBroadcast() {
                 setNetworkSlotOccupant(slot, 'remote');
             }
         },
-        onReady: (peerKey) => {
+        onReady: (peerKey, cid) => {
             // Client has confirmed its RenderClient is subscribed. NOW
             // it's safe to fire the initial-state catch-up — the
             // commands these produce land on a listening transport.
-            const slot = orchestrator.currentRemoteSlot(peerKey);
+            const key = bindingKey(peerKey, cid);
+            const slot = orchestrator.currentRemoteSlot(key);
             if (slot == null) return;
 
             // Catchup envelope: world (mechanics, things, corpses,
@@ -333,11 +373,12 @@ function setupMasterBroadcast() {
                 spawnPlayer(player);
             }
         },
-        onLeave: (peerKey) => {
+        onLeave: (peerKey, cid) => {
+            const key = bindingKey(peerKey, cid);
             // Capture the slot before unbinding — the orchestrator
             // forgets the peer after unbindRemoteSlot, and we need
             // the slot index to clear its row in the network lobby UI.
-            const slot = orchestrator.currentRemoteSlot(peerKey);
+            const slot = orchestrator.currentRemoteSlot(key);
             // Zero this slot's cached analog snapshot so the departed
             // peer's last movement values don't bleed into a rebound
             // slot (next peer to take it, or the host's local roster
@@ -351,27 +392,49 @@ function setupMasterBroadcast() {
             // other already-in-sync local renderers and remote sinks
             // aren't disturbed by re-fired non-idempotent commands
             // like createCorpse.
-            orchestrator.unbindRemoteSlot(peerKey, {
+            // For Network DM, keep the orchestrator binding alive for
+            // BINDING_GRACE_MS so the cid → slot reservation survives
+            // long enough for a reattach to reclaim the same slot
+            // without going through the mid-match wait gate. Local DM
+            // and any non-cid peer use the orchestrator default (the
+            // short visual-rebuild window).
+            const isNetworkRemote = state.networkMode === 'host' && peerKey !== 'local';
+            orchestrator.unbindRemoteSlot(key, {
                 onGraceRebuilt: (rebuiltRenderer) => {
                     applyCatchupCmds(rebuiltRenderer, buildCatchup(slot));
                 },
+                // Network DM: hold the cid → slot binding for the long
+                // window so a late reattach reclaims the same slot. The
+                // visual-rebuild grace uses the orchestrator default,
+                // which is already aligned with ALIVE_GRACE_MS so a
+                // mid-refresh peer's pane doesn't flash master's local
+                // view before the player would die.
+                ...(isNetworkRemote ? { bindingGraceMs: BINDING_GRACE_MS } : {}),
             });
-            if (state.networkMode === 'host' && peerKey !== 'local' && slot != null) {
-                // Mark the departed player as dead + collected so they
-                // drop out of the visible world (no sprite, no collision)
-                // but their state.players entry and scoreboard row stay
-                // until match end. A reconnect at the same slot would
-                // reuse the same Player and re-spawn them.
-                const player = state.players[slot];
-                if (player) {
-                    player.isDead = true;
-                    if (player.thingRef) player.thingRef.collected = true;
-                }
-                // setNetworkSlotOccupant emits a lobby-state change;
-                // Game's onLobbyChange subscriber repaints (the
-                // remaining connected joiners drop the departed peer's
-                // row to "WAITING FOR PLAYER" via that path).
-                setNetworkSlotOccupant(slot, 'empty');
+            if (isNetworkRemote && slot != null) {
+                // Two-stage grace: defer the player-dies / slot-empty
+                // transition by ALIVE_GRACE_MS. A reattach inside that
+                // window cancels this timer in onJoin above, so the
+                // player never dies and no respawn happens. After it
+                // fires, the slot is visibly empty but the cid still
+                // owns it until BINDING_GRACE_MS — a later reattach
+                // respawns into the same slot (onReady's spawn-if-dead
+                // path).
+                const prevTimer = aliveGraceTimers.get(key);
+                if (prevTimer != null) clearTimeout(prevTimer);
+                aliveGraceTimers.set(key, setTimeout(() => {
+                    aliveGraceTimers.delete(key);
+                    const player = state.players[slot];
+                    if (player) {
+                        player.isDead = true;
+                        if (player.thingRef) player.thingRef.collected = true;
+                    }
+                    // setNetworkSlotOccupant emits a lobby-state change;
+                    // Game's onLobbyChange subscriber repaints (the
+                    // remaining connected joiners drop the departed
+                    // peer's row to "WAITING FOR PLAYER" via that path).
+                    setNetworkSlotOccupant(slot, 'empty');
+                }, ALIVE_GRACE_MS));
             }
         },
     });

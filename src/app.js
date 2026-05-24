@@ -55,6 +55,28 @@ function readLastUsedMode() {
     }
 }
 
+/**
+ * Ensure a `?cid=` is present in the URL (the joiner's stable
+ * identity for slot reattach on refresh). Generates one when absent
+ * and rewrites the URL via history.replaceState so a reload picks it
+ * up next time. Returns the cid for handing into RemoteGame.
+ *
+ * The cid lives ONLY in the URL — not sessionStorage, not
+ * localStorage. Closing the tab and reopening the join link gives
+ * the user a fresh identity; a hard reload of the same URL keeps it.
+ * Short base36 string — collision risk is negligible compared to the
+ * benefit of "the address bar is the truth."
+ */
+function ensureClientIdInUrl() {
+    const url = new URL(location.href);
+    const existing = url.searchParams.get('cid');
+    if (existing && /^[a-z0-9]{4,16}$/i.test(existing)) return existing;
+    const cid = Math.random().toString(36).slice(2, 10);
+    url.searchParams.set('cid', cid);
+    history.replaceState(history.state, '', url.toString());
+    return cid;
+}
+
 import { Game } from './game/game.js';
 import { RemoteGame } from './game/remote-game.js';
 import { state } from './game/state.js';
@@ -236,10 +258,17 @@ export class App {
      * roomCode null → Local DM secondary (BroadcastChannel transport
      * inside ClientConnection); non-null string → Network DM remote
      * (WebRTC transport via connectToNetworkRoom).
+     *
+     * For Network DM remotes the joiner identity (`cid`) is read or
+     * generated here and written back into the URL so a hard refresh
+     * reattaches to the same slot. Local DM secondary skips cid (its
+     * peer identity is the 'local' constant — single peer, no slot
+     * race).
      */
     async joinRemoteGame(roomCode) {
         if (this.game) await this.endGame();
-        this.game = new RemoteGame({ roomCode, orchestrator });
+        const cid = roomCode ? ensureClientIdInUrl() : null;
+        this.game = new RemoteGame({ roomCode, cid, orchestrator });
         this._wireGameSubscriptions(this.game);
         await this.game.start();
         this.transitionTo('IN_GAME');

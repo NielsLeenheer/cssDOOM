@@ -67,8 +67,10 @@ const MAX_SLOTS = 4;
 // (sink → DomRenderer) happens immediately so master's per-frame commands
 // keep the local pane DOM current. The visual "show pane again" toggle is
 // deferred this long so a quickly-reloading client can reconnect
-// without the user seeing master's pane flash visible.
-const RECONNECT_GRACE_MS = 500;
+// without the user seeing master's pane flash visible. Aligned with
+// master.js's ALIVE_GRACE_MS so a Network DM refresh that keeps the
+// player alive doesn't briefly flash master's local view in between.
+const RECONNECT_GRACE_MS = 1000;
 
 // Per-player input state. `inputs[i]` is the unified input snapshot for
 // the player at state.players[i]. Lives at module scope (not on the
@@ -129,7 +131,7 @@ class Orchestrator {
         // can restore it; may be null for network-only slots that never
         // had a local pane), and the deferred-unhide grace timer.
         this._occupiedRemoteSlots = new Set();
-        this._remoteBindings = new Map(); // peerKey → { slot, sink, savedDom, unbindGraceTimer, suppressAudio }
+        this._remoteBindings = new Map(); // peerKey → { slot, sink, savedDom, unbindGraceTimer, bindingExpiryTimer, suppressAudio }
 
         // Lowest slot index a joining remote can be allocated to. Held
         // local slots (master's host, kiosk's second local) must be
@@ -281,9 +283,23 @@ class Orchestrator {
             sink: null,
             savedDom: null,
             unbindGraceTimer: null,
+            bindingExpiryTimer: null,
             suppressAudio: false,
             reserved: true,
         });
+    }
+
+    /**
+     * True iff the given key has a real binding (full or in-grace)
+     * — i.e. NOT a pure mid-match reservation. Used by master.js's
+     * snapshotProvider to tell a refreshing already-active joiner
+     * apart from a brand-new mid-match joiner: the former should
+     * bypass the wait gate and re-ACK immediately; the latter should
+     * be told to wait for the next lobby phase.
+     */
+    isBoundRemoteSlot(peerKey) {
+        const b = this._remoteBindings.get(peerKey);
+        return !!b && !b.reserved;
     }
 
     /** Returns the slot bound to the given peerKey, or null. */
@@ -395,12 +411,13 @@ class Orchestrator {
         const suppressAudio = opts.suppressAudio === true;
 
         // Mid-grace reconnect by the same peer: cancel its visual-unhide
-        // so the user doesn't see a flash, and recover its savedDom.
+        // so the user doesn't see a flash, recover its savedDom, and
+        // cancel the binding-expiry timer so the entry isn't deleted
+        // out from under us.
         const previous = this._remoteBindings.get(peerKey);
         let savedDom = previous?.savedDom ?? null;
-        if (previous?.unbindGraceTimer) {
-            clearTimeout(previous.unbindGraceTimer);
-        }
+        if (previous?.unbindGraceTimer) clearTimeout(previous.unbindGraceTimer);
+        if (previous?.bindingExpiryTimer) clearTimeout(previous.bindingExpiryTimer);
 
         // A *different* peer's binding is still mid-grace on this slot
         // (rare in practice — would mean someone left and another joined
@@ -408,8 +425,9 @@ class Orchestrator {
         // loadMap rebuild doesn't stomp the new sink's output.
         for (const [otherKey, b] of this._remoteBindings) {
             if (otherKey === peerKey) continue;
-            if (b.slot === slot && b.unbindGraceTimer) {
-                clearTimeout(b.unbindGraceTimer);
+            if (b.slot === slot && (b.unbindGraceTimer || b.bindingExpiryTimer)) {
+                if (b.unbindGraceTimer) clearTimeout(b.unbindGraceTimer);
+                if (b.bindingExpiryTimer) clearTimeout(b.bindingExpiryTimer);
                 this._remoteBindings.delete(otherKey);
                 savedDom = savedDom ?? b.savedDom;
             }
@@ -442,6 +460,7 @@ class Orchestrator {
             sink,
             savedDom: localDom ?? null,
             unbindGraceTimer: null,
+            bindingExpiryTimer: null,
             suppressAudio,
         });
 
@@ -473,7 +492,7 @@ class Orchestrator {
      * local DomRenderer (savedTarget was null) or if a reconnect
      * cancelled the grace timer.
      */
-    unbindRemoteSlot(peerKey, { onGraceRebuilt } = {}) {
+    unbindRemoteSlot(peerKey, { onGraceRebuilt, bindingGraceMs = RECONNECT_GRACE_MS } = {}) {
         const binding = this._remoteBindings.get(peerKey);
         if (!binding) return;
 
@@ -499,9 +518,9 @@ class Orchestrator {
 
         if (binding.unbindGraceTimer) clearTimeout(binding.unbindGraceTimer);
         binding.unbindGraceTimer = setTimeout(async () => {
-            // If a reconnect arrived during grace, bindRemoteSlot
+            // If a reconnect arrived during this short grace, bindRemoteSlot
             // cancelled this timer and we never reach this body.
-            this._remoteBindings.delete(peerKey);
+            binding.unbindGraceTimer = null;
             if (!savedDom) return;
             // `reload()` rebuilds against the map this renderer last
             // loaded — the renderer owns that memory so the
@@ -517,6 +536,21 @@ class Orchestrator {
             this._publishActiveRendererCount();
             onGraceRebuilt?.(savedDom);
         }, RECONNECT_GRACE_MS);
+
+        // Binding-deletion timer runs independently of the visual rebuild.
+        // Keeping the binding entry alive past the visual rebuild preserves
+        // the peerKey→slot reservation, so a late reattach (same cid)
+        // still finds `isBoundRemoteSlot` true and reclaims its slot
+        // without going through the mid-match wait gate. Master.js drives
+        // this with a long window (~30s) for Network DM cid identity;
+        // Local DM and any short-grace caller leave it at the default
+        // (matches the visual rebuild) so behaviour is unchanged.
+        if (binding.bindingExpiryTimer) clearTimeout(binding.bindingExpiryTimer);
+        binding.bindingExpiryTimer = setTimeout(() => {
+            // bindRemoteSlot also clears this on reconnect; this body
+            // only runs when no reattach happened within the window.
+            this._remoteBindings.delete(peerKey);
+        }, bindingGraceMs);
 
         console.log('[orchestrator] client unbound from slot', slot, '- peer', peerKey);
     }

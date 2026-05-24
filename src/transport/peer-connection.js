@@ -94,19 +94,24 @@ class PeerConnectionBase {
  * for Local DM, on each `onPeerConnected` callback for Network DM).
  *
  * @param {object} options
- * @param {(peerKey: string|number) => object} options.snapshotProvider
+ * @param {(peerKey: string|number, cid: string|null) => object} options.snapshotProvider
  *   Returns ACK payload (mode/level/slotIndex/...). Called per peer so the
- *   provider can allocate a distinct slot per joiner.
- * @param {(payload: object, peerKey: string|number) => void} [options.onJoin]
+ *   provider can allocate a distinct slot per joiner. `cid` is the
+ *   URL-derived stable client identity from the peer's LOOKING; use
+ *   it as the orchestrator binding key for Network DM so a refresh
+ *   reattaches to the same slot. null for Local DM secondary.
+ * @param {(payload: object, peerKey: string|number, cid: string|null) => void} [options.onJoin]
  *   Fires once per peer when it connects (transport is open, ACK sent).
- *   Use this for slot binding — anything that lets master's per-frame
- *   commands start flowing toward the new sink.
- * @param {(peerKey: string|number) => void} [options.onReady]
+ *   `cid` is the URL-derived stable client identity carried by the
+ *   peer's LOOKING envelope (Network DM only; null for Local DM
+ *   secondary). Use cid as the orchestrator binding key so a refresh
+ *   reattaches to the same slot.
+ * @param {(peerKey: string|number, cid: string|null) => void} [options.onReady]
  *   Fires once per peer when it sends READY (the client's RenderClient
  *   has subscribed to the wire and won't drop incoming command envelopes).
  *   Use this for the spawn / initial-state burst that needs to land on
  *   a live, subscribed client.
- * @param {(peerKey: string|number) => void} [options.onLeave]
+ * @param {(peerKey: string|number, cid: string|null) => void} [options.onLeave]
  *   Fires when a specific peer goes silent or disconnects.
  * @param {(msg: object, peerKey: string|number) => void} [options.onRemoteInput]
  *   Forwarded ACTION / ANALOG envelopes, tagged with the originating peer.
@@ -159,6 +164,14 @@ export class MasterConnection {
         const session = {
             transport,
             peerKey,
+            // URL-derived stable client identity (Network DM only).
+            // Set on first MSG.LOOKING from the client side; null for
+            // Local DM secondary and for any joiner that didn't put
+            // a cid in their URL. Master.js uses this as the
+            // orchestrator binding key so a hard refresh
+            // (signaling peerId churns but cid persists in the URL)
+            // reattaches to the same slot.
+            cid: null,
             alive: false,
             ready: false,
             // Set by MSG.READY_TO_PLAY; reset to false on each
@@ -198,6 +211,12 @@ export class MasterConnection {
         return this._peers.get(peerKey)?.playsAudioLocally ?? false;
     }
 
+    /** Look up the URL-derived client identity for a peer, or null
+     *  if the peer didn't send one (Local DM or pre-cid joiner). */
+    cidFor(peerKey) {
+        return this._peers.get(peerKey)?.cid ?? null;
+    }
+
     /** True if any peer is currently alive. Mostly for debugging / asserts. */
     get peerAlive() {
         for (const session of this._peers.values()) {
@@ -218,7 +237,14 @@ export class MasterConnection {
 
         if (msg.type === MSG.LOOKING) {
             if (this.paused) return;
-            const payload = this.snapshotProvider ? this.snapshotProvider(session.peerKey) : {};
+            // Stash cid from the client's LOOKING on the first arrival.
+            // Subsequent LOOKINGs (retry loop) carry the same cid; the
+            // first-write-wins guard keeps a malicious or buggy peer
+            // from re-identifying mid-session.
+            if (session.cid == null && typeof msg.cid === 'string') {
+                session.cid = msg.cid;
+            }
+            const payload = this.snapshotProvider ? this.snapshotProvider(session.peerKey, session.cid) : {};
             // Mid-match (or any non-lobby state where slot assignment
             // shouldn't happen yet) — tell the joiner to wait. The
             // peer session stays not-alive; the existing LOOKING retry
@@ -243,7 +269,7 @@ export class MasterConnection {
             if (!session.alive) {
                 session.alive = true;
                 this._startHeartbeat(session);
-                this.onJoin?.(payload, session.peerKey);
+                this.onJoin?.(payload, session.peerKey, session.cid);
             }
         } else if (msg.type === MSG.READY) {
             // Client's RenderClient is now subscribed. Only fire onReady
@@ -251,7 +277,7 @@ export class MasterConnection {
             // which will also produce a fresh READY.
             if (!session.ready) {
                 session.ready = true;
-                this.onReady?.(session.peerKey);
+                this.onReady?.(session.peerKey, session.cid);
             }
         } else if (msg.type === MSG.LEAVING) {
             this._handlePeerGone(session);
@@ -429,7 +455,7 @@ export class MasterConnection {
         // catchup fan-out.
         session.ready = false;
         this._stopHeartbeat(session);
-        this.onLeave?.(session.peerKey);
+        this.onLeave?.(session.peerKey, session.cid);
     }
 
     _tearDownSession(session) {
@@ -437,7 +463,7 @@ export class MasterConnection {
         if (session.unsubscribe) { session.unsubscribe(); session.unsubscribe = null; }
         if (session.alive) {
             session.alive = false;
-            this.onLeave?.(session.peerKey);
+            this.onLeave?.(session.peerKey, session.cid);
         }
     }
 
@@ -486,9 +512,13 @@ export class MasterConnection {
  *   purely for UI ("WAITING FOR CURRENT GAME TO END…"). Fires on
  *   every WAIT response so the splash stays current if a transient
  *   state flip happened.
+ * @param {string|null} [options.cid]
+ *   URL-derived stable identity. Sent with every LOOKING so master
+ *   can reattach the same slot on a hard refresh (URL preserves cid,
+ *   signaling peerId churns). null for Local DM (peerKey is 'local').
  */
 export class ClientConnection extends PeerConnectionBase {
-    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup, onRefused, onWait } = {}) {
+    constructor({ transport = null, onAck, onLeave, onPlay, onCatchup, onRefused, onWait, cid = null } = {}) {
         super(transport);
         this.onAck = onAck;
         this.onLeave = onLeave;
@@ -496,6 +526,7 @@ export class ClientConnection extends PeerConnectionBase {
         this.onCatchup = onCatchup;
         this.onRefused = onRefused;
         this.onWait = onWait;
+        this.cid = cid;
         this.lastFromMaster = 0;
         this._lookingTimer = null;
         this._timeoutCheck = null;
@@ -558,14 +589,14 @@ export class ClientConnection extends PeerConnectionBase {
     /** Send LOOKING repeatedly until master responds with ACK. */
     _startLooking() {
         if (this._lookingTimer) return;
-        this._post({ type: MSG.LOOKING });
+        this._post({ type: MSG.LOOKING, cid: this.cid });
         this._lookingTimer = setInterval(() => {
             if (this.peerAlive) {
                 clearInterval(this._lookingTimer);
                 this._lookingTimer = null;
                 return;
             }
-            this._post({ type: MSG.LOOKING });
+            this._post({ type: MSG.LOOKING, cid: this.cid });
         }, PING_INTERVAL_MS * 2);
     }
 

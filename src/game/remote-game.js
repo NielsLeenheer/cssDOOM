@@ -71,12 +71,16 @@ function messageForFailure(err, roomCode) {
 }
 
 export class RemoteGame {
-    constructor({ roomCode, orchestrator }) {
+    constructor({ roomCode, cid = null, orchestrator }) {
         // Normalize to uppercase so the splash text matches what the
         // transport actually sends (uppercased there too). A user
         // typing ?join=abcd would otherwise see "CONNECTING TO ROOM
         // abcd" while the WS resolves against `ABCD`.
         this.roomCode = roomCode ? roomCode.toUpperCase() : roomCode;
+        // URL-derived stable identity. Sent with every LOOKING so a
+        // refreshing joiner reattaches to the same slot. null for
+        // Local DM secondary (peer identity is 'local' there).
+        this.cid = cid;
         this.orchestrator = orchestrator;
 
         this._state = 'CONNECTING';
@@ -157,6 +161,10 @@ export class RemoteGame {
 
         this._connection = new ClientConnection({
             transport: this._transport, // null for Local DM → BroadcastChannel default
+            // Stable identity sent on every LOOKING so master can
+            // reattach us to the same slot across a hard refresh
+            // (URL preserves ?cid=, signaling peerId churns).
+            cid: this.cid,
             // Lobby / match-end / overlay updates ride the
             // renderer-command pipeline (showLobby, showResults,
             // showAttract, etc.). Impls live in renderer/screens/.
