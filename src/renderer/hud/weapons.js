@@ -14,7 +14,17 @@
 export function switchWeapon(renderer, weaponName, fireRate) {
     const weaponElement = renderer.weaponEl;
     const currentType = weaponElement.dataset.type;
-    const needsAnimation = weaponName !== currentType
+    // A fresh weaponEl (no dataset.type yet) has nothing to animate
+    // from, so skip the switch animation entirely. Without this, a
+    // catchup-applied switchWeapon schedules a 200ms delayed apply
+    // that races a follow-up live switchWeapon (eg spawnPlayer's
+    // equipWeapon firing pistol right after catchup advertised the
+    // pre-respawn weapon): the live cmd lands first (no animation
+    // because `switching` class is set), then 200ms later the
+    // catchup's setTimeout fires and stomps the visual back to the
+    // stale weapon while game state actually fires the new one.
+    const needsAnimation = currentType
+        && weaponName !== currentType
         && !weaponElement.classList.contains('switching');
 
     if (needsAnimation) {
