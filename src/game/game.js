@@ -771,16 +771,20 @@ export class Game {
             }
         }
 
+        // No `slots: this.roster` in the payload — Player instances
+        // hold a circular thingRef.player back-reference, so anything
+        // that JSON.stringifies the payload (RenderSink.forwardWorld
+        // → WebRTC dataChannel.send) throws and the send is silently
+        // dropped, causing showLobby to vanish on Network DM joiners.
+        // Both renderLocalLobby and renderNetworkLobby ignore .slots
+        // anyway; everything they read is a flat scalar or array of
+        // primitives derived above.
         return {
             inLobby: isMatchLobby(),
-            slots: this.roster,
             mapCursor: this.mapCursor,
             slotsClaimed,
             slotsCarriedOver,
             slotOccupants,
-            // Stage A additions — populated alongside the legacy
-            // fields so existing impls keep working while the
-            // migration is in flight.
             variant,
             roomCode: getRoomCode(),
             locallyClaimableSlots,
