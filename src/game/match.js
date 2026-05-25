@@ -69,7 +69,7 @@ export function resetMatch({
         kills: Array.from({ length: n }, () => new Array(n).fill(0)),
     };
     for (const p of state.players) { p.score = 0; p._hudDirty = true; }
-    orchestrator.dispatch('world', 'hideResults');
+    orchestrator.dispatch({ type: 'world', cmd: 'hideResults', args: [] });
     hideTimer();
     setGameState(GAME_STATE.LOBBY);
     // Clear any transient held-input from the previous match (a fire
@@ -128,7 +128,7 @@ export function ensureMatchSize(n) {
 /** Clears any DM match state — called when leaving DM mode. */
 export function clearMatch() {
     state.match = null;
-    orchestrator.dispatch('world', 'hideResults');
+    orchestrator.dispatch({ type: 'world', cmd: 'hideResults', args: [] });
     hideTimer();
     setGameState(GAME_STATE.ACTIVE);
 }
@@ -191,13 +191,13 @@ function updateCountdown(remainingMs) {
     const text = `${m}:${s.toString().padStart(2, '0')}`;
     if (text === _currentTimerText) return;
     _currentTimerText = text;
-    orchestrator.dispatch('world', 'showTimer', text);
+    orchestrator.dispatch({ type: 'world', cmd: 'showTimer', args: [text] });
 }
 
 function hideTimer() {
     if (_currentTimerText === null) return;
     _currentTimerText = null;
-    orchestrator.dispatch('world', 'showTimer', null);
+    orchestrator.dispatch({ type: 'world', cmd: 'showTimer', args: [null] });
 }
 
 /** Current m:ss text being broadcast, or null if the timer is hidden.
@@ -248,7 +248,7 @@ export function endMatch() {
 
     setGameState(GAME_STATE.ENDED);
     // Notify subscribers. Game's onMatch('ended') subscriber owns the
-    // scoreboard dispatch (`orchestrator.dispatch('world', 'showResults', game.getResultsPayload())`)
+    // scoreboard dispatch (`orchestrator.dispatch({ type: 'world', cmd: 'showResults', args: [game.getResultsPayload()] })`)
     // — match.js doesn't import Game and doesn't construct the payload
     // itself.
     _emitMatchEvent('ended');

@@ -108,7 +108,7 @@ export function initGates() {
     // Joiner-side level load rides the coordinated handshake:
     // Level.load fires 'changing' → master's onLevel subscriber calls
     // beginCoordinatedLoad (resets readyToPlay flags) → Level.load's
-    // `await this.orchestrator.dispatch('world', 'loadMap', name)` fans `cmd-world loadMap`
+    // `await this.orchestrator.dispatch({ type: 'world', cmd: 'loadMap', args: [name] })` fans `cmd-world loadMap`
     // through every RenderSink → joiner's RenderClient dispatches to
     // its local orchestrator.loadMap (scene.loadMap rebuilds the
     // pane) → RenderClient posts MSG.READY_TO_PLAY → master awaits

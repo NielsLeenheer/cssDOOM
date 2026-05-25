@@ -163,19 +163,15 @@ function updateLocation(player, deltaTime, input) {
         // (east-convention) for updateEnemyRotation's billboard math.
         player.thingRef.facing = Math.PI / 2 + player.angle;
 
-        renderer.dispatch('world', 'updateThingPosition', player.thingIndex, player.x, player.y, player.floorHeight);
+        renderer.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [player.thingIndex, player.x, player.y, player.floorHeight] });
         const sector = getSectorAt(player.x, player.y);
         if (sector) {
-            renderer.dispatch('world', 'reparentThingToSector', player.thingIndex, sector.sectorIndex);
+            renderer.dispatch({ type: 'world', cmd: 'reparentThingToSector', args: [player.thingIndex, sector.sectorIndex] });
             // SP stats: credit the player for entering a SECRET sector
             // (no-op in DM / repeat enters / non-secret sectors).
             recordSectorEnter(sector.sectorIndex);
         }
-        renderer.dispatch('world', 'updateEnemyRotation', 
-            player.thingIndex,
-            { x: player.thingRef.x, y: player.thingRef.y, facing: player.thingRef.facing },
-            state.players.map(p => ({ x: p.x, y: p.y })),
-        );
+        renderer.dispatch({ type: 'world', cmd: 'updateEnemyRotation', args: [player.thingIndex, { x: player.thingRef.x, y: player.thingRef.y, facing: player.thingRef.facing }, state.players.map(p => ({ x: p.x, y: p.y }))] });
     }
 }
 
@@ -190,7 +186,7 @@ function updateLocation(player, deltaTime, input) {
 export function clearMovingState(player) {
     if (!wasMovingByPlayer.get(player.index)) return;
     wasMovingByPlayer.set(player.index, false);
-    renderer.dispatch('per-pane', 'setPlayerMoving', player.viewportIndex, false);
+    renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'setPlayerMoving', args: [false] });
 }
 
 function updateMovingState(player, input) {
@@ -200,12 +196,12 @@ function updateMovingState(player, input) {
         wasMovingByPlayer.set(player.index, isMoving);
         // Local: toggle `.moving` on the player's renderer (drives weapon
         // bob and head-bob in their own pane).
-        renderer.dispatch('per-pane', 'setPlayerMoving', player.viewportIndex, isMoving);
+        renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'setPlayerMoving', args: [isMoving] });
         // Cross-pane: toggle `.moving` on the player's thing container in
         // every pane so the billboard sprite's walk cycle pauses/resumes
         // for the OPPOSING player's view.
         if (player.thingIndex >= 0) {
-            renderer.dispatch('world', 'setThingMoving', player.thingIndex, isMoving);
+            renderer.dispatch({ type: 'world', cmd: 'setThingMoving', args: [player.thingIndex, isMoving] });
         }
     }
 }
@@ -219,6 +215,6 @@ function updateHeight(player) {
     // DOOM plays sfx_oof when momz < -GRAVITY*8. With gravity=1 unit/tic²,
     // that velocity is reached after falling 32 units (v²=2gh → h=8²/2=32).
     if (prevFloorHeight - player.floorHeight > 32) {
-        orchestrator.dispatch('world', 'playSound', 'DSOOF', { x: player.x, y: player.y });
+        orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSOOF', { x: player.x, y: player.y }] });
     }
 }

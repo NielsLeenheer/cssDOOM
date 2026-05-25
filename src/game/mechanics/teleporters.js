@@ -88,21 +88,21 @@ export function checkTeleporters() {
 
                 // Spawn teleport fog at departure and arrival
                 // Based on: linuxdoom-1.10/p_telept.c — spawns MT_TFOG at both ends
-                renderer.dispatch('world', 'createTeleportFog', departX, departZ, departY);
-                renderer.dispatch('world', 'createTeleportFog', player.x, player.floorHeight, player.y);
-                renderer.dispatch('per-pane', 'triggerFlash', player.viewportIndex, 'teleport-flash');
-                orchestrator.dispatch('world', 'playSound', 'DSTELEPT', { x: player.x, y: player.y });
+                renderer.dispatch({ type: 'world', cmd: 'createTeleportFog', args: [departX, departZ, departY] });
+                renderer.dispatch({ type: 'world', cmd: 'createTeleportFog', args: [player.x, player.floorHeight, player.y] });
+                renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'triggerFlash', args: ['teleport-flash'] });
+                orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSTELEPT', { x: player.x, y: player.y }] });
 
                 // Update the moving player's camera immediately so there's no
                 // frame of the old position.
-                renderer.dispatch('per-pane', 'updateCamera', player.viewportIndex, {
+                renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'updateCamera', args: [{
                     x: player.x,
                     y: player.y,
                     z: player.z,
                     angle: player.angle,
                     floorHeight: player.floorHeight ?? 0,
                     isFiring: player.isFiring,
-                });
+                }] });
 
                 // Disable one-shot teleporters
                 if (tp.oneShot) tp.used = true;

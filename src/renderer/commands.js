@@ -3,45 +3,48 @@
  *
  * Every renderer command is declared here with its `kind`:
  *
- *   `per-pane` — addressed to one pane. Orchestrator iterates targets
- *                whose `playerIndex` matches the addressed slot and
- *                calls `target.dispatch('per-pane', command, args)`.
+ *   `player` — addressed to one slot. Game code constructs the envelope
+ *              `{ type: 'player', slot, cmd, args }` and hands it to
+ *              `orchestrator.dispatch(env)`. The orchestrator iterates
+ *              targets whose `playerIndex` matches `slot` and calls
+ *              `target.dispatch(env)` on each.
  *
- *   `world`    — broadcast to every target. Orchestrator iterates all
- *                targets and calls `target.dispatch('world', command,
- *                args)`.
+ *   `world`  — broadcast to every target. Game code constructs
+ *              `{ type: 'world', cmd, args }` and hands it to
+ *              `orchestrator.dispatch(env)`. The orchestrator iterates
+ *              every target and calls `target.dispatch(env)` on each.
  *
- * The orchestrator generates one per-pane / world method per entry
- * here (so game code can call `orchestrator.updateCamera(slot, ...)`).
- * Each target type decides what `dispatch` does — see
- * `renderer-base.js`, `dom/dom-renderer.js`, `flat/renderer.js`,
- * `line/renderer.js`, `transport/render-sink.js`.
+ * The orchestrator no longer reads this file at runtime — envelope
+ * type drives routing directly. This registry is documentation: the
+ * authoritative list of valid `cmd` strings plus their kind, useful
+ * when wiring a new command or auditing the surface.
  *
  * Impl wiring lives in the renderer that owns the impl (DomRenderer's
- * bottom block imports the impl modules and binds methods to its own
- * prototype). This file owns only the cross-cutting kind metadata
- * the orchestrator needs to pick a dispatch path.
+ * bottom block imports impl modules and binds methods to its own
+ * prototype). Each target type decides what `dispatch(env)` does —
+ * see `renderer-base.js`, `dom/dom-renderer.js`, `flat/renderer.js`,
+ * `line/renderer.js`, `transport/render-sink.js`.
  */
 
 export const COMMANDS = {
     // ── Per-player: camera & HUD ─────────────────────────────────────────
-    updateCamera: 'per-pane',
-    updateHud: 'per-pane',
+    updateCamera: 'player',
+    updateHud: 'player',
     // ── Per-player: effects ─────────────────────────────────────────────
-    triggerFlash: 'per-pane',
-    showPowerup: 'per-pane',
-    flickerPowerup: 'per-pane',
-    hidePowerup: 'per-pane',
+    triggerFlash: 'player',
+    showPowerup: 'player',
+    flickerPowerup: 'player',
+    hidePowerup: 'player',
     // ── Per-player: weapon visuals ──────────────────────────────────────
-    switchWeapon: 'per-pane',
-    startFiring: 'per-pane',
-    stopFiring: 'per-pane',
+    switchWeapon: 'player',
+    startFiring: 'player',
+    stopFiring: 'player',
     // ── Per-player: player visuals ──────────────────────────────────────
-    setPlayerDead: 'per-pane',
-    setPlayerMoving: 'per-pane',
+    setPlayerDead: 'player',
+    setPlayerMoving: 'player',
     // ── Per-player: pause tint ──────────────────────────────────────────
-    showPaused: 'per-pane',
-    hidePaused: 'per-pane',
+    showPaused: 'player',
+    hidePaused: 'player',
     // ── World: per-renderer map load ────────────────────────────────────
     loadMap: 'world',
     // ── World: enemies / things / projectiles / effects ─────────────────
@@ -88,11 +91,3 @@ export const COMMANDS = {
     showLevelTransition: 'world',
     hideLevelTransition: 'world',
 };
-
-export const PER_PANE_COMMANDS = Object.fromEntries(
-    Object.entries(COMMANDS).filter(([, kind]) => kind === 'per-pane'),
-);
-
-export const WORLD_COMMANDS = Object.fromEntries(
-    Object.entries(COMMANDS).filter(([, kind]) => kind === 'world'),
-);

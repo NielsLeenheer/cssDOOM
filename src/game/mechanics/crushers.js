@@ -94,7 +94,7 @@ export function updateCrushers(deltaTime) {
 
         // Apply visual offset via renderer
         const offset = entry.topHeight - entry.currentHeight;
-        orchestrator.dispatch('world', 'setCrusherOffset', entry.sectorIndex, offset);
+        orchestrator.dispatch({ type: 'world', cmd: 'setCrusherOffset', args: [entry.sectorIndex, offset] });
 
         // Check each player for being crushed; per-player damage timer so two
         // players in the same crusher accumulate independently.

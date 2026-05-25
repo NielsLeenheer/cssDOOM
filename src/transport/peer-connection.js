@@ -343,7 +343,7 @@ export class MasterConnection {
      *
      * Bookkeeping only — does NOT send any envelope. The
      * `cmd-world loadMap` envelope is fired by master's Level.load
-     * via `await this.orchestrator.dispatch('world', 'loadMap', name)`, which fans
+     * via `await this.orchestrator.dispatch({ type: 'world', cmd: 'loadMap', args: [name] })`, which fans
      * through every RenderSink. `beginCoordinatedLoad` MUST run
      * BEFORE that fan-out (from master.js's `onLevel('changing')`
      * subscriber): otherwise a fast joiner could send READY_TO_PLAY

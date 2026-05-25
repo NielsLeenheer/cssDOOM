@@ -41,7 +41,7 @@ import { orchestrator as renderer } from "../../orchestrator.js";
  */
 export function enemyHitscanAttack(enemy, enemyAI, targetPlayer) {
     if (!hasLineOfSight(enemy.x, enemy.y, targetPlayer.x, targetPlayer.y)) {
-        orchestrator.dispatch('world', 'playSound', enemyAI.hitscanSound, { x: enemy.x, y: enemy.y });
+        orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [enemyAI.hitscanSound, { x: enemy.x, y: enemy.y }] });
         return;
     }
 
@@ -70,7 +70,7 @@ export function enemyHitscanAttack(enemy, enemyAI, targetPlayer) {
         }
     }
 
-    orchestrator.dispatch('world', 'playSound', enemyAI.hitscanSound, { x: enemy.x, y: enemy.y });
+    orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [enemyAI.hitscanSound, { x: enemy.x, y: enemy.y }] });
     if (totalDamage > 0) {
         damagePlayer(targetPlayer, totalDamage, enemy);
     }
@@ -87,7 +87,7 @@ export function enemyHitscanAttackEnemy(attacker, attackerAI) {
     if (!target || target.collected) return;
 
     if (!hasLineOfSight(attacker.x, attacker.y, target.x, target.y)) {
-        orchestrator.dispatch('world', 'playSound', attackerAI.hitscanSound, { x: attacker.x, y: attacker.y });
+        orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [attackerAI.hitscanSound, { x: attacker.x, y: attacker.y }] });
         return;
     }
 
@@ -106,7 +106,7 @@ export function enemyHitscanAttackEnemy(attacker, attackerAI) {
         }
     }
 
-    orchestrator.dispatch('world', 'playSound', attackerAI.hitscanSound, { x: attacker.x, y: attacker.y });
+    orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [attackerAI.hitscanSound, { x: attacker.x, y: attacker.y }] });
     if (totalDamage > 0) {
         damageEnemy(target, totalDamage, attacker);
     }
@@ -236,14 +236,14 @@ export function damageEnemy(target, damage, source) {
         const gib = target.hp <= -target.maxHp;
         target.collected = true;
         target.gibbed = gib;
-        renderer.dispatch('world', 'killEnemy', thingIndex, target.type, false, gib);
+        renderer.dispatch({ type: 'world', cmd: 'killEnemy', args: [thingIndex, target.type, false, gib] });
         recordKill(target);
 
         if (target.type === 2035) {
-            orchestrator.dispatch('world', 'playSound', 'DSBAREXP', { x: target.x, y: target.y });
+            orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSBAREXP', { x: target.x, y: target.y }] });
             barrelExplosion(target, source);
         } else {
-            orchestrator.dispatch('world', 'playSound', 'DSPODTH1', { x: target.x, y: target.y });
+            orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPODTH1', { x: target.x, y: target.y }] });
             // Based on: linuxdoom-1.10/p_mobj.c:P_NightmareRespawn()
             // Nightmare: enemies respawn 12 seconds after death
             if (state.skillLevel === 5 && target.ai) {
@@ -258,7 +258,7 @@ export function damageEnemy(target, damage, source) {
     } else {
         // Target survived — play pain sound (barrels have no pain sound)
         if (target.type !== 2035) {
-            orchestrator.dispatch('world', 'playSound', 'DSPOPAIN', { x: target.x, y: target.y });
+            orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPOPAIN', { x: target.x, y: target.y }] });
         }
 
         if (target.ai) {
@@ -311,9 +311,9 @@ function checkBossDeath(lastBaron) {
     // Renderer-side: fan a per-sector setFloorHeight to animate the
     // visual drop. Each renderer's impl is paint-only.
     const updates = lowerFloorsWithTag(666);
-    for (const u of updates) renderer.dispatch('world', 'setFloorHeight', u.sectorIndex, u.height);
+    for (const u of updates) renderer.dispatch({ type: 'world', cmd: 'setFloorHeight', args: [u.sectorIndex, u.height] });
     // Source position: the dying boss is in the arena where the floor
     // lowers (E1M8 layout puts them in the same room). Good enough proxy
     // without needing to look up the tag-666 sector center.
-    orchestrator.dispatch('world', 'playSound', 'DSPSTART', { x: lastBaron.x, y: lastBaron.y });
+    orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPSTART', { x: lastBaron.x, y: lastBaron.y }] });
 }

@@ -149,7 +149,7 @@ export function addPlayerThings() {
  *
  * MUST run only after every receiving renderer's scene is built. For
  * master's local renderers that's guaranteed by Level.load's
- * `await orchestrator.dispatch('world', 'loadMap', name)`. For remote joiners over the
+ * `await orchestrator.dispatch({ type: 'world', cmd: 'loadMap', args: [name] })`. For remote joiners over the
  * wire that's guaranteed by waiting on MSG.READY_TO_PLAY (master
  * does this in Game.beginPlay via awaitAllReadyToPlay before
  * calling this).
@@ -158,9 +158,6 @@ export function broadcastPlayerSprites() {
     for (const player of state.players) {
         if (!player?.thingRef || player.thingIndex == null) continue;
         const sectorIndex = getSectorAt(player.x, player.y)?.sectorIndex;
-        renderer.dispatch('world', 'createPlayerSprite', 
-            player.thingIndex, player.index,
-            player.x, player.y, player.floorHeight, sectorIndex,
-        );
+        renderer.dispatch({ type: 'world', cmd: 'createPlayerSprite', args: [player.thingIndex, player.index, player.x, player.y, player.floorHeight, sectorIndex] });
     }
 }

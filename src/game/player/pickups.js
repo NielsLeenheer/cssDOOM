@@ -50,7 +50,7 @@ export function checkPickups(player) {
                 player.collectedKeys.add(keyColor);
                 player._hudDirty = true;
                 thing.collected = true;
-                renderer.dispatch('world', 'collectItem', index);
+                renderer.dispatch({ type: 'world', cmd: 'collectItem', args: [index] });
                 triggerPickupFlash(player);
                 recordPickup(thing);
                 continue;
@@ -93,7 +93,7 @@ export function checkPickups(player) {
                     activatePowerup(player, effect.powerup);
                 }
                 thing.collected = true;
-                renderer.dispatch('world', 'collectItem', index);
+                renderer.dispatch({ type: 'world', cmd: 'collectItem', args: [index] });
                 triggerPickupFlash(player);
                 recordPickup(thing);
                 continue;
@@ -133,7 +133,7 @@ export function checkPickups(player) {
 
             if (PICKUPS.has(thing.type)) {
                 thing.collected = true;
-                renderer.dispatch('world', 'collectItem', index);
+                renderer.dispatch({ type: 'world', cmd: 'collectItem', args: [index] });
                 triggerPickupFlash(player);
             }
 
@@ -150,8 +150,8 @@ export function checkPickups(player) {
  * pick up an item. Rapid successive pickups restart the flash animation.
  */
 function triggerPickupFlash(player) {
-    orchestrator.dispatch('world', 'playSound', 'DSITEMUP', { x: player.x, y: player.y });
-    renderer.dispatch('per-pane', 'triggerFlash', player.viewportIndex, 'pickup-flash');
+    orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSITEMUP', { x: player.x, y: player.y }] });
+    renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'triggerFlash', args: ['pickup-flash'] });
 }
 
 // ============================================================================
@@ -177,7 +177,7 @@ function triggerPickupFlash(player) {
  */
 function activatePowerup(player, name) {
     player.powerups[name] = POWERUP_DURATION[name];
-    renderer.dispatch('per-pane', 'showPowerup', player.viewportIndex, name);
+    renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'showPowerup', args: [name] });
 
     if (name === 'berserk') {
         // Berserk gives +100 health (capped at 100) and auto-switches to fist
@@ -203,12 +203,12 @@ export function updatePowerups(player, deltaTime) {
         // Flicker warning in the last 4 seconds
         if (player.powerups[name] <= 4 && player.powerups[name] > 0) {
             const visible = Math.floor(player.powerups[name] * 8) % 2 === 0;
-            renderer.dispatch('per-pane', 'flickerPowerup', player.viewportIndex, name, visible);
+            renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'flickerPowerup', args: [name, visible] });
         }
 
         if (player.powerups[name] <= 0) {
             delete player.powerups[name];
-            renderer.dispatch('per-pane', 'hidePowerup', player.viewportIndex, name);
+            renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'hidePowerup', args: [name] });
         }
     }
 }
@@ -243,7 +243,7 @@ export function checkItemRespawns(deltaTime) {
         if (thing.respawnTimer <= 0) {
             thing.collected = false;
             delete thing.respawnTimer;
-            renderer.dispatch('world', 'uncollectItem', i);
+            renderer.dispatch({ type: 'world', cmd: 'uncollectItem', args: [i] });
         }
     }
 }

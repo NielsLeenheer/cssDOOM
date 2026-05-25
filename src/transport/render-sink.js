@@ -4,12 +4,10 @@
  * DomRenderers in the orchestrator's target list and represent
  * remote clients (Network DM joiners, Local DM secondary).
  *
- * Sinks override `dispatch` once instead of defining a method per
- * command. The override picks the wire envelope shape based on
- * `kind` — per-pane envelopes carry `target: paneIndex` so the
- * receiver knows which pane to apply against; world envelopes don't.
- * The receiving side (`RenderClient`) reads the envelope and calls
- * the matching method on its local DomRenderer.
+ * The orchestrator dispatches a command envelope to each target;
+ * the sink ships that same envelope verbatim over the wire. The
+ * receiving window's `RenderClient` reads it and dispatches into
+ * its own orchestrator — same envelope shape, same routing.
  */
 
 import { MSG } from './protocol.js';
@@ -37,26 +35,17 @@ export class RenderSink extends RendererBase {
     }
 
     /**
-     * Orchestrator entry point — forwards every command verbatim to
-     * the wire. Per-pane envelopes carry `target: paneIndex` so the
-     * receiver routes to the right pane; world envelopes don't. Args
-     * arrive variadic, get collected back into an array for the
-     * envelope.
+     * Forward the dispatch envelope verbatim. The wire-level type
+     * field is derived from the envelope's dispatch type — the
+     * receiving RenderClient discriminates on it the same way our
+     * other MSG.* envelopes do.
      */
-    dispatch(kind, command, ...args) {
-        if (kind === 'per-pane') {
-            this.channel.send({
-                type: MSG.CMD_PANE,
-                target: this.paneIndex,
-                method: command,
-                args,
-            });
-        } else {
-            this.channel.send({
-                type: MSG.CMD_WORLD,
-                method: command,
-                args,
-            });
-        }
+    dispatch(env) {
+        this.channel.send({
+            type: env.type === 'player' ? MSG.CMD_PLAYER : MSG.CMD_WORLD,
+            slot: env.slot,
+            cmd: env.cmd,
+            args: env.args,
+        });
     }
 }

@@ -120,9 +120,9 @@ export function activateLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    orchestrator.dispatch('world', 'setLiftState', sectorIndex, 'lowered');
+    orchestrator.dispatch({ type: 'world', cmd: 'setLiftState', args: [sectorIndex, 'lowered'] });
     const lowerCenter = sectorCenter(sectorIndex);
-    if (lowerCenter) orchestrator.dispatch('world', 'playSound', 'DSPSTART', lowerCenter);
+    if (lowerCenter) orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPSTART', lowerCenter] });
 
     // One-way lifts (e.g. type 36) stay lowered permanently
     if (!liftState.oneWay) {
@@ -140,9 +140,9 @@ function raiseLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    orchestrator.dispatch('world', 'setLiftState', sectorIndex, 'raised');
+    orchestrator.dispatch({ type: 'world', cmd: 'setLiftState', args: [sectorIndex, 'raised'] });
     const raiseCenter = sectorCenter(sectorIndex);
-    if (raiseCenter) orchestrator.dispatch('world', 'playSound', 'DSPSTOP', raiseCenter);
+    if (raiseCenter) orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPSTOP', raiseCenter] });
     liftState.timer = null;
 }
 
@@ -184,7 +184,7 @@ export function updatePlayerFromLift(timestamp) {
             const thing = things[i];
             if (thing.sectorIndex !== sectorIndex) continue;
             thing.floorHeight = liftState.currentHeight;
-            orchestrator.dispatch('world', 'updateThingPosition', i, thing.x, thing.y, liftState.currentHeight);
+            orchestrator.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [i, thing.x, thing.y, liftState.currentHeight] });
         }
     }
 }

@@ -636,37 +636,37 @@ class Orchestrator {
 }
 
 /**
- * Single fan-out entry point for game code. Each target's own
- * `dispatch(kind, command, ...args)` decides what to do with the
- * call — DomRenderer / FlatRenderer / LineRenderer / AudioRenderer
- * route to a same-named method (or no-op if missing); RenderSink
- * forwards a wire envelope.
+ * Single fan-out entry point. Game code constructs a dispatch
+ * envelope and hands it off here; each target's own `dispatch(env)`
+ * decides what to do with the same envelope:
  *
- *   `per-pane`: first arg is the addressed `playerIndex` / slot.
- *                Only targets whose `playerIndex` matches are
- *                dispatched to (mirror SP has two; Network DM has
- *                one local + one sink at each remote's slot;
- *                AudioRenderers match their listener slot).
+ *   { type: 'player', slot, cmd, args } — only targets whose
+ *      `playerIndex` matches `slot` are dispatched to (mirror SP has
+ *      two; Network DM has one local + one sink at each remote's
+ *      slot; AudioRenderers match their listener slot).
  *
- *   `world`:    every target is dispatched to. AudioRenderers
- *                without the named method silently no-op via their
- *                base dispatch; DomRenderer / RenderSink always
- *                participate. Returns Promise.all so async impls
- *                (loadMap's scene rebuild, level-transition's
- *                fade-complete promise) can be awaited.
+ *   { type: 'world', cmd, args } — every target is dispatched to.
+ *      AudioRenderers without the named method silently no-op via
+ *      their base dispatch; DomRenderer / RenderSink always
+ *      participate. Returns Promise.all so async impls (loadMap's
+ *      scene rebuild, level-transition's fade-complete promise) can
+ *      be awaited.
+ *
+ * The envelope itself is what travels — orchestrator → target →
+ * (for sinks) wire → receiving RenderClient → receiving orchestrator
+ * → its targets. No field renaming or repackaging at any step.
  */
-Orchestrator.prototype.dispatch = function (kind, command, ...args) {
-    if (kind === 'per-pane') {
-        const [playerIndex, ...rest] = args;
+Orchestrator.prototype.dispatch = function (env) {
+    if (env.type === 'player') {
         for (const t of this.targets) {
-            if (t.playerIndex !== playerIndex) continue;
-            t.dispatch('per-pane', command, ...rest);
+            if (t.playerIndex !== env.slot) continue;
+            t.dispatch(env);
         }
         return;
     }
     const promises = [];
     for (const t of this.targets) {
-        promises.push(t.dispatch('world', command, ...args));
+        promises.push(t.dispatch(env));
     }
     return Promise.all(promises);
 };

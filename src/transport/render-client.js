@@ -37,50 +37,47 @@ export class RenderClient {
         if (!msg || typeof msg !== 'object') return;
 
         switch (msg.type) {
-            case MSG.CMD_PANE:
-                // Per-pane commands are addressed to a specific slot; ignore
-                // messages for slots we don't represent. Future multi-remote
-                // shares one channel across multiple secondaries — each
-                // filters by its own slot.
-                if (msg.target !== this.slotIndex) return;
-                this._dispatchPaneCommand(msg);
+            case MSG.CMD_PLAYER:
+                // Player-addressed commands are scoped to a specific
+                // slot; ignore messages for slots we don't represent.
+                // Future multi-remote shares one channel across
+                // multiple secondaries — each filters by its own slot.
+                if (msg.slot !== this.slotIndex) return;
+                this.orchestrator.dispatch({
+                    type: 'player',
+                    slot: msg.slot,
+                    cmd: msg.cmd,
+                    args: msg.args,
+                });
                 break;
-            case MSG.CMD_WORLD:
-                this._dispatchWorldCommand(msg);
+            case MSG.CMD_WORLD: {
+                const result = this.orchestrator.dispatch({
+                    type: 'world',
+                    cmd: msg.cmd,
+                    args: msg.args,
+                });
+                // loadMap is the only world command on the joiner that
+                // needs a follow-up: master's awaitAllReadyToPlay polls
+                // session.readyToPlay, which the joiner satisfies by
+                // sending MSG.READY_TO_PLAY after its local scene
+                // rebuild resolves. orchestrator.dispatch returns the
+                // Promise.all of per-target results — on the joiner
+                // that's the single local DomRenderer, so awaiting it
+                // is awaiting scene.loadMap's clear + maps.load + build
+                // + absorb + warmup chain. `.finally` so the signal
+                // still fires on failure (master proceeds; joiner's
+                // pane may be blank) — better than master timing out.
+                if (msg.cmd === 'loadMap') {
+                    Promise.resolve(result)
+                        .catch((err) => console.warn('[render-client] loadMap failed:', err))
+                        .finally(() => this.channel.send({ type: MSG.READY_TO_PLAY }));
+                }
                 break;
+            }
             // Handshake / lifecycle messages are handled by a separate
             // connection manager that wraps this class.
             default:
                 break;
-        }
-    }
-
-    _dispatchPaneCommand({ target, method, args }) {
-        // Delegate through the orchestrator so its per-pane fan-out
-        // dispatches to every target at the addressed slot — the
-        // local DomRenderer plus the local AudioRenderer for commands
-        // both kinds answer (like updateCamera). Same mechanism master
-        // uses when its own game code calls orchestrator.dispatch(...).
-        this.orchestrator.dispatch('per-pane', method, target, ...args);
-    }
-
-    _dispatchWorldCommand({ method, args }) {
-        const result = this.orchestrator.dispatch('world', method, ...args);
-
-        // loadMap is the only world command on the joiner that needs a
-        // follow-up: master's awaitAllReadyToPlay polls session.readyToPlay,
-        // which the joiner satisfies by sending MSG.READY_TO_PLAY after
-        // its local scene rebuild resolves. orchestrator.dispatch for
-        // a world command returns Promise.all of per-target results —
-        // on the joiner that's the single local DomRenderer, so awaiting
-        // it is awaiting scene.loadMap's clear + maps.load + build +
-        // absorb + warmup chain. `.finally` so the signal still fires
-        // on failure (master proceeds; joiner's pane may be blank) —
-        // better than master timing out.
-        if (method === 'loadMap') {
-            Promise.resolve(result)
-                .catch((err) => console.warn('[render-client] loadMap failed:', err))
-                .finally(() => this.channel.send({ type: MSG.READY_TO_PLAY }));
         }
     }
 }

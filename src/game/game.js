@@ -108,7 +108,7 @@ export class Game {
      */
     async start() {
         this._transitionTo('LOBBY');
-        orchestrator.dispatch('world', 'showLobby', this.getLobbyPayload());
+        orchestrator.dispatch({ type: 'world', cmd: 'showLobby', args: [this.getLobbyPayload()] });
         this._emit('lobby-updated', this.getLobbyPayload());
 
         // Subscribe to lobby-state changes. lobby-state.js's setters
@@ -120,7 +120,7 @@ export class Game {
         this._disposers.push(onLobbyChange(() => {
             if (this._state !== 'LOBBY') return;
             const payload = this.getLobbyPayload();
-            orchestrator.dispatch('world', 'showLobby', payload);
+            orchestrator.dispatch({ type: 'world', cmd: 'showLobby', args: [payload] });
             this._emit('lobby-updated', payload);
         }));
 
@@ -133,7 +133,7 @@ export class Game {
         this._disposers.push(onClaimChange(() => {
             if (this._state !== 'LOBBY') return;
             const payload = this.getLobbyPayload();
-            orchestrator.dispatch('world', 'showLobby', payload);
+            orchestrator.dispatch({ type: 'world', cmd: 'showLobby', args: [payload] });
             this._emit('lobby-updated', payload);
             this._checkAutoStart();
         }));
@@ -151,7 +151,7 @@ export class Game {
             if (this._state === 'ENDED' || this._state === 'RESULTS') return;
             this._transitionTo('RESULTS');
             const payload = this.getResultsPayload();
-            orchestrator.dispatch('world', 'showResults', payload);
+            orchestrator.dispatch({ type: 'world', cmd: 'showResults', args: [payload] });
             this._emit('match-ended', payload);
         }));
 
@@ -286,7 +286,7 @@ export class Game {
             this.level?.pause();
         }
         for (let i = 0; i < this.roster.length; i++) {
-            orchestrator.dispatch('per-pane', 'showPaused', i);
+            orchestrator.dispatch({ type: 'player', slot: i, cmd: 'showPaused', args: [] });
         }
     }
 
@@ -300,7 +300,7 @@ export class Game {
             this.level?.resume();
         }
         for (let i = 0; i < this.roster.length; i++) {
-            orchestrator.dispatch('per-pane', 'hidePaused', i);
+            orchestrator.dispatch({ type: 'player', slot: i, cmd: 'hidePaused', args: [] });
         }
     }
     /**
@@ -336,9 +336,9 @@ export class Game {
 
         // Hide any open overlays so a Game switch doesn't leak stale
         // lobby/intermission/results visuals into the next session.
-        orchestrator.dispatch('world', 'hideLobby');
-        orchestrator.dispatch('world', 'hideIntermission');
-        orchestrator.dispatch('world', 'hideResults');
+        orchestrator.dispatch({ type: 'world', cmd: 'hideLobby', args: [] });
+        orchestrator.dispatch({ type: 'world', cmd: 'hideIntermission', args: [] });
+        orchestrator.dispatch({ type: 'world', cmd: 'hideResults', args: [] });
 
         // Drop every state-owner subscription so post-stop emits
         // don't fan into a dead Game. Without this, dead-Game
@@ -364,7 +364,7 @@ export class Game {
      */
     claimSlot(slot, deviceId) {
         ensurePlayerCount(slot + 1);
-        orchestrator.dispatch('world', 'showLobby', this.getLobbyPayload());
+        orchestrator.dispatch({ type: 'world', cmd: 'showLobby', args: [this.getLobbyPayload()] });
         this._emit('roster-updated', {
             slot,
             deviceId,
@@ -392,14 +392,14 @@ export class Game {
         // handoff. Skipped when there's nothing to load (Local DM
         // preload path — the loaded scene is already visible behind
         // the lobby panel, so the lobby hide is the cover).
-        // `orchestrator.dispatch('world', 'showLevelTransition')` is idempotent across
+        // `orchestrator.dispatch({ type: 'world', cmd: 'showLevelTransition', args: [] })` is idempotent across
         // the advance → beginPlay → Level.load chain — once the cover
         // is up, subsequent awaits resolve immediately.
         if (needsLoad) {
-            await orchestrator.dispatch('world', 'showLevelTransition');
+            await orchestrator.dispatch({ type: 'world', cmd: 'showLevelTransition', args: [] });
         }
 
-        orchestrator.dispatch('world', 'hideLobby');
+        orchestrator.dispatch({ type: 'world', cmd: 'hideLobby', args: [] });
 
         if (needsLoad) {
             // Network DM / fallback (preload missed for some reason):
@@ -415,7 +415,7 @@ export class Game {
             // Level.load fires onLevel('changing', { name }), which
             // master.js's subscriber turns into beginCoordinatedLoad
             // (resets per-session readyToPlay flags + pauses LOOKING).
-            // Level.load's own `await this.orchestrator.dispatch('world', 'loadMap', name)`
+            // Level.load's own `await this.orchestrator.dispatch({ type: 'world', cmd: 'loadMap', args: [name] })`
             // then fans `cmd-world loadMap` through every RenderSink
             // so every connected joiner rebuilds its local scene in
             // parallel with master's.
@@ -485,7 +485,7 @@ export class Game {
         // here (no claim change), so we have to push the re-render
         // explicitly. Otherwise the READY! overlay lingers over the
         // running match.
-        orchestrator.dispatch('world', 'showLobby', this.getLobbyPayload());
+        orchestrator.dispatch({ type: 'world', cmd: 'showLobby', args: [this.getLobbyPayload()] });
         this._emit('lobby-updated', this.getLobbyPayload());
     }
 
@@ -504,7 +504,7 @@ export class Game {
      * matches.
      */
     async restartMatch() {
-        orchestrator.dispatch('world', 'hideResults');
+        orchestrator.dispatch({ type: 'world', cmd: 'hideResults', args: [] });
 
         // Advance mapCursor. _pendingNextMap is set by _onLevelComplete
         // when an exit switch triggered the end (carries secret-exit
@@ -521,7 +521,7 @@ export class Game {
         resetMatch();
 
         this._transitionTo('LOBBY');
-        orchestrator.dispatch('world', 'showLobby', this.getLobbyPayload());
+        orchestrator.dispatch({ type: 'world', cmd: 'showLobby', args: [this.getLobbyPayload()] });
         this._emit('lobby-updated', this.getLobbyPayload());
         this._emit('match-restarted', { mapCursor: this.mapCursor });
 
@@ -588,9 +588,9 @@ export class Game {
         // kicking in. The orchestrator's showLevelTransition is
         // idempotent, so the later calls from beginPlay → Level.load
         // hit the already-visible early-return and resolve immediately.
-        await orchestrator.dispatch('world', 'showLevelTransition');
+        await orchestrator.dispatch({ type: 'world', cmd: 'showLevelTransition', args: [] });
 
-        orchestrator.dispatch('world', 'hideIntermission');
+        orchestrator.dispatch({ type: 'world', cmd: 'hideIntermission', args: [] });
         if (this._pendingNextMap) {
             this.mapCursor = this._pendingNextMap;
             this._pendingNextMap = null;
@@ -707,7 +707,7 @@ export class Game {
             // Owning this here (not inside the renderer impl) keeps
             // the renderer a pure projection target.
             setGameState(GAME_STATE.INTERMISSION);
-            orchestrator.dispatch('world', 'showIntermission', this.getIntermissionPayload());
+            orchestrator.dispatch({ type: 'world', cmd: 'showIntermission', args: [this.getIntermissionPayload()] });
         } else {
             // DM: funnel into the same endMatch path as frag/time-limit.
             // The onMatch('ended') subscriber in start() flips _state

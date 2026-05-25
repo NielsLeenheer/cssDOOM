@@ -1,26 +1,32 @@
 /**
  * RendererBase — common entry point for every renderer / sink target the
- * orchestrator dispatches to. The orchestrator calls
- * `target.dispatch(kind, command, args)` once per command per target;
- * implementations decide what to do with it.
+ * orchestrator dispatches to.
  *
- * Default routing: look up `this[command]` and call it with `args`. A
- * renderer that wants to support a command defines a same-named method
- * (e.g. `updateCamera(camera) { ... }`) — that's it. Commands the
- * renderer doesn't implement silently no-op via the typeof check.
+ * The orchestrator calls `target.dispatch(env)` once per command per
+ * target with an envelope object:
  *
- * Sinks (and any other target that needs the SAME behavior for every
- * command — record-and-forward, logging, telemetry) override `dispatch`
+ *   { type: 'player', slot, cmd, args }   — addressed to one player
+ *   { type: 'world',         cmd, args }   — broadcast to all targets
+ *
+ * The envelope is the unit of work. The same object flows from
+ * game-loop call → orchestrator → each target → (for sinks) wire →
+ * receiving window's RenderClient → receiving orchestrator → its
+ * targets, with no field renaming or repackaging at any step.
+ *
+ * Default routing: look up `this[env.cmd]` and call it with
+ * `env.args`. A renderer that wants to support a command defines a
+ * same-named method (e.g. `updateCamera(camera) { ... }`). Commands
+ * the renderer doesn't implement silently no-op via the typeof
+ * check.
+ *
+ * Sinks (or anything that needs the SAME behaviour for every command
+ * — wire forwarding, logging, replay, telemetry) override `dispatch`
  * directly instead of defining per-command methods.
- *
- * `kind` is passed through as `'per-pane' | 'world'` so targets that
- * care (the wire sink picks a per-pane vs world envelope shape) can
- * branch on it. Targets that don't care ignore the arg.
  */
 
 export class RendererBase {
-    dispatch(kind, command, ...args) {
-        const fn = this[command];
-        if (typeof fn === 'function') return fn.apply(this, args);
+    dispatch(env) {
+        const fn = this[env.cmd];
+        if (typeof fn === 'function') return fn.apply(this, env.args);
     }
 }

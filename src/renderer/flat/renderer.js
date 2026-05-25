@@ -98,7 +98,7 @@ const SUPPRESSED = new Set([
     'hideAttract', 'showLevelTransition', 'hideLevelTransition',
 ]);
 
-FlatRenderer.prototype.dispatch = function (kind, command, ...args) {
-    if (SUPPRESSED.has(command)) return;
-    return RendererBase.prototype.dispatch.call(this, kind, command, ...args);
+FlatRenderer.prototype.dispatch = function (env) {
+    if (SUPPRESSED.has(env.cmd)) return;
+    return RendererBase.prototype.dispatch.call(this, env);
 };

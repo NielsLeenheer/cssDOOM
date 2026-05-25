@@ -37,7 +37,7 @@ export function updateProjectiles() {
 
         // Remove projectiles that have exceeded their maximum lifetime
         if (elapsed >= projectile.lifetime) {
-            renderer.dispatch('world', 'removeProjectile', projectile.id);
+            renderer.dispatch({ type: 'world', cmd: 'removeProjectile', args: [projectile.id] });
             state.projectiles.splice(index, 1);
             continue;
         }
@@ -61,9 +61,9 @@ export function updateProjectiles() {
             const impactX = hitPoint ? hitPoint.x - dirX * 25 : projectile.x;
             const impactY = hitPoint ? hitPoint.y - dirY * 25 : projectile.y;
             spawnFireballExplosion(impactX, impactY, projectile.z);
-            orchestrator.dispatch('world', 'playSound', projectile.hitSound, { x: impactX, y: impactY });
+            orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [projectile.hitSound, { x: impactX, y: impactY }] });
             if (projectile.isPlayerRocket) rocketExplosion(impactX, impactY, projectile.source);
-            renderer.dispatch('world', 'removeProjectile', projectile.id);
+            renderer.dispatch({ type: 'world', cmd: 'removeProjectile', args: [projectile.id] });
             state.projectiles.splice(index, 1);
             continue;
         }
@@ -77,9 +77,9 @@ export function updateProjectiles() {
         const floorHeight = getFloorHeightAt(newX, newY);
         if (newZ <= floorHeight) {
             spawnFireballExplosion(newX, newY, floorHeight);
-            orchestrator.dispatch('world', 'playSound', projectile.hitSound, { x: newX, y: newY });
+            orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [projectile.hitSound, { x: newX, y: newY }] });
             if (projectile.isPlayerRocket) rocketExplosion(newX, newY, projectile.source);
-            renderer.dispatch('world', 'removeProjectile', projectile.id);
+            renderer.dispatch({ type: 'world', cmd: 'removeProjectile', args: [projectile.id] });
             state.projectiles.splice(index, 1);
             continue;
         }
@@ -96,7 +96,7 @@ export function updateProjectiles() {
             const playerDeltaY = projectile.y - player.y;
             if (playerDeltaX * playerDeltaX + playerDeltaY * playerDeltaY < PROJECTILE_HIT_RADIUS * PROJECTILE_HIT_RADIUS) {
                 spawnFireballExplosion(projectile.x, projectile.y, projectile.z);
-                orchestrator.dispatch('world', 'playSound', projectile.hitSound, { x: projectile.x, y: projectile.y });
+                orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [projectile.hitSound, { x: projectile.x, y: projectile.y }] });
                 // Player rockets deal direct hit damage + splash; enemy projectiles
                 // roll damage on impact: (P_Random()%8+1) * missileDamage.
                 // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() missile damage.
@@ -106,7 +106,7 @@ export function updateProjectiles() {
                 } else {
                     damagePlayer(player, (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage, projectile.source);
                 }
-                renderer.dispatch('world', 'removeProjectile', projectile.id);
+                renderer.dispatch({ type: 'world', cmd: 'removeProjectile', args: [projectile.id] });
                 state.projectiles.splice(index, 1);
                 hitPlayer = true;
                 break;
@@ -130,7 +130,7 @@ export function updateProjectiles() {
             const enemyDeltaY = projectile.y - thing.y;
             if (enemyDeltaX * enemyDeltaX + enemyDeltaY * enemyDeltaY < (PROJECTILE_HIT_RADIUS + enemyRadius) * (PROJECTILE_HIT_RADIUS + enemyRadius)) {
                 spawnFireballExplosion(projectile.x, projectile.y, projectile.z);
-                orchestrator.dispatch('world', 'playSound', projectile.hitSound, { x: projectile.x, y: projectile.y });
+                orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [projectile.hitSound, { x: projectile.x, y: projectile.y }] });
                 // Player rockets deal direct hit damage + splash damage in a radius
                 if (projectile.isPlayerRocket) {
                     damageEnemy(thing, projectile.damage, projectile.source);
@@ -139,7 +139,7 @@ export function updateProjectiles() {
                     // Roll damage on impact: (P_Random()%8+1) * missileDamage
                     damageEnemy(thing, (Math.floor(Math.random() * 8) + 1) * projectile.missileDamage, projectile.source);
                 }
-                renderer.dispatch('world', 'removeProjectile', projectile.id);
+                renderer.dispatch({ type: 'world', cmd: 'removeProjectile', args: [projectile.id] });
                 state.projectiles.splice(index, 1);
                 hitEnemy = true;
                 break;
@@ -159,7 +159,7 @@ export function updateProjectiles() {
  * The renderer handles the animation and cleanup.
  */
 function spawnFireballExplosion(worldX, worldY, worldZ) {
-    renderer.dispatch('world', 'createExplosion', worldX, worldY, worldZ);
+    renderer.dispatch({ type: 'world', cmd: 'createExplosion', args: [worldX, worldY, worldZ] });
 }
 
 /**
@@ -209,13 +209,13 @@ export function spawnProjectile(enemy, projectileDefinition) {
     const endZ = spawnHeight + directionZ * speed * lifetime;
 
     const projectileId = state.nextProjectileId++;
-    renderer.dispatch('world', 'createProjectile', projectileId, {
+    renderer.dispatch({ type: 'world', cmd: 'createProjectile', args: [projectileId, {
         type: 'enemy',
         width: projectileDefinition.size, height: projectileDefinition.size,
         sprite: projectileDefinition.sprite,
         startX: enemy.x, startY: enemy.y, startZ: spawnHeight,
         endX, endY, endZ, duration: lifetime,
-    });
+    }] });
 
     const projectile = {
         id: projectileId,
@@ -235,5 +235,5 @@ export function spawnProjectile(enemy, projectileDefinition) {
     };
 
     state.projectiles.push(projectile);
-    orchestrator.dispatch('world', 'playSound', projectileDefinition.sound, { x: projectile.x, y: projectile.y });
+    orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: [projectileDefinition.sound, { x: projectile.x, y: projectile.y }] });
 }

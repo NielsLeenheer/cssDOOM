@@ -107,7 +107,7 @@ export class Level {
         // already-resolved promise when it's already visible.
         _emitLevelEvent('changing', { name });
         if (!isInitialLoad) {
-            await this.orchestrator.dispatch('world', 'showLevelTransition');
+            await this.orchestrator.dispatch({ type: 'world', cmd: 'showLevelTransition', args: [] });
         }
 
         // Fetch + enrich mapData. Mutates `maps.mapData` and
@@ -153,14 +153,14 @@ export class Level {
         // never state.players directly — so this priming step is what
         // makes the warmup land correct values.
         for (const player of state.players) {
-            renderer.dispatch('per-pane', 'updateCamera', player.viewportIndex, {
+            renderer.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'updateCamera', args: [{
                 x: player.x,
                 y: player.y,
                 z: player.z,
                 angle: player.angle,
                 floorHeight: player.floorHeight ?? 0,
                 isFiring: player.isFiring,
-            });
+            }] });
         }
 
         // Fan the load to every render target. Each local DomRenderer
@@ -169,7 +169,7 @@ export class Level {
         // `cmd-world loadMap` envelope to its remote. Promise.all of
         // per-target results so we synchronize on every local renderer
         // being built before proceeding to the game-side post-build.
-        await this.orchestrator.dispatch('world', 'loadMap', name);
+        await this.orchestrator.dispatch({ type: 'world', cmd: 'loadMap', args: [name] });
 
         // Game-side post-build: spatial grid (needs state.things),
         // player thing entries (state-only — pushes player entries
@@ -194,7 +194,7 @@ export class Level {
         // and any caller-raised cover. Each pane's impl no-ops when
         // the cover wasn't visible, so this is safe on every path
         // including the truly-initial-load case.
-        this.orchestrator.dispatch('world', 'hideLevelTransition');
+        this.orchestrator.dispatch({ type: 'world', cmd: 'hideLevelTransition', args: [] });
 
         // Tell master's broadcast layer that the scene is rebuilt and
         // it's safe to accept client reconnections again. Fires on
