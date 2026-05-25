@@ -8,19 +8,19 @@
  *
  * Implemented as a DomRenderer subclass so we inherit the pane DOM
  * construction, ResizeObserver-driven perspective, camera state,
- * spectator delegates, and the auto-bound per-pane / world commands
- * that we keep (chief among them updateCamera, which writes the
- * scene-transform CSS vars and is identical to a textured pane).
- * Commands that operate on things / effects / weapons / HUD are
- * overridden to no-ops below so a dispatch addressed to a fresh-and-
- * empty scene doesn't blow up on missing thingDom entries.
+ * spectator delegates, and the per-player / world commands we keep
+ * (chief among them updateCamera, which writes the scene-transform
+ * CSS vars and is identical to a textured pane). Commands that
+ * operate on things / effects / weapons / HUD are overridden to
+ * no-ops below so a dispatch addressed to a fresh-and-empty scene
+ * doesn't blow up on missing thingDom entries.
  *
  * The flat pane lives at slot 1 in ?lines mode (top-right of the
- * 2×2 layout). See `dom-renderer-manager.js`.
+ * 2×2 layout). See `manager.js`.
  */
 
-import { DomRenderer } from '../dom/dom-renderer.js';
-import { RendererBase } from '../renderer-base.js';
+import { DomRenderer } from '../dom/renderer.js';
+import { RendererBase } from '../base.js';
 import { buildFlatScene } from './scene.js';
 import * as maps from '../../shared/maps/index.js';
 

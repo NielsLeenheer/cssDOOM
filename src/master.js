@@ -24,7 +24,7 @@ import { state } from './game/state.js';
 import { GAME_STATE, getGameState } from './game/game-state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
-import { rendererManager } from './renderer/renderer-manager.js';
+import { rendererManager } from './renderer/manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { app } from './app.js';

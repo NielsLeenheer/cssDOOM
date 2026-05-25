@@ -11,7 +11,7 @@
  */
 
 import { MSG } from './protocol.js';
-import { RendererBase } from '../renderer/renderer-base.js';
+import { RendererBase } from '../renderer/base.js';
 
 export class RenderSink extends RendererBase {
     /**

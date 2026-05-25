@@ -9,14 +9,14 @@
  *
  * Impls that update thing position / collected state also write to
  * `renderer.state.things[]` (the per-renderer world-view used by the
- * culler). See dom-renderer.js's `makeRendererState` / `ensureThing`.
+ * culler). See renderer.js's `makeRendererState` / `ensureThing`.
  *
  * Enemy rotation picks its viewer via `viewers[renderer.playerIndex]` — in
  * mirror SP both renderers share playerIndex 0 and compute against player 0;
  * in DM each renderer reads its own player.
  */
 
-import { ensureThing } from '../../dom-renderer.js';
+import { ensureThing } from '../../renderer.js';
 
 // ============================================================================
 // Sprite Sheet Layout

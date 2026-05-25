@@ -113,7 +113,7 @@ function playBuffer(name, volume, pan) {
 
 // ── AudioRenderer (per-listener) ───────────────────────────────────────
 
-import { RendererBase } from '../renderer/renderer-base.js';
+import { RendererBase } from '../renderer/base.js';
 
 export class AudioRenderer extends RendererBase {
     /**

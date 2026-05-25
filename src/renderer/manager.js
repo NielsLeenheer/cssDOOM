@@ -22,7 +22,7 @@
  * differs; the management surface does not.
  */
 
-import { DomRenderer } from './dom/dom-renderer.js';
+import { DomRenderer } from './dom/renderer.js';
 import { LineRenderer } from './line/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
 import { orchestrator } from '../orchestrator.js';

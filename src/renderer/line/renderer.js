@@ -16,7 +16,7 @@
  */
 
 import { renderScene3D, setRendererSettings } from './scene.js';
-import { RendererBase } from '../renderer-base.js';
+import { RendererBase } from '../base.js';
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene

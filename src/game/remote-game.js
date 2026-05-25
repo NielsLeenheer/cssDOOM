@@ -25,7 +25,7 @@ import { MSG } from '../transport/protocol.js';
 import { ClientConnection } from '../transport/peer-connection.js';
 import { connectToNetworkRoom } from '../transport/webrtc-transport.js';
 import { inputs } from '../orchestrator.js';
-import { rendererManager } from '../renderer/renderer-manager.js';
+import { rendererManager } from '../renderer/manager.js';
 import { setDefaultSlot } from '../input/claim-registry.js';
 import { initKeyboardMouse } from '../input/keyboard-mouse.js';
 import { initGamepadInput } from '../input/gamepad.js';

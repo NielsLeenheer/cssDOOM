@@ -13,7 +13,7 @@
  * for the migration story.
  */
 
-import { makeSceneState } from '../dom-renderer.js';
+import { makeSceneState } from '../renderer.js';
 import * as maps from '../../../shared/maps/index.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
@@ -185,7 +185,7 @@ export async function buildScene(mapData) {
  * scene.loadMap warmup primes against fresh data too.
  *
  * Wired onto DomRenderer.prototype as the `loadMap` impl at the
- * bottom of dom-renderer.js. Returns a Promise so the orchestrator's
+ * bottom of renderer.js. Returns a Promise so the orchestrator's
  * world dispatch can Promise.all every local renderer.
  */
 export async function loadMap(renderer, name) {

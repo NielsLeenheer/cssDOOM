@@ -45,7 +45,7 @@ const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showResults / hideResults through the orchestrator as
 // world envelopes; the impls below are bound onto DomRenderer at the
-// bottom of dom-renderer.js. The envelope fans to master's own
+// bottom of renderer.js. The envelope fans to master's own
 // DomRenderer and to every connected client's RenderSink, carrying the
 // full scoreboard payload over the wire.
 //

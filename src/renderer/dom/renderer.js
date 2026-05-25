@@ -27,7 +27,7 @@ import { updatePerspective } from './scene/scene.js';
 import { updateCulling as runCulling } from './scene/culling.js';
 import { wireWeaponEvents } from './hud/weapons.js';
 import * as spectator from './spectator.js';
-import { RendererBase } from '../renderer-base.js';
+import { RendererBase } from '../base.js';
 
 // Per-player and world command methods are bound onto this prototype
 // at the bottom of this file — see the binding loop after the class

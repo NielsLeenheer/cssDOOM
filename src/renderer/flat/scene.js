@@ -15,7 +15,7 @@
  * `.floor` / `.ceiling` classes.
  */
 
-import { makeSceneState } from '../dom/dom-renderer.js';
+import { makeSceneState } from '../dom/renderer.js';
 import { buildSectorContainers } from '../dom/scene/sectors.js';
 import { buildWalls } from '../dom/scene/surfaces/walls.js';
 import { buildFloors } from '../dom/scene/surfaces/floors.js';
