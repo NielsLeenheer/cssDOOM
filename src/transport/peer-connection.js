@@ -244,6 +244,35 @@ export class MasterConnection {
             if (session.cid == null && typeof msg.cid === 'string') {
                 session.cid = msg.cid;
             }
+            // Duplicate-cid handover: a fresh LOOKING with a cid that
+            // matches an existing session means either (a) the user
+            // opened a second window with the same join URL, or (b) the
+            // same window is reconnecting after a network blip / fast
+            // reload that beat our PING_TIMEOUT_MS detection of the
+            // dropped connection.
+            //
+            // We can't distinguish those two cases — the cid is the
+            // only identity we have — so we always let the new
+            // connection win and tear the old one down. The reconnect
+            // case Just Works: onLeave fires for the old session,
+            // alive-grace gets scheduled in master.js, and onJoin for
+            // the new session cancels that timer before the player
+            // dies. The two-windows case sends a distinct REFUSED to
+            // the displaced window so its joiner shows a clear
+            // "another window connected" splash instead of looping
+            // through its disconnected → 2s reload → reconnect path
+            // (which would otherwise kick the new window in turn,
+            // ad infinitum).
+            if (session.cid != null) {
+                for (const other of this._peers.values()) {
+                    if (other === session || other.cid !== session.cid) continue;
+                    if (other.alive) {
+                        try { this._postTo(other, { type: MSG.REFUSED, reason: 'replaced' }); } catch {}
+                    }
+                    this._tearDownSession(other);
+                    this._peers.delete(other.peerKey);
+                }
+            }
             const payload = this.snapshotProvider ? this.snapshotProvider(session.peerKey, session.cid) : {};
             // Mid-match (or any non-lobby state where slot assignment
             // shouldn't happen yet) — tell the joiner to wait. The

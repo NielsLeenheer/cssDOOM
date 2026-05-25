@@ -67,6 +67,9 @@ function messageForFailure(err, roomCode) {
     if (err?.code === 'room-not-found') {
         return `ROOM ${roomCode} NOT FOUND`;
     }
+    if (err?.code === 'replaced') {
+        return `DISCONNECTED\nGAME CONTINUED IN NEW WINDOW`;
+    }
     return `CONNECTION FAILED\nCHECK ROOM CODE AND TRY AGAIN`;
 }
 
