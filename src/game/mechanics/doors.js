@@ -88,7 +88,7 @@ export function toggleDoor(sectorIndex, player) {
     // Based on: linuxdoom-1.10/p_doors.c:EV_VerticalDoor()
     if (doorEntry.keyRequired && !doorEntry.open) {
         if (!player.collectedKeys.has(doorEntry.keyRequired)) {
-            orchestrator.playSound('DSOOF', { x: player.x, y: player.y });
+            orchestrator.dispatch('world', 'playSound', 'DSOOF', { x: player.x, y: player.y });
             return;
         }
     }
@@ -104,9 +104,9 @@ export function toggleDoor(sectorIndex, player) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.passableTimer = setTimeout(() => { doorEntry.passable = true; }, DOOR_PASSABLE_DELAY * 1000);
-    orchestrator.setDoorState(sectorIndex, 'open');
+    orchestrator.dispatch('world', 'setDoorState', sectorIndex, 'open');
     const openCenter = sectorCenter(sectorIndex);
-    if (openCenter) orchestrator.playSound('DSDOROPN', openCenter);
+    if (openCenter) orchestrator.dispatch('world', 'playSound', 'DSDOROPN', openCenter);
     doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
 }
 
@@ -134,9 +134,9 @@ function closeDoor(sectorIndex) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.timer = null;
-    orchestrator.setDoorState(sectorIndex, 'closed');
+    orchestrator.dispatch('world', 'setDoorState', sectorIndex, 'closed');
     const closeCenter = sectorCenter(sectorIndex);
-    if (closeCenter) orchestrator.playSound('DSDORCLS', closeCenter);
+    if (closeCenter) orchestrator.dispatch('world', 'playSound', 'DSDORCLS', closeCenter);
 }
 
 /**

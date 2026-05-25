@@ -190,7 +190,7 @@ export class RemoteGame {
             //
             // Coordinated in-place loadMap rides `cmd-world loadMap`
             // through RenderClient — see render-client.js for the
-            // special-case that calls `orchestrator.loadMap(name)`
+            // special-case that calls `orchestrator.dispatch('world', 'loadMap', name)`
             // on the joiner and posts MSG.READY_TO_PLAY once the
             // local scene rebuild resolves.
             onAck: (payload, isReconnect) => this._onAck(payload, isReconnect),
@@ -278,7 +278,7 @@ export class RemoteGame {
             // handshake. MSG.READY (sent from _wireUp below) is the
             // bootstrap-finished signal master gates the spawn / initial
             // state burst on.
-            await this.orchestrator.loadMap(payload.level);
+            await this.orchestrator.dispatch('world', 'loadMap', payload.level);
         }
 
         this._wireUp();
@@ -439,12 +439,12 @@ export class RemoteGame {
      */
     pause() {
         this._paused = true;
-        if (this._mySlot != null) this.orchestrator.showPaused(this._mySlot);
+        if (this._mySlot != null) this.orchestrator.dispatch('per-pane', 'showPaused', this._mySlot);
     }
 
     resume() {
         this._paused = false;
-        if (this._mySlot != null) this.orchestrator.hidePaused(this._mySlot);
+        if (this._mySlot != null) this.orchestrator.dispatch('per-pane', 'hidePaused', this._mySlot);
     }
 
     /**

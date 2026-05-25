@@ -28,7 +28,7 @@ export function setEnemyState(thingIndex, enemy, newState) {
     enemy.ai.state = newState;
     enemy.ai.stateTime = 0;
     enemy.ai.damageDealt = false;
-    renderer.setEnemyState(thingIndex, enemy.type, newState);
+    renderer.dispatch('world', 'setEnemyState', thingIndex, enemy.type, newState);
 }
 
 // ============================================================================
@@ -59,5 +59,5 @@ export function respawnEnemy(thingIndex, enemy) {
 
     // Reset visuals via renderer
     const floorHeight = getFloorHeightAt(enemy.x, enemy.y);
-    renderer.resetEnemy(thingIndex, enemy.type, enemy.x, enemy.y, floorHeight);
+    renderer.dispatch('world', 'resetEnemy', thingIndex, enemy.type, enemy.x, enemy.y, floorHeight);
 }

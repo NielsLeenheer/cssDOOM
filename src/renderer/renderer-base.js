@@ -19,8 +19,8 @@
  */
 
 export class RendererBase {
-    dispatch(kind, command, args) {
+    dispatch(kind, command, ...args) {
         const fn = this[command];
-        if (typeof fn === 'function') fn.apply(this, args);
+        if (typeof fn === 'function') return fn.apply(this, args);
     }
 }

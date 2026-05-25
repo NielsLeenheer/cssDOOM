@@ -6,7 +6,7 @@
  * Pure data + accessors; no DOM. Mutation goes through the setters
  * below. Each setter calls `_emitLobbyChange()` after mutating so the
  * single subscriber (Game.start wires `onLobbyChange`) fires
- * `orchestrator.showLobby(getLobbyPayload())` once per change. Callers
+ * `orchestrator.dispatch('world', 'showLobby', getLobbyPayload())` once per change. Callers
  * never trigger renders themselves — the state owner does, because the
  * lobby update IS a consequence of the state changing.
  *

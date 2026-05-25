@@ -69,7 +69,7 @@ export function tryUseSwitch(player) {
 
         if (distance < USE_RANGE) {
             // Toggle the switch's visual state between on and off.
-            renderer.toggleSwitchState(wall.wallId);
+            renderer.dispatch('world', 'toggleSwitchState', wall.wallId);
 
             // Look up the linedef associated with this wall to determine what
             // action the switch triggers (exit, door, lift, etc.).

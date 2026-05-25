@@ -39,9 +39,11 @@ export class RenderSink extends RendererBase {
     /**
      * Orchestrator entry point — forwards every command verbatim to
      * the wire. Per-pane envelopes carry `target: paneIndex` so the
-     * receiver routes to the right pane; world envelopes don't.
+     * receiver routes to the right pane; world envelopes don't. Args
+     * arrive variadic, get collected back into an array for the
+     * envelope.
      */
-    dispatch(kind, command, args) {
+    dispatch(kind, command, ...args) {
         if (kind === 'per-pane') {
             this.channel.send({
                 type: MSG.CMD_PANE,

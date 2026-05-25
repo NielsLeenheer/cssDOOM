@@ -24,7 +24,7 @@
  * rotation each pane shows — lives in
  * [src/renderer/screens/attract.js](../renderer/screens/attract.js)
  * as the showAttract / hideAttract command impls, driven from
- * `orchestrator.showAttract()` / `.hideAttract()` calls below. The
+ * `orchestrator.dispatch('world', 'showAttract')` / `.hideAttract()` calls below. The
  * rotation animation runs per-pane on the renderer side and mutates
  * each renderer's own `state.camera.angle` — it does NOT mutate
  * `state.players[i].angle`. The simulation stays honest about which
@@ -171,7 +171,7 @@ export async function enterAttract() {
     // Signal each pane to start its own camera-rotation animation.
     // The renderer impl captures its current camera.angle as the base
     // and rotates from there — see src/renderer/screens/attract.js.
-    orchestrator.showAttract();
+    orchestrator.dispatch('world', 'showAttract');
 }
 
 function exitAttract() {
@@ -182,7 +182,7 @@ function exitAttract() {
     // somehow not in ATTRACT (e.g., direct pingActivity call) —
     // setGameState early-returns on same-state writes.
     setGameState(GAME_STATE.LOBBY);
-    orchestrator.hideAttract();
+    orchestrator.dispatch('world', 'hideAttract');
     // Restart the match clock — the wall-clock timer kept advancing while
     // attract was running but matchTick was paused, so without this the
     // very next updateGame frame would see elapsed > timeLimit and call

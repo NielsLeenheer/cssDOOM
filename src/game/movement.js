@@ -163,15 +163,15 @@ function updateLocation(player, deltaTime, input) {
         // (east-convention) for updateEnemyRotation's billboard math.
         player.thingRef.facing = Math.PI / 2 + player.angle;
 
-        renderer.updateThingPosition(player.thingIndex, player.x, player.y, player.floorHeight);
+        renderer.dispatch('world', 'updateThingPosition', player.thingIndex, player.x, player.y, player.floorHeight);
         const sector = getSectorAt(player.x, player.y);
         if (sector) {
-            renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
+            renderer.dispatch('world', 'reparentThingToSector', player.thingIndex, sector.sectorIndex);
             // SP stats: credit the player for entering a SECRET sector
             // (no-op in DM / repeat enters / non-secret sectors).
             recordSectorEnter(sector.sectorIndex);
         }
-        renderer.updateEnemyRotation(
+        renderer.dispatch('world', 'updateEnemyRotation', 
             player.thingIndex,
             { x: player.thingRef.x, y: player.thingRef.y, facing: player.thingRef.facing },
             state.players.map(p => ({ x: p.x, y: p.y })),
@@ -190,7 +190,7 @@ function updateLocation(player, deltaTime, input) {
 export function clearMovingState(player) {
     if (!wasMovingByPlayer.get(player.index)) return;
     wasMovingByPlayer.set(player.index, false);
-    renderer.setPlayerMoving(player.viewportIndex, false);
+    renderer.dispatch('per-pane', 'setPlayerMoving', player.viewportIndex, false);
 }
 
 function updateMovingState(player, input) {
@@ -200,12 +200,12 @@ function updateMovingState(player, input) {
         wasMovingByPlayer.set(player.index, isMoving);
         // Local: toggle `.moving` on the player's renderer (drives weapon
         // bob and head-bob in their own pane).
-        renderer.setPlayerMoving(player.viewportIndex, isMoving);
+        renderer.dispatch('per-pane', 'setPlayerMoving', player.viewportIndex, isMoving);
         // Cross-pane: toggle `.moving` on the player's thing container in
         // every pane so the billboard sprite's walk cycle pauses/resumes
         // for the OPPOSING player's view.
         if (player.thingIndex >= 0) {
-            renderer.setThingMoving(player.thingIndex, isMoving);
+            renderer.dispatch('world', 'setThingMoving', player.thingIndex, isMoving);
         }
     }
 }
@@ -219,6 +219,6 @@ function updateHeight(player) {
     // DOOM plays sfx_oof when momz < -GRAVITY*8. With gravity=1 unit/tic²,
     // that velocity is reached after falling 32 units (v²=2gh → h=8²/2=32).
     if (prevFloorHeight - player.floorHeight > 32) {
-        orchestrator.playSound('DSOOF', { x: player.x, y: player.y });
+        orchestrator.dispatch('world', 'playSound', 'DSOOF', { x: player.x, y: player.y });
     }
 }

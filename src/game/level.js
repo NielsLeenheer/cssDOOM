@@ -107,7 +107,7 @@ export class Level {
         // already-resolved promise when it's already visible.
         _emitLevelEvent('changing', { name });
         if (!isInitialLoad) {
-            await this.orchestrator.showLevelTransition();
+            await this.orchestrator.dispatch('world', 'showLevelTransition');
         }
 
         // Fetch + enrich mapData. Mutates `maps.mapData` and
@@ -153,7 +153,7 @@ export class Level {
         // never state.players directly — so this priming step is what
         // makes the warmup land correct values.
         for (const player of state.players) {
-            renderer.updateCamera(player.viewportIndex, {
+            renderer.dispatch('per-pane', 'updateCamera', player.viewportIndex, {
                 x: player.x,
                 y: player.y,
                 z: player.z,
@@ -169,7 +169,7 @@ export class Level {
         // `cmd-world loadMap` envelope to its remote. Promise.all of
         // per-target results so we synchronize on every local renderer
         // being built before proceeding to the game-side post-build.
-        await this.orchestrator.loadMap(name);
+        await this.orchestrator.dispatch('world', 'loadMap', name);
 
         // Game-side post-build: spatial grid (needs state.things),
         // player thing entries (state-only — pushes player entries
@@ -194,7 +194,7 @@ export class Level {
         // and any caller-raised cover. Each pane's impl no-ops when
         // the cover wasn't visible, so this is safe on every path
         // including the truly-initial-load case.
-        this.orchestrator.hideLevelTransition();
+        this.orchestrator.dispatch('world', 'hideLevelTransition');
 
         // Tell master's broadcast layer that the scene is rebuilt and
         // it's safe to accept client reconnections again. Fires on

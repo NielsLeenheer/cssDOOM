@@ -55,7 +55,6 @@
  */
 
 import { RenderSink } from './transport/render-sink.js';
-import { PER_PANE_COMMANDS, WORLD_COMMANDS } from './renderer/commands.js';
 import { AudioRenderer } from './audio/audio.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
@@ -636,58 +635,40 @@ class Orchestrator {
     }
 }
 
-// Per-player commands: iterate targets and dispatch to every one whose
-// `playerIndex` matches. In normal modes a single DomRenderer matches;
-// in mirror SP two DomRenderers share playerIndex 0 and both receive
-// the call; in Network DM a RenderSink at the player's slot forwards
-// to the wire; with AudioRenderer as a target the matching listener
-// also receives the call (e.g. updateCamera keeps its state.camera in
-// sync). Each target's prototype-bound method decides what its kind
-// does with the call.
-for (const name of Object.keys(PER_PANE_COMMANDS)) {
-    Orchestrator.prototype[name] = function (playerIndex, ...args) {
+/**
+ * Single fan-out entry point for game code. Each target's own
+ * `dispatch(kind, command, ...args)` decides what to do with the
+ * call — DomRenderer / FlatRenderer / LineRenderer / AudioRenderer
+ * route to a same-named method (or no-op if missing); RenderSink
+ * forwards a wire envelope.
+ *
+ *   `per-pane`: first arg is the addressed `playerIndex` / slot.
+ *                Only targets whose `playerIndex` matches are
+ *                dispatched to (mirror SP has two; Network DM has
+ *                one local + one sink at each remote's slot;
+ *                AudioRenderers match their listener slot).
+ *
+ *   `world`:    every target is dispatched to. AudioRenderers
+ *                without the named method silently no-op via their
+ *                base dispatch; DomRenderer / RenderSink always
+ *                participate. Returns Promise.all so async impls
+ *                (loadMap's scene rebuild, level-transition's
+ *                fade-complete promise) can be awaited.
+ */
+Orchestrator.prototype.dispatch = function (kind, command, ...args) {
+    if (kind === 'per-pane') {
+        const [playerIndex, ...rest] = args;
         for (const t of this.targets) {
             if (t.playerIndex !== playerIndex) continue;
-            t.dispatch('per-pane', name, args);
+            t.dispatch('per-pane', command, ...rest);
         }
-    };
-}
-
-// World commands: iterate every target. Each DomRenderer runs the impl
-// against itself via its dispatch routing; each RenderSink forwards to
-// the wire (its client's own orchestrator then iterates its own
-// targets). AudioRenderer has no world commands today; its base
-// dispatch no-ops when the method isn't present.
-//
-// Returns Promise.all of every target's call so commands with async
-// impls (loadMap's scene rebuild, level-transition's fade-complete
-// promise) can be `await`-ed by callers. Synchronous impls return
-// undefined, which Promise.all treats as instantly fulfilled — so
-// fire-and-forget commands incur no measurable overhead.
-for (const name of Object.keys(WORLD_COMMANDS)) {
-    Orchestrator.prototype[name] = function (...args) {
-        const promises = [];
-        for (const t of this.targets) {
-            promises.push(t.dispatch('world', name, args));
-        }
-        return Promise.all(promises);
-    };
-}
-
-// World sound: hand-rolled rather than registry-driven because the
-// dispatch is intrinsically per-kind — only AudioRenderers actually
-// emit sound (each runs its own distance/pan math from its listener
-// state); DomRenderers ignore it. Sinks still forward via the standard
-// CMD_WORLD envelope (the receiving window's orchestrator dispatches
-// through this same method, where its own AudioRenderers handle the
-// playback). Both call sites — local game code and incoming wire from
-// a joiner — use one entry point so any dispatch goes to every target
-// kind that cares.
-Orchestrator.prototype.playSound = function (name, opts) {
-    for (const t of this.targets) {
-        if (t.kind === 'audio') t.playSound(name, opts);
-        else if (t.kind === 'sink') t.dispatch('world', 'playSound', [name, opts]);
+        return;
     }
+    const promises = [];
+    for (const t of this.targets) {
+        promises.push(t.dispatch('world', command, ...args));
+    }
+    return Promise.all(promises);
 };
 
 export const orchestrator = new Orchestrator();

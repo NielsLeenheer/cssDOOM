@@ -58,7 +58,7 @@ export function spawnPlayer(player) {
     player.isFiring = false;
     player.sectorDamageTimer = 0;
     // Clear any active powerup visuals carried over from the previous life.
-    for (const name in player.powerups) renderer.hidePowerup(player.viewportIndex, name);
+    for (const name in player.powerups) renderer.dispatch('per-pane', 'hidePowerup', player.viewportIndex, name);
     player.powerups = {};
     player.collectedKeys.clear();
     player.isDead = false;
@@ -75,7 +75,7 @@ export function spawnPlayer(player) {
     if (!player.thingRef) {
         addPlayerThing(player);
         const sectorIndex = getSectorAt(player.x, player.y)?.sectorIndex;
-        renderer.createPlayerSprite(
+        renderer.dispatch('world', 'createPlayerSprite', 
             player.thingIndex, player.index,
             player.x, player.y, player.floorHeight, sectorIndex,
         );
@@ -96,16 +96,16 @@ export function spawnPlayer(player) {
         // class on container), and teleport it to the new spawn point.
         // The corpse decoration spawned at the death point is a separate
         // element and stays put.
-        renderer.uncollectItem(player.thingIndex);
-        renderer.resetEnemy(player.thingIndex, -1, player.x, player.y, player.floorHeight);
+        renderer.dispatch('world', 'uncollectItem', player.thingIndex);
+        renderer.dispatch('world', 'resetEnemy', player.thingIndex, -1, player.x, player.y, player.floorHeight);
         const sector = getSectorAt(player.x, player.y);
-        if (sector) renderer.reparentThingToSector(player.thingIndex, sector.sectorIndex);
+        if (sector) renderer.dispatch('world', 'reparentThingToSector', player.thingIndex, sector.sectorIndex);
     }
 
     // Drop the dead-cam class and equip the default weapon (which
     // sets the right sprite in this player's pane). Keys reflect
     // automatically via updateHud reading player.collectedKeys.
-    renderer.setPlayerDead(player.viewportIndex, false);
+    renderer.dispatch('per-pane', 'setPlayerDead', player.viewportIndex, false);
     equipWeapon(player, player.currentWeapon);
     // DM rule: every respawn comes back with all three keys.
     if (state.gameMode === 'deathmatch') {
@@ -115,9 +115,9 @@ export function spawnPlayer(player) {
     }
 
     // Spawn-fog effect + sound, matching DOOM-authentic respawn feel.
-    renderer.createTeleportFog(player.x, player.floorHeight, player.y);
-    renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
-    orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
+    renderer.dispatch('world', 'createTeleportFog', player.x, player.floorHeight, player.y);
+    renderer.dispatch('per-pane', 'triggerFlash', player.viewportIndex, 'teleport-flash');
+    orchestrator.dispatch('world', 'playSound', 'DSTELEPT', { x: player.x, y: player.y });
 
     // Informational. Game subscribes via _subscribeLevel and uses this
     // to confirm a slot is live again so it can hide a respawn overlay

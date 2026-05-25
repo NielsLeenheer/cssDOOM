@@ -56,38 +56,27 @@ export class RenderClient {
     }
 
     _dispatchPaneCommand({ target, method, args }) {
-        // Delegate through the orchestrator so its per-pane prototype
-        // binding fans to every target at the addressed slot — the
+        // Delegate through the orchestrator so its per-pane fan-out
+        // dispatches to every target at the addressed slot — the
         // local DomRenderer plus the local AudioRenderer for commands
         // both kinds answer (like updateCamera). Same mechanism master
-        // uses when its own game code calls renderer.* commands.
-        const fn = this.orchestrator[method];
-        if (typeof fn === 'function') {
-            fn.call(this.orchestrator, target, ...args);
-        } else {
-            console.warn(`RenderClient: unknown pane method '${method}'`);
-        }
+        // uses when its own game code calls orchestrator.dispatch(...).
+        this.orchestrator.dispatch('per-pane', method, target, ...args);
     }
 
     _dispatchWorldCommand({ method, args }) {
-        const fn = this.orchestrator[method];
-        if (typeof fn !== 'function') {
-            console.warn(`RenderClient: unknown world method '${method}'`);
-            return;
-        }
-
-        const result = fn.apply(this.orchestrator, args);
+        const result = this.orchestrator.dispatch('world', method, ...args);
 
         // loadMap is the only world command on the joiner that needs a
         // follow-up: master's awaitAllReadyToPlay polls session.readyToPlay,
         // which the joiner satisfies by sending MSG.READY_TO_PLAY after
-        // its local scene rebuild resolves. orchestrator.loadMap returns
-        // Promise.all of per-target results — on the joiner that's the
-        // single local DomRenderer, so awaiting it is awaiting
-        // scene.loadMap's clear + maps.load + build + absorb + warmup
-        // chain. `.finally` so the signal still fires on failure (master
-        // proceeds; joiner's pane may be blank) — better than master
-        // timing out.
+        // its local scene rebuild resolves. orchestrator.dispatch for
+        // a world command returns Promise.all of per-target results —
+        // on the joiner that's the single local DomRenderer, so awaiting
+        // it is awaiting scene.loadMap's clear + maps.load + build +
+        // absorb + warmup chain. `.finally` so the signal still fires
+        // on failure (master proceeds; joiner's pane may be blank) —
+        // better than master timing out.
         if (method === 'loadMap') {
             Promise.resolve(result)
                 .catch((err) => console.warn('[render-client] loadMap failed:', err))

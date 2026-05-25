@@ -266,10 +266,10 @@ function moveEnemyToward(enemy, targetX, targetY, deltaTime) {
  */
 function updateEnemyPosition(thingIndex, enemy) {
     const floorHeight = getFloorHeightAt(enemy.x, enemy.y);
-    renderer.updateThingPosition(thingIndex, enemy.x, enemy.y, floorHeight);
+    renderer.dispatch('world', 'updateThingPosition', thingIndex, enemy.x, enemy.y, floorHeight);
     // Reparent to current sector so the enemy inherits its --light (including animations)
     const sector = getSectorAt(enemy.x, enemy.y);
-    if (sector) renderer.reparentThingToSector(thingIndex, sector.sectorIndex);
+    if (sector) renderer.dispatch('world', 'reparentThingToSector', thingIndex, sector.sectorIndex);
 }
 
 /**
@@ -434,7 +434,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                     // don't produce a cacophony of overlapping cries
                     if (currentTime - lastAlertSoundTime > 500) {
                         lastAlertSoundTime = currentTime;
-                        orchestrator.playSound(enemyAI.alertSound, { x: enemy.x, y: enemy.y });
+                        orchestrator.dispatch('world', 'playSound', enemyAI.alertSound, { x: enemy.x, y: enemy.y });
                     }
                 }
             }
@@ -533,7 +533,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                         }
                     }
                     // Demon/Spectre: sfx_sgtatk, Imp/Baron: sfx_claw
-                    orchestrator.playSound(
+                    orchestrator.dispatch('world', 'playSound', 
                         enemy.type === 3002 || enemy.type === 58 ? 'DSSGTATK' : 'DSCLAW',
                         { x: enemy.x, y: enemy.y },
                     );
@@ -617,7 +617,7 @@ export function updateAllEnemies(deltaTime) {
         if (nearestDistSq > maxRenderDistSq) continue;
 
         updateSingleEnemy(index, thing, deltaTime, currentTime);
-        renderer.updateEnemyRotation(
+        renderer.dispatch('world', 'updateEnemyRotation', 
             index,
             { x: thing.x, y: thing.y, facing: thing.facing },
             state.players.map(p => ({ x: p.x, y: p.y })),

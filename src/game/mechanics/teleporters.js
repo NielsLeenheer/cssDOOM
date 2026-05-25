@@ -88,14 +88,14 @@ export function checkTeleporters() {
 
                 // Spawn teleport fog at departure and arrival
                 // Based on: linuxdoom-1.10/p_telept.c — spawns MT_TFOG at both ends
-                renderer.createTeleportFog(departX, departZ, departY);
-                renderer.createTeleportFog(player.x, player.floorHeight, player.y);
-                renderer.triggerFlash(player.viewportIndex, 'teleport-flash');
-                orchestrator.playSound('DSTELEPT', { x: player.x, y: player.y });
+                renderer.dispatch('world', 'createTeleportFog', departX, departZ, departY);
+                renderer.dispatch('world', 'createTeleportFog', player.x, player.floorHeight, player.y);
+                renderer.dispatch('per-pane', 'triggerFlash', player.viewportIndex, 'teleport-flash');
+                orchestrator.dispatch('world', 'playSound', 'DSTELEPT', { x: player.x, y: player.y });
 
                 // Update the moving player's camera immediately so there's no
                 // frame of the old position.
-                renderer.updateCamera(player.viewportIndex, {
+                renderer.dispatch('per-pane', 'updateCamera', player.viewportIndex, {
                     x: player.x,
                     y: player.y,
                     z: player.z,

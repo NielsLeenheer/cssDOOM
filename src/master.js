@@ -78,7 +78,7 @@ function renderAllActivePanes() {
         // fan-out (and on Network DM, the per-frame wire envelope per
         // slot) when nothing changed.
         if (player._hudDirty) {
-            orchestrator.updateHud(player.viewportIndex, {
+            orchestrator.dispatch('per-pane', 'updateHud', player.viewportIndex, {
                 currentWeapon: player.currentWeapon,
                 ammo: { ...player.ammo },
                 maxAmmo: { ...player.maxAmmo },
@@ -92,7 +92,7 @@ function renderAllActivePanes() {
             });
             player._hudDirty = false;
         }
-        orchestrator.updateCamera(player.viewportIndex, {
+        orchestrator.dispatch('per-pane', 'updateCamera', player.viewportIndex, {
             x: player.x,
             y: player.y,
             z: player.z,
@@ -128,7 +128,7 @@ function gameLoop(timestamp) {
     // death-cam view at their corpse until they fire to respawn.
     if (state.players.every(p => p.isDead)) {
         for (const player of state.players) {
-            orchestrator.updateCamera(player.viewportIndex, {
+            orchestrator.dispatch('per-pane', 'updateCamera', player.viewportIndex, {
                 x: player.x,
                 y: player.y,
                 z: player.z,
@@ -183,7 +183,7 @@ function setupMasterBroadcast() {
         // alive session's readyToPlay flag, capture _loadInFlight, pause
         // LOOKING. Bookkeeping only — the actual `cmd-world loadMap`
         // envelope is fired by Level.load's own
-        // `await this.orchestrator.loadMap(name)` call (which fans
+        // `await this.orchestrator.dispatch('world', 'loadMap', name)` call (which fans
         // through every RenderSink to every alive peer). This must run
         // BEFORE that fan-out so a fast joiner's READY_TO_PLAY can't
         // race the reset — JS execution order guarantees this because
@@ -465,7 +465,7 @@ function setupMasterBroadcast() {
     // Scoreboard fan-out to clients is handled by the renderer-command
     // pipeline: match.js::endMatch's _emitMatchEvent('ended') triggers
     // Game's onMatch('ended') subscriber, which fires
-    // orchestrator.showResults(getResultsPayload()). DM exit-switch
+    // orchestrator.dispatch('world', 'showResults', getResultsPayload()). DM exit-switch
     // path funnels through the same endMatch.
 
 }

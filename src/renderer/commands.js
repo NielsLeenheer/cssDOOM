@@ -69,6 +69,12 @@ export const COMMANDS = {
     toggleSwitchState: 'world',
     // ── World: surfaces ─────────────────────────────────────────────────
     setFloorHeight: 'world',
+    // ── World: audio ────────────────────────────────────────────────────
+    // Only AudioRenderers act on it — DomRenderer / LineRenderer /
+    // FlatRenderer have no playSound method, so the base dispatch
+    // routing no-ops them automatically. RenderSink forwards over the
+    // wire; the receiving window's AudioRenderers handle playback.
+    playSound: 'world',
     // ── World: lobby / intermission / results / attract / etc. ──────────
     showLobby: 'world',
     hideLobby: 'world',

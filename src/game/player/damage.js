@@ -70,7 +70,7 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             // from the normal death row to the xdeath row mid-animation.
             // The corpse spawn at 1400ms reads back gibbed via the
             // captured thingRef and picks PLAYW0.
-            renderer.killEnemy(player.thingIndex, -1, false, true);
+            renderer.dispatch('world', 'killEnemy', player.thingIndex, -1, false, true);
         }
         return;
     }
@@ -97,8 +97,8 @@ export function damagePlayer(player, damageAmount, attacker = null) {
     player.lastDamagedBy = attacker;
     player.lastDamagedTime = performance.now();
 
-    renderer.triggerFlash(player.viewportIndex, 'hurt');
-    orchestrator.playSound('DSPLPAIN', { x: player.x, y: player.y });
+    renderer.dispatch('per-pane', 'triggerFlash', player.viewportIndex, 'hurt');
+    orchestrator.dispatch('world', 'playSound', 'DSPLPAIN', { x: player.x, y: player.y });
 
     if (player.health <= 0) {
         // Match DOOM's extreme-death (gib/xdeath) trigger: cumulative
@@ -135,8 +135,8 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             // animation finishes, hide the live sprite and place a
             // static corpse decoration at the death point so the body
             // persists when the player respawns elsewhere.
-            renderer.setThingMoving(player.thingIndex, false);
-            renderer.killEnemy(player.thingIndex, -1, false, gib);
+            renderer.dispatch('world', 'setThingMoving', player.thingIndex, false);
+            renderer.dispatch('world', 'killEnemy', player.thingIndex, -1, false, gib);
 
             const deathX = player.x;
             const deathY = player.y;
@@ -156,8 +156,8 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             // which reads as "the gibs settle into the pile."
             setTimeout(() => {
                 const isGib = thingRefAtDeath?.gibbed === true;
-                renderer.collectItem(thingIndex);
-                renderer.createCorpse(deathX, deathY, deathFloor, deathSectorIndex, playerIndex, isGib);
+                renderer.dispatch('world', 'collectItem', thingIndex);
+                renderer.dispatch('world', 'createCorpse', deathX, deathY, deathFloor, deathSectorIndex, playerIndex, isGib);
                 // Remember the corpse so the world snapshot sent to a
                 // reconnecting / late-joining client can re-emit it.
                 state.deathCorpses.push({
@@ -167,8 +167,8 @@ export function damagePlayer(player, damageAmount, attacker = null) {
             }, 1400);
         }
 
-        renderer.setPlayerDead(player.viewportIndex, true);
-        orchestrator.playSound('DSPLDETH', { x: player.x, y: player.y });
+        renderer.dispatch('per-pane', 'setPlayerDead', player.viewportIndex, true);
+        orchestrator.dispatch('world', 'playSound', 'DSPLDETH', { x: player.x, y: player.y });
 
         // Announce the death for Game (subscribed via _subscribeLevel)
         // and any other listener. Fired AFTER all visual/audio side
@@ -278,7 +278,7 @@ function clearSceneState() {
         player.sectorDamageTimer = 0;
         // Clear all active powerup effects and visuals
         for (const name in player.powerups) {
-            renderer.hidePowerup(player.viewportIndex, name);
+            renderer.dispatch('per-pane', 'hidePowerup', player.viewportIndex, name);
         }
         player.powerups = {};
         // Clear the player's thing entry so addPlayerThing re-creates
@@ -295,12 +295,12 @@ function clearSceneState() {
     // Clear in place to preserve the array identity for any external
     // references held across map loads.
     state.things.length = 0;
-    for (let index = 0; index < state.projectiles.length; index++) renderer.removeProjectile(state.projectiles[index].id);
+    for (let index = 0; index < state.projectiles.length; index++) renderer.dispatch('world', 'removeProjectile', state.projectiles[index].id);
     state.projectiles = [];
     state.nextProjectileId = 0;
     // Drop tracked corpses; the next map starts fresh.
     state.deathCorpses.length = 0;
-    for (const player of state.players) renderer.setPlayerDead(player.viewportIndex, false);
+    for (const player of state.players) renderer.dispatch('per-pane', 'setPlayerDead', player.viewportIndex, false);
 }
 
 // Level transition — keep inventory, clear keys (keys are per-level)

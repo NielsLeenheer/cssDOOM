@@ -41,7 +41,7 @@ export function equipWeapon(player, slot) {
     if (isSwitching) {
         player.weaponSwitchUntil = performance.now() + WEAPON_SWITCH_MS;
     }
-    renderer.switchWeapon(player.viewportIndex, weapon.name, weapon.fireRate);
+    renderer.dispatch('per-pane', 'switchWeapon', player.viewportIndex, weapon.name, weapon.fireRate);
 }
 
 // ============================================================================
@@ -93,9 +93,9 @@ export function fireWeapon(player) {
     }
     player.isFiring = true;
 
-    orchestrator.playSound(weapon.sound, { x: player.x, y: player.y });
+    orchestrator.dispatch('world', 'playSound', weapon.sound, { x: player.x, y: player.y });
 
-    renderer.startFiring(player.viewportIndex);
+    renderer.dispatch('per-pane', 'startFiring', player.viewportIndex);
 
     // Trigger the attack pose on this player's billboard sprite so the
     // opposing player sees them firing (front-facing PLAYE/F frames, row
@@ -106,7 +106,7 @@ export function fireWeapon(player) {
     // east-convention thing-facing the renderer's atan2 math expects,
     // matching movement.js's thingRef.facing write.
     if (player.thingIndex >= 0) {
-        renderer.playPlayerAttack(player.thingIndex, {
+        renderer.dispatch('world', 'playPlayerAttack', player.thingIndex, {
             x: player.x,
             y: player.y,
             facing: Math.PI / 2 + player.angle,
@@ -134,7 +134,7 @@ export function fireWeapon(player) {
                 player.ammo[weapon.ammoType] -= weapon.ammoPerShot;
                 player._hudDirty = true;
             }
-            orchestrator.playSound(weapon.sound, { x: player.x, y: player.y });
+            orchestrator.dispatch('world', 'playSound', weapon.sound, { x: player.x, y: player.y });
             checkWeaponHit(player);
             alertNearbyEnemies(player);
         }, weapon.fireRate);
@@ -158,7 +158,7 @@ export function stopAutoFire(player) {
     if (handle) {
         clearInterval(handle);
         automaticFireIntervalsByPlayer.delete(player.index);
-        renderer.stopFiring(player.viewportIndex);
+        renderer.dispatch('per-pane', 'stopFiring', player.viewportIndex);
         player.isFiring = false;
     }
 }
@@ -360,7 +360,7 @@ function spawnPlayerRocket(player, forwardX, forwardY) {
     const endY = spawnY + forwardY * PLAYER_ROCKET_SPEED * lifetime;
 
     const projectileId = state.nextProjectileId++;
-    renderer.createProjectile(projectileId, {
+    renderer.dispatch('world', 'createProjectile', projectileId, {
         type: 'player-rocket',
         width: 11, height: 11, sprite: 'MISLA1',
         startX: spawnX, startY: spawnY, startZ: spawnZ,
@@ -456,5 +456,5 @@ function spawnPuff(player, hitX, hitY, hitFloorHeight) {
     const isTargetHit = hitFloorHeight !== undefined;
     const floorHeight = isTargetHit ? hitFloorHeight : getFloorHeightAt(hitX, hitY);
     const puffHeight = floorHeight + (isTargetHit ? EYE_HEIGHT * 0.5 : EYE_HEIGHT);
-    renderer.createPuff(hitX, puffHeight, hitY);
+    renderer.dispatch('world', 'createPuff', hitX, puffHeight, hitY);
 }
