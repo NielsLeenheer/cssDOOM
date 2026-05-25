@@ -12,7 +12,7 @@ import { damagePlayer } from '../player/damage.js';
 import { orchestrator } from '../../orchestrator.js';
 import { damageEnemy } from './combat.js';
 import { rocketExplosion } from './weapons.js';
-import * as renderer from '../../renderer/dom/index.js';
+import { orchestrator as renderer } from "../../orchestrator.js";
 
 // ============================================================================
 // Projectiles

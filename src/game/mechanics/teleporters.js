@@ -20,7 +20,7 @@ import { EYE_HEIGHT, PLAYER_RADIUS, SHOOTABLE, BARREL_RADIUS } from '../../share
 import { state } from '../state.js';
 import { mapData } from '../../shared/maps/index.js';
 import { getFloorHeightAt } from '../physics.js';
-import * as renderer from '../../renderer/dom/index.js';
+import { orchestrator as renderer } from "../../orchestrator.js";
 import { orchestrator } from '../../orchestrator.js';
 import { damageEnemy } from '../entities/combat.js';
 

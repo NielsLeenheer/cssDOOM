@@ -16,7 +16,7 @@ import { hasPowerup } from '../player/pickups.js';
 import { orchestrator } from '../../orchestrator.js';
 import { setEnemyState } from './enemies.js';
 import { damageEnemy } from './combat.js';
-import * as renderer from '../../renderer/dom/index.js';
+import { orchestrator as renderer } from "../../orchestrator.js";
 import { inputs } from '../../orchestrator.js';
 import { propagateSound } from '../sound-propagation.js';
 import { isMatchLobby } from '../match.js';

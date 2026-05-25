@@ -34,7 +34,7 @@ import { PLAYER_RADIUS } from '../../shared/constants.js';
 import { state } from '../state.js';
 import { getSectorAt } from '../physics.js';
 import { mapData } from '../../shared/maps/index.js';
-import * as renderer from '../../renderer/dom/index.js';
+import { orchestrator as renderer } from "../../orchestrator.js";
 
 /**
  * Sets each player's position and angle from the current map's start

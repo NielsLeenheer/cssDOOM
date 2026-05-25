@@ -24,7 +24,6 @@ import { state } from './game/state.js';
 import { GAME_STATE, getGameState } from './game/game-state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
-import { updateCamera, updateHud } from './renderer/dom/index.js';
 import { rendererManager } from './renderer/renderer-manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
@@ -79,7 +78,7 @@ function renderAllActivePanes() {
         // fan-out (and on Network DM, the per-frame wire envelope per
         // slot) when nothing changed.
         if (player._hudDirty) {
-            updateHud(player.viewportIndex, {
+            orchestrator.updateHud(player.viewportIndex, {
                 currentWeapon: player.currentWeapon,
                 ammo: { ...player.ammo },
                 maxAmmo: { ...player.maxAmmo },
@@ -93,7 +92,7 @@ function renderAllActivePanes() {
             });
             player._hudDirty = false;
         }
-        updateCamera(player.viewportIndex, {
+        orchestrator.updateCamera(player.viewportIndex, {
             x: player.x,
             y: player.y,
             z: player.z,
@@ -129,7 +128,7 @@ function gameLoop(timestamp) {
     // death-cam view at their corpse until they fire to respawn.
     if (state.players.every(p => p.isDead)) {
         for (const player of state.players) {
-            updateCamera(player.viewportIndex, {
+            orchestrator.updateCamera(player.viewportIndex, {
                 x: player.x,
                 y: player.y,
                 z: player.z,

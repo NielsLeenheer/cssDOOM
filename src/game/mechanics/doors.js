@@ -25,7 +25,6 @@ import { mapData } from '../../shared/maps/index.js';
 import { getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
 import { sectorCenter } from '../../shared/maps/index.js';
-import { setDoorState } from '../../renderer/dom/index.js';
 import { isMatchLobby } from '../match.js';
 
 const DOOR_PASSABLE_DELAY = 0.8; // seconds — slightly before fully open to allow ducking under
@@ -105,7 +104,7 @@ export function toggleDoor(sectorIndex, player) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.passableTimer = setTimeout(() => { doorEntry.passable = true; }, DOOR_PASSABLE_DELAY * 1000);
-    setDoorState(sectorIndex, 'open');
+    orchestrator.setDoorState(sectorIndex, 'open');
     const openCenter = sectorCenter(sectorIndex);
     if (openCenter) orchestrator.playSound('DSDOROPN', openCenter);
     doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
@@ -135,7 +134,7 @@ function closeDoor(sectorIndex) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.timer = null;
-    setDoorState(sectorIndex, 'closed');
+    orchestrator.setDoorState(sectorIndex, 'closed');
     const closeCenter = sectorCenter(sectorIndex);
     if (closeCenter) orchestrator.playSound('DSDORCLS', closeCenter);
 }

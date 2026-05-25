@@ -24,7 +24,6 @@ import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../../shared/cons
 import { state } from '../state.js';
 import { mapData, sectorCenter } from '../../shared/maps/index.js';
 import { orchestrator } from '../../orchestrator.js';
-import { setLiftState, updateThingPosition } from '../../renderer/dom/index.js';
 import { isMatchLobby } from '../match.js';
 
 const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation duration
@@ -121,7 +120,7 @@ export function activateLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    setLiftState(sectorIndex, 'lowered');
+    orchestrator.setLiftState(sectorIndex, 'lowered');
     const lowerCenter = sectorCenter(sectorIndex);
     if (lowerCenter) orchestrator.playSound('DSPSTART', lowerCenter);
 
@@ -141,7 +140,7 @@ function raiseLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    setLiftState(sectorIndex, 'raised');
+    orchestrator.setLiftState(sectorIndex, 'raised');
     const raiseCenter = sectorCenter(sectorIndex);
     if (raiseCenter) orchestrator.playSound('DSPSTOP', raiseCenter);
     liftState.timer = null;
@@ -185,7 +184,7 @@ export function updatePlayerFromLift(timestamp) {
             const thing = things[i];
             if (thing.sectorIndex !== sectorIndex) continue;
             thing.floorHeight = liftState.currentHeight;
-            updateThingPosition(i, thing.x, thing.y, liftState.currentHeight);
+            orchestrator.updateThingPosition(i, thing.x, thing.y, liftState.currentHeight);
         }
     }
 }

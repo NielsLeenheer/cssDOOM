@@ -24,7 +24,7 @@ import { state } from '../state.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { orchestrator } from '../../orchestrator.js';
 import { recordPickup } from '../sp-stats.js';
-import * as renderer from '../../renderer/dom/index.js';
+import { orchestrator as renderer } from "../../orchestrator.js";
 
 /** Item respawn delay in deathmatch — collected pickups reappear after this. */
 const DM_ITEM_RESPAWN_SECONDS = 30;

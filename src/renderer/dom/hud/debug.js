@@ -9,7 +9,7 @@ import { state, debug } from '../../../game/state.js';
 import { EYE_HEIGHT } from '../../../shared/constants.js';
 import { THING_NAMES } from '../scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../../../game/physics.js';
-import { updateCamera } from '../index.js';
+import { orchestrator } from '../../../orchestrator.js';
 import { mapData, currentMap } from '../../../shared/maps/index.js';
 import { swapLevel } from '../../../game/level.js';
 import { forEachWallInAABB } from '../../../game/spatial-grid.js';
@@ -38,7 +38,7 @@ window.teleport = (positionX, positionY, angleDegrees) => {
     if (angleDegrees !== undefined) player.angle = angleDegrees * Math.PI / 180;
     player.floorHeight = getFloorHeightAt(player.x, player.y);
     player.z = player.floorHeight + EYE_HEIGHT;
-    updateCamera(player.viewportIndex, {
+    orchestrator.updateCamera(player.viewportIndex, {
         x: player.x,
         y: player.y,
         z: player.z,
@@ -74,7 +74,7 @@ window.load = async function (slot = 0) {
     player.angle = data.angle;
     player.floorHeight = getFloorHeightAt(player.x, player.y);
     player.z = player.floorHeight + EYE_HEIGHT;
-    updateCamera(player.viewportIndex, {
+    orchestrator.updateCamera(player.viewportIndex, {
         x: player.x,
         y: player.y,
         z: player.z,

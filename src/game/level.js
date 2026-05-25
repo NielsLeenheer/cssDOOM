@@ -27,7 +27,7 @@ import { initSpStats } from './sp-stats.js';
 import * as maps from '../shared/maps/index.js';
 import { applyPlayerStart, addPlayerThings, broadcastPlayerSprites } from './player/start.js';
 import { orchestrator } from '../orchestrator.js';
-import * as renderer from '../renderer/dom/index.js';
+import { orchestrator as renderer } from "../orchestrator.js";
 
 /**
  * Module-level registry for "the Level currently being simulated by
