@@ -184,10 +184,9 @@ export async function buildScene(mapData) {
  * fan-out forwards to joiners over each RenderSink, so the joiner's
  * scene.loadMap warmup primes against fresh data too.
  *
- * Wired onto DomRenderer.prototype as the `loadMap` world-command
- * impl via commands.js's auto-binding loop. Returns a Promise so the
- * orchestrator's `loadMap` override can Promise.all every local
- * renderer.
+ * Wired onto DomRenderer.prototype as the `loadMap` impl at the
+ * bottom of dom-renderer.js. Returns a Promise so the orchestrator's
+ * world dispatch can Promise.all every local renderer.
  */
 export async function loadMap(renderer, name) {
     // Teardown phase — only if this renderer has a prior scene to

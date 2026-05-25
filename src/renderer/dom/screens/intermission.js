@@ -31,10 +31,10 @@ const animationsByPane = new WeakMap();
 
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showIntermission / hideIntermission through the
-// orchestrator (see src/renderer/commands.js); commands.js imports
-// these directly and wires them as the world-command impls. Game also
-// owns the `body.dataset.gameState` transition that gates CSS
-// visibility — this module never touches it.
+// orchestrator as world envelopes; DomRenderer's bottom-of-file
+// binding wires these as the impls. Game also owns the
+// `body.dataset.gameState` transition that gates CSS visibility —
+// this module never touches it.
 
 /**
  * @param {object} renderer  DomRenderer for the pane this call addresses.

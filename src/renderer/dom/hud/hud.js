@@ -97,8 +97,8 @@ export function updateHud(renderer, player) {
     // Weapon ownership — per-pane, reflecting this player's weapons.
     // Master passes the live Player (ownedWeapons is a Set); a client
     // receives the same field as an Array off the wire (Set doesn't
-    // survive JSON.stringify — see commands.js stripHudData). Normalize
-    // here so both calling conventions work.
+    // survive JSON.stringify). Normalize here so both calling
+    // conventions work.
     const owned = player.ownedWeapons instanceof Set
         ? player.ownedWeapons
         : new Set(player.ownedWeapons ?? []);

@@ -43,14 +43,14 @@ const TOTAL_WIDTH = 2;
 const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 
 // ── Renderer-command entry points ──────────────────────────────────────
-// Game pushes showResults / hideResults through the orchestrator (see
-// src/renderer/commands.js, which imports the two impls below
-// directly). The impls fan to master's own DomRenderer and to every
-// connected client's RenderSink, carrying the full scoreboard payload
-// over the wire.
+// Game pushes showResults / hideResults through the orchestrator as
+// world envelopes; the impls below are bound onto DomRenderer at the
+// bottom of dom-renderer.js. The envelope fans to master's own
+// DomRenderer and to every connected client's RenderSink, carrying the
+// full scoreboard payload over the wire.
 //
-// World-kind dispatch fires once per render target; each call writes
-// only that target's pane via `renderer.paneEl.querySelector('.pane-win')`.
+// World dispatch fires once per render target; each call writes only
+// that target's pane via `renderer.paneEl.querySelector('.pane-win')`.
 // DOM is fully rebuilt each call via replaceChildren — idempotent
 // against repeated invocations.
 

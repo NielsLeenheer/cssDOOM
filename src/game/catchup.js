@@ -58,13 +58,12 @@ export function buildCatchup(slot) {
 }
 
 /**
- * Apply a catchup cmd list to a DomRenderer. Both world and per-pane
- * impls are auto-bound onto DomRenderer.prototype by
- * renderer/commands.js, so the same target shape covers every
- * command in the envelope. Animations are CSS-suppressed during the
- * apply via the `snapshot-applying` class on the pane element.
- * Per-tuple try/catch isolates failure so one bad entry doesn't
- * abort the rest.
+ * Apply a catchup cmd list to a DomRenderer. World and per-player
+ * impls both hang off DomRenderer.prototype, so the same target shape
+ * covers every command in the envelope. Animations are CSS-suppressed
+ * during the apply via the `snapshot-applying` class on the pane
+ * element. Per-tuple try/catch isolates failure so one bad entry
+ * doesn't abort the rest.
  */
 export function applyCatchupCmds(target, cmds) {
     if (!target || !cmds?.length) return;

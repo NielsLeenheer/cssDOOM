@@ -15,12 +15,11 @@
  * No DomRenderer reaches into another DomRenderer's state. Cross-pane
  * fan-out is the orchestrator's job (it iterates renderers).
  *
- * Per-player and world methods on the prototype are generated from
- * [commands.js](commands.js)'s PER_PANE_COMMANDS / WORLD_COMMANDS at
- * module load. Each method calls the registered `impl` with `this`
- * (the renderer) baked in as the first arg, so impls operate directly
- * on `this.sceneState` / `this.sceneEl` / `this.viewportEl` / etc.
- * The orchestrator's per-player dispatch fans to renderers whose
+ * Per-player and world methods are bound onto the prototype at the
+ * bottom of this file. Each method calls the registered `impl` with
+ * `this` (the renderer) baked in as the first arg, so impls operate
+ * directly on `this.sceneState` / `this.sceneEl` / `this.viewportEl` /
+ * etc. The orchestrator's per-player dispatch fans to renderers whose
  * `playerIndex` matches; its world dispatch fans to every target.
  */
 
@@ -32,8 +31,8 @@ import { RendererBase } from '../renderer-base.js';
 
 // Per-player and world command methods are bound onto this prototype
 // at the bottom of this file — see the binding loop after the class
-// definition. The orchestrator calls `target.dispatch(kind, command,
-// args)`; RendererBase routes that to the bound method here.
+// definition. The orchestrator calls `target.dispatch(env)`;
+// RendererBase routes that to the bound method here.
 
 export class DomRenderer extends RendererBase {
     /**
@@ -161,11 +160,11 @@ export class DomRenderer extends RendererBase {
      * stops painting an invisible subtree until the client disconnects
      * (at which point loadMap() rebuilds it).
      *
-     * `loadMap(name)` itself is bound onto this prototype by the
-     * COMMANDS auto-binding loop in `./commands.js` — it routes to
-     * `scene.loadMap(this, name)`, which fetches/enriches mapData,
-     * builds the scene fragment, absorbs it into this renderer, and
-     * primes camera + culling for the first composited frame.
+     * `loadMap(name)` itself is bound onto this prototype below — it
+     * routes to `scene.loadMap(this, name)`, which fetches/enriches
+     * mapData, builds the scene fragment, absorbs it into this
+     * renderer, and primes camera + culling for the first composited
+     * frame.
      */
     clear() {
         this.sceneEl.replaceChildren();
@@ -258,14 +257,11 @@ export function ensureThing(state, thingIndex) {
 // ── Command impl bindings ────────────────────────────────────────────────
 // Each renderer command is bound here as a method on DomRenderer.prototype
 // that calls the impl with `this` baked in as the first arg. The
-// orchestrator calls `target.dispatch(kind, command, args)`;
-// RendererBase.dispatch routes to the method bound below.
-//
-// Adding a new command is two entries: an `impl` line here plus a
-// `kind` line in `../commands.js` (orchestrator reads the kind to
-// decide between per-pane and world dispatch). Bound here rather
-// than from commands.js so the cross-cutting prototype mutation
-// lives next to the class it mutates.
+// orchestrator calls `target.dispatch(env)`; RendererBase.dispatch
+// routes to the method bound below by `env.cmd`. Player vs world
+// routing is on `env.type` at the orchestrator — DomRenderer doesn't
+// need to know the difference. Bound here so the cross-cutting
+// prototype mutation lives next to the class it mutates.
 
 import * as sprites from './scene/entities/sprites.js';
 import * as doors from './scene/mechanics/doors.js';

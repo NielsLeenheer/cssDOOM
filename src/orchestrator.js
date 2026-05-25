@@ -14,13 +14,13 @@
  *
  *   1. Render-target dispatch — `targets` is a flat list of every
  *      registered target (DomRenderer, RenderSink, AudioRenderer).
- *      Per-pane commands fan to every target whose `playerIndex`
- *      matches the addressed slot; world commands fan to every
- *      target. Each kind's prototype method decides what it does
- *      (DomRenderer paints, RenderSink forwards over the wire,
- *      AudioRenderer updates its per-listener state). Command names
- *      are generated from
- *      [renderer/commands.js](renderer/commands.js).
+ *      Game code constructs an envelope (`{ type, slot?, cmd, args }`)
+ *      and calls `orchestrator.dispatch(env)`. Player envelopes fan to
+ *      every target whose `playerIndex` matches the addressed slot;
+ *      world envelopes fan to every target. Each target's
+ *      `dispatch(env)` decides what it does (DomRenderer paints,
+ *      RenderSink forwards over the wire, AudioRenderer updates its
+ *      per-listener state).
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
  *      `unbindRemoteSlot`. A joining client triggers bind: the local

@@ -202,11 +202,10 @@ export class RemoteGame {
                 // No-op for now.
             },
             // Apply the catchup envelope against our local
-            // DomRenderer directly — both world and per-pane impls
-            // are auto-bound onto DomRenderer.prototype by
-            // renderer/commands.js. Bypassing the orchestrator
-            // sidesteps its per-pane dispatch signature (which
-            // prefixes playerIndex), and the AudioRenderer's
+            // DomRenderer directly — world and per-player impls both
+            // hang off DomRenderer.prototype. Bypassing the
+            // orchestrator skips the per-player slot filter (catchup
+            // is always for our own slot), and the AudioRenderer's
             // listener position lands on the next gameLoop frame's
             // updateCamera anyway.
             onCatchup: (cmds) => {
