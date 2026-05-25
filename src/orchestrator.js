@@ -252,11 +252,33 @@ class Orchestrator {
     nextOrCurrentRemoteSlot(peerKey) {
         const existing = this._remoteBindings.get(peerKey);
         if (existing) return existing.slot;
-        const reserved = new Set();
-        for (const b of this._remoteBindings.values()) reserved.add(b.slot);
+
+        // First pass: prefer a slot that no binding holds at all.
+        const taken = new Set();
+        for (const b of this._remoteBindings.values()) taken.add(b.slot);
         for (let i = this._minRemoteSlot; i < MAX_SLOTS; i++) {
-            if (!reserved.has(i)) return i;
+            if (!taken.has(i)) return i;
         }
+
+        // Second pass: every slot is taken, but some may be held by
+        // in-grace bindings (peer has disconnected, awaiting cid
+        // reattach) or mid-match-wait reservations. Neither has a live
+        // peer behind it. Evict one so a fresh joiner doesn't see
+        // "room full" when a seat is genuinely empty. Live bindings
+        // (no expiry timer, not flagged reserved) stay protected. The
+        // grace's reattach window is best-effort by design — if the
+        // original cid was going to come back, it would have by now
+        // or it can reconnect as a fresh joiner.
+        for (const [otherKey, b] of this._remoteBindings) {
+            if (b.reserved || b.bindingExpiryTimer) {
+                if (b.unbindGraceTimer) clearTimeout(b.unbindGraceTimer);
+                if (b.bindingExpiryTimer) clearTimeout(b.bindingExpiryTimer);
+                const evictedSlot = b.slot;
+                this._remoteBindings.delete(otherKey);
+                return evictedSlot;
+            }
+        }
+
         return null;
     }
 
