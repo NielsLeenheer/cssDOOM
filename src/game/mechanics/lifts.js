@@ -24,7 +24,7 @@ import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../../shared/cons
 import { state } from '../state.js';
 import { mapData, sectorCenter } from '../../shared/maps/index.js';
 import { orchestrator } from '../../orchestrator.js';
-import { setLiftState, updateThingPosition } from '../../renderer/index.js';
+import { setLiftState, updateThingPosition } from '../../renderer/dom/index.js';
 import { isMatchLobby } from '../match.js';
 
 const LIFT_MOVE_DURATION = 1.0; // seconds — must match renderer animation duration

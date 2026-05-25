@@ -15,7 +15,7 @@
  * so unchanged values skip DOM touches.
  */
 
-import { WEAPONS } from '../../shared/constants.js';
+import { WEAPONS } from '../../../shared/constants.js';
 
 const AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
 const KEY_COLORS = ['blue', 'yellow', 'red'];

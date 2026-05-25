@@ -11,7 +11,7 @@ import {
 import { state, debug } from '../state.js';
 import { Player } from '../player/player.js';
 import { canMoveTo, getFloorHeightAt, getSectorAt } from '../physics.js';
-import * as renderer from '../../renderer/index.js';
+import * as renderer from '../../renderer/dom/index.js';
 import { hasLineOfSight } from '../line-of-sight.js';
 import { isSectorAlerted } from '../sound-propagation.js';
 import { damagePlayer } from '../player/damage.js';

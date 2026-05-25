@@ -16,7 +16,7 @@ import { mapData } from '../../shared/maps/index.js';
 import { equipWeapon } from '../entities/weapons.js';
 import { getFloorHeightAt, getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
-import * as renderer from '../../renderer/index.js';
+import * as renderer from '../../renderer/dom/index.js';
 import { getCurrentLevel } from '../level.js';
 import { addPlayerThing } from './start.js';
 

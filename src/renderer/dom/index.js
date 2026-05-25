@@ -17,8 +17,8 @@
  * there; this file picks it up automatically.
  */
 
-import { orchestrator } from '../orchestrator.js';
-import { COMMANDS } from './commands.js';
+import { orchestrator } from '../../orchestrator.js';
+import { COMMANDS } from '../commands.js';
 
 const exported = {};
 

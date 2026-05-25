@@ -9,7 +9,7 @@
 import { state } from '../state.js';
 import { getFloorHeightAt } from '../physics.js';
 import { findVisibleTargetForEnemy } from './ai.js';
-import * as renderer from '../../renderer/index.js';
+import * as renderer from '../../renderer/dom/index.js';
 
 // ============================================================================
 // Enemy State Management

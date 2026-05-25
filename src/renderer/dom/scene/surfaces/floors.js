@@ -2,7 +2,7 @@
  * Floor surface construction and animation.
  */
 
-import { mapData } from '../../../shared/maps/index.js';
+import { mapData } from '../../../../shared/maps/index.js';
 import { buildHorizontalSurface } from './horizontal.js';
 
 export function buildFloors(ctx) {

@@ -24,8 +24,8 @@ import { state } from './game/state.js';
 import { GAME_STATE, getGameState } from './game/game-state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
 import { getCurrentLevel, onLevel } from './game/level.js';
-import { updateCamera, updateHud } from './renderer/index.js';
-import { domRendererManager } from './renderer/dom-renderer-manager.js';
+import { updateCamera, updateHud } from './renderer/dom/index.js';
+import { rendererManager } from './renderer/renderer-manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
 import { app } from './app.js';
@@ -34,7 +34,7 @@ import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
-import { initDebugMenu, updateDebugStats } from './renderer/hud/debug.js';
+import { initDebugMenu, updateDebugStats } from './renderer/dom/hud/debug.js';
 import { attractTick, isAttractActive } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
@@ -525,7 +525,7 @@ export async function initMaster({ isKiosk = false } = {}) {
     // both slots are claimed. Kiosk-SP and Network-DM-host map to
     // the same paths.
     await app.start();
-    domRendererManager.startCullingLoop({
+    rendererManager.startCullingLoop({
         isAttract: isAttractActive,
         getSpectatorActive: () => spectatorActive,
     });

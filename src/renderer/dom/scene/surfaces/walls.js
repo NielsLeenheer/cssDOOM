@@ -13,7 +13,7 @@
 
 import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
-import { mapData } from '../../../shared/maps/index.js';
+import { mapData } from '../../../../shared/maps/index.js';
 import { appendToSector, getSectorLight } from '../sectors.js';
 
 /** Creates a wall DOM element from wall data with the given floor/ceiling heights. */

@@ -25,7 +25,7 @@ import { mapData } from '../../shared/maps/index.js';
 import { getSectorAt } from '../physics.js';
 import { orchestrator } from '../../orchestrator.js';
 import { sectorCenter } from '../../shared/maps/index.js';
-import { setDoorState } from '../../renderer/index.js';
+import { setDoorState } from '../../renderer/dom/index.js';
 import { isMatchLobby } from '../match.js';
 
 const DOOR_PASSABLE_DELAY = 0.8; // seconds — slightly before fully open to allow ducking under

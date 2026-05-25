@@ -36,7 +36,7 @@
 import { state } from './game/state.js';
 import { Player } from './game/player/player.js';
 import { currentMap } from './shared/maps/index.js';
-import { domRendererManager } from './renderer/dom-renderer-manager.js';
+import { rendererManager } from './renderer/renderer-manager.js';
 import { resetMatch, clearMatch } from './game/match.js';
 import { setDefaultSlot, unclaimSlotsNotIn } from './input/claim-registry.js';
 import {
@@ -175,13 +175,13 @@ export function applyMode(gameMode, networkMode = 'standalone') {
     // Reshape the master's local DomRenderers + audio listeners for
     // this mode. Client windows skip both: they manage exactly one
     // DomRenderer for their master-assigned slot (handled by
-    // RemoteGame._onAck → domRendererManager.resetToJoinerSlot), and
+    // RemoteGame._onAck → rendererManager.resetToJoinerSlot), and
     // their audio listener also lives at that slot (set by _onAck
     // after the slot is known — applyMode runs BEFORE the join
     // handshake assigns one, so configureAudio here would land at the
     // wrong index).
     if (!document.body.classList.contains('client-window')) {
-        domRendererManager.reshape(gameMode, networkMode);
+        rendererManager.reshape(gameMode, networkMode);
         // Master plays audio for every local player. SP gets one
         // bearing-pan listener; DM gets two pane-side-locked listeners
         // (slot 0 left, slot 1 right). Suppressed slots (Network DM

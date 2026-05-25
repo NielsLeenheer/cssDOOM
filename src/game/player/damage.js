@@ -11,7 +11,7 @@ import { equipWeapon } from '../entities/weapons.js';
 import { getSectorAt } from '../physics.js';
 import { awardFrag } from '../match.js';
 import { getCurrentLevel } from '../level.js';
-import * as renderer from '../../renderer/index.js';
+import * as renderer from '../../renderer/dom/index.js';
 import { clearMovingState } from '../movement.js';
 
 // ============================================================================

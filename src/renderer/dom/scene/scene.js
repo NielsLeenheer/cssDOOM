@@ -14,7 +14,7 @@
  */
 
 import { makeSceneState } from '../dom-renderer.js';
-import * as maps from '../../shared/maps/index.js';
+import * as maps from '../../../shared/maps/index.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
 import { buildFloors } from './surfaces/floors.js';

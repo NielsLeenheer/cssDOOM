@@ -1,9 +1,10 @@
 /**
- * DomRendererManager — single owner of the DomRenderer lifecycle in this
- * window.
+ * RendererManager — single owner of the renderer lifecycle in this
+ * window. Manages DomRenderers by default, plus LineRenderer /
+ * FlatRenderer instances when ?lines mode is active.
  *
  * Each window (master or joiner) has exactly one Manager instance,
- * exported as a singleton. The Manager owns the live `DomRenderer`
+ * exported as a singleton. The Manager owns the live renderer
  * registry as instance state — there's no module-level array anyone
  * else can mutate. Everything that creates, destroys, or reshapes
  * renderers goes through the Manager.
@@ -21,11 +22,13 @@
  * differs; the management surface does not.
  */
 
-import { DomRenderer } from './dom-renderer.js';
+import { DomRenderer } from './dom/dom-renderer.js';
+import { LineRenderer } from './line/renderer.js';
+import { FlatRenderer } from './flat/renderer.js';
 import { orchestrator } from '../orchestrator.js';
-import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './scene/culling.js';
+import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.js';
 
-class DomRendererManager {
+class RendererManager {
     constructor() {
         this._renderers = [];
         // Captured once at module load. Both elements live in index.html
@@ -56,6 +59,31 @@ class DomRendererManager {
      */
     create(playerIndex) {
         const renderer = new DomRenderer({
+            playerIndex,
+            gameContainer: this._gameContainer,
+            paneTemplate: this._paneTemplate,
+        });
+        this._renderers.push(renderer);
+        return renderer;
+    }
+
+    /** ?lines-only: construct a LineRenderer instead of a DomRenderer
+     *  for one of the panes. Same lifecycle surface (destroy / paneEl
+     *  / orchestrator-target shape) so reshape + the culling loop
+     *  don't need a different code path. */
+    _createLineRenderer(playerIndex) {
+        const renderer = new LineRenderer({
+            playerIndex,
+            gameContainer: this._gameContainer,
+        });
+        this._renderers.push(renderer);
+        return renderer;
+    }
+
+    /** ?lines-only: construct a FlatRenderer (DomRenderer subclass)
+     *  for the flat-shaded pane. */
+    _createFlatRenderer(playerIndex) {
+        const renderer = new FlatRenderer({
             playerIndex,
             gameContainer: this._gameContainer,
             paneTemplate: this._paneTemplate,
@@ -99,6 +127,19 @@ class DomRendererManager {
      */
     reshape(gameMode, networkMode) {
         const isKiosk = document.body.classList.contains('kiosk');
+        const isLines = document.body.classList.contains('lines');
+
+        // ?lines SP: progression demo for the talk. 2×2 quadrants:
+        // top-left wireframe, top-right flat-shaded, bottom-left
+        // empty (placeholder for a future fourth renderer),
+        // bottom-right fully textured. All three live renderers
+        // render the same player (mirror). Custom layout path —
+        // doesn't fit the count-based loop below.
+        if (isLines && gameMode === 'singleplayer') {
+            this._reshapeLines();
+            return;
+        }
+
         const mirror = gameMode === 'singleplayer' && isKiosk;
         const needsTwoLocal = (gameMode === 'deathmatch' && networkMode === 'standalone')
             || mirror
@@ -136,6 +177,46 @@ class DomRendererManager {
             r.playerIndex = mirror ? 0 : slot;
             r.paneEl.dataset.player = String(r.playerIndex);
             r.paneEl.dataset.slot = String(slot);
+        }
+    }
+
+    /**
+     * ?lines SP layout. Three renderers, all rendering player 0:
+     *
+     *   data-slot=0 (top-left)     → LineRenderer       (wireframe)
+     *   data-slot=1 (top-right)    → FlatRenderer       (flat-shaded)
+     *   data-slot=3 (bottom-right) → DomRenderer        (fully textured)
+     *
+     * Slot 2 (bottom-left) is intentionally left empty as a slot for
+     * a future fourth renderer. Idempotent.
+     */
+    _reshapeLines() {
+        const specs = [
+            { kind: 'line', slot: 0 },
+            { kind: 'flat', slot: 1 },
+            { kind: 'dom',  slot: 3 },
+        ];
+        // First-time build: tear down anything already present and
+        // construct the three panes in spec order. Subsequent calls
+        // are no-ops (we keep the existing renderers).
+        if (this._renderers.length !== specs.length) {
+            while (this._renderers.length > 0) {
+                const r = this._renderers.pop();
+                orchestrator.removeTarget(r);
+                r.destroy();
+            }
+            for (const spec of specs) {
+                const r = spec.kind === 'line' ? this._createLineRenderer(0)
+                        : spec.kind === 'flat' ? this._createFlatRenderer(0)
+                        : this.create(0);
+                orchestrator.addTarget(r);
+            }
+        }
+        for (let i = 0; i < specs.length; i++) {
+            const r = this._renderers[i];
+            r.playerIndex = 0;
+            r.paneEl.dataset.player = '0';
+            r.paneEl.dataset.slot = String(specs[i].slot);
         }
     }
 
@@ -214,4 +295,4 @@ class DomRendererManager {
     }
 }
 
-export const domRendererManager = new DomRendererManager();
+export const rendererManager = new RendererManager();

@@ -5,17 +5,17 @@
  */
 
 import { culling, cullingStats } from '../scene/culling.js';
-import { state, debug } from '../../game/state.js';
-import { EYE_HEIGHT } from '../../shared/constants.js';
+import { state, debug } from '../../../game/state.js';
+import { EYE_HEIGHT } from '../../../shared/constants.js';
 import { THING_NAMES } from '../scene/constants.js';
-import { getFloorHeightAt, getSectorAt } from '../../game/physics.js';
+import { getFloorHeightAt, getSectorAt } from '../../../game/physics.js';
 import { updateCamera } from '../index.js';
-import { mapData, currentMap } from '../../shared/maps/index.js';
-import { swapLevel } from '../../game/level.js';
-import { forEachWallInAABB } from '../../game/spatial-grid.js';
-import { endMatch } from '../../game/match.js';
-import { enterAttract } from '../../game/attract.js';
-import { app } from '../../app.js';
+import { mapData, currentMap } from '../../../shared/maps/index.js';
+import { swapLevel } from '../../../game/level.js';
+import { forEachWallInAABB } from '../../../game/spatial-grid.js';
+import { endMatch } from '../../../game/match.js';
+import { enterAttract } from '../../../game/attract.js';
+import { app } from '../../../app.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 

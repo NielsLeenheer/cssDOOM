@@ -18,7 +18,7 @@ import { orchestrator } from '../../orchestrator.js';
 import { setEnemyState } from './enemies.js';
 import { recordKill } from '../sp-stats.js';
 import { lowerFloorsWithTag } from '../mechanics/floors.js';
-import * as renderer from '../../renderer/index.js';
+import * as renderer from '../../renderer/dom/index.js';
 
 // ============================================================================
 // Enemy Hitscan Attack

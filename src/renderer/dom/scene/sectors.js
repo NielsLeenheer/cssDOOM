@@ -15,7 +15,7 @@
  */
 
 import { LIGHT_MINIMUM_BRIGHTNESS, DOOM_LIGHT_MAX, LIGHT_DISTANCE_OFFSET } from './constants.js';
-import { mapData } from '../../shared/maps/index.js';
+import { mapData } from '../../../shared/maps/index.js';
 
 /**
  * Maps DOOM sector special types to CSS animation classes for dynamic lighting effects.

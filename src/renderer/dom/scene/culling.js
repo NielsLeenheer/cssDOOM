@@ -18,7 +18,7 @@
  * overlay in DM.
  */
 
-import { MAX_RENDER_DISTANCE } from '../../shared/constants.js';
+import { MAX_RENDER_DISTANCE } from '../../../shared/constants.js';
 
 // Culling flags — toggled by the debug menu
 export const culling = {

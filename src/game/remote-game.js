@@ -25,7 +25,7 @@ import { MSG } from '../transport/protocol.js';
 import { ClientConnection } from '../transport/peer-connection.js';
 import { connectToNetworkRoom } from '../transport/webrtc-transport.js';
 import { inputs } from '../orchestrator.js';
-import { domRendererManager } from '../renderer/dom-renderer-manager.js';
+import { rendererManager } from '../renderer/renderer-manager.js';
 import { setDefaultSlot } from '../input/claim-registry.js';
 import { initKeyboardMouse } from '../input/keyboard-mouse.js';
 import { initGamepadInput } from '../input/gamepad.js';
@@ -225,7 +225,7 @@ export class RemoteGame {
             onWait: () => setLoadingStatus('WAITING FOR CURRENT GAME TO END'),
         });
 
-        domRendererManager.startCullingLoop({
+        rendererManager.startCullingLoop({
             isAttract: isAttractActive,
             getSpectatorActive: () => spectatorActive,
         });
@@ -259,7 +259,7 @@ export class RemoteGame {
         // clears every orchestrator target, then creates + installs a
         // fresh one — all through the Manager + Orchestrator's clean
         // APIs (no reaching past either's surface).
-        domRendererManager.resetToJoinerSlot(slotIndex);
+        rendererManager.resetToJoinerSlot(slotIndex);
 
         // One local audio listener at the master-assigned slot. applyMode
         // skipped this because the slot wasn't known yet, AND

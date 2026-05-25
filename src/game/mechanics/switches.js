@@ -29,7 +29,7 @@ import { toggleDoor } from './doors.js';
 import { activateLift } from './lifts.js';
 import { activateCrusher } from './crushers.js';
 import { getNextMap, getSecretExitMap } from '../../shared/maps/index.js';
-import * as renderer from '../../renderer/index.js';
+import * as renderer from '../../renderer/dom/index.js';
 import { isMatchLobby } from '../match.js';
 import { getCurrentLevel } from '../level.js';
 

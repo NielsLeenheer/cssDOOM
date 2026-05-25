@@ -33,24 +33,24 @@
  * the fields they read.
  */
 
-import * as sprites from './scene/entities/sprites.js';
-import * as doors from './scene/mechanics/doors.js';
-import * as lifts from './scene/mechanics/lifts.js';
-import * as crushers from './scene/mechanics/crushers.js';
-import * as scene from './scene/scene.js';
-import { toggleSwitchState } from './scene/mechanics/switches.js';
-import { setFloorHeight } from './scene/surfaces/floors.js';
-import * as effects from './hud/effects.js';
-import * as weapons from './hud/weapons.js';
-import { updateHud } from './hud/hud.js';
-import { updateCamera } from './scene/camera.js';
-import * as playerVisuals from './scene/entities/player.js';
-import { renderIntermission, clearIntermission } from './screens/intermission.js';
-import { renderResults, clearResults } from './screens/scoreboard.js';
-import { showLobby, hideLobby } from './screens/lobby.js';
-import { showAttract, hideAttract } from './screens/attract.js';
-import { showTimer } from './hud/match-timer.js';
-import { showLevelTransition, hideLevelTransition } from './hud/level-transition.js';
+import * as sprites from './dom/scene/entities/sprites.js';
+import * as doors from './dom/scene/mechanics/doors.js';
+import * as lifts from './dom/scene/mechanics/lifts.js';
+import * as crushers from './dom/scene/mechanics/crushers.js';
+import * as scene from './dom/scene/scene.js';
+import { toggleSwitchState } from './dom/scene/mechanics/switches.js';
+import { setFloorHeight } from './dom/scene/surfaces/floors.js';
+import * as effects from './dom/hud/effects.js';
+import * as weapons from './dom/hud/weapons.js';
+import { updateHud } from './dom/hud/hud.js';
+import { updateCamera } from './dom/scene/camera.js';
+import * as playerVisuals from './dom/scene/entities/player.js';
+import { renderIntermission, clearIntermission } from './dom/screens/intermission.js';
+import { renderResults, clearResults } from './dom/screens/scoreboard.js';
+import { showLobby, hideLobby } from './dom/screens/lobby.js';
+import { showAttract, hideAttract } from './dom/screens/attract.js';
+import { showTimer } from './dom/hud/match-timer.js';
+import { showLevelTransition, hideLevelTransition } from './dom/hud/level-transition.js';
 
 export const COMMANDS = {
     // ── Per-player: camera & HUD ──────────────────────────────────────────
@@ -178,7 +178,7 @@ export const WORLD_COMMANDS = Object.fromEntries(
 // hazard that otherwise hits when a renderer impl (hud.js, scene.js,
 // etc.) transitively pulls commands.js back through DomRenderer or
 // RenderSink.
-import { DomRenderer } from './dom-renderer.js';
+import { DomRenderer } from './dom/dom-renderer.js';
 import { RenderSink } from '../transport/render-sink.js';
 
 // DomRenderer: each command method invokes its impl with `this`

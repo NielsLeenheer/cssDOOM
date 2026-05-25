@@ -7,7 +7,7 @@ import { EYE_HEIGHT, MOVE_SPEED, RUN_MULTIPLIER, TURN_SPEED, PLAYER_RADIUS } fro
 import { canMoveTo, getFloorHeightAt, getSectorAt } from './physics.js';
 import { orchestrator } from '../orchestrator.js';
 import { updatePlayerFromLift } from './mechanics/lifts.js';
-import * as renderer from '../renderer/index.js';
+import * as renderer from '../renderer/dom/index.js';
 import { inputs } from '../orchestrator.js';
 import { state } from './state.js';
 import { isMatchLobby } from './match.js';
