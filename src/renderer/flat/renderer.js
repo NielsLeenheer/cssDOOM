@@ -20,6 +20,7 @@
  */
 
 import { DomRenderer } from '../dom/dom-renderer.js';
+import { RendererBase } from '../renderer-base.js';
 import { buildFlatScene } from './scene.js';
 import * as maps from '../../shared/maps/index.js';
 
@@ -68,68 +69,36 @@ export class FlatRenderer extends DomRenderer {
     // only the viewport's sky background.
 }
 
-// Commands the flat renderer should ignore. updateHud / switchWeapon /
-// effect spawns / player visuals / lobby overlays etc. either operate
-// on DOM nodes that don't exist in a flat pane (no .weapon child for
-// switchWeapon, no thingDom entry for collectItem) or write text /
-// classes we explicitly don't want surfaced (HUD digits, paused tint).
-// Some of these would silently no-op against an empty sceneState;
-// others would throw. Cheaper to blanket-disable them than to chase
-// each impl's defensive-check pattern.
-const NOOP_COMMANDS = [
+// Commands the flat renderer should ignore. Some operate on DOM nodes
+// or sceneState entries that don't exist in a flat pane (no thingDom
+// entry for collectItem, etc.) and would throw if the DomRenderer
+// impls ran. Others (HUD, weapon visuals, overlay screens) write to
+// nodes that DO exist but are CSS-hidden in `.pane-flat`, so running
+// them would just be wasted work. Either way, suppress at dispatch
+// time rather than shadowing each method.
+const SUPPRESSED = new Set([
     // Per-pane: HUD + weapons + effects + player visuals + pause tint
-    'updateHud',
-    'triggerFlash',
-    'showPowerup',
-    'flickerPowerup',
-    'hidePowerup',
-    'switchWeapon',
-    'startFiring',
-    'stopFiring',
-    'setPlayerDead',
-    'setPlayerMoving',
-    'showPaused',
-    'hidePaused',
+    'updateHud', 'triggerFlash', 'showPowerup', 'flickerPowerup',
+    'hidePowerup', 'switchWeapon', 'startFiring', 'stopFiring',
+    'setPlayerDead', 'setPlayerMoving', 'showPaused', 'hidePaused',
     // World: enemies / things / projectiles / effects / player sprites
-    'setEnemyState',
-    'resetEnemy',
-    'killEnemy',
-    'updateEnemyRotation',
-    'updateThingPosition',
-    'reparentThingToSector',
-    'collectItem',
-    'uncollectItem',
-    'setThingMoving',
-    'createPuff',
-    'createExplosion',
-    'createTeleportFog',
-    'createProjectile',
-    'removeProjectile',
-    'createPlayerSprite',
-    'createCorpse',
-    'playPlayerAttack',
-    // World: mechanics state we don't render. switch toggles + raw
-    // floor-height tweaks aren't represented in the flat aesthetic;
-    // setDoorState / setLiftState / setCrusherOffset are inherited
-    // from DomRenderer (the flat scene does build those mechanic
-    // containers, so the data-state and --offset animations work
-    // identically to the textured pane).
-    'toggleSwitchState',
-    'setFloorHeight',
-    // World: overlay screens. Lobby / results / intermission / attract
-    // / level-transition / timer don't belong in the talk visual.
-    'showLobby',
-    'hideLobby',
-    'showIntermission',
-    'hideIntermission',
-    'showResults',
-    'hideResults',
-    'showTimer',
-    'showAttract',
-    'hideAttract',
-    'showLevelTransition',
-    'hideLevelTransition',
-];
-for (const name of NOOP_COMMANDS) {
-    FlatRenderer.prototype[name] = function () {};
-}
+    'setEnemyState', 'resetEnemy', 'killEnemy', 'updateEnemyRotation',
+    'updateThingPosition', 'reparentThingToSector', 'collectItem',
+    'uncollectItem', 'setThingMoving', 'createPuff', 'createExplosion',
+    'createTeleportFog', 'createProjectile', 'removeProjectile',
+    'createPlayerSprite', 'createCorpse', 'playPlayerAttack',
+    // World: mechanics we don't render. setDoorState / setLiftState /
+    // setCrusherOffset are NOT in this set — the flat scene builds
+    // those mechanic containers and the data-state / --offset CSS
+    // animations work identically to the textured pane.
+    'toggleSwitchState', 'setFloorHeight',
+    // World: overlay screens — don't belong in the talk visual.
+    'showLobby', 'hideLobby', 'showIntermission', 'hideIntermission',
+    'showResults', 'hideResults', 'showTimer', 'showAttract',
+    'hideAttract', 'showLevelTransition', 'hideLevelTransition',
+]);
+
+FlatRenderer.prototype.dispatch = function (kind, command, args) {
+    if (SUPPRESSED.has(command)) return;
+    return RendererBase.prototype.dispatch.call(this, kind, command, args);
+};

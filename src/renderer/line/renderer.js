@@ -16,7 +16,7 @@
  */
 
 import { renderScene3D, setRendererSettings } from './scene.js';
-import { COMMANDS } from '../commands.js';
+import { RendererBase } from '../renderer-base.js';
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
@@ -31,13 +31,14 @@ setRendererSettings({
     renderFloorsCeilings: true,
 });
 
-export class LineRenderer {
+export class LineRenderer extends RendererBase {
     /**
      * @param {object} options
      * @param {number} options.playerIndex   the player this renderer is for
      * @param {HTMLElement} options.gameContainer  `#game` — where the pane is appended
      */
     constructor({ playerIndex, gameContainer }) {
+        super();
         // Same orchestrator marker as DomRenderer so callers that
         // already know how to find a 'dom' target don't have to learn
         // a new kind for the lines pane. Findability-by-kind is mainly
@@ -198,13 +199,9 @@ export class LineRenderer {
     }
 }
 
-// No-op every command we don't actively implement above. Orchestrator
-// fan-out calls these blindly (e.g. world `createCorpse`, per-pane
-// `updateHud`) and a missing method would surface as a "is not a
-// function" TypeError. Iterate the registry so any future command
-// addition gets a quiet default here too.
-for (const name of Object.keys(COMMANDS)) {
-    if (!LineRenderer.prototype[name]) {
-        LineRenderer.prototype[name] = function () {};
-    }
-}
+// Commands not implemented above no-op automatically via
+// RendererBase.dispatch — it checks `typeof this[command] === 'function'`
+// and skips if absent. So no manual no-op loop is needed here; the
+// orchestrator's dispatch into commands the line renderer doesn't
+// care about (updateHud, createCorpse, lobby/overlay commands…)
+// quietly falls through.

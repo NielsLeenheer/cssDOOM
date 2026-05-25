@@ -28,17 +28,14 @@ import { updatePerspective } from './scene/scene.js';
 import { updateCulling as runCulling } from './scene/culling.js';
 import { wireWeaponEvents } from './hud/weapons.js';
 import * as spectator from './spectator.js';
+import { RendererBase } from '../renderer-base.js';
 
 // Per-player and world command methods are bound onto this prototype
-// at the bottom of `commands.js` — commands.js owns the registry and
-// runs the binding after both the registry and this class are loaded.
-// Doing it here used to be a circular-import TDZ hazard: any module
-// in the renderer impl chain (hud.js, scene.js, etc.) that wanted to
-// touch a DomRenderer would transitively pull commands.js, which in
-// turn pulls hud.js again — and dom-renderer.js's binding loop fired
-// before commands.js had finished defining its exports.
+// at the bottom of this file — see the binding loop after the class
+// definition. The orchestrator calls `target.dispatch(kind, command,
+// args)`; RendererBase routes that to the bound method here.
 
-export class DomRenderer {
+export class DomRenderer extends RendererBase {
     /**
      * @param {object} options
      * @param {number} options.playerIndex   the player this renderer is for
@@ -46,6 +43,7 @@ export class DomRenderer {
      * @param {HTMLTemplateElement} options.paneTemplate  `#pane-template`
      */
     constructor({ playerIndex, gameContainer, paneTemplate }) {
+        super();
         // Explicit type marker. Orchestrator uses `target.kind` to
         // distinguish local DomRenderers from RenderSinks instead of
         // duck-typing on method existence — see
@@ -255,5 +253,102 @@ export function ensureThing(state, thingIndex) {
         };
     }
     return thing;
+}
+
+// ── Command impl bindings ────────────────────────────────────────────────
+// Each renderer command is bound here as a method on DomRenderer.prototype
+// that calls the impl with `this` baked in as the first arg. The
+// orchestrator calls `target.dispatch(kind, command, args)`;
+// RendererBase.dispatch routes to the method bound below.
+//
+// Adding a new command is two entries: an `impl` line here plus a
+// `kind` line in `../commands.js` (orchestrator reads the kind to
+// decide between per-pane and world dispatch). Bound here rather
+// than from commands.js so the cross-cutting prototype mutation
+// lives next to the class it mutates.
+
+import * as sprites from './scene/entities/sprites.js';
+import * as doors from './scene/mechanics/doors.js';
+import * as lifts from './scene/mechanics/lifts.js';
+import * as crushers from './scene/mechanics/crushers.js';
+import * as scene from './scene/scene.js';
+import { toggleSwitchState } from './scene/mechanics/switches.js';
+import { setFloorHeight } from './scene/surfaces/floors.js';
+import * as effects from './hud/effects.js';
+import * as weapons from './hud/weapons.js';
+import { updateHud } from './hud/hud.js';
+import { updateCamera } from './scene/camera.js';
+import * as playerVisuals from './scene/entities/player.js';
+import { renderIntermission, clearIntermission } from './screens/intermission.js';
+import { renderResults, clearResults } from './screens/scoreboard.js';
+import { showLobby, hideLobby } from './screens/lobby.js';
+import { showAttract, hideAttract } from './screens/attract.js';
+import { showTimer } from './hud/match-timer.js';
+import { showLevelTransition, hideLevelTransition } from './hud/level-transition.js';
+
+const IMPLS = {
+    // Camera & HUD
+    updateCamera,
+    updateHud,
+    // Effects
+    triggerFlash: effects.triggerFlash,
+    showPowerup: effects.showPowerup,
+    flickerPowerup: effects.flickerPowerup,
+    hidePowerup: effects.hidePowerup,
+    // Weapon visuals
+    switchWeapon: weapons.switchWeapon,
+    startFiring: weapons.startFiring,
+    stopFiring: weapons.stopFiring,
+    // Player visuals
+    setPlayerDead: playerVisuals.setPlayerDead,
+    setPlayerMoving: playerVisuals.setPlayerMoving,
+    // Pause tint
+    showPaused: (renderer) => renderer.rendererEl.classList.add('paused'),
+    hidePaused: (renderer) => renderer.rendererEl.classList.remove('paused'),
+    // Per-renderer map load
+    loadMap: scene.loadMap,
+    // Enemies / things / projectiles / effects
+    setEnemyState: sprites.setEnemyState,
+    resetEnemy: sprites.resetEnemy,
+    killEnemy: sprites.killEnemy,
+    updateEnemyRotation: sprites.updateEnemyRotation,
+    updateThingPosition: sprites.updateThingPosition,
+    reparentThingToSector: sprites.reparentThingToSector,
+    collectItem: sprites.collectItem,
+    uncollectItem: sprites.uncollectItem,
+    setThingMoving: sprites.setThingMoving,
+    createPuff: sprites.createPuff,
+    createExplosion: sprites.createExplosion,
+    createTeleportFog: sprites.createTeleportFog,
+    createProjectile: sprites.createProjectile,
+    removeProjectile: sprites.removeProjectile,
+    createPlayerSprite: sprites.createPlayerSprite,
+    createCorpse: sprites.createCorpse,
+    playPlayerAttack: sprites.playPlayerAttack,
+    // Mechanics state
+    setDoorState: doors.setDoorState,
+    setLiftState: lifts.setLiftState,
+    setCrusherOffset: crushers.setCrusherOffset,
+    toggleSwitchState,
+    // Surfaces
+    setFloorHeight,
+    // Lobby / intermission / results / attract / level-transition / timer
+    showLobby,
+    hideLobby,
+    showIntermission: renderIntermission,
+    hideIntermission: clearIntermission,
+    showResults: renderResults,
+    hideResults: clearResults,
+    showAttract,
+    hideAttract,
+    showTimer,
+    showLevelTransition,
+    hideLevelTransition,
+};
+
+for (const [name, impl] of Object.entries(IMPLS)) {
+    DomRenderer.prototype[name] = function (...args) {
+        return impl(this, ...args);
+    };
 }
 

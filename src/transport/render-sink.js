@@ -1,32 +1,21 @@
 /**
- * RenderSink — a render target that forwards commands over a `Transport`
- * instead of painting DOM.
+ * RenderSink — a render target that forwards every command over a
+ * `Transport` instead of painting DOM. Sinks live alongside
+ * DomRenderers in the orchestrator's target list and represent
+ * remote clients (Network DM joiners, Local DM secondary).
  *
- * Per-pane methods are generated from the command registry
- * ([../renderer/commands.js](../renderer/commands.js)) at module load.
- * Each method serializes its args (via the registry's optional
- * `serialize`, used to strip non-cloneable refs like player objects)
- * and posts a `cmd-pane` envelope. The receiving side (`RenderClient`)
- * deserializes and dispatches to its local DomRenderer.
- *
- * From the orchestrator's perspective, RenderSink and DomRenderer are
- * interchangeable for per-pane commands: same method names, same arity.
- *
- * World commands are forwarded separately via `forwardWorld(method, args)`
- * — see Orchestrator's world dispatch for the call site. The master also
- * applies the world command locally (helpers iterate every pane); the
- * sink still forwards because the client window has its own DOM tree
- * and needs its own copy of the update.
+ * Sinks override `dispatch` once instead of defining a method per
+ * command. The override picks the wire envelope shape based on
+ * `kind` — per-pane envelopes carry `target: paneIndex` so the
+ * receiver knows which pane to apply against; world envelopes don't.
+ * The receiving side (`RenderClient`) reads the envelope and calls
+ * the matching method on its local DomRenderer.
  */
 
 import { MSG } from './protocol.js';
+import { RendererBase } from '../renderer/renderer-base.js';
 
-// Per-player and world command methods are bound onto this prototype
-// at the bottom of `renderer/commands.js`. Same reason as DomRenderer:
-// commands.js owns the registry and runs the binding after both the
-// registry and this class are loaded, avoiding a circular-import TDZ.
-
-export class RenderSink {
+export class RenderSink extends RendererBase {
     /**
      * @param {{send: (msg: object) => void}} channel  Transport instance
      *        shared with the corresponding Connection on the receiving
@@ -34,6 +23,7 @@ export class RenderSink {
      * @param {number} paneIndex   master-side pane this sink represents.
      */
     constructor(channel, paneIndex) {
+        super();
         // Explicit type marker. Orchestrator uses `target.kind` to
         // distinguish RenderSinks from local DomRenderers instead of
         // duck-typing on method existence.
@@ -46,23 +36,25 @@ export class RenderSink {
         this.playerIndex = paneIndex;
     }
 
-    /** Post a per-pane command envelope. */
-    _post(method, args) {
-        this.channel.send({
-            type: MSG.CMD_PANE,
-            target: this.paneIndex,
-            method,
-            args,
-        });
-    }
-
-    /** Post a world-command envelope (called from the orchestrator). */
-    forwardWorld(method, args) {
-        this.channel.send({
-            type: MSG.CMD_WORLD,
-            method,
-            args,
-        });
+    /**
+     * Orchestrator entry point — forwards every command verbatim to
+     * the wire. Per-pane envelopes carry `target: paneIndex` so the
+     * receiver routes to the right pane; world envelopes don't.
+     */
+    dispatch(kind, command, args) {
+        if (kind === 'per-pane') {
+            this.channel.send({
+                type: MSG.CMD_PANE,
+                target: this.paneIndex,
+                method: command,
+                args,
+            });
+        } else {
+            this.channel.send({
+                type: MSG.CMD_WORLD,
+                method: command,
+                args,
+            });
+        }
     }
 }
-

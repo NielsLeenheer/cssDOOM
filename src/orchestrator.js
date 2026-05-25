@@ -648,16 +648,16 @@ for (const name of Object.keys(PER_PANE_COMMANDS)) {
     Orchestrator.prototype[name] = function (playerIndex, ...args) {
         for (const t of this.targets) {
             if (t.playerIndex !== playerIndex) continue;
-            t[name]?.(...args);
+            t.dispatch('per-pane', name, args);
         }
     };
 }
 
 // World commands: iterate every target. Each DomRenderer runs the impl
-// against itself; each RenderSink forwards to the wire (its client's
-// own orchestrator then iterates its own targets). AudioRenderer has
-// no world commands today, but the optional-chaining handles any kind
-// that doesn't expose a particular method.
+// against itself via its dispatch routing; each RenderSink forwards to
+// the wire (its client's own orchestrator then iterates its own
+// targets). AudioRenderer has no world commands today; its base
+// dispatch no-ops when the method isn't present.
 //
 // Returns Promise.all of every target's call so commands with async
 // impls (loadMap's scene rebuild, level-transition's fade-complete
@@ -668,7 +668,7 @@ for (const name of Object.keys(WORLD_COMMANDS)) {
     Orchestrator.prototype[name] = function (...args) {
         const promises = [];
         for (const t of this.targets) {
-            promises.push(t[name]?.(...args));
+            promises.push(t.dispatch('world', name, args));
         }
         return Promise.all(promises);
     };
@@ -686,7 +686,7 @@ for (const name of Object.keys(WORLD_COMMANDS)) {
 Orchestrator.prototype.playSound = function (name, opts) {
     for (const t of this.targets) {
         if (t.kind === 'audio') t.playSound(name, opts);
-        else if (t.kind === 'sink') t.forwardWorld('playSound', [name, opts]);
+        else if (t.kind === 'sink') t.dispatch('world', 'playSound', [name, opts]);
     }
 };
 

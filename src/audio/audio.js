@@ -113,7 +113,9 @@ function playBuffer(name, volume, pan) {
 
 // ── AudioRenderer (per-listener) ───────────────────────────────────────
 
-export class AudioRenderer {
+import { RendererBase } from '../renderer/renderer-base.js';
+
+export class AudioRenderer extends RendererBase {
     /**
      * @param {object} cfg
      * @param {number} cfg.slot        listener slot. Per-pane updateCamera
@@ -124,6 +126,7 @@ export class AudioRenderer {
      *                                            null = bearing-based.
      */
     constructor({ slot, paneSide }) {
+        super();
         // Orchestrator target identity. `kind` distinguishes audio
         // targets from DomRenderer ('dom') and RenderSink ('sink') in
         // dispatch sites that branch on the kind. `playerIndex` is
