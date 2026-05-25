@@ -440,7 +440,45 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
             }
             break;
 
-        case 'chasing':
+        case 'chasing': {
+            // DM-flavored deviation from DOOM: vanilla A_Chase is sticky —
+            // once locked on a target, an enemy chases it until it dies,
+            // even if the target walks far out of attack range and a
+            // closer player is right next to the enemy. That feels broken
+            // in split-screen / Network DM, where an Imp locked on a
+            // distant host visibly ignores a joiner standing in front of
+            // it. We re-evaluate target ONLY when the current target is
+            // unreachable for both melee AND ranged this tick — engaged
+            // combat stays sticky (matching DOOM's commit-to-the-fight
+            // feel), but an enemy fruitlessly trudging toward an
+            // out-of-attackRange target can switch to whoever is closer
+            // and visible. Capped to one re-eval per LINE_OF_SIGHT_CHECK_INTERVAL
+            // for the same reason DOOM caps LOS checks: P_CheckSight is
+            // expensive.
+            if (enemyAI.target instanceof Player) {
+                const meleeSq = enemyAI.meleeRange ? enemyAI.meleeRange * enemyAI.meleeRange : 0;
+                const rangedSq = enemyAI.attackRange * enemyAI.attackRange;
+                const inReach = distSqToTarget < meleeSq || distSqToTarget < rangedSq;
+                if (!inReach) {
+                    enemyAI.retargetTimer = (enemyAI.retargetTimer ?? 0) + deltaTime;
+                    if (enemyAI.retargetTimer >= LINE_OF_SIGHT_CHECK_INTERVAL) {
+                        enemyAI.retargetTimer = 0;
+                        const candidate = findVisibleTargetForEnemy(enemy);
+                        if (candidate && candidate !== enemyAI.target
+                            && hasLineOfSight(enemy.x, enemy.y, candidate.x, candidate.y)) {
+                            const candDistSq = (candidate.x - enemy.x) ** 2
+                                + (candidate.y - enemy.y) ** 2;
+                            if (candDistSq < distSqToTarget) {
+                                enemyAI.target = candidate;
+                                enemyAI.threshold = 0;
+                            }
+                        }
+                    }
+                } else {
+                    enemyAI.retargetTimer = 0;
+                }
+            }
+
             moveEnemyToward(enemy, targetPos.x, targetPos.y, deltaTime);
             updateEnemyPosition(thingIndex, enemy);
 
@@ -474,6 +512,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                 }
             }
             break;
+        }
 
         case 'attacking':
             // Damage is dealt at the midpoint of the attack animation, giving

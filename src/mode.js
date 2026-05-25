@@ -78,13 +78,32 @@ export function loadSavedGameMode() {
  * Player instances for any missing slot. Idempotent — never shrinks,
  * never overwrites an existing Player. Callers that also want to shrink
  * follow with `state.players.length = n`.
+ *
+ * Auto-created slots start `isDead=true`. A Player constructed here is
+ * a placeholder — no peer has bound to that slot yet, so it has no
+ * thingRef and lives at world origin (0,0). Leaving isDead=false would
+ * let AI target it as a live player at the origin, which corrupts
+ * targeting (enemies wake at a phantom location, or lock on the ghost
+ * and ignore real players). `spawnPlayer` flips isDead=false when a
+ * real peer actually claims the slot.
+ *
+ * Note: this only applies to side-effect creates (e.g. allocating slot
+ * 3 also grows the array through slot 2 even if no peer is at 2). A
+ * slot that's about to receive `spawnPlayer` will have isDead overridden
+ * back to false immediately, so the gameplay flow is unchanged for real
+ * joiners.
  */
+function makePlaceholderPlayer(index) {
+    const player = new Player(index);
+    player.isDead = true;
+    return player;
+}
 export function ensurePlayerCount(n) {
     while (state.players.length < n) {
-        state.players.push(new Player(state.players.length));
+        state.players.push(makePlaceholderPlayer(state.players.length));
     }
     for (let i = 0; i < n; i++) {
-        if (!state.players[i]) state.players[i] = new Player(i);
+        if (!state.players[i]) state.players[i] = makePlaceholderPlayer(i);
     }
 }
 

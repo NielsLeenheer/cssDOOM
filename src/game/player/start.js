@@ -57,6 +57,16 @@ export function applyPlayerStart() {
     } else {
         applySinglePlayerStart();
     }
+    // ensurePlayerCount creates placeholder Players with isDead=true so
+    // AI doesn't target an unbound phantom at world origin (see the
+    // commentary in mode.js). Players that have a real start position
+    // here are real participants — wake them up. For DM, beginPlay's
+    // spawnPlayer also sets isDead=false; doing it here too keeps
+    // addPlayerThings (which runs between applyPlayerStart and
+    // beginPlay) from initializing thingRef.collected to true.
+    for (const player of state.players) {
+        if (player) player.isDead = false;
+    }
 }
 
 function applySinglePlayerStart() {
