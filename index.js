@@ -25,17 +25,22 @@ const isVisualize = params.has('visualize');
 // still receive the same world / per-player envelopes, just paint
 // them differently.
 const rendererKind = params.get('renderer');
-// `?play=slot` replays a recorded envelope stream from localStorage.
+// `?play=slot` replays a recorded envelope stream from IndexedDB.
 // Bypasses both client and server boot paths — initMaster runs a
 // stripped sequence (renderers + culling only) and hands off to the
 // player module.
 const playSlot = params.get('play');
+// `?export=mp4 | webm` captures the playback window via
+// getDisplayMedia + MediaRecorder and downloads the result when the
+// recording ends. Requires a user click before screen capture (the
+// player paints a prompt overlay).
+const exportFormat = params.get('export');
 if (isKiosk) document.body.classList.add('kiosk');
 if (isVisualize) document.body.classList.add('visualize');
 if (rendererKind) document.body.dataset.renderer = rendererKind;
 
 if (playSlot) {
-    initMaster({ isKiosk, playSlot });
+    initMaster({ isKiosk, playSlot, exportFormat });
 } else if (isClient) {
     initClientWindow({ roomCode });
 } else {

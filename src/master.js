@@ -499,7 +499,7 @@ function setupMasterBroadcast() {
  *   into 2P split-screen regardless of what the last interactive
  *   session left in localStorage.
  */
-export async function initMaster({ isKiosk = false, playSlot = null } = {}) {
+export async function initMaster({ isKiosk = false, playSlot = null, exportFormat = null } = {}) {
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
 
     // ?play=slot path — stand up the renderer infrastructure only,
@@ -507,7 +507,8 @@ export async function initMaster({ isKiosk = false, playSlot = null } = {}) {
     // (which would create a Game, load a level, and start dispatching
     // its own envelopes) and the gameLoop kickoff at the end of this
     // function — the recording IS the envelope source, including the
-    // initial loadMap that builds the scene.
+    // initial loadMap that builds the scene. `exportFormat` (from
+    // ?export=mp4 | webm) routes the player through MediaRecorder.
     if (playSlot) {
         applyMode('singleplayer', 'standalone');
         rendererManager.startCullingLoop({
@@ -515,7 +516,7 @@ export async function initMaster({ isKiosk = false, playSlot = null } = {}) {
             getSpectatorActive: () => false,
         });
         hideInitialOverlay();
-        playRecording(playSlot);
+        playRecording(playSlot, exportFormat);
         return;
     }
 
