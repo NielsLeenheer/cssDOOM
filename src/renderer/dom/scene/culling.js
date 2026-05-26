@@ -284,9 +284,13 @@ export function updateCulling(renderer, worldThings, spectatorActive, collectSta
 
     // Precompute frustum parameters. Half-FOV uses this pane's actual width
     // so side-by-side panes each cull against their own slice of the screen.
+    // `paneWidth` is the cached pane size from `updatePerspective` —
+    // reading `viewportEl.clientWidth` here would force a synchronous
+    // layout every culling pass (the game loop writes CSS custom
+    // properties on the scene each frame, invalidating layout).
     const sinAngle = Math.sin(player.angle);
     const cosAngle = Math.cos(player.angle);
-    const paneWidth = renderer.viewportEl.clientWidth || window.innerWidth;
+    const paneWidth = sState.paneWidth || window.innerWidth;
     const halfFov = Math.atan2(paneWidth / 2, sState.perspectiveValue) + FRUSTUM_MARGIN;
 
     // Cull walls

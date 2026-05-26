@@ -214,6 +214,7 @@ export function makeSceneState() {
         thingDom: new Map(),           // Map<thingIndex, { element, sprite }>
         projectileDom: new Map(),      // Map<projectileId, element>
         perspectiveValue: 700,
+        paneWidth: 0,                  // cached by updatePerspective; culler reads it instead of forcing layout
     };
 }
 

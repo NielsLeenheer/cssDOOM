@@ -84,12 +84,18 @@ const IOS_GPU_RELEASE_DELAY_MS = 100;
  * remote client joins or leaves). No external trigger needed.
  */
 export function updatePerspective(renderer) {
+    // ResizeObserver fires after layout, so clientWidth here is free —
+    // no forced reflow. Cache the result on sceneState so the per-
+    // frame culler can derive its frustum half-FOV without paying for
+    // its own layout read on every tick.
+    const paneWidth = renderer.viewportEl.clientWidth || window.innerWidth;
     const value = document.body.classList.contains('kiosk')
         ? KIOSK_PERSPECTIVE
         : Math.max(
-            (renderer.viewportEl.clientWidth || window.innerWidth) / 2,
+            paneWidth / 2,
             Math.max(window.innerWidth * MIN_PERSPECTIVE_RATIO, MIN_PERSPECTIVE_PX),
         );
+    renderer.sceneState.paneWidth = paneWidth;
     renderer.sceneState.perspectiveValue = value;
     renderer.viewportEl.style.setProperty('--perspective', `${value}px`);
 }
