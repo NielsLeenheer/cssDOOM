@@ -35,3 +35,20 @@
         animation: sprite-stop calc(var(--frames) * 100ms) steps(calc(var(--frames) - 1)) forwards;
     }
 }
+
+/* Sprite-cycle desync. Without this every enemy of the same type
+   advances frames in lock-step — visually a hive. things.js's
+   buildThing seeds a random animation-delay inline at construction
+   to break the sync; this @supports block lets the browser handle
+   it natively when CSS `random()` is available (Safari 26.5+ at
+   time of writing). `!important` so the CSS value beats the JS-
+   written inline style on supporting browsers; on others, the
+   inline JS value still applies.
+
+   The `random()` default scope is per-element, so every .sprite
+   instance gets its own independent value at style time. */
+@supports (animation-delay: random(0s, 1s)) {
+    .sprite {
+        animation-delay: random(-2s, 0s) !important;
+    }
+}
