@@ -60,6 +60,17 @@ export class LineRenderer extends RendererBase {
 
         this.ctx = this.canvas.getContext('2d');
 
+        // Half-resolution offscreen canvas for the wide bloom passes.
+        // The rasterizer cost of a stroke scales with (width × path
+        // length); the widest pass (28px) alone fills more pixels
+        // than the other four combined. Painting them onto a half-
+        // res buffer cuts that work by ~4× and the upscaled blur is
+        // visually indistinguishable from a full-res stroke at the
+        // same source widths. The thin core stays on the main canvas
+        // to keep the centre line crisp.
+        this.glowCanvas = document.createElement('canvas');
+        this.glowCtx = this.glowCanvas.getContext('2d');
+
         // Scene data, populated by loadMap.
         this._walls = null;
         this._sectorPolygons = null;
@@ -143,6 +154,11 @@ export class LineRenderer extends RendererBase {
         this.canvas.height = Math.round(h * dpr);
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
+        // Glow buffer sized at half the main canvas in each
+        // dimension — quarter the pixel count for the wide bloom
+        // strokes.
+        this.glowCanvas.width = Math.max(1, Math.round(this.canvas.width / 2));
+        this.glowCanvas.height = Math.max(1, Math.round(this.canvas.height / 2));
         // Keep line-scene's depth buffer aspect matched to the canvas
         // so the perspective math doesn't squash vertically. The
         // perspective formulas in line-scene divide by `aspect =
@@ -191,22 +207,67 @@ export class LineRenderer extends RendererBase {
     ];
 
     _paint(lines) {
-        const { ctx } = this;
+        const { ctx, glowCtx } = this;
         const w = this.canvas.width;
         const h = this.canvas.height;
+        const gw = this.glowCanvas.width;
+        const gh = this.glowCanvas.height;
+        const dpr = window.devicePixelRatio || 1;
+
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, w, h);
         if (!lines.length) return;
 
-        // Build the path once, stroke it once per glow pass. Round
-        // caps/joins keep the halo continuous through segment ends.
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        // ── Wide bloom passes on the half-res glow buffer ──────────
+        // All wide passes except the thin core paint here. Same NDC
+        // → pixel mapping, but the canvas is half size so widths
+        // halve too. globalCompositeOperation = 'lighter' makes the
+        // overlapping strokes accumulate additively, same as before.
+        glowCtx.globalCompositeOperation = 'source-over';
+        glowCtx.clearRect(0, 0, gw, gh);
+        glowCtx.beginPath();
+        for (const seg of lines) {
+            const x1 = (seg.start[0] * 0.5 + 0.5) * gw;
+            const y1 = (1 - (seg.start[1] * 0.5 + 0.5)) * gh;
+            const x2 = (seg.end[0] * 0.5 + 0.5) * gw;
+            const y2 = (1 - (seg.end[1] * 0.5 + 0.5)) * gh;
+            glowCtx.moveTo(x1, y1);
+            glowCtx.lineTo(x2, y2);
+        }
+        glowCtx.globalCompositeOperation = 'lighter';
+        glowCtx.lineCap = 'butt';
+        glowCtx.lineJoin = 'miter';
+        const passes = LineRenderer.GLOW_PASSES;
+        for (let i = 0; i < passes.length - 1; i++) {
+            const pass = passes[i];
+            glowCtx.lineWidth = pass.width * dpr * 0.5;
+            glowCtx.strokeStyle = pass.color;
+            glowCtx.stroke();
+        }
+
+        // Composite the bloom buffer back at 2×. Two cost cuts here:
+        //
+        //   - imageSmoothingEnabled = false → nearest-neighbor
+        //     upscale, no bilinear sampling. The multi-pass additive
+        //     glow already softens pixel boundaries, so the
+        //     blockiness isn't visible against the bloom.
+        //
+        //   - globalCompositeOperation = 'source-over' (NOT 'lighter')
+        //     — the main canvas is freshly cleared to black at this
+        //     point, so additive over black is equivalent to a plain
+        //     copy. Avoiding 'lighter' here saves a read-modify-
+        //     write per destination pixel (Firefox's bottleneck when
+        //     painting at full canvas size). The thin core pass
+        //     below switches back to 'lighter' to add onto the glow.
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this.glowCanvas, 0, 0, w, h);
+
+        // ── Thin core pass on the main canvas ──────────────────────
+        // Crisp centre line; round caps soften segment tips.
         ctx.beginPath();
         for (const seg of lines) {
-            // line-scene returns segments in NDC ([-1, 1]). Map to
-            // canvas pixels: x ∈ [0, w], y ∈ [0, h] with +y down.
             const x1 = (seg.start[0] * 0.5 + 0.5) * w;
             const y1 = (1 - (seg.start[1] * 0.5 + 0.5)) * h;
             const x2 = (seg.end[0] * 0.5 + 0.5) * w;
@@ -214,14 +275,12 @@ export class LineRenderer extends RendererBase {
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
         }
-
-        const dpr = window.devicePixelRatio || 1;
-        ctx.globalCompositeOperation = 'lighter';
-        for (const pass of LineRenderer.GLOW_PASSES) {
-            ctx.lineWidth = pass.width * dpr;
-            ctx.strokeStyle = pass.color;
-            ctx.stroke();
-        }
+        const core = passes[passes.length - 1];
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = core.width * dpr;
+        ctx.strokeStyle = core.color;
+        ctx.stroke();
         ctx.globalCompositeOperation = 'source-over';
     }
 }
