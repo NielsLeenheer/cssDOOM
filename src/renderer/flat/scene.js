@@ -20,6 +20,7 @@ import { buildSectorContainers } from '../dom/scene/sectors.js';
 import { buildWalls } from '../dom/scene/surfaces/walls.js';
 import { buildFloors } from '../dom/scene/surfaces/floors.js';
 import { buildCeilings } from '../dom/scene/surfaces/ceilings.js';
+import { buildThing } from '../dom/scene/entities/things.js';
 import { buildDoor } from '../dom/scene/mechanics/doors.js';
 import { buildLift } from '../dom/scene/mechanics/lifts.js';
 import { buildCrusher } from '../dom/scene/mechanics/crushers.js';
@@ -43,6 +44,18 @@ export async function buildFlatScene(mapData) {
     buildWalls(ctx);
     buildFloors(ctx);
     buildCeilings(ctx);
+    // Things (enemies, barrels, pickups, decorations). Same builder
+    // the textured pane uses — we want the same DOM shape so runtime
+    // dispatches (updateThingPosition, setEnemyState, collectItem,
+    // …) land on the same `thingDom` entries the dom renderer would
+    // see. The .pane-flat CSS in styles.css flattens the resulting
+    // sprite / img children into solid-color billboarded rectangles.
+    if (mapData?.things) {
+        for (const thing of mapData.things) {
+            if (thing.category === undefined) continue;
+            buildThing(ctx, thing);
+        }
+    }
     // Doors / lifts / crushers re-parent existing wall+ceiling/floor
     // elements into mechanic containers AND create new track / shaft
     // walls via createWallElement. The mechanics' CSS rules

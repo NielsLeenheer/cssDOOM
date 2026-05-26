@@ -17,9 +17,9 @@ const joinParam = params.get('join'); // null when absent; '' when present witho
 const isClient = joinParam !== null;
 const roomCode = joinParam || null;   // null for Local DM secondary
 const isKiosk = params.has('kiosk');
-const isLines = params.has('lines');
+const isVisualize = params.has('visualize');
 if (isKiosk) document.body.classList.add('kiosk');
-if (isLines) document.body.classList.add('lines');
+if (isVisualize) document.body.classList.add('visualize');
 
 if (isClient) {
     initClientWindow({ roomCode });

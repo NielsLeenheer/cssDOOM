@@ -1,21 +1,17 @@
 /**
- * FlatRenderer — stripped-down DomRenderer for the talk's middle step
- * in the progression visual (wireframe → flat → fully textured). Same
- * cssDOOM scene transform / perspective / lighting; just no things,
- * no doors, no lifts, no HUD, no weapon, no effects. Walls / floors /
- * ceilings only, painted in flat colors from
- * `scripts/precompute-flat-colors.js`.
+ * FlatRenderer — stripped-down DomRenderer for the talk's progression
+ * visual. Same cssDOOM scene transform / perspective / lighting,
+ * walls / floors / ceilings painted in flat colors from
+ * `scripts/precompute-flat-colors.js`, things rendered as
+ * solid-color billboarded rectangles (see flat/styles.css). No HUD,
+ * no weapon, no overlay screens.
  *
  * Implemented as a DomRenderer subclass so we inherit the pane DOM
  * construction, ResizeObserver-driven perspective, camera state,
- * spectator delegates, and the per-player / world commands we keep
- * (chief among them updateCamera, which writes the scene-transform
- * CSS vars and is identical to a textured pane). Commands that
- * operate on things / effects / weapons / HUD are overridden to
- * no-ops below so a dispatch addressed to a fresh-and-empty scene
- * doesn't blow up on missing thingDom entries.
+ * spectator delegates, and the per-player / world commands. HUD /
+ * weapon / overlay commands are suppressed at dispatch below.
  *
- * The flat pane lives at slot 1 in ?lines mode (top-right of the
+ * The flat pane lives at slot 2 in ?visualize mode (bottom-left of the
  * 2×2 layout). See `manager.js`.
  */
 
@@ -69,28 +65,23 @@ export class FlatRenderer extends DomRenderer {
     // only the viewport's sky background.
 }
 
-// Commands the flat renderer should ignore. Some operate on DOM nodes
-// or sceneState entries that don't exist in a flat pane (no thingDom
-// entry for collectItem, etc.) and would throw if the DomRenderer
-// impls ran. Others (HUD, weapon visuals, overlay screens) write to
-// nodes that DO exist but are CSS-hidden in `.pane-flat`, so running
-// them would just be wasted work. Either way, suppress at dispatch
-// time rather than shadowing each method.
+// Commands the flat renderer should ignore. HUD chrome, weapon
+// visuals, overlay screens write to nodes that DO exist (inherited
+// from the pane template) but are CSS-hidden in `.pane-flat`, so
+// running them would just be wasted work. Thing / effect /
+// projectile / sprite commands ARE allowed — buildFlatScene
+// creates thingDom entries, and the .pane-flat CSS flattens the
+// resulting sprite / img children into solid-color rectangles.
 const SUPPRESSED = new Set([
     // Per-pane: HUD + weapons + effects + player visuals + pause tint
     'updateHud', 'triggerFlash', 'showPowerup', 'flickerPowerup',
     'hidePowerup', 'switchWeapon', 'startFiring', 'stopFiring',
     'setPlayerDead', 'setPlayerMoving', 'showPaused', 'hidePaused',
-    // World: enemies / things / projectiles / effects / player sprites
-    'setEnemyState', 'resetEnemy', 'killEnemy', 'updateEnemyRotation',
-    'updateThingPosition', 'reparentThingToSector', 'collectItem',
-    'uncollectItem', 'setThingMoving', 'createPuff', 'createExplosion',
-    'createTeleportFog', 'createProjectile', 'removeProjectile',
-    'createPlayerSprite', 'createCorpse', 'playPlayerAttack',
-    // World: mechanics we don't render. setDoorState / setLiftState /
-    // setCrusherOffset are NOT in this set — the flat scene builds
-    // those mechanic containers and the data-state / --offset CSS
-    // animations work identically to the textured pane.
+    // World: things we don't render geometry-wise.
+    // setDoorState / setLiftState / setCrusherOffset are NOT in this
+    // set — the flat scene builds those mechanic containers and the
+    // data-state / --offset CSS animations work identically to the
+    // textured pane.
     'toggleSwitchState', 'setFloorHeight',
     // World: overlay screens — don't belong in the talk visual.
     'showLobby', 'hideLobby', 'showIntermission', 'hideIntermission',

@@ -3,7 +3,7 @@
  * DomRenderer in the orchestrator's target list. Same interface
  * shape (kind, playerIndex, paneEl, command methods) so the
  * orchestrator's per-pane / world dispatch fans to it without any
- * special-casing. Used by `?lines` mode for the talk visual: a
+ * special-casing. Used by `?visualize` mode for the talk visual: a
  * DomRenderer in one pane and this in another, side by side.
  *
  * Scene rendering is delegated to the vendored line-scene.js
@@ -175,15 +175,34 @@ export class LineRenderer extends RendererBase {
         this._paint(lines);
     };
 
+    // CRT phosphor glow passes. Each entry is one stroke layer: width
+    // in CSS px, RGBA color. Painted in order under
+    // `globalCompositeOperation = 'lighter'` so overlapping strokes
+    // accumulate intensity additively — wide low-alpha pass lays a
+    // soft green bleed, medium pass thickens the halo, narrow
+    // near-white pass paints the hot core last. Tune widths/alphas
+    // here to taste; no other knobs.
+    static GLOW_PASSES = [
+        { width: 28, color: 'rgba(0, 255, 40, 0.05)' },
+        { width: 16, color: 'rgba(0, 255, 40, 0.10)' },
+        { width: 8,  color: 'rgba(0, 255, 40, 0.22)' },
+        { width: 3,  color: 'rgba(40, 255, 40, 0.55)' },
+        { width: 1.2, color: '#80ff80' },
+    ];
+
     _paint(lines) {
         const { ctx } = this;
         const w = this.canvas.width;
         const h = this.canvas.height;
+        ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = '#000';
         ctx.fillRect(0, 0, w, h);
         if (!lines.length) return;
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 1.5;
+
+        // Build the path once, stroke it once per glow pass. Round
+        // caps/joins keep the halo continuous through segment ends.
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         ctx.beginPath();
         for (const seg of lines) {
             // line-scene returns segments in NDC ([-1, 1]). Map to
@@ -195,7 +214,15 @@ export class LineRenderer extends RendererBase {
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
         }
-        ctx.stroke();
+
+        const dpr = window.devicePixelRatio || 1;
+        ctx.globalCompositeOperation = 'lighter';
+        for (const pass of LineRenderer.GLOW_PASSES) {
+            ctx.lineWidth = pass.width * dpr;
+            ctx.strokeStyle = pass.color;
+            ctx.stroke();
+        }
+        ctx.globalCompositeOperation = 'source-over';
     }
 }
 

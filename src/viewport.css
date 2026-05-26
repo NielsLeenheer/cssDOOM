@@ -39,13 +39,13 @@
 body.kiosk { --screen-scale: 1; }
 @media (min-width: 2880px) { body.kiosk { --screen-scale: 2; } }
 @media (min-width: 5760px) { body.kiosk { --screen-scale: 4; } }
-/* ?lines mirrors the kiosk pane-sizing curve — the two panes are
+/* ?visualize mirrors the kiosk pane-sizing curve — the two panes are
    shown at the same scale as a kiosk install would render them, so
    the line wireframe sits next to the CSS scene at 1:1 dimensions
    for the talk's side-by-side screen capture. */
-body.lines { --screen-scale: 1; }
-@media (min-width: 2880px) { body.lines { --screen-scale: 2; } }
-@media (min-width: 5760px) { body.lines { --screen-scale: 4; } }
+body.visualize { --screen-scale: 1; }
+@media (min-width: 2880px) { body.visualize { --screen-scale: 2; } }
+@media (min-width: 5760px) { body.visualize { --screen-scale: 4; } }
 
 .pane {
     position: relative;
@@ -92,12 +92,12 @@ body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player
    in the top-right. The bottom half of the capture is discarded by
    the wall. Uses viewport units so a future move to 4K input doesn't
    touch CSS. */
-/* ?lines reuses the kiosk 2×2 top-row positioning so the line
+/* ?visualize reuses the kiosk 2×2 top-row positioning so the line
    wireframe pane sits in the same quadrant as a kiosk's second
    physical monitor would. Mode is SP-only; CSS deathmatch / network
    selectors below don't get the lines selector. */
 body.kiosk .pane,
-body.lines .pane {
+body.visualize .pane {
     position: absolute;
     /* HD path: pane internal = 100vw × 100vh = 1920×1080. Scale to
        50% × 50% visual so each pane fits one physical monitor (top
@@ -116,7 +116,7 @@ body.lines .pane {
        identical between HD and 4K kiosk. The extra pixels just go
        toward sharper output. */
     body.kiosk .pane,
-    body.lines .pane {
+    body.visualize .pane {
         width: 50vw;
         height: 50vh;
         transform: none;
@@ -128,62 +128,24 @@ body.lines .pane {
    top of each other. `data-slot` is "0" / "1" regardless of which player
    each pane displays. */
 body.kiosk .pane[data-slot="0"],
-body.lines .pane[data-slot="0"] {
+body.visualize .pane[data-slot="0"] {
     top: 0;
     left: 0;
 }
 body.kiosk .pane[data-slot="1"],
-body.lines .pane[data-slot="1"] {
+body.visualize .pane[data-slot="1"] {
     top: 0;
     left: 50vw;
 }
-/* ?lines bottom row — slot 2 is intentionally empty (no pane is
+/* ?visualize bottom row — slot 2 is intentionally empty (no pane is
    created at this index), slot 3 holds the fully-textured pane. */
-body.lines .pane[data-slot="2"] {
+body.visualize .pane[data-slot="2"] {
     top: 50vh;
     left: 0;
 }
-body.lines .pane[data-slot="3"] {
+body.visualize .pane[data-slot="3"] {
     top: 50vh;
     left: 50vw;
-}
-
-/* Flat pane (top-right of the ?lines layout): same DOM as the
-   textured pane but the HUD chrome belongs only to the textured
-   pane. Suppress HUD + weapon overlay here so the flat-shaded
-   walls/floors/ceilings stand alone. The viewport sky texture is
-   replaced with a flat horizon gradient — the textured sky doesn't
-   fit the flat-shaded aesthetic, and a solid color would feel
-   disconnected from a 3D scene. The linear-gradient gives a subtle
-   horizon / ground separation that reads as "above the room" /
-   "below the room" without competing visually with the flat
-   surfaces. */
-.pane.pane-flat .hud,
-.pane.pane-flat .weapon {
-    display: none;
-}
-.pane.pane-flat .viewport {
-    background: #8a8a98;
-}
-/* Outline each wall in the flat pane so individual planes read
-   distinctly against neighbours of similar color. Outline (vs
-   border) doesn't take pixel space, so wall-to-wall joins stay
-   tight and the flat color fills the same area as the textured
-   pane's wall. */
-.pane.pane-flat .wall {
-    outline: 1px solid #000;
-}
-
-/* Animated flats / scrolling walls (NUKAGE keyframes, scroll-texture
-   keyframes) override `background-image` via CSS animation, which
-   wins over the inline `style.backgroundImage = "none"` we set in
-   buildFlatScene. Suppress the animations entirely in the flat pane
-   so the precomputed solid color reads through. */
-.pane.pane-flat .floor,
-.pane.pane-flat .ceiling,
-.pane.pane-flat .wall {
-    animation: none !important;
-    background-image: none !important;
 }
 
 /* Kiosk SP — the kiosk has two physical monitors; we don't want the SP
@@ -191,21 +153,11 @@ body.lines .pane[data-slot="3"] {
    left monitor and mirror pane 0's scene onto the right pane (the
    mirror state is set by menu.applyMode → setMirrorMode based on
    body.kiosk + singleplayer). Override SP's default "hide pane 1" so
-   both monitors show the SP scene side by side. ?lines uses the same
+   both monitors show the SP scene side by side. ?visualize uses the same
    override so its second (line-wireframe) pane shows up. */
 body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"],
-body.lines[data-game-mode="singleplayer"] .pane[data-player="1"] {
+body.visualize[data-game-mode="singleplayer"] .pane[data-player="1"] {
     display: block;
-}
-
-/* Line-wireframe canvas fills its pane. The pane itself is sized by
-   the kiosk-style rules above; the canvas backing store is sized in
-   JS to match the displayed size × devicePixelRatio. */
-.line-canvas {
-    display: block;
-    width: 100%;
-    height: 100%;
-    background: #000;
 }
 
 /* Client window mode (?join URL param) — the client constructs exactly
@@ -346,4 +298,26 @@ body.client-window .pane {
 body.kiosk #loading-overlay {
     bottom: 50vh;
     background-position-x: calc(25vw - 82px * 4 * var(--screen-scale, 1) / 2);
+}
+
+/* ?visualize chrome — DOOM logo (#menu-button), top-right action
+   buttons (#ui-buttons), and the debug toggle (#debug-menu) all
+   render at opacity:0 by default so the four-pane talk capture is
+   just the panes. Hover reveals them at 0.4 opacity so you can
+   still find click targets. The debug toggle goes to full opacity
+   when expanded (details[open]) so its contents are usable while
+   inspecting. */
+body.visualize #menu-button,
+body.visualize #ui-buttons,
+body.visualize #debug-menu {
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+body.visualize #menu-button:hover,
+body.visualize #ui-buttons:hover,
+body.visualize #debug-menu:hover {
+    opacity: 0.4;
+}
+body.visualize #debug-menu[open] {
+    opacity: 1;
 }

@@ -1,0 +1,11 @@
+/* Line-wireframe canvas fills its pane. The pane itself is sized by
+   the kiosk-style rules in viewport.css; the canvas backing store is
+   sized in JS to match the displayed size × devicePixelRatio. The
+   CRT phosphor glow is painted into the canvas (see line/renderer.js's
+   GLOW_PASSES). */
+.line-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: #000;
+}

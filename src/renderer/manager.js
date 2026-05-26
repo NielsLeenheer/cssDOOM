@@ -1,7 +1,7 @@
 /**
  * RendererManager — single owner of the renderer lifecycle in this
  * window. Manages DomRenderers by default, plus LineRenderer /
- * FlatRenderer instances when ?lines mode is active.
+ * FlatRenderer instances when ?visualize mode is active.
  *
  * Each window (master or joiner) has exactly one Manager instance,
  * exported as a singleton. The Manager owns the live renderer
@@ -25,6 +25,7 @@
 import { DomRenderer } from './dom/renderer.js';
 import { LineRenderer } from './line/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
+import { ShadeRenderer } from './shade/renderer.js';
 import { orchestrator } from '../orchestrator.js';
 import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.js';
 
@@ -67,7 +68,7 @@ class RendererManager {
         return renderer;
     }
 
-    /** ?lines-only: construct a LineRenderer instead of a DomRenderer
+    /** ?visualize-only: construct a LineRenderer instead of a DomRenderer
      *  for one of the panes. Same lifecycle surface (destroy / paneEl
      *  / orchestrator-target shape) so reshape + the culling loop
      *  don't need a different code path. */
@@ -80,10 +81,22 @@ class RendererManager {
         return renderer;
     }
 
-    /** ?lines-only: construct a FlatRenderer (DomRenderer subclass)
+    /** ?visualize-only: construct a FlatRenderer (DomRenderer subclass)
      *  for the flat-shaded pane. */
     _createFlatRenderer(playerIndex) {
         const renderer = new FlatRenderer({
+            playerIndex,
+            gameContainer: this._gameContainer,
+            paneTemplate: this._paneTemplate,
+        });
+        this._renderers.push(renderer);
+        return renderer;
+    }
+
+    /** ?visualize-only: construct a ShadeRenderer (DomRenderer subclass)
+     *  for the black-and-white pane. */
+    _createShadeRenderer(playerIndex) {
+        const renderer = new ShadeRenderer({
             playerIndex,
             gameContainer: this._gameContainer,
             paneTemplate: this._paneTemplate,
@@ -127,16 +140,16 @@ class RendererManager {
      */
     reshape(gameMode, networkMode) {
         const isKiosk = document.body.classList.contains('kiosk');
-        const isLines = document.body.classList.contains('lines');
+        const isVisualize = document.body.classList.contains('visualize');
 
-        // ?lines SP: progression demo for the talk. 2×2 quadrants:
-        // top-left wireframe, top-right flat-shaded, bottom-left
-        // empty (placeholder for a future fourth renderer),
-        // bottom-right fully textured. All three live renderers
-        // render the same player (mirror). Custom layout path —
-        // doesn't fit the count-based loop below.
-        if (isLines && gameMode === 'singleplayer') {
-            this._reshapeLines();
+        // ?visualize SP: progression demo for the talk. 2×2 quadrants:
+        // top-left wireframe, top-right black+white shade,
+        // bottom-left flat-shaded, bottom-right fully textured. All
+        // four live renderers render the same player (mirror).
+        // Custom layout path — doesn't fit the count-based loop
+        // below.
+        if (isVisualize && gameMode === 'singleplayer') {
+            this._reshapeVisualize();
             return;
         }
 
@@ -181,23 +194,24 @@ class RendererManager {
     }
 
     /**
-     * ?lines SP layout. Three renderers, all rendering player 0:
+     * ?visualize SP layout. Four renderers, all rendering player 0:
      *
-     *   data-slot=0 (top-left)     → LineRenderer       (wireframe)
-     *   data-slot=1 (top-right)    → FlatRenderer       (flat-shaded)
-     *   data-slot=3 (bottom-right) → DomRenderer        (fully textured)
+     *   data-slot=0 (top-left)     → LineRenderer    (wireframe)
+     *   data-slot=1 (top-right)    → ShadeRenderer   (black + white)
+     *   data-slot=2 (bottom-left)  → FlatRenderer    (flat-shaded)
+     *   data-slot=3 (bottom-right) → DomRenderer     (fully textured)
      *
-     * Slot 2 (bottom-left) is intentionally left empty as a slot for
-     * a future fourth renderer. Idempotent.
+     * Idempotent.
      */
-    _reshapeLines() {
+    _reshapeVisualize() {
         const specs = [
-            { kind: 'line', slot: 0 },
-            { kind: 'flat', slot: 1 },
-            { kind: 'dom',  slot: 3 },
+            { kind: 'line',  slot: 0 },
+            { kind: 'shade', slot: 1 },
+            { kind: 'flat',  slot: 2 },
+            { kind: 'dom',   slot: 3 },
         ];
         // First-time build: tear down anything already present and
-        // construct the three panes in spec order. Subsequent calls
+        // construct the four panes in spec order. Subsequent calls
         // are no-ops (we keep the existing renderers).
         if (this._renderers.length !== specs.length) {
             while (this._renderers.length > 0) {
@@ -206,8 +220,9 @@ class RendererManager {
                 r.destroy();
             }
             for (const spec of specs) {
-                const r = spec.kind === 'line' ? this._createLineRenderer(0)
-                        : spec.kind === 'flat' ? this._createFlatRenderer(0)
+                const r = spec.kind === 'line'  ? this._createLineRenderer(0)
+                        : spec.kind === 'shade' ? this._createShadeRenderer(0)
+                        : spec.kind === 'flat'  ? this._createFlatRenderer(0)
                         : this.create(0);
                 orchestrator.addTarget(r);
             }
