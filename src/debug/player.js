@@ -94,9 +94,13 @@ async function playWithExport(slot, recording, format) {
                 // Advisory constraints — most browsers honour
                 // these for tab/window capture so the stream isn't
                 // down-sampled before it reaches MediaRecorder.
+                // 30 fps is the standard for slide-embedded video
+                // (cinema is 24, talk-software players rarely
+                // render 60 smoothly); halves frame count, halves
+                // file size at the same per-frame quality.
                 width:     { ideal: 1920 },
                 height:    { ideal: 1080 },
-                frameRate: { ideal: 60 },
+                frameRate: { ideal: 30 },
             },
             // Tab-audio capture. Chrome shows a "Share audio"
             // checkbox in the screen-capture dialog when this is
@@ -113,14 +117,14 @@ async function playWithExport(slot, recording, format) {
     }
 
     const chunks = [];
-    // 25 Mbps is the bitrate that consumer 1080p60 capture cards
-    // settle on for near-lossless output. MediaRecorder's default
-    // is ~2.5 Mbps which is why uninstrumented captures look
-    // blocky on detailed scenes. Bump 4× for footage that holds up
-    // when projected.
+    // 12 Mbps at 1080p30 ≈ 25 Mbps at 1080p60 in per-frame quality
+    // terms (linear in frames-per-second). Plenty of bits to keep
+    // the detail without bloating the output for a half-frame-rate
+    // capture. MediaRecorder's default ~2.5 Mbps is the source of
+    // the blocky look on uninstrumented captures.
     const mediaRecorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 25_000_000,
+        videoBitsPerSecond: 12_000_000,
     });
     mediaRecorder.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
 
