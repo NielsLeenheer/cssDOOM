@@ -56,6 +56,7 @@
 
 import { RenderSink } from './transport/render-sink.js';
 import { AudioRenderer } from './audio/renderer.js';
+import * as recorder from './debug/recorder.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -657,6 +658,11 @@ class Orchestrator {
  * → its targets. No field renaming or repackaging at any step.
  */
 Orchestrator.prototype.dispatch = function (env) {
+    // Debug recorder hook — when active, captures every envelope
+    // with a relative timestamp so the run can be saved to
+    // localStorage and replayed via ?play=slot.
+    if (recorder.isRecording()) recorder.capture(env);
+
     if (env.type === 'player') {
         for (const t of this.targets) {
             if (t.playerIndex !== env.slot) continue;

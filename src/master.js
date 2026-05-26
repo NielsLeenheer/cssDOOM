@@ -23,7 +23,7 @@
 import { state } from './game/state.js';
 import { GAME_STATE, getGameState } from './game/game-state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
-import { getCurrentLevel, onLevel } from './game/level.js';
+import { getCurrentLevel, onLevel, swapLevel } from './game/level.js';
 import { rendererManager } from './renderer/manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
@@ -46,6 +46,8 @@ import { ensureMatchSize } from './game/match.js';
 import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { config } from '../config.js';
+import * as recorder from './debug/recorder.js';
+import { play as playRecording } from './debug/player.js';
 
 
 // ── Debug toggle ───────────────────────────────────────────────────────
@@ -61,6 +63,19 @@ window.debug = function () {
         console.log('Debug menu enabled');
     }
 };
+
+// Render-command recording — capture every envelope flowing through
+// orchestrator.dispatch from a clean level state, save to local
+// storage, and replay via ?play=slot. Methods hang off the same
+// `window.debug` function so the console surface stays in one place.
+//
+//   debug.record()       — restart current level, start capturing
+//   debug.save('slot')   — write buffer to localStorage[`record:slot`]
+window.debug.record = async () => {
+    recorder.start();
+    await swapLevel(currentMap);
+};
+window.debug.save = (slot) => recorder.save(slot);
 
 // ── Render-all-panes ───────────────────────────────────────────────────
 
@@ -484,8 +499,26 @@ function setupMasterBroadcast() {
  *   into 2P split-screen regardless of what the last interactive
  *   session left in localStorage.
  */
-export async function initMaster({ isKiosk = false } = {}) {
+export async function initMaster({ isKiosk = false, playSlot = null } = {}) {
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
+
+    // ?play=slot path — stand up the renderer infrastructure only,
+    // then hand control to the recording player. We skip app.start
+    // (which would create a Game, load a level, and start dispatching
+    // its own envelopes) and the gameLoop kickoff at the end of this
+    // function — the recording IS the envelope source, including the
+    // initial loadMap that builds the scene.
+    if (playSlot) {
+        applyMode('singleplayer', 'standalone');
+        rendererManager.startCullingLoop({
+            isAttract: () => false,
+            getSpectatorActive: () => false,
+        });
+        hideInitialOverlay();
+        playRecording(playSlot);
+        return;
+    }
+
     // Wire action handlers BEFORE input modules emit anything. Inputs
     // produce events on the bus; handlers in src/actions/* subscribe to
     // them and dispatch into game functions.

@@ -25,11 +25,18 @@ const isVisualize = params.has('visualize');
 // still receive the same world / per-player envelopes, just paint
 // them differently.
 const rendererKind = params.get('renderer');
+// `?play=slot` replays a recorded envelope stream from localStorage.
+// Bypasses both client and server boot paths — initMaster runs a
+// stripped sequence (renderers + culling only) and hands off to the
+// player module.
+const playSlot = params.get('play');
 if (isKiosk) document.body.classList.add('kiosk');
 if (isVisualize) document.body.classList.add('visualize');
 if (rendererKind) document.body.dataset.renderer = rendererKind;
 
-if (isClient) {
+if (playSlot) {
+    initMaster({ isKiosk, playSlot });
+} else if (isClient) {
     initClientWindow({ roomCode });
 } else {
     initMaster({ isKiosk });
