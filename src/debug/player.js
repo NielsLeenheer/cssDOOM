@@ -98,7 +98,13 @@ async function playWithExport(slot, recording, format) {
                 height:    { ideal: 1080 },
                 frameRate: { ideal: 60 },
             },
-            audio: false,
+            // Tab-audio capture. Chrome shows a "Share audio"
+            // checkbox in the screen-capture dialog when this is
+            // true and the user picks a tab; tick it to include
+            // playSound output in the encoded file. Firefox
+            // doesn't support display-media audio capture, so it
+            // silently produces a video-only stream there.
+            audio: true,
         });
     } catch (err) {
         console.error('[play] screen capture refused:', err.message);
@@ -177,7 +183,7 @@ function waitForUserGesture() {
             cursor: pointer; user-select: none;
             text-align: center; padding: 32px;
         `;
-        overlay.textContent = 'Click to start recording.\nPick this tab in the screen-capture dialog.';
+        overlay.textContent = 'Click to start recording.\nPick this tab in the screen-capture dialog\nand tick "Share audio".';
         overlay.style.whiteSpace = 'pre-line';
         overlay.addEventListener('click', () => {
             overlay.remove();
