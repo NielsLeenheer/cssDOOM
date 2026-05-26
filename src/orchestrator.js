@@ -55,7 +55,7 @@
  */
 
 import { RenderSink } from './transport/render-sink.js';
-import { AudioRenderer } from './audio/audio.js';
+import { AudioRenderer } from './audio/renderer.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -119,7 +119,7 @@ class Orchestrator {
         // playerIndex; world dispatch fans to all. Lifecycle (who's
         // in the list when) is owned by the modules that create
         // targets: DomRendererManager for 'dom', bindRemoteSlot /
-        // unbindRemoteSlot for 'sink', audio.js for 'audio'.
+        // unbindRemoteSlot for 'sink', audio/renderer.js for 'audio'.
         this.targets = [];
 
         // Remote-slot bookkeeping. `_occupiedRemoteSlots` is the set of
