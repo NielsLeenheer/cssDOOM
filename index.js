@@ -18,8 +18,16 @@ const isClient = joinParam !== null;
 const roomCode = joinParam || null;   // null for Local DM secondary
 const isKiosk = params.has('kiosk');
 const isVisualize = params.has('visualize');
+// `?renderer=flat | shade | line` swaps which renderer the manager
+// builds for each pane (default `dom`). Stashed on
+// body.dataset.renderer so the manager picks the constructor in
+// `create()` without re-parsing the URL. The alternative renderers
+// still receive the same world / per-player envelopes, just paint
+// them differently.
+const rendererKind = params.get('renderer');
 if (isKiosk) document.body.classList.add('kiosk');
 if (isVisualize) document.body.classList.add('visualize');
+if (rendererKind) document.body.dataset.renderer = rendererKind;
 
 if (isClient) {
     initClientWindow({ roomCode });

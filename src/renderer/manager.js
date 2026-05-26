@@ -53,12 +53,28 @@ class RendererManager {
     }
 
     /**
-     * Construct a new `DomRenderer` for the given player, append its
-     * pane to the game container, and register it. Caller (or reshape)
-     * is responsible for installing it as an orchestrator target via
+     * Construct a new renderer for the given player, append its pane
+     * to the game container, and register it. Caller (or reshape) is
+     * responsible for installing it as an orchestrator target via
      * `orchestrator.addTarget`.
+     *
+     * Renderer kind is selected by `?renderer=…` (stashed on
+     * `body.dataset.renderer` at boot). Defaults to DomRenderer.
+     * Visualize mode bypasses this routing — it builds its own fixed
+     * line / shade / flat / dom layout via `_reshapeVisualize`.
      */
     create(playerIndex) {
+        const kind = document.body.dataset.renderer;
+        if (kind === 'line')  return this._createLineRenderer(playerIndex);
+        if (kind === 'flat')  return this._createFlatRenderer(playerIndex);
+        if (kind === 'shade') return this._createShadeRenderer(playerIndex);
+        return this._createDomRenderer(playerIndex);
+    }
+
+    /** Construct the default DomRenderer. Split out so `_reshapeVisualize`
+     *  can ask for a dom pane explicitly without going through the
+     *  `?renderer=…` routing in `create()`. */
+    _createDomRenderer(playerIndex) {
         const renderer = new DomRenderer({
             playerIndex,
             gameContainer: this._gameContainer,
@@ -220,10 +236,13 @@ class RendererManager {
                 r.destroy();
             }
             for (const spec of specs) {
+                // Bypass `create()`'s `?renderer` routing so the
+                // visualize layout is always the fixed four-pane
+                // progression regardless of any ?renderer override.
                 const r = spec.kind === 'line'  ? this._createLineRenderer(0)
                         : spec.kind === 'shade' ? this._createShadeRenderer(0)
                         : spec.kind === 'flat'  ? this._createFlatRenderer(0)
-                        : this.create(0);
+                        : this._createDomRenderer(0);
                 orchestrator.addTarget(r);
             }
         }
