@@ -61,12 +61,12 @@ export async function buildShadeScene(mapData) {
     }
     for (const el of ctx.fragment.querySelectorAll('.floor')) {
         el.style.backgroundImage = 'none';
-        el.style.backgroundColor = 'rgba(255, 0, 0, 0.5)';
+        el.style.backgroundColor = 'rgba(0, 255, 0, 0.5)';
     }
 
     for (const el of ctx.fragment.querySelectorAll('.ceiling')) {
         el.style.backgroundImage = 'none';
-        el.style.backgroundColor = 'rgba(0, 255, 0, 0.5)';
+        el.style.backgroundColor = 'rgba(0, 0, 255, 0.5)';
     }
 
     return { fragment: ctx.fragment, sceneState: ctx.sceneState };
