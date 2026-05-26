@@ -119,7 +119,14 @@
 }
 .pane.pane-flat .sprite::before {
     background: #fff8;
-    transform: scale(1.05);
+    /* `translateZ(-1px)` pushes the outline 1px behind the body
+       along the billboard's local Z axis (the sprite's parent has
+       the rotateY billboard transform, so the pseudo's local Z is
+       perpendicular to the billboard, pointing away from the
+       camera). Disambiguates painter's order when the outline and
+       body would otherwise be coplanar; not enough depth to
+       perceive as parallax. */
+    transform: translateZ(-1px) scale(1.05);
     transform-origin: 50% 100%;
 }
 .pane.pane-flat .sprite::after {
@@ -148,7 +155,15 @@
 .pane.pane-flat .pickup:has(> img)::before,
 .pane.pane-flat .decoration:has(> img)::before {
     background: #fff8;
-    transform: translateX(-50%) rotateY(calc(var(--player-angle) * 1rad)) scale(1.05);
+    /* translateZ(-1px) AFTER the rotateY puts the outline 1px
+       behind the body along the billboard's local Z axis. Same
+       trick as the .sprite outline above — kills painter's-order
+       coin-flips with the ::after body without visible parallax. */
+    transform:
+        translateX(-50%)
+        rotateY(calc(var(--player-angle) * 1rad))
+        translateZ(-1px)
+        scale(1.05);
 }
 .pane.pane-flat .pickup:has(> img)::after     { background-color: var(--silhouette-color, #40c060); }
 .pane.pane-flat .decoration:has(> img)::after { background-color: var(--silhouette-color, #909090); }
