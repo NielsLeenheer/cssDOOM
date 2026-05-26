@@ -321,3 +321,13 @@ body.visualize #debug-menu:hover {
 body.visualize #debug-menu[open] {
     opacity: 1;
 }
+
+/* ?export chrome — the captured video should be just the rendered
+   scene. Drop the DOOM logo, action buttons, and debug toggle
+   entirely via display:none (no need to keep them click-able
+   during recording; the user isn't interacting). */
+body.recording #menu-button,
+body.recording #ui-buttons,
+body.recording #debug-menu {
+    display: none;
+}

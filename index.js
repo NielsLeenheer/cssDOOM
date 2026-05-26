@@ -35,9 +35,11 @@ const playSlot = params.get('play');
 // recording ends. Requires a user click before screen capture (the
 // player paints a prompt overlay).
 const exportFormat = params.get('export');
+
 if (isKiosk) document.body.classList.add('kiosk');
 if (isVisualize) document.body.classList.add('visualize');
 if (rendererKind) document.body.dataset.renderer = rendererKind;
+if (exportFormat) document.body.classList.add('recording');
 
 if (playSlot) {
     initMaster({ isKiosk, playSlot, exportFormat });
