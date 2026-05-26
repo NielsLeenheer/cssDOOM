@@ -21,10 +21,10 @@ import { RendererBase } from '../base.js';
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
 // treats `fov` as the horizontal field of view. cssDOOM's CSS
-// perspective on a kiosk-style pane works out to ~60° HFOV at the
-// dev viewport sizes used for the talk recording — tighten this
-// number to match the side-by-side framing.
-const CAMERA_DEFAULTS = { fov: Math.PI * 5 / 12, nearPlane: 0.1 };
+// perspective on a kiosk-style pane reads slightly wider in
+// practice than the dev-time ~60° estimate; 90° widens the line
+// wireframe to match the textured pane's framing side-by-side.
+const CAMERA_DEFAULTS = { fov: Math.PI / 2, nearPlane: 0.1 };
 
 setRendererSettings({
     drawBorder: false,
