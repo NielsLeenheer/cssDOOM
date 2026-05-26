@@ -496,6 +496,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                 // Melee attack: if enemy has a melee state and target is within MELEERANGE (64)
                 if (enemyAI.meleeRange && distSqToTarget < enemyAI.meleeRange * enemyAI.meleeRange) {
                     enemyAI.attackIsMelee = true;
+                    enemy.facing = Math.atan2(targetPos.y - enemy.y, targetPos.x - enemy.x);
                     setEnemyState(thingIndex, enemy, 'attacking');
                 }
                 // Ranged attack: non-melee-only enemies check LOS + P_CheckMissileRange
@@ -506,6 +507,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
                         if (hasLineOfSight(enemy.x, enemy.y, targetPos.x, targetPos.y)
                             && checkMissileRange(enemy, Math.sqrt(distSqToTarget))) {
                             enemyAI.attackIsMelee = false;
+                            enemy.facing = Math.atan2(targetPos.y - enemy.y, targetPos.x - enemy.x);
                             setEnemyState(thingIndex, enemy, 'attacking');
                         }
                     }
