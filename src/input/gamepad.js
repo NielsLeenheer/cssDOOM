@@ -199,8 +199,6 @@ function pollGamepads() {
         logChangesIfEnabled(rawPad);
         processGamepad(rawPad);
     }
-
-    requestAnimationFrame(pollGamepads);
 }
 
 /** Translate a gamepad's current state into padState updates + button events. */
