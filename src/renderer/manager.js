@@ -27,6 +27,7 @@ import { LineRenderer } from './line/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
 import { ShadeRenderer } from './shade/renderer.js';
 import { CatRenderer } from './cat/renderer.js';
+import { AxisRenderer } from './axis/renderer.js';
 import { orchestrator } from '../orchestrator.js';
 import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.js';
 
@@ -136,6 +137,19 @@ class RendererManager {
         return renderer;
     }
 
+    /** ?cad-only: construct an AxisRenderer pointed at the named
+     *  world axis. */
+    _createAxisRenderer(playerIndex, axis) {
+        const renderer = new AxisRenderer({
+            playerIndex,
+            axis,
+            gameContainer: this._gameContainer,
+            paneTemplate: this._paneTemplate,
+        });
+        this._renderers.push(renderer);
+        return renderer;
+    }
+
     /**
      * Tear down a renderer's pane and remove it from the registry.
      * Caller is responsible for clearing any orchestrator target slot
@@ -172,6 +186,7 @@ class RendererManager {
     reshape(gameMode, networkMode) {
         const isKiosk = document.body.classList.contains('kiosk');
         const isVisualize = document.body.classList.contains('visualize');
+        const isCad = document.body.classList.contains('cad');
 
         // ?visualize SP: progression demo for the talk. 2×2 quadrants:
         // top-left wireframe, top-right black+white shade,
@@ -181,6 +196,10 @@ class RendererManager {
         // below.
         if (isVisualize && gameMode === 'singleplayer') {
             this._reshapeVisualize();
+            return;
+        }
+        if (isCad && gameMode === 'singleplayer') {
+            this._reshapeCad();
             return;
         }
 
@@ -258,6 +277,47 @@ class RendererManager {
                         : spec.kind === 'shade' ? this._createShadeRenderer(0)
                         : spec.kind === 'flat'  ? this._createFlatRenderer(0)
                         : this._createDomRenderer(0);
+                orchestrator.addTarget(r);
+            }
+        }
+        for (let i = 0; i < specs.length; i++) {
+            const r = this._renderers[i];
+            r.playerIndex = 0;
+            r.paneEl.dataset.player = '0';
+            r.paneEl.dataset.slot = String(specs[i].slot);
+        }
+    }
+
+    /**
+     * ?cad SP layout. Three AxisRenderers + one default
+     * DomRenderer, all rendering player 0:
+     *
+     *   data-slot=0 (top-left)     → axis 'z' (top-down)
+     *   data-slot=1 (top-right)    → axis 'y' (north-side)
+     *   data-slot=2 (bottom-left)  → axis 'x' (east-side)
+     *   data-slot=3 (bottom-right) → 3D default
+     *
+     * AxisRenderer overrides updateCamera to place the camera
+     * perpendicular to the player on its axis; the rest of the
+     * DomRenderer pipeline runs unchanged.
+     */
+    _reshapeCad() {
+        const specs = [
+            { slot: 0, axis: 'z' },
+            { slot: 1, axis: 'y' },
+            { slot: 2, axis: 'x' },
+            { slot: 3, axis: null },  // null → default 3D DomRenderer
+        ];
+        if (this._renderers.length !== specs.length) {
+            while (this._renderers.length > 0) {
+                const r = this._renderers.pop();
+                orchestrator.removeTarget(r);
+                r.destroy();
+            }
+            for (const spec of specs) {
+                const r = spec.axis
+                    ? this._createAxisRenderer(0, spec.axis)
+                    : this._createDomRenderer(0);
                 orchestrator.addTarget(r);
             }
         }

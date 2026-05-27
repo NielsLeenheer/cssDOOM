@@ -18,6 +18,7 @@ const isClient = joinParam !== null;
 const roomCode = joinParam || null;   // null for Local DM secondary
 const isKiosk = params.has('kiosk');
 const isVisualize = params.has('visualize');
+const isCad = params.has('cad');
 // `?renderer=flat | shade | line` swaps which renderer the manager
 // builds for each pane (default `dom`). Stashed on
 // body.dataset.renderer so the manager picks the constructor in
@@ -38,6 +39,7 @@ const exportFormat = params.get('export');
 
 if (isKiosk) document.body.classList.add('kiosk');
 if (isVisualize) document.body.classList.add('visualize');
+if (isCad) document.body.classList.add('cad');
 if (rendererKind) document.body.dataset.renderer = rendererKind;
 // `body.recording` is added later (in the player, after the
 // click-to-start overlay is dismissed) so the debug menu stays

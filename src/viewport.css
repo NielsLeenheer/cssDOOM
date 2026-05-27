@@ -97,7 +97,8 @@ body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player
    physical monitor would. Mode is SP-only; CSS deathmatch / network
    selectors below don't get the lines selector. */
 body.kiosk .pane,
-body.visualize .pane {
+body.visualize .pane,
+body.cad .pane {
     position: absolute;
     /* HD path: pane internal = 100vw × 100vh = 1920×1080. Scale to
        50% × 50% visual so each pane fits one physical monitor (top
@@ -128,22 +129,27 @@ body.visualize .pane {
    top of each other. `data-slot` is "0" / "1" regardless of which player
    each pane displays. */
 body.kiosk .pane[data-slot="0"],
-body.visualize .pane[data-slot="0"] {
+body.visualize .pane[data-slot="0"],
+body.cad .pane[data-slot="0"] {
     top: 0;
     left: 0;
 }
 body.kiosk .pane[data-slot="1"],
-body.visualize .pane[data-slot="1"] {
+body.visualize .pane[data-slot="1"],
+body.cad .pane[data-slot="1"] {
     top: 0;
     left: 50vw;
 }
 /* ?visualize bottom row — slot 2 is intentionally empty (no pane is
-   created at this index), slot 3 holds the fully-textured pane. */
-body.visualize .pane[data-slot="2"] {
+   created at this index), slot 3 holds the fully-textured pane.
+   ?cad uses all four slots. */
+body.visualize .pane[data-slot="2"],
+body.cad .pane[data-slot="2"] {
     top: 50vh;
     left: 0;
 }
-body.visualize .pane[data-slot="3"] {
+body.visualize .pane[data-slot="3"],
+body.cad .pane[data-slot="3"] {
     top: 50vh;
     left: 50vw;
 }
@@ -156,7 +162,8 @@ body.visualize .pane[data-slot="3"] {
    both monitors show the SP scene side by side. ?visualize uses the same
    override so its second (line-wireframe) pane shows up. */
 body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"],
-body.visualize[data-game-mode="singleplayer"] .pane[data-player="1"] {
+body.visualize[data-game-mode="singleplayer"] .pane[data-player="1"],
+body.cad[data-game-mode="singleplayer"] .pane[data-player="1"] {
     display: block;
 }
 

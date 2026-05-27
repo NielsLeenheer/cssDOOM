@@ -1,0 +1,106 @@
+/* AxisRenderer — perpendicular CAD-style camera views.
+   The camera transform lives in JS (axis/renderer.js
+   updateCamera), but two things need CSS:
+
+   1. The top view (axis z) needs an additional rotateX(-90deg)
+      on the .scene to actually look DOWN. The renderer puts the
+      camera above the player, but the scene transform's yaw-only
+      rotation can't pitch the view — only CSS can.
+
+   2. The off-axis cameras are never the player's eyes, so we
+      want to actually SEE the player. The #player FOV-arc
+      marker + sprite are hidden by default (only body.spectator
+      reveals them); enable them on pane-axis. */
+
+.pane.pane-axis #player {
+    display: block;
+    /* Override spectator.css's #player transform — its default
+       uses --player-x/y/floor, but axis renderers set those vars
+       to the off-axis CAMERA position. The AxisRenderer stashes
+       the ACTUAL player coords on --actor-* so the sprite sits
+       at the real player location. */
+    transform:
+        translate3d(
+            calc(var(--actor-x) * 1px),
+            calc(var(--actor-floor) * -1px),
+            calc(var(--actor-y) * -1px)
+        );
+}
+/* Hide the spectator-only FOV-arc marker and the ground-shadow
+   pseudo — neither shows in DM and we don't want them on the CAD
+   panes either. The .enemy.player billboard alone represents the
+   player; same shape Network DM uses. */
+.pane.pane-axis #player > .marker,
+.pane.pane-axis #player::before {
+    display: none;
+}
+/* Reveal the own-player billboard. enemies.css hides it by default
+   (`.pane[data-player="0"] .enemy.player[data-player-index="0"]
+   { display:none }`) because you don't see yourself in your own
+   first-person pane — but the axis renderer IS looking at the
+   player from off-axis, so we want it visible. */
+.pane.pane-axis .enemy.player[data-player-index="0"] {
+    display: block;
+}
+
+/* Off-axis panes aren't a first-person view; the HUD + weapon
+   overlay don't belong here. */
+.pane.pane-axis .hud,
+.pane.pane-axis .weapon {
+    display: none;
+}
+
+/* The body.head-bob rule in camera.css runs the head-bob animation
+   on every .scene. The axis-x/y panes still pick up `--bob` in the
+   inherited scene transform, and even the axis-z pane (which
+   overrides the transform) keeps a useless animation ticking. Off-
+   axis views aren't through the player's eyes, so the bob has no
+   business showing up here at all. */
+.pane.pane-axis .scene {
+    animation: none;
+}
+
+/* Top-down pitch override. Re-states the standard .scene
+   transform from camera.css with rotateX(-90deg) prepended —
+   pitches the world so its XY plane lies flat against the
+   screen with altitude becoming depth toward the viewer. */
+.pane.pane-axis-z .scene {
+    transform:
+        rotateX(-90deg)
+        rotateY(calc(var(--player-angle) * -1rad))
+        translate3d(
+            calc(var(--player-x) * -1px),
+            calc(var(--player-z) * 1px),
+            calc(var(--player-y) * 1px)
+        );
+}
+
+/* Small backward tilt on every sprite (player, enemies, pickups,
+   decorations) so they aren't edge-on to the top-down camera but
+   aren't laying flat either. 20° on X tilts the top of the sprite
+   away from the viewer in the sprite's local space; after the
+   scene's rotateX(-90deg) the sprite ends up mostly facing up with
+   a slight backwards lean. Re-states the base transform from
+   entities/things.css with rotateX(20deg) prepended. */
+.pane.pane-axis-z .sprite,
+.pane.pane-axis-z .decoration img,
+.pane.pane-axis-z .pickup img {
+    transform:
+        rotateX(20deg)
+        translateX(-50%)
+        rotateY(calc(var(--player-angle) * 1rad))
+        scaleX(var(--mirror, 1));
+}
+
+/* Top-down: hide ceilings so the camera looks straight into
+   each room instead of seeing the roof tops. */
+.pane.pane-axis-z .ceiling {
+    display: none;
+}
+
+/* Top-down: no sense rendering the sky texture (we're looking
+   straight down). Blank the viewport background so the pane
+   reads as plain black behind the geometry. */
+.pane.pane-axis-z .viewport {
+    background: #000;
+}
