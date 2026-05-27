@@ -95,7 +95,7 @@
    `.debug-button-kiosk` — Enter attract. Only meaningful when
    the kiosk attract loop is wired up. */
 body:not([data-game-mode="deathmatch"]) #debug-menu .debug-button-dm    { display: none; }
-body:not(.kiosk)                        #debug-menu .debug-button-kiosk { display: none; }
+body:not([data-layout="kiosk"])         #debug-menu .debug-button-kiosk { display: none; }
 
 /* Geometry / entity hide toggles — companions to HIDE_TOGGLES in
    debug.js. Each `body.hide-…` class drops the corresponding

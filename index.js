@@ -16,9 +16,12 @@ const params = new URLSearchParams(location.search);
 const joinParam = params.get('join'); // null when absent; '' when present without value
 const isClient = joinParam !== null;
 const roomCode = joinParam || null;   // null for Local DM secondary
-const isKiosk = params.has('kiosk');
-const isVisualize = params.has('visualize');
-const isCad = params.has('cad');
+// `?layout=kiosk | cad | visualize` chooses a multi-pane layout.
+// `?kiosk` is kept as a shorthand for `?layout=kiosk` (it's the URL
+// the installation kiosk boots from — predates the layout switch).
+// Stashed on body.dataset.layout so CSS + JS read a single token
+// instead of three independent body-class checks.
+const layout = params.get('layout') ?? (params.has('kiosk') ? 'kiosk' : null);
 // `?renderer=flat | shade | line` swaps which renderer the manager
 // builds for each pane (default `dom`). Stashed on
 // body.dataset.renderer so the manager picks the constructor in
@@ -37,18 +40,16 @@ const playSlot = params.get('play');
 // player paints a prompt overlay).
 const exportFormat = params.get('export');
 
-if (isKiosk) document.body.classList.add('kiosk');
-if (isVisualize) document.body.classList.add('visualize');
-if (isCad) document.body.classList.add('cad');
+if (layout) document.body.dataset.layout = layout;
 if (rendererKind) document.body.dataset.renderer = rendererKind;
 // `body.recording` is added later (in the player, after the
 // click-to-start overlay is dismissed) so the debug menu stays
 // reachable while the user configures the recording.
 
 if (playSlot) {
-    initMaster({ isKiosk, playSlot, exportFormat });
+    initMaster({ playSlot, exportFormat });
 } else if (isClient) {
     initClientWindow({ roomCode });
 } else {
-    initMaster({ isKiosk });
+    initMaster();
 }

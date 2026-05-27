@@ -109,7 +109,7 @@ export function attractTick(timestamp) {
         lastActivityAt = timestamp;
         return;
     }
-    if (!document.body.classList.contains('kiosk')) {
+    if (document.body.dataset.layout !== 'kiosk') {
         lastActivityAt = timestamp;
         return;
     }

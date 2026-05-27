@@ -4,8 +4,8 @@
  * start map) into a plain object for `new Game(...)`. Game doesn't
  * look at URL params / localStorage / kiosk class itself.
  *
- *   - `?kiosk`  → Local DM standalone (forces deathmatch).
- *   - otherwise → `loadSavedGameMode()` + standalone.
+ *   - kiosk layout → Local DM standalone (forces deathmatch).
+ *   - otherwise    → `loadSavedGameMode()` + standalone.
  *
  * App.start handles the richer boot tree (`?join`, `?server`,
  * sessionStorage, etc.); this helper only covers the subset master
@@ -15,8 +15,7 @@
 import { loadSavedGameMode } from '../mode.js';
 
 export function buildModeConfigFromUrl() {
-    const params = new URLSearchParams(location.search);
-    const isKiosk = params.has('kiosk');
+    const isKiosk = document.body.dataset.layout === 'kiosk';
 
     const gameMode = isKiosk ? 'deathmatch' : loadSavedGameMode();
     const networkMode = 'standalone';

@@ -140,7 +140,7 @@ export function applyMode(gameMode, networkMode = 'standalone') {
         // (locals at 0+1, remotes at 2+3); non-kiosk shows 1 auto-claimed
         // local at slot 0 (remotes at 1..3). Remote slots grow
         // state.players on bind — see master.js onReady.
-        const isKiosk = document.body.classList.contains('kiosk');
+        const isKiosk = document.body.dataset.layout === 'kiosk';
         const localCount = isKiosk ? 2 : 1;
         ensurePlayerCount(localCount);
         state.players.length = localCount;

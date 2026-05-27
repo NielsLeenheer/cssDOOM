@@ -20,7 +20,7 @@
 /* Kiosk layout — pin the cluster to the right edge of the top-left
    monitor (50vw + 12px gutter) so all buttons sit on one physical 1080p
    display instead of straddling the bezel between the two screens. */
-body.kiosk #ui-buttons {
+body[data-layout="kiosk"] #ui-buttons {
     right: calc(50vw + 12px);
 }
 

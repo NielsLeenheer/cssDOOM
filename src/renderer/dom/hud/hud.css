@@ -879,7 +879,7 @@ body.spectator .weapon {
    Kiosk vs single-screen overlay positioning
 
    The kiosk runs on a 3840×2160 capture but only the top half is two
-   physical 1080p monitors side-by-side (see viewport.css `body.kiosk
+   physical 1080p monitors side-by-side (see viewport.css `body[data-layout="kiosk"]
    #game`). Each pane has its own monitor, so per-pane overlays must
    anchor per-pane — `position: absolute` against the pane (which is
    position: relative) confines them to one monitor.
@@ -894,19 +894,19 @@ body.spectator .weapon {
    overlay copies.
    ======================================================================== */
 
-body.kiosk .pane-attract,
-body.kiosk .pane-win,
-body.kiosk .pane-intermission,
-body.kiosk .pane-timer,
-body.kiosk .pane-network-lobby {
+body[data-layout="kiosk"] .pane-attract,
+body[data-layout="kiosk"] .pane-win,
+body[data-layout="kiosk"] .pane-intermission,
+body[data-layout="kiosk"] .pane-timer,
+body[data-layout="kiosk"] .pane-network-lobby {
     position: absolute;
 }
 
-body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-attract,
-body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-win,
-body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-intermission,
-body[data-game-mode="deathmatch"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-timer,
-body[data-network-mode="host"]:not(.client-window):not(.kiosk) .pane[data-player="1"] .pane-network-lobby {
+body[data-game-mode="deathmatch"]:not(.client-window):not([data-layout="kiosk"]) .pane[data-player="1"] .pane-attract,
+body[data-game-mode="deathmatch"]:not(.client-window):not([data-layout="kiosk"]) .pane[data-player="1"] .pane-win,
+body[data-game-mode="deathmatch"]:not(.client-window):not([data-layout="kiosk"]) .pane[data-player="1"] .pane-intermission,
+body[data-game-mode="deathmatch"]:not(.client-window):not([data-layout="kiosk"]) .pane[data-player="1"] .pane-timer,
+body[data-network-mode="host"]:not(.client-window):not([data-layout="kiosk"]) .pane[data-player="1"] .pane-network-lobby {
     display: none;
 }
 

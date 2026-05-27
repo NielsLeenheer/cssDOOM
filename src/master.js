@@ -493,13 +493,15 @@ function setupMasterBroadcast() {
  * that lets a client window join and receive a streamed view of one
  * pane.
  *
- * @param {object} [options]
- * @param {boolean} [options.isKiosk=false]  Kiosk forces deathmatch and
- *   bypasses the saved-mode restore so the installation always boots
- *   into 2P split-screen regardless of what the last interactive
- *   session left in localStorage.
+ * Layout (`?layout=kiosk | cad | visualize`, or `?kiosk` shorthand)
+ * is read from `document.body.dataset.layout` rather than a parameter
+ * so every consumer reads from the same place. Kiosk layout forces
+ * deathmatch and bypasses the saved-mode restore — the installation
+ * always boots into 2P split-screen regardless of what the last
+ * interactive session left in localStorage.
  */
-export async function initMaster({ isKiosk = false, playSlot = null, exportFormat = null } = {}) {
+export async function initMaster({ playSlot = null, exportFormat = null } = {}) {
+    const isKiosk = document.body.dataset.layout === 'kiosk';
     if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
 
     // ?play=slot path — stand up the renderer infrastructure only,

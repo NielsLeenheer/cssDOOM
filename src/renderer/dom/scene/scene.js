@@ -89,7 +89,7 @@ export function updatePerspective(renderer) {
     // frame culler can derive its frustum half-FOV without paying for
     // its own layout read on every tick.
     const paneWidth = renderer.viewportEl.clientWidth || window.innerWidth;
-    const value = document.body.classList.contains('kiosk')
+    const value = document.body.dataset.layout === 'kiosk'
         ? KIOSK_PERSPECTIVE
         : Math.max(
             paneWidth / 2,

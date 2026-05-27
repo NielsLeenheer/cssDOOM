@@ -36,16 +36,16 @@
 @media (min-width: 2880px) { :root { --screen-scale: 4; } }
 
 /* Kiosk: pane = window / 2, so the breakpoints are doubled. */
-body.kiosk { --screen-scale: 1; }
-@media (min-width: 2880px) { body.kiosk { --screen-scale: 2; } }
-@media (min-width: 5760px) { body.kiosk { --screen-scale: 4; } }
+body[data-layout="kiosk"] { --screen-scale: 1; }
+@media (min-width: 2880px) { body[data-layout="kiosk"] { --screen-scale: 2; } }
+@media (min-width: 5760px) { body[data-layout="kiosk"] { --screen-scale: 4; } }
 /* ?visualize mirrors the kiosk pane-sizing curve — the two panes are
    shown at the same scale as a kiosk install would render them, so
    the line wireframe sits next to the CSS scene at 1:1 dimensions
    for the talk's side-by-side screen capture. */
-body.visualize { --screen-scale: 1; }
-@media (min-width: 2880px) { body.visualize { --screen-scale: 2; } }
-@media (min-width: 5760px) { body.visualize { --screen-scale: 4; } }
+body[data-layout="visualize"] { --screen-scale: 1; }
+@media (min-width: 2880px) { body[data-layout="visualize"] { --screen-scale: 2; } }
+@media (min-width: 5760px) { body[data-layout="visualize"] { --screen-scale: 4; } }
 
 .pane {
     position: relative;
@@ -60,7 +60,7 @@ body.visualize { --screen-scale: 1; }
 }
 
 body[data-game-mode="deathmatch"] .pane,
-body.kiosk[data-network-mode="host"] .pane {
+body[data-layout="kiosk"][data-network-mode="host"] .pane {
     flex: 1 1 50%;
 }
 
@@ -70,12 +70,12 @@ body.kiosk[data-network-mode="host"] .pane {
    their assigned slot), so we must defer to the body.client-window
    rules below, which already do pane-0-hide / pane-1-fill. */
 body[data-game-mode="singleplayer"] .pane[data-player="0"],
-body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player="0"] {
+body[data-network-mode="host"]:not([data-layout="kiosk"]):not(.client-window) .pane[data-player="0"] {
     flex: 1;
 }
 
 body[data-game-mode="singleplayer"] .pane[data-player="1"],
-body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player="1"] {
+body[data-network-mode="host"]:not([data-layout="kiosk"]):not(.client-window) .pane[data-player="1"] {
     display: none;
 }
 
@@ -96,9 +96,9 @@ body[data-network-mode="host"]:not(.kiosk):not(.client-window) .pane[data-player
    wireframe pane sits in the same quadrant as a kiosk's second
    physical monitor would. Mode is SP-only; CSS deathmatch / network
    selectors below don't get the lines selector. */
-body.kiosk .pane,
-body.visualize .pane,
-body.cad .pane {
+body[data-layout="kiosk"] .pane,
+body[data-layout="visualize"] .pane,
+body[data-layout="cad"] .pane {
     position: absolute;
     /* HD path: pane internal = 100vw × 100vh = 1920×1080. Scale to
        50% × 50% visual so each pane fits one physical monitor (top
@@ -116,8 +116,8 @@ body.cad .pane {
        so HUD scaling, perspective, and overall composition are
        identical between HD and 4K kiosk. The extra pixels just go
        toward sharper output. */
-    body.kiosk .pane,
-    body.visualize .pane {
+    body[data-layout="kiosk"] .pane,
+    body[data-layout="visualize"] .pane {
         width: 50vw;
         height: 50vh;
         transform: none;
@@ -128,28 +128,28 @@ body.cad .pane {
    `data-player` is "0" on both panes — keying off it would land them on
    top of each other. `data-slot` is "0" / "1" regardless of which player
    each pane displays. */
-body.kiosk .pane[data-slot="0"],
-body.visualize .pane[data-slot="0"],
-body.cad .pane[data-slot="0"] {
+body[data-layout="kiosk"] .pane[data-slot="0"],
+body[data-layout="visualize"] .pane[data-slot="0"],
+body[data-layout="cad"] .pane[data-slot="0"] {
     top: 0;
     left: 0;
 }
-body.kiosk .pane[data-slot="1"],
-body.visualize .pane[data-slot="1"],
-body.cad .pane[data-slot="1"] {
+body[data-layout="kiosk"] .pane[data-slot="1"],
+body[data-layout="visualize"] .pane[data-slot="1"],
+body[data-layout="cad"] .pane[data-slot="1"] {
     top: 0;
     left: 50vw;
 }
 /* ?visualize bottom row — slot 2 is intentionally empty (no pane is
    created at this index), slot 3 holds the fully-textured pane.
    ?cad uses all four slots. */
-body.visualize .pane[data-slot="2"],
-body.cad .pane[data-slot="2"] {
+body[data-layout="visualize"] .pane[data-slot="2"],
+body[data-layout="cad"] .pane[data-slot="2"] {
     top: 50vh;
     left: 0;
 }
-body.visualize .pane[data-slot="3"],
-body.cad .pane[data-slot="3"] {
+body[data-layout="visualize"] .pane[data-slot="3"],
+body[data-layout="cad"] .pane[data-slot="3"] {
     top: 50vh;
     left: 50vw;
 }
@@ -158,12 +158,12 @@ body.cad .pane[data-slot="3"] {
    view to span both with a giant 32:9 image. Instead, render SP on the
    left monitor and mirror pane 0's scene onto the right pane (the
    mirror state is set by menu.applyMode → setMirrorMode based on
-   body.kiosk + singleplayer). Override SP's default "hide pane 1" so
+   body[data-layout="kiosk"] + singleplayer). Override SP's default "hide pane 1" so
    both monitors show the SP scene side by side. ?visualize uses the same
    override so its second (line-wireframe) pane shows up. */
-body.kiosk[data-game-mode="singleplayer"] .pane[data-player="1"],
-body.visualize[data-game-mode="singleplayer"] .pane[data-player="1"],
-body.cad[data-game-mode="singleplayer"] .pane[data-player="1"] {
+body[data-layout="kiosk"][data-game-mode="singleplayer"] .pane[data-player="1"],
+body[data-layout="visualize"][data-game-mode="singleplayer"] .pane[data-player="1"],
+body[data-layout="cad"][data-game-mode="singleplayer"] .pane[data-player="1"] {
     display: block;
 }
 
@@ -302,7 +302,7 @@ body.client-window .pane {
    centered on the top-left 1920×1080 monitor instead of straddling the
    bezel. The bottom half of the capture is clamped away — it's not on
    the physical wall. */
-body.kiosk #loading-overlay {
+body[data-layout="kiosk"] #loading-overlay {
     bottom: 50vh;
     background-position-x: calc(25vw - 82px * 4 * var(--screen-scale, 1) / 2);
 }
@@ -314,18 +314,18 @@ body.kiosk #loading-overlay {
    still find click targets. The debug toggle goes to full opacity
    when expanded (details[open]) so its contents are usable while
    inspecting. */
-body.visualize #menu-button,
-body.visualize #ui-buttons,
-body.visualize #debug-menu {
+body[data-layout="visualize"] #menu-button,
+body[data-layout="visualize"] #ui-buttons,
+body[data-layout="visualize"] #debug-menu {
     opacity: 0;
     transition: opacity 0.15s;
 }
-body.visualize #menu-button:hover,
-body.visualize #ui-buttons:hover,
-body.visualize #debug-menu:hover {
+body[data-layout="visualize"] #menu-button:hover,
+body[data-layout="visualize"] #ui-buttons:hover,
+body[data-layout="visualize"] #debug-menu:hover {
     opacity: 0.4;
 }
-body.visualize #debug-menu[open] {
+body[data-layout="visualize"] #debug-menu[open] {
     opacity: 1;
 }
 

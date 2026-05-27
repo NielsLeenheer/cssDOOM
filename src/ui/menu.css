@@ -291,11 +291,11 @@ body.client-window #menu-button:hover { filter: none; }
    Kiosk layout — confine the menu to the top-left monitor (1920×1080
    inside the 3840×2160 capture). The whole overlay (backdrop + content)
    shrinks to that quadrant so the other monitor and the bottom half of
-   the capture stay clear. See viewport.css `body.kiosk #game` for the
+   the capture stay clear. See viewport.css `body[data-layout="kiosk"] #game` for the
    matching constraint on the game area itself.
    ======================================================================== */
 
-body.kiosk #menu-overlay {
+body[data-layout="kiosk"] #menu-overlay {
     right: 50vw;
     bottom: 50vh;
 }

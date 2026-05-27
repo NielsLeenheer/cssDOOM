@@ -123,9 +123,10 @@ class RendererManager {
      * directly without reshape.
      */
     reshape(gameMode, networkMode) {
-        const isKiosk = document.body.classList.contains('kiosk');
-        const isVisualize = document.body.classList.contains('visualize');
-        const isCad = document.body.classList.contains('cad');
+        const layout = document.body.dataset.layout;
+        const isKiosk = layout === 'kiosk';
+        const isVisualize = layout === 'visualize';
+        const isCad = layout === 'cad';
 
         // ?visualize SP: progression demo for the talk. 2×2 quadrants:
         // top-left wireframe, top-right black+white shade,

@@ -127,7 +127,7 @@ export class App {
         const params = new URLSearchParams(location.search);
         const joinParam = params.get('join');
         const serverParam = params.get('server');
-        const isKiosk = params.has('kiosk');
+        const isKiosk = document.body.dataset.layout === 'kiosk';
 
         if (joinParam !== null) {
             await this.joinRemoteGame(joinParam || null);
@@ -233,7 +233,8 @@ export class App {
         // without the param should revert to whatever was previously
         // running, not re-enter Network DM host.
         const params = new URLSearchParams(location.search);
-        const skipPersist = params.has('kiosk') || params.has('server');
+        const isKioskLayout = document.body.dataset.layout === 'kiosk';
+        const skipPersist = isKioskLayout || params.has('server');
         if (!skipPersist) {
             try {
                 sessionStorage.setItem(
