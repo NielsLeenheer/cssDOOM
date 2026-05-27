@@ -26,6 +26,7 @@ import { DomRenderer } from './dom/renderer.js';
 import { LineRenderer } from './line/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
 import { ShadeRenderer } from './shade/renderer.js';
+import { CatRenderer } from './cat/renderer.js';
 import { orchestrator } from '../orchestrator.js';
 import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.js';
 
@@ -68,6 +69,7 @@ class RendererManager {
         if (kind === 'line')  return this._createLineRenderer(playerIndex);
         if (kind === 'flat')  return this._createFlatRenderer(playerIndex);
         if (kind === 'shade') return this._createShadeRenderer(playerIndex);
+        if (kind === 'cat')   return this._createCatRenderer(playerIndex);
         return this._createDomRenderer(playerIndex);
     }
 
@@ -113,6 +115,19 @@ class RendererManager {
      *  for the black-and-white pane. */
     _createShadeRenderer(playerIndex) {
         const renderer = new ShadeRenderer({
+            playerIndex,
+            gameContainer: this._gameContainer,
+            paneTemplate: this._paneTemplate,
+        });
+        this._renderers.push(renderer);
+        return renderer;
+    }
+
+    /** Construct a CatRenderer. Same DomRenderer-subclass shape as
+     *  the other variants; walls render as a random pick from a
+     *  pool of cat photos. */
+    _createCatRenderer(playerIndex) {
+        const renderer = new CatRenderer({
             playerIndex,
             gameContainer: this._gameContainer,
             paneTemplate: this._paneTemplate,

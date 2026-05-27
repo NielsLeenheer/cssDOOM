@@ -41,3 +41,4 @@
    the category-wide defaults. */
 @import url('src/renderer/flat/sprite-overrides.css');
 @import url('src/renderer/shade/styles.css');
+@import url('src/renderer/cat/styles.css');
