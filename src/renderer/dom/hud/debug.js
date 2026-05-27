@@ -284,7 +284,7 @@ async function switchRenderer(kind) {
     rendererManager.destroy(old);
 
     document.body.dataset.renderer = kind;
-    const fresh = rendererManager.create(playerIndex);
+    const fresh = rendererManager.create(kind, playerIndex);
     if (savedSlot !== undefined) fresh.paneEl.dataset.slot = savedSlot;
     orchestrator.addTarget(fresh);
 

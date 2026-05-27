@@ -31,6 +31,18 @@ import { AxisRenderer } from './axis/renderer.js';
 import { orchestrator } from '../orchestrator.js';
 import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.js';
 
+// `?renderer=…` lookup table for the default-pane factory. Keys are
+// the URL values; values are the constructors. Missing entries (or
+// no `?renderer=`) fall back to DomRenderer.
+const RENDERERS = {
+    line:  LineRenderer,
+    flat:  FlatRenderer,
+    shade: ShadeRenderer,
+    cat:   CatRenderer,
+    axis:  AxisRenderer,
+    dom:   DomRenderer,
+};
+
 class RendererManager {
     constructor() {
         this._renderers = [];
@@ -65,86 +77,13 @@ class RendererManager {
      * Visualize mode bypasses this routing — it builds its own fixed
      * line / shade / flat / dom layout via `_reshapeVisualize`.
      */
-    create(playerIndex) {
-        const kind = document.body.dataset.renderer;
-        if (kind === 'line')  return this._createLineRenderer(playerIndex);
-        if (kind === 'flat')  return this._createFlatRenderer(playerIndex);
-        if (kind === 'shade') return this._createShadeRenderer(playerIndex);
-        if (kind === 'cat')   return this._createCatRenderer(playerIndex);
-        return this._createDomRenderer(playerIndex);
-    }
-
-    /** Construct the default DomRenderer. Split out so `_reshapeVisualize`
-     *  can ask for a dom pane explicitly without going through the
-     *  `?renderer=…` routing in `create()`. */
-    _createDomRenderer(playerIndex) {
-        const renderer = new DomRenderer({
+    create(kind, playerIndex, extras = {}) {
+        const RendererClass = RENDERERS[kind ?? document.body.dataset.renderer] ?? DomRenderer;
+        const renderer = new RendererClass({
             playerIndex,
             gameContainer: this._gameContainer,
             paneTemplate: this._paneTemplate,
-        });
-        this._renderers.push(renderer);
-        return renderer;
-    }
-
-    /** ?visualize-only: construct a LineRenderer instead of a DomRenderer
-     *  for one of the panes. Same lifecycle surface (destroy / paneEl
-     *  / orchestrator-target shape) so reshape + the culling loop
-     *  don't need a different code path. */
-    _createLineRenderer(playerIndex) {
-        const renderer = new LineRenderer({
-            playerIndex,
-            gameContainer: this._gameContainer,
-        });
-        this._renderers.push(renderer);
-        return renderer;
-    }
-
-    /** ?visualize-only: construct a FlatRenderer (DomRenderer subclass)
-     *  for the flat-shaded pane. */
-    _createFlatRenderer(playerIndex) {
-        const renderer = new FlatRenderer({
-            playerIndex,
-            gameContainer: this._gameContainer,
-            paneTemplate: this._paneTemplate,
-        });
-        this._renderers.push(renderer);
-        return renderer;
-    }
-
-    /** ?visualize-only: construct a ShadeRenderer (DomRenderer subclass)
-     *  for the black-and-white pane. */
-    _createShadeRenderer(playerIndex) {
-        const renderer = new ShadeRenderer({
-            playerIndex,
-            gameContainer: this._gameContainer,
-            paneTemplate: this._paneTemplate,
-        });
-        this._renderers.push(renderer);
-        return renderer;
-    }
-
-    /** Construct a CatRenderer. Same DomRenderer-subclass shape as
-     *  the other variants; walls render as a random pick from a
-     *  pool of cat photos. */
-    _createCatRenderer(playerIndex) {
-        const renderer = new CatRenderer({
-            playerIndex,
-            gameContainer: this._gameContainer,
-            paneTemplate: this._paneTemplate,
-        });
-        this._renderers.push(renderer);
-        return renderer;
-    }
-
-    /** ?cad-only: construct an AxisRenderer pointed at the named
-     *  world axis. */
-    _createAxisRenderer(playerIndex, axis) {
-        const renderer = new AxisRenderer({
-            playerIndex,
-            axis,
-            gameContainer: this._gameContainer,
-            paneTemplate: this._paneTemplate,
+            ...extras,
         });
         this._renderers.push(renderer);
         return renderer;
@@ -222,7 +161,7 @@ class RendererManager {
         while (this._renderers.length < desiredCount) {
             const slot = this._renderers.length;
             const playerIndex = mirror ? 0 : slot;
-            const r = this.create(playerIndex);
+            const r = this.create(null, playerIndex);
             orchestrator.addTarget(r);
         }
 
@@ -273,11 +212,7 @@ class RendererManager {
                 // Bypass `create()`'s `?renderer` routing so the
                 // visualize layout is always the fixed four-pane
                 // progression regardless of any ?renderer override.
-                const r = spec.kind === 'line'  ? this._createLineRenderer(0)
-                        : spec.kind === 'shade' ? this._createShadeRenderer(0)
-                        : spec.kind === 'flat'  ? this._createFlatRenderer(0)
-                        : this._createDomRenderer(0);
-                orchestrator.addTarget(r);
+                orchestrator.addTarget(this.create(spec.kind, 0));
             }
         }
         for (let i = 0; i < specs.length; i++) {
@@ -316,8 +251,8 @@ class RendererManager {
             }
             for (const spec of specs) {
                 const r = spec.axis
-                    ? this._createAxisRenderer(0, spec.axis)
-                    : this._createDomRenderer(0);
+                    ? this.create('axis', 0, { axis: spec.axis })
+                    : this.create('dom', 0);
                 orchestrator.addTarget(r);
             }
         }
@@ -353,7 +288,7 @@ class RendererManager {
         for (const t of [...orchestrator.targets]) {
             orchestrator.removeTarget(t);
         }
-        const renderer = this.create(slot);
+        const renderer = this.create(null, slot);
         renderer.paneEl.dataset.slot = String(slot);
         orchestrator.addTarget(renderer);
         return renderer;
