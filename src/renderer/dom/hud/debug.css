@@ -9,7 +9,12 @@
     position: fixed;
     top: 58px;
     left: 12px;
-    z-index: 999;
+    /* Above the player's click-to-start overlay so the menu
+       stays reachable while configuring an ?export run. The
+       overlay sits at z-index 100; this comfortably outranks it
+       and still falls below any modal that genuinely should
+       cover everything. */
+    z-index: 1000;
     font-family: monospace;
     font-size: 12px;
     color: #aaa;
@@ -29,4 +34,82 @@
         cursor: pointer;
         user-select: none;
     }
+
+    /* Section header — separates the menu into Game / Culling /
+       Effects / Renderer / Debug / State groups. */
+    & .debug-section {
+        font: bold 10px/1 system-ui, sans-serif;
+        color: #ccc;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        margin: 8px 0 2px;
+        padding-top: 6px;
+        border-top: 1px solid #444;
+    }
+    & .debug-section:first-of-type {
+        margin-top: 4px;
+        padding-top: 0;
+        border-top: 0;
+    }
+
+    /* Per-step culling stats (e.g. "382 → 124") below each
+       culling-toggle row. */
+    & .debug-stat {
+        font-size: 11px;
+        color: #888;
+        padding-left: 20px;
+    }
+
+    /* State-group action buttons (End level / End match / etc.). */
+    & .debug-button {
+        display: block;
+        margin: 4px 0;
+        padding: 4px 8px;
+        font: inherit;
+        background: #222;
+        color: #ddd;
+        border: 1px solid #444;
+        cursor: pointer;
+    }
+
+    /* Renderer-picker dropdown. */
+    & .debug-select {
+        font: inherit;
+        background: #222;
+        color: #ddd;
+        border: 1px solid #444;
+        padding: 1px 4px;
+    }
+
+    /* Two-column toggle grid (renderer layer visibility). */
+    & .debug-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        column-gap: 8px;
+    }
 }
+
+/* Conditional State-group buttons.
+   `.debug-button-dm` — End match. Only meaningful when a match
+   exists, so hide outside deathmatch.
+   `.debug-button-kiosk` — Enter attract. Only meaningful when
+   the kiosk attract loop is wired up. */
+body:not([data-game-mode="deathmatch"]) #debug-menu .debug-button-dm    { display: none; }
+body:not(.kiosk)                        #debug-menu .debug-button-kiosk { display: none; }
+
+/* Geometry / entity hide toggles — companions to HIDE_TOGGLES in
+   debug.js. Each `body.hide-…` class drops the corresponding
+   layer so the talk visuals can build up the scene one element
+   type at a time. */
+body.hide-floors   .floor   { display: none; }
+body.hide-ceilings .ceiling { display: none; }
+body.hide-walls    .wall    { display: none; }
+body.hide-things   .pickup,
+body.hide-things   .decoration,
+body.hide-things   .barrel  { display: none; }
+body.hide-enemies  .enemy   { display: none; }
+body.hide-hud      .hud,
+body.hide-hud      .weapon  { display: none; }
+/* Sky is the .viewport background-image; null it out to leave a
+   plain black background where the sky texture would be. */
+body.hide-sky      .viewport { background-image: none; }

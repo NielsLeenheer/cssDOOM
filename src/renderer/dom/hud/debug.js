@@ -16,6 +16,8 @@ import { forEachWallInAABB } from '../../../game/spatial-grid.js';
 import { endMatch } from '../../../game/match.js';
 import { enterAttract } from '../../../game/attract.js';
 import { app } from '../../../app.js';
+import { rendererManager } from '../../manager.js';
+import { buildCatchup, applyCatchupCmds } from '../../../game/catchup.js';
 
 /** Teleport player to a thing by type name (e.g. teleportTo('spectre')) */
 
@@ -227,11 +229,23 @@ for (const toggle of TOGGLES) {
     if (toggle.defaultOn) document.body.classList.add(toggle.name);
 }
 
-const DEBUG_TOGGLES = [
-    { name: 'all-enemies-shadow', label: 'All enemies shadow', defaultOn: false },
-    { name: 'show-sky-walls', label: 'Show sky walls', defaultOn: false },
-    { name: 'show-wall-ids', label: 'Show wall IDs', defaultOn: false },
-    { name: 'show-sector-ids', label: 'Show sector IDs', defaultOn: false },
+// Geometry / entity hide toggles — used to dissect scenes for the
+// talk visuals (e.g. show just the walls, then add floors, then
+// ceilings). CSS rules in debug.css hook each `body.hide-…` class
+// to its `display: none` selector.
+// Renderer-layer toggles. Labels are the positive ("Floors") and
+// the checkbox-checked state means "visible" — the `hide-…` class
+// is added when the user UNCHECKS the box. Reads more naturally
+// for the talk's geometry walk-through ("turn off floors" =
+// uncheck Floors).
+const HIDE_TOGGLES = [
+    { name: 'hide-floors',   label: 'Floors'   },
+    { name: 'hide-ceilings', label: 'Ceilings' },
+    { name: 'hide-walls',    label: 'Walls'    },
+    { name: 'hide-things',   label: 'Things'   },
+    { name: 'hide-enemies',  label: 'Enemies'  },
+    { name: 'hide-hud',      label: 'HUD'      },
+    { name: 'hide-sky',      label: 'Sky'      },
 ];
 
 // Ordered to match processing order in updateCulling()
@@ -249,6 +263,105 @@ const CSS_CULLING_TOGGLES = [
 
 const cullingStatElements = {};
 
+/**
+ * Swap the SP renderer at runtime. Tears down the existing pane,
+ * builds a fresh one via manager.create() (which reads
+ * body.dataset.renderer), reloads the current map, then replays a
+ * world-state catchup so the new renderer arrives with the same
+ * door / lift / thing state the old one had. The first renderer in
+ * the manager's list is the SP pane; the loop body skips if there
+ * isn't one (e.g. in a join-only client window).
+ */
+async function switchRenderer(kind) {
+    const old = rendererManager.all[0];
+    if (!old) return;
+
+    const playerIndex = old.playerIndex;
+    const savedSlot = old.paneEl.dataset.slot;
+    const savedCamera = old.state?.camera ? { ...old.state.camera } : null;
+
+    orchestrator.removeTarget(old);
+    rendererManager.destroy(old);
+
+    document.body.dataset.renderer = kind;
+    const fresh = rendererManager.create(playerIndex);
+    if (savedSlot !== undefined) fresh.paneEl.dataset.slot = savedSlot;
+    orchestrator.addTarget(fresh);
+
+    if (currentMap && typeof fresh.loadMap === 'function') {
+        await fresh.loadMap(currentMap);
+        applyCatchupCmds(fresh, buildCatchup(playerIndex));
+        if (savedCamera && typeof fresh.updateCamera === 'function') {
+            fresh.updateCamera(savedCamera);
+        }
+    }
+}
+
+// ── Small helpers — keep initDebugMenu readable as a flat list of
+//    sections + items. Each helper appends one row to the parent.
+
+function appendHeader(parent, title) {
+    const h = document.createElement('div');
+    h.className = 'debug-section';
+    h.textContent = title;
+    parent.appendChild(h);
+}
+
+/** Body-class toggle — checkbox flips a class on document.body.
+ *  Default state read from whether the class is already present
+ *  (set at module load for TOGGLES). */
+function appendClassToggle(parent, name, label) {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = document.body.classList.contains(name);
+    cb.addEventListener('change', () => {
+        document.body.classList.toggle(name, cb.checked);
+    });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(` ${label}`));
+    parent.appendChild(lbl);
+}
+
+/** Inverted body-class toggle — checked = class absent, so the
+ *  user reads it as "Floors are visible" rather than "Hide
+ *  floors". Used by the renderer hide-toggles which all map to
+ *  `hide-…` classes. */
+function appendInvertedClassToggle(parent, name, label) {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !document.body.classList.contains(name);
+    cb.addEventListener('change', () => {
+        document.body.classList.toggle(name, !cb.checked);
+    });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(` ${label}`));
+    parent.appendChild(lbl);
+}
+
+/** debug-flag toggle — checkbox flips a boolean on the `debug`
+ *  state object (read by game logic each tick). */
+function appendFlagToggle(parent, flag, label) {
+    const lbl = document.createElement('label');
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!debug[flag];
+    cb.addEventListener('change', () => { debug[flag] = cb.checked; });
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(` ${label}`));
+    parent.appendChild(lbl);
+}
+
+function appendButton(parent, label, onClick, extraClass = '') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = label;
+    btn.className = `debug-button${extraClass ? ' ' + extraClass : ''}`;
+    btn.addEventListener('click', onClick);
+    parent.appendChild(btn);
+}
+
 export function initDebugMenu() {
     const details = document.createElement('details');
     details.id = 'debug-menu';
@@ -257,163 +370,92 @@ export function initDebugMenu() {
     summary.textContent = 'Debug';
     details.appendChild(summary);
 
-    // Visual toggles
-    for (const toggle of TOGGLES) {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = document.body.classList.contains(toggle.name);
+    // ── Game ──────────────────────────────────────────────────
+    appendHeader(details, 'Game');
+    appendFlagToggle(details, 'noEnemyAttack', 'No enemy attack');
+    appendFlagToggle(details, 'noEnemyMove',   'No enemy movement');
+    appendFlagToggle(details, 'noclip',        'No collision (noclip)');
 
-        checkbox.addEventListener('change', () => {
-            document.body.classList.toggle(toggle.name, checkbox.checked);
-        });
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(` ${toggle.label}`));
-        details.appendChild(label);
-    }
-
-    // Separator
-    const hr = document.createElement('hr');
-    hr.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
-    details.appendChild(hr);
-
-    // Culling toggles (in processing order) with per-step stats
+    // ── Culling ───────────────────────────────────────────────
+    // CULLING_TOGGLES drive the `culling` flags directly (not
+    // body classes) and each gets a stats element below it for
+    // the per-frame "in → out" readout.
+    appendHeader(details, 'Culling');
     for (const toggle of CULLING_TOGGLES) {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = culling[toggle.key];
-
-        checkbox.addEventListener('change', () => {
-            culling[toggle.key] = checkbox.checked;
-        });
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(` ${toggle.label}`));
-        details.appendChild(label);
+        const lbl = document.createElement('label');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = culling[toggle.key];
+        cb.addEventListener('change', () => { culling[toggle.key] = cb.checked; });
+        lbl.appendChild(cb);
+        lbl.appendChild(document.createTextNode(` ${toggle.label}`));
+        details.appendChild(lbl);
 
         const stat = document.createElement('div');
-        stat.style.cssText = 'font-size:11px;color:#888;padding-left:20px';
+        stat.className = 'debug-stat';
         details.appendChild(stat);
         cullingStatElements[toggle.statKey] = stat;
     }
-
-    // CSS culling experiments
     for (const toggle of CSS_CULLING_TOGGLES) {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = toggle.defaultOn;
-
-        if (toggle.defaultOn) document.body.classList.add(toggle.name);
-
-        checkbox.addEventListener('change', () => {
-            document.body.classList.toggle(toggle.name, checkbox.checked);
-        });
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(` ${toggle.label}`));
-        details.appendChild(label);
+        appendClassToggle(details, toggle.name, toggle.label);
     }
 
-    // Separator
-    const hr2 = document.createElement('hr');
-    hr2.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
-    details.appendChild(hr2);
-
-    // Gameplay toggles
-    const noAttackLabel = document.createElement('label');
-    const noAttackCheckbox = document.createElement('input');
-    noAttackCheckbox.type = 'checkbox';
-    noAttackCheckbox.checked = false;
-    noAttackCheckbox.addEventListener('change', () => {
-        debug.noEnemyAttack = noAttackCheckbox.checked;
-    });
-    noAttackLabel.appendChild(noAttackCheckbox);
-    noAttackLabel.appendChild(document.createTextNode(' No enemy attack'));
-    details.appendChild(noAttackLabel);
-
-    const noMoveLabel = document.createElement('label');
-    const noMoveCheckbox = document.createElement('input');
-    noMoveCheckbox.type = 'checkbox';
-    noMoveCheckbox.checked = false;
-    noMoveCheckbox.addEventListener('change', () => {
-        debug.noEnemyMove = noMoveCheckbox.checked;
-    });
-    noMoveLabel.appendChild(noMoveCheckbox);
-    noMoveLabel.appendChild(document.createTextNode(' No enemy movement'));
-    details.appendChild(noMoveLabel);
-
-    const noclipLabel = document.createElement('label');
-    const noclipCheckbox = document.createElement('input');
-    noclipCheckbox.type = 'checkbox';
-    noclipCheckbox.checked = false;
-    noclipCheckbox.addEventListener('change', () => {
-        debug.noclip = noclipCheckbox.checked;
-    });
-    noclipLabel.appendChild(noclipCheckbox);
-    noclipLabel.appendChild(document.createTextNode(' No collision (noclip)'));
-    details.appendChild(noclipLabel);
-
-    // Separator
-    const hr3 = document.createElement('hr');
-    hr3.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
-    details.appendChild(hr3);
-
-    // Debug visualization toggles
-    for (const toggle of DEBUG_TOGGLES) {
-        const label = document.createElement('label');
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = toggle.defaultOn;
-
-        if (toggle.defaultOn) document.body.classList.add(toggle.name);
-
-        checkbox.addEventListener('change', () => {
-            document.body.classList.toggle(toggle.name, checkbox.checked);
-        });
-
-        label.appendChild(checkbox);
-        label.appendChild(document.createTextNode(` ${toggle.label}`));
-        details.appendChild(label);
+    // ── Effects ───────────────────────────────────────────────
+    appendHeader(details, 'Effects');
+    for (const toggle of TOGGLES) {
+        appendClassToggle(details, toggle.name, toggle.label);
     }
+    appendClassToggle(details, 'all-enemies-shadow', 'All enemies shadow');
 
-    // Separator
-    const hr4 = document.createElement('hr');
-    hr4.style.cssText = 'border:0;border-top:1px solid #444;margin:4px 0';
-    details.appendChild(hr4);
+    // ── Renderer ──────────────────────────────────────────────
+    // Dropdown swaps the SP renderer at runtime while keeping
+    // camera + world state in place (catchup-replay covers the
+    // doors / lifts / things the fresh renderer would otherwise
+    // be missing). Hide-toggles let you peel layers off the
+    // scene one at a time — useful for the talk's geometry walk-
+    // through.
+    appendHeader(details, 'Renderer');
+    const rendererLabel = document.createElement('label');
+    rendererLabel.appendChild(document.createTextNode('Renderer: '));
+    const rendererSelect = document.createElement('select');
+    rendererSelect.className = 'debug-select';
+    for (const kind of ['dom', 'flat', 'shade', 'line', 'cat']) {
+        const opt = document.createElement('option');
+        opt.value = kind;
+        opt.textContent = kind;
+        rendererSelect.appendChild(opt);
+    }
+    rendererSelect.value = document.body.dataset.renderer || 'dom';
+    rendererSelect.addEventListener('change', () => switchRenderer(rendererSelect.value));
+    rendererLabel.appendChild(rendererSelect);
+    details.appendChild(rendererLabel);
+    // Two-column grid of layer toggles. Inverted semantics —
+    // checked = visible — so reading the menu matches reading
+    // the scene.
+    const layerGrid = document.createElement('div');
+    layerGrid.className = 'debug-grid';
+    for (const toggle of HIDE_TOGGLES) {
+        appendInvertedClassToggle(layerGrid, toggle.name, toggle.label);
+    }
+    details.appendChild(layerGrid);
 
-    const buttonStyle = 'display:block;margin:4px 0;padding:4px 8px;font:inherit;background:#222;color:#ddd;border:1px solid #444;cursor:pointer';
+    // ── Debug ─────────────────────────────────────────────────
+    appendHeader(details, 'Debug');
+    appendClassToggle(details, 'show-sky-walls',   'Show sky walls');
+    appendClassToggle(details, 'show-wall-ids',    'Show wall IDs');
+    appendClassToggle(details, 'show-sector-ids',  'Show sector IDs');
 
-    // End-match button — forces the post-match scoreboard up without
-    // having to actually hit the frag limit or wait out the timer.
-    const endBtn = document.createElement('button');
-    endBtn.type = 'button';
-    endBtn.textContent = 'End match';
-    endBtn.style.cssText = buttonStyle;
-    endBtn.addEventListener('click', () => endMatch());
-    details.appendChild(endBtn);
-
-    // Attract button — kicks the kiosk into attract mode immediately so
-    // we don't have to wait out the idle timer to inspect attract visuals.
-    const attractBtn = document.createElement('button');
-    attractBtn.type = 'button';
-    attractBtn.textContent = 'Enter attract';
-    attractBtn.style.cssText = buttonStyle;
-    attractBtn.addEventListener('click', () => enterAttract());
-    details.appendChild(attractBtn);
-
-    // End-level button — fires the same level-complete event the
-    // exit switch fires, so SP gets the intermission screen and DM
-    // gets the end-match scoreboard. Dismissal then advances the
-    // same way the real exit-switch flow does.
-    const endLevelBtn = document.createElement('button');
-    endLevelBtn.type = 'button';
-    endLevelBtn.textContent = 'End level';
-    endLevelBtn.style.cssText = buttonStyle;
-    endLevelBtn.addEventListener('click', () => app.game?.endCurrentLevel());
-    details.appendChild(endLevelBtn);
+    // ── State ─────────────────────────────────────────────────
+    // End-level fires the same level-complete event the exit
+    // switch fires (always shown). End-match forces the post-
+    // match scoreboard up without hitting the frag limit; only
+    // meaningful in DM, hidden via CSS in SP. Attract kicks the
+    // kiosk into attract mode immediately so we don't have to
+    // wait out the idle timer; only meaningful in kiosk mode.
+    appendHeader(details, 'State');
+    appendButton(details, 'End level',     () => app.game?.endCurrentLevel());
+    appendButton(details, 'End match',     () => endMatch(),     'debug-button-dm');
+    appendButton(details, 'Enter attract', () => enterAttract(), 'debug-button-kiosk');
 
     document.body.appendChild(details);
 }

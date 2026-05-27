@@ -41,6 +41,12 @@ export async function play(slot, exportFormat = null) {
 
     if (exportFormat) {
         await waitForUserGesture();
+        // Hide chrome (DOOM logo, action buttons, debug menu)
+        // only AFTER the user has clicked the start overlay —
+        // they may have toggled debug menu options to configure
+        // the capture. Adding it here also ensures the first
+        // frame the MediaRecorder ever sees is chrome-free.
+        document.body.classList.add('recording');
         await playWithExport(slot, recording, exportFormat);
         return;
     }
@@ -180,13 +186,16 @@ function waitForUserGesture() {
     return new Promise((resolve) => {
         const overlay = document.createElement('div');
         overlay.style.cssText = `
-            position: fixed; inset: 0; z-index: 99999;
+            position: fixed; inset: 0; z-index: 100;
             background: #000; color: #ddd;
             display: flex; align-items: center; justify-content: center;
             font: 600 24px/1.4 system-ui, sans-serif;
             cursor: pointer; user-select: none;
             text-align: center; padding: 32px;
         `;
+        // z-index 100 is below #debug-menu (1000) so the debug
+        // toggles stay clickable on top of the overlay — handy
+        // for configuring the recording before pressing start.
         overlay.textContent = 'Click to start recording.\nPick this tab in the screen-capture dialog\nand tick "Share audio".';
         overlay.style.whiteSpace = 'pre-line';
         overlay.addEventListener('click', () => {

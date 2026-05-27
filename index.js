@@ -39,7 +39,9 @@ const exportFormat = params.get('export');
 if (isKiosk) document.body.classList.add('kiosk');
 if (isVisualize) document.body.classList.add('visualize');
 if (rendererKind) document.body.dataset.renderer = rendererKind;
-if (exportFormat) document.body.classList.add('recording');
+// `body.recording` is added later (in the player, after the
+// click-to-start overlay is dismissed) so the debug menu stays
+// reachable while the user configures the recording.
 
 if (playSlot) {
     initMaster({ isKiosk, playSlot, exportFormat });
