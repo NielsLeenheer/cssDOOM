@@ -43,6 +43,76 @@ const RENDERERS = {
     dom:   DomRenderer,
 };
 
+// Per-layout pane composition, all static. Each layout has:
+//
+//   slots    — index-aligned with the panes the layout can build.
+//              `kind` is a key of RENDERERS, or null to use ?renderer=
+//              routing (default + kiosk are URL-routable; visualize +
+//              cad pin specific renderers per slot). `extras` are
+//              passed through to the constructor (e.g. AxisRenderer's
+//              axis).
+//
+//   players  — gameMode → networkMode → playerIndex[]. The ARRAY
+//              LENGTH is the number of slots active in this mode; the
+//              VALUES are which playerIndex each slot renders. SP
+//              kiosk uses `[0, 0]` because both panes mirror player 0;
+//              Local DM uses `[0, 1]`; network host non-kiosk uses
+//              `[0]` because the lone local pane covers player 0 and
+//              the rest fill with remote sinks.
+//
+// `reshape` looks up `LAYOUT_SPECS[body.dataset.layout]`. If the
+// chosen layout doesn't list the current (gameMode, networkMode) —
+// e.g. ?layout=cad in deathmatch — reshape falls back to the
+// `default` layout entirely.
+const LAYOUT_SPECS = {
+    default: {
+        slots: [
+            { kind: null },
+            { kind: null },
+        ],
+        players: {
+            singleplayer: { standalone: [0] },
+            deathmatch:   { standalone: [0, 1], host: [0] },
+        },
+    },
+    kiosk: {
+        slots: [
+            { kind: null },
+            { kind: null },
+        ],
+        players: {
+            // SP mirror — both panes render player 0 so the right
+            // monitor mirrors the left.
+            singleplayer: { standalone: [0, 0] },
+            deathmatch:   { standalone: [0, 1], host: [0, 1] },
+        },
+    },
+    // ?layout=visualize SP: talk progression demo.
+    // top-left wireframe, top-right black+white shade,
+    // bottom-left flat-shaded, bottom-right fully textured.
+    visualize: {
+        slots: [
+            { kind: 'line' },
+            { kind: 'shade' },
+            { kind: 'flat' },
+            { kind: 'dom' },
+        ],
+        players: { singleplayer: { standalone: [0, 0, 0, 0] } },
+    },
+    // ?layout=cad SP: three AxisRenderers + one default DomRenderer.
+    // AxisRenderer overrides updateCamera to place the camera
+    // perpendicular to the player on its axis.
+    cad: {
+        slots: [
+            { kind: 'axis', extras: { axis: 'z' } },
+            { kind: 'axis', extras: { axis: 'y' } },
+            { kind: 'axis', extras: { axis: 'x' } },
+            { kind: 'dom' },
+        ],
+        players: { singleplayer: { standalone: [0, 0, 0, 0] } },
+    },
+};
+
 class RendererManager {
     constructor() {
         this._renderers = [];
@@ -101,167 +171,51 @@ class RendererManager {
     }
 
     /**
-     * Master-side reshape: construct or destroy local renderers to
-     * match what the mode needs, registering / deregistering each
-     * with the orchestrator. Idempotent.
-     *
-     *   - SP standalone non-kiosk: 1 renderer at slot 0 (playerIndex 0).
-     *   - SP standalone kiosk:     2 renderers at slots 0 + 1, both
-     *                               playerIndex 0 — mirror. Player 0's
-     *                               per-player commands fan to both panes
-     *                               so the right monitor mirrors the left.
-     *   - Local DM (deathmatch+standalone):  2 renderers, playerIndex 0 + 1.
-     *   - Network host non-kiosk:  1 local renderer at slot 0. Slots 1..3
-     *                               fill with sinks when remotes join.
-     *   - Network host kiosk:      2 local renderers (slots 0 + 1,
-     *                               playerIndex 0 + 1). Slots 2..3 sinks.
-     *
-     * Existing renderers are reused across mode switches; only the
-     * delta count is created or destroyed, and `playerIndex` updates
-     * in place for existing ones. Client windows manage their single
-     * renderer separately (joiner-side) — they call create/destroy
-     * directly without reshape.
+     * Master-side reshape: drive the local renderer set from
+     * LAYOUT_SPECS based on `body.dataset.layout` + the supplied
+     * mode. If the chosen layout doesn't support this mode (e.g.
+     * ?layout=cad in deathmatch), reshape falls back to the `default`
+     * layout entirely. Existing renderers are reused across mode
+     * switches; only the tail delta is created or destroyed, and
+     * playerIndex updates in place. Client windows manage their
+     * single renderer separately (joiner-side) — they call create /
+     * destroy directly without reshape.
      */
     reshape(gameMode, networkMode) {
-        const layout = document.body.dataset.layout;
-        const isKiosk = layout === 'kiosk';
-        const isVisualize = layout === 'visualize';
-        const isCad = layout === 'cad';
-
-        // ?visualize SP: progression demo for the talk. 2×2 quadrants:
-        // top-left wireframe, top-right black+white shade,
-        // bottom-left flat-shaded, bottom-right fully textured. All
-        // four live renderers render the same player (mirror).
-        // Custom layout path — doesn't fit the count-based loop
-        // below.
-        if (isVisualize && gameMode === 'singleplayer') {
-            this._reshapeVisualize();
-            return;
+        const layoutName = document.body.dataset.layout ?? 'default';
+        let layout = LAYOUT_SPECS[layoutName] ?? LAYOUT_SPECS.default;
+        if (!layout.players[gameMode]?.[networkMode]) {
+            layout = LAYOUT_SPECS.default;
         }
-        if (isCad && gameMode === 'singleplayer') {
-            this._reshapeCad();
-            return;
-        }
+        const players = layout.players[gameMode][networkMode];
 
-        const mirror = gameMode === 'singleplayer' && isKiosk;
-        const needsTwoLocal = (gameMode === 'deathmatch' && networkMode === 'standalone')
-            || mirror
-            || (gameMode === 'deathmatch' && networkMode === 'host' && isKiosk);
-        const desiredCount = needsTwoLocal ? 2 : 1;
-
-        // Tear down extras (from the end so indices stay stable).
-        while (this._renderers.length > desiredCount) {
+        // Tail-prune any renderers past the active slot count, then
+        // tail-create to fill out missing slots from the layout's
+        // slot definitions.
+        while (this._renderers.length > players.length) {
             const r = this._renderers[this._renderers.length - 1];
             orchestrator.removeTarget(r);
             this.destroy(r);
         }
-
-        // Create missing renderers and register each as a target. New
-        // renderers come in at the end of `this._renderers` so the slot
-        // index is the current length.
-        while (this._renderers.length < desiredCount) {
-            const slot = this._renderers.length;
-            const playerIndex = mirror ? 0 : slot;
-            const r = this.create(null, playerIndex);
-            orchestrator.addTarget(r);
+        while (this._renderers.length < players.length) {
+            const i = this._renderers.length;
+            const slot = layout.slots[i];
+            orchestrator.addTarget(
+                this.create(slot.kind, players[i], slot.extras ?? {}),
+            );
         }
 
-        // Update playerIndex on existing renderers in case mirror just
-        // toggled. Pane element's `data-player` follows the playerIndex
-        // so CSS hide rules (`body[data-game-mode] .pane[data-player="0"]`
-        // …) and the player-sprite "hide own billboard" selector key
-        // correctly.
-        // `data-slot` tracks the pane's physical position (0 = first/left,
-        // 1 = second/right) independent of which player it renders — kiosk
-        // SP mirror reuses player 0 in both panes, so `data-player` is the
-        // same on both and can't drive positioning.
-        for (let slot = 0; slot < this._renderers.length; slot++) {
-            const r = this._renderers[slot];
-            r.playerIndex = mirror ? 0 : slot;
-            r.paneEl.dataset.player = String(r.playerIndex);
-            r.paneEl.dataset.slot = String(slot);
-        }
-    }
-
-    /**
-     * ?visualize SP layout. Four renderers, all rendering player 0:
-     *
-     *   data-slot=0 (top-left)     → LineRenderer    (wireframe)
-     *   data-slot=1 (top-right)    → ShadeRenderer   (black + white)
-     *   data-slot=2 (bottom-left)  → FlatRenderer    (flat-shaded)
-     *   data-slot=3 (bottom-right) → DomRenderer     (fully textured)
-     *
-     * Idempotent.
-     */
-    _reshapeVisualize() {
-        const specs = [
-            { kind: 'line',  slot: 0 },
-            { kind: 'shade', slot: 1 },
-            { kind: 'flat',  slot: 2 },
-            { kind: 'dom',   slot: 3 },
-        ];
-        // First-time build: tear down anything already present and
-        // construct the four panes in spec order. Subsequent calls
-        // are no-ops (we keep the existing renderers).
-        if (this._renderers.length !== specs.length) {
-            while (this._renderers.length > 0) {
-                const r = this._renderers.pop();
-                orchestrator.removeTarget(r);
-                r.destroy();
-            }
-            for (const spec of specs) {
-                // Bypass `create()`'s `?renderer` routing so the
-                // visualize layout is always the fixed four-pane
-                // progression regardless of any ?renderer override.
-                orchestrator.addTarget(this.create(spec.kind, 0));
-            }
-        }
-        for (let i = 0; i < specs.length; i++) {
+        // Refresh playerIndex + pane dataset on every active slot.
+        // `data-player` follows playerIndex (CSS hide rules + "hide
+        // own billboard" key off it); `data-slot` is the pane's
+        // physical position (kiosk SP mirrors player 0 to both panes,
+        // so data-player is identical on both and can't drive
+        // positioning).
+        for (let i = 0; i < players.length; i++) {
             const r = this._renderers[i];
-            r.playerIndex = 0;
-            r.paneEl.dataset.player = '0';
-            r.paneEl.dataset.slot = String(specs[i].slot);
-        }
-    }
-
-    /**
-     * ?cad SP layout. Three AxisRenderers + one default
-     * DomRenderer, all rendering player 0:
-     *
-     *   data-slot=0 (top-left)     → axis 'z' (top-down)
-     *   data-slot=1 (top-right)    → axis 'y' (north-side)
-     *   data-slot=2 (bottom-left)  → axis 'x' (east-side)
-     *   data-slot=3 (bottom-right) → 3D default
-     *
-     * AxisRenderer overrides updateCamera to place the camera
-     * perpendicular to the player on its axis; the rest of the
-     * DomRenderer pipeline runs unchanged.
-     */
-    _reshapeCad() {
-        const specs = [
-            { slot: 0, axis: 'z' },
-            { slot: 1, axis: 'y' },
-            { slot: 2, axis: 'x' },
-            { slot: 3, axis: null },  // null → default 3D DomRenderer
-        ];
-        if (this._renderers.length !== specs.length) {
-            while (this._renderers.length > 0) {
-                const r = this._renderers.pop();
-                orchestrator.removeTarget(r);
-                r.destroy();
-            }
-            for (const spec of specs) {
-                const r = spec.axis
-                    ? this.create('axis', 0, { axis: spec.axis })
-                    : this.create('dom', 0);
-                orchestrator.addTarget(r);
-            }
-        }
-        for (let i = 0; i < specs.length; i++) {
-            const r = this._renderers[i];
-            r.playerIndex = 0;
-            r.paneEl.dataset.player = '0';
-            r.paneEl.dataset.slot = String(specs[i].slot);
+            r.playerIndex = players[i];
+            r.paneEl.dataset.player = String(players[i]);
+            r.paneEl.dataset.slot = String(i);
         }
     }
 
