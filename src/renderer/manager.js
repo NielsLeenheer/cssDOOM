@@ -45,6 +45,14 @@ const RENDERERS = {
 
 // Per-layout pane composition, all static. Each layout has:
 //
+//   grid     — pane positioning model, written to `body.dataset.grid`.
+//              Omitted = the default flex layout (#game is display:flex,
+//              panes fill via flex-grow, count drives fullscreen vs
+//              50/50 via `#game[data-active-renderers]`).
+//              'tiled' = transform-scaled 2×2 grid keyed off
+//              `data-slot`, used by the video-wall kiosk + talk
+//              layouts; see viewport.css.
+//
 //   slots    — index-aligned with the panes the layout can build.
 //              `kind` is a key of RENDERERS, or null to use ?renderer=
 //              routing (default + kiosk are URL-routable; visualize +
@@ -76,6 +84,7 @@ const LAYOUT_SPECS = {
         },
     },
     kiosk: {
+        grid: 'tiled',
         slots: [
             { kind: null },
             { kind: null },
@@ -91,6 +100,7 @@ const LAYOUT_SPECS = {
     // top-left wireframe, top-right black+white shade,
     // bottom-left flat-shaded, bottom-right fully textured.
     visualize: {
+        grid: 'tiled',
         slots: [
             { kind: 'line' },
             { kind: 'shade' },
@@ -103,6 +113,7 @@ const LAYOUT_SPECS = {
     // AxisRenderer overrides updateCamera to place the camera
     // perpendicular to the player on its axis.
     cad: {
+        grid: 'tiled',
         slots: [
             { kind: 'axis', extras: { axis: 'z' } },
             { kind: 'axis', extras: { axis: 'y' } },
@@ -188,6 +199,14 @@ class RendererManager {
             layout = LAYOUT_SPECS.default;
         }
         const players = layout.players[gameMode][networkMode];
+
+        // `body.dataset.grid` drives the pane positioning model in
+        // viewport.css. Unset = the default flex layout.
+        if (layout.grid) {
+            document.body.dataset.grid = layout.grid;
+        } else {
+            delete document.body.dataset.grid;
+        }
 
         // Tail-prune any renderers past the active slot count, then
         // tail-create to fill out missing slots from the layout's

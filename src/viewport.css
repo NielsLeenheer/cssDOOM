@@ -35,17 +35,11 @@
 @media (min-width: 1440px) { :root { --screen-scale: 2; } }
 @media (min-width: 2880px) { :root { --screen-scale: 4; } }
 
-/* Kiosk: pane = window / 2, so the breakpoints are doubled. */
-body[data-layout="kiosk"] { --screen-scale: 1; }
-@media (min-width: 2880px) { body[data-layout="kiosk"] { --screen-scale: 2; } }
-@media (min-width: 5760px) { body[data-layout="kiosk"] { --screen-scale: 4; } }
-/* ?visualize mirrors the kiosk pane-sizing curve — the two panes are
-   shown at the same scale as a kiosk install would render them, so
-   the line wireframe sits next to the CSS scene at 1:1 dimensions
-   for the talk's side-by-side screen capture. */
-body[data-layout="visualize"] { --screen-scale: 1; }
-@media (min-width: 2880px) { body[data-layout="visualize"] { --screen-scale: 2; } }
-@media (min-width: 5760px) { body[data-layout="visualize"] { --screen-scale: 4; } }
+/* Tiled grid: pane = window / 2 visually, so the breakpoints
+   double — kiosk + visualize + cad all share this curve. */
+body[data-grid="tiled"] { --screen-scale: 1; }
+@media (min-width: 2880px) { body[data-grid="tiled"] { --screen-scale: 2; } }
+@media (min-width: 5760px) { body[data-grid="tiled"] { --screen-scale: 4; } }
 
 .pane {
     position: relative;
@@ -59,132 +53,22 @@ body[data-layout="visualize"] { --screen-scale: 1; }
        moved to. */
 }
 
-body[data-game-mode="deathmatch"] .pane,
-body[data-layout="kiosk"][data-network-mode="host"] .pane {
-    flex: 1 1 50%;
-}
+/* Pane visibility + sizing driven by data attributes set by the
+   orchestrator + manager. Two layers:
 
-/* Non-kiosk single-pane layouts: pane 0 fills, pane 1 hides. The
-   :not(.client-window) gate is critical for Network DM — a remote
-   joiner has body.client-window and renders pane 1 (the one bound to
-   their assigned slot), so we must defer to the body.client-window
-   rules below, which already do pane-0-hide / pane-1-fill. */
-body[data-game-mode="singleplayer"] .pane[data-player="0"],
-body[data-network-mode="host"]:not([data-layout="kiosk"]):not(.client-window) .pane[data-player="0"] {
-    flex: 1;
-}
+   1. Active count — `#game[data-active-renderers="N"]` reflects how
+      many panes are currently `[data-active="true"]`. The flex-path
+      rules below use it to size panes (1 = fill, 2 = 50/50). The
+      orchestrator updates it on every addTarget / removeTarget.
 
-body[data-game-mode="singleplayer"] .pane[data-player="1"],
-body[data-network-mode="host"]:not([data-layout="kiosk"]):not(.client-window) .pane[data-player="1"] {
-    display: none;
-}
+   2. Pane visibility — `.pane[data-active]` per pane. "false" marks a
+      pane whose local DomRenderer was taken over by a remote client;
+      the paneEl stays in the DOM (reused on disconnect via Level.load)
+      but shouldn't be visible.
 
-/* Kiosk mode (?kiosk URL param) — installation runs on a video-wall
-   controller that takes a single HD input in 2×2 quadrant mode, with
-   the top two quadrants wired to physical monitors and the bottom two
-   unused.
-
-   Each pane renders internally as if it were a full-window SP game
-   (100vw × 100vh) so the perspective and FOV match what a single-window
-   game would look like. A `transform: scale(0.5)` shrinks the visual
-   output to 50% × 50%, fitting one physical monitor (top quadrant).
-   `top` / `left` position pane 0 in the top-left monitor and pane 1
-   in the top-right. The bottom half of the capture is discarded by
-   the wall. Uses viewport units so a future move to 4K input doesn't
-   touch CSS. */
-/* ?visualize reuses the kiosk 2×2 top-row positioning so the line
-   wireframe pane sits in the same quadrant as a kiosk's second
-   physical monitor would. Mode is SP-only; CSS deathmatch / network
-   selectors below don't get the lines selector. */
-body[data-layout="kiosk"] .pane,
-body[data-layout="visualize"] .pane,
-body[data-layout="cad"] .pane {
-    position: absolute;
-    /* HD path: pane internal = 100vw × 100vh = 1920×1080. Scale to
-       50% × 50% visual so each pane fits one physical monitor (top
-       quadrant of the 2×2 split). */
-    width: 100vw;
-    height: 100vh;
-    flex: none;
-    transform-origin: top left;
-    transform: scale(0.5);
-}
-@media (min-width: 2880px) {
-    /* 4K path: native 50vw × 50vh per pane (= 1920×1080), no
-       transform needed — each pane already lands 1:1 on its
-       physical monitor. Same internal logical size as the HD path
-       so HUD scaling, perspective, and overall composition are
-       identical between HD and 4K kiosk. The extra pixels just go
-       toward sharper output. */
-    body[data-layout="kiosk"] .pane,
-    body[data-layout="visualize"] .pane {
-        width: 50vw;
-        height: 50vh;
-        transform: none;
-    }
-}
-/* Position by `data-slot` (pane's physical index in the layout), not
-   `data-player`. Kiosk SP renders both panes for player 0 (mirror), so
-   `data-player` is "0" on both panes — keying off it would land them on
-   top of each other. `data-slot` is "0" / "1" regardless of which player
-   each pane displays. */
-body[data-layout="kiosk"] .pane[data-slot="0"],
-body[data-layout="visualize"] .pane[data-slot="0"],
-body[data-layout="cad"] .pane[data-slot="0"] {
-    top: 0;
-    left: 0;
-}
-body[data-layout="kiosk"] .pane[data-slot="1"],
-body[data-layout="visualize"] .pane[data-slot="1"],
-body[data-layout="cad"] .pane[data-slot="1"] {
-    top: 0;
-    left: 50vw;
-}
-/* ?visualize bottom row — slot 2 is intentionally empty (no pane is
-   created at this index), slot 3 holds the fully-textured pane.
-   ?cad uses all four slots. */
-body[data-layout="visualize"] .pane[data-slot="2"],
-body[data-layout="cad"] .pane[data-slot="2"] {
-    top: 50vh;
-    left: 0;
-}
-body[data-layout="visualize"] .pane[data-slot="3"],
-body[data-layout="cad"] .pane[data-slot="3"] {
-    top: 50vh;
-    left: 50vw;
-}
-
-/* Kiosk SP — the kiosk has two physical monitors; we don't want the SP
-   view to span both with a giant 32:9 image. Instead, render SP on the
-   left monitor and mirror pane 0's scene onto the right pane (the
-   mirror state is set by menu.applyMode → setMirrorMode based on
-   body[data-layout="kiosk"] + singleplayer). Override SP's default "hide pane 1" so
-   both monitors show the SP scene side by side. ?visualize uses the same
-   override so its second (line-wireframe) pane shows up. */
-body[data-layout="kiosk"][data-game-mode="singleplayer"] .pane[data-player="1"],
-body[data-layout="visualize"][data-game-mode="singleplayer"] .pane[data-player="1"],
-body[data-layout="cad"][data-game-mode="singleplayer"] .pane[data-player="1"] {
-    display: block;
-}
-
-/* Client window mode (?join URL param) — the client constructs exactly
-   one DomRenderer for the slot the master assigned, so there's just one
-   pane in the DOM. Stretch it to fill the window. */
-body.client-window .pane {
-    flex: 1;
-}
-
-/* Pane visibility + sizing driven by data attributes instead of a
-   body.client-active marker. The orchestrator sets two attributes:
-     - `.pane[data-active="true|false"]` per pane. "false" marks a pane
-       whose local DomRenderer was taken over by a remote client — its
-       paneEl stays in the DOM (the renderer instance is reused on
-       disconnect via Level.load) but should not be visible.
-     - `#game[data-active-renderers="N"]` reflects how many panes
-       currently have data-active="true". CSS uses this to size the
-       remaining active panes (one pane = fill; two panes = split 50/50;
-       future >2-pane layouts can extend this without new body classes).
-   Replaces the L6-era body.client-active hack (L7 cleanup). */
+   The default flex grid (#game is display:flex) handles SP fullscreen,
+   Local DM side-by-side, and network host single-local layouts purely
+   off the count attribute — no layout-specific selectors needed. */
 .pane[data-active="false"] {
     display: none;
 }
@@ -193,6 +77,45 @@ body.client-window .pane {
 }
 #game[data-active-renderers="2"] .pane[data-active="true"] {
     flex: 1 1 50%;
+}
+
+/* ───── Tiled grid ─────
+   `body[data-grid="tiled"]` (set by reshape() from the LAYOUT_SPECS
+   entry) — used by the video-wall kiosk + the talk layouts (visualize,
+   cad). The video wall takes a single HD input split into 2×2
+   quadrants; kiosk only wires the top two, visualize + cad fill all
+   four. Each pane renders internally as if it were a full-window SP
+   game (100vw × 100vh) so the perspective + FOV math matches a single-
+   window game — `transform: scale(0.5)` then shrinks it to fit one
+   quadrant of the capture.
+
+   Positioned by `data-slot` (pane's physical index, set by reshape),
+   not `data-player` — kiosk SP renders both panes for player 0
+   (mirror), so `data-player` is "0" on both. */
+body[data-grid="tiled"] .pane {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    flex: none;
+    transform-origin: top left;
+    transform: scale(0.5);
+}
+body[data-grid="tiled"] .pane[data-slot="0"] { top: 0;    left: 0; }
+body[data-grid="tiled"] .pane[data-slot="1"] { top: 0;    left: 50vw; }
+body[data-grid="tiled"] .pane[data-slot="2"] { top: 50vh; left: 0; }
+body[data-grid="tiled"] .pane[data-slot="3"] { top: 50vh; left: 50vw; }
+
+@media (min-width: 2880px) {
+    /* 4K path: native 50vw × 50vh per pane (= 1920×1080), no
+       transform needed — each pane already lands 1:1 on its physical
+       monitor. Same internal logical size as the HD path so HUD
+       scaling, perspective, and overall composition are identical
+       between HD and 4K. */
+    body[data-grid="tiled"] .pane {
+        width: 50vw;
+        height: 50vh;
+        transform: none;
+    }
 }
 
 /* The .renderer fills its pane; .viewport and .hud both inset:0 it.
