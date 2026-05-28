@@ -4,9 +4,10 @@
    (deathmatch + standalone — the secondary window has networkMode=client
    so it's already excluded by the standalone filter), not fullscreen,
    and don't already have a client bound to a slot. Also hidden on
-   touch (no popup windows there). */
+   touch (no popup windows there) and in kiosk (the installation runs
+   both players on the one video-wall machine — no detaching). */
 #detach-button { display: none; }
-body[data-game-mode="deathmatch"][data-network-mode="standalone"]:not(.fullscreen):not(:has(.pane[data-active="false"])) #detach-button {
+body[data-game-mode="deathmatch"][data-network-mode="standalone"]:not([data-layout="kiosk"]):not(.fullscreen):not(:has(.pane[data-active="false"])) #detach-button {
     display: block;
 }
 @media (pointer: coarse) {
