@@ -44,6 +44,10 @@ import { isMenuOpen } from '../ui/menu.js';
 import { GAME_STATE, getGameState, setGameState } from './game-state.js';
 import { orchestrator } from '../orchestrator.js';
 
+// Map attract shows + the map the woken match starts on (kept the same
+// so there's no discontinuity between the attract view and the match).
+const ATTRACT_MAP = 'E1M1';
+
 // Idle thresholds.
 //   GAME_IDLE_MS — in-progress match → end the match so the scoreboard
 //                  appears before attract takes over.
@@ -55,6 +59,14 @@ const SCORE_IDLE_MS = 30_000;
 
 let lastActivityAt = performance.now();
 let entering = false;
+
+// Wake handler injected by master (the composition root) — attract.js
+// can't import app.js without a cycle (app → remote-game → attract).
+// Called on attract exit with the attract map; master wires it to
+// Game.restartMatch so the woken match is a coherent, Game-owned match
+// (fresh Level subscribed to the Game, both state machines in sync).
+let onWake = null;
+export function setAttractWakeHandler(fn) { onWake = fn; }
 // Tracks the previous tick's game state so we can detect the LOBBY/ACTIVE
 // → ENDED transition and reset the idle clock — without this, a 60s
 // in-match idle would immediately trip the 30s scoreboard timeout the
@@ -148,11 +160,11 @@ export async function enterAttract() {
     // ammo, weapons, projectiles, corpses; map rebuild restores pickups.)
     resetMatch();
 
-    // Always reload E1M1 — guarantees a clean attract view (both players
-    // at fresh DM starts, full health, no in-flight projectiles, no
-    // corpses lingering from the previous match).
+    // Always reload the attract map — guarantees a clean attract view
+    // (both players at fresh DM starts, full health, no in-flight
+    // projectiles, no corpses lingering from the previous match).
     state.players[0].isDead = true; // force resetGameState path
-    await swapLevel('E1M1');
+    await swapLevel(ATTRACT_MAP);
     // applyPlayerStart (inside swapLevel's Level.load) already resampled
     // each player's real floor + set the eye-level camera height, so
     // attract's view is correct without the game loop's movement update.
@@ -167,16 +179,17 @@ export async function enterAttract() {
 
 function exitAttract() {
     lastActivityAt = performance.now();
-    // After attract, swapLevel put us in a fresh post-resetMatch world.
-    // resetMatch already transitioned us to LOBBY; we just need to
-    // un-set the ATTRACT state. setGameState(LOBBY) is a no-op if we're
-    // somehow not in ATTRACT (e.g., direct pingActivity call) —
-    // setGameState early-returns on same-state writes.
+    // Leave ATTRACT synchronously so a second wakeup press (before the
+    // async restart below runs) doesn't re-enter exitAttract and fire a
+    // second restart. setGameState early-returns on same-state writes.
     setGameState(GAME_STATE.LOBBY);
     orchestrator.dispatch({ type: 'world', cmd: 'hideAttract', args: [] });
-    // Restart the match clock — the wall-clock timer kept advancing while
-    // attract was running but matchTick was paused, so without this the
-    // very next updateGame frame would see elapsed > timeLimit and call
-    // endMatch() ("TIE" flash) before the player even moves.
-    if (state.match) state.match.startTime = performance.now();
+    // Hand off to the Game's canonical restart path. enterAttract
+    // abandoned the match via swapLevel, which leaves a Level detached
+    // from the Game and Game._state stuck at PLAYING — restartMatch
+    // rebuilds a Game-owned Level, syncs both state machines to LOBBY,
+    // and re-runs the kiosk auto-start so the woken match actually
+    // begins (and player input flows again). Fire-and-forget: the
+    // wakeup press is consumed now; the rebuild resolves a tick later.
+    onWake?.(ATTRACT_MAP);
 }

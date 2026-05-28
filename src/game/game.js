@@ -506,15 +506,17 @@ export class Game {
      * is owned by Game so the subscription chain stays intact across
      * matches.
      */
-    async restartMatch() {
+    async restartMatch(nextMap = null) {
         orchestrator.dispatch({ type: 'world', cmd: 'hideResults', args: [] });
 
-        // Advance mapCursor. _pendingNextMap is set by _onLevelComplete
+        // Choose the next map. An explicit `nextMap` (attract wake passes
+        // the map it was showing so the woken match stays on it) wins.
+        // Otherwise advance: _pendingNextMap is set by _onLevelComplete
         // when an exit switch triggered the end (carries secret-exit
         // routing too); frag/time-limit ends leave it null so we fall
         // through to getNextMap. Final fallback to currentMap covers
         // the end-of-cycle case (no next map defined).
-        this.mapCursor = this._pendingNextMap ?? getNextMap() ?? this.mapCursor;
+        this.mapCursor = nextMap ?? this._pendingNextMap ?? getNextMap() ?? this.mapCursor;
         this._pendingNextMap = null;
 
         // Reset match state in match.js (kill matrix, scores, frag

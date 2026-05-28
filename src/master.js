@@ -34,7 +34,7 @@ import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
 import { initDebugMenu, updateDebugStats } from './renderer/dom/hud/debug.js';
-import { attractTick, isAttractActive } from './game/attract.js';
+import { attractTick, isAttractActive, setAttractWakeHandler } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
 import { BroadcastChannelTransport } from './transport/transport.js';
@@ -561,6 +561,12 @@ export async function initMaster({ playSlot = null, exportFormat = null } = {}) 
     // both slots are claimed. Kiosk-SP and Network-DM-host map to
     // the same paths.
     await app.start();
+
+    // Wake from attract through the Game's canonical restart path.
+    // Read app.game at call time (not capture) so it stays correct
+    // across game recreations on mode switches.
+    setAttractWakeHandler((map) => app.game?.restartMatch(map));
+
     rendererManager.startCullingLoop({
         isAttract: isAttractActive,
         getSpectatorActive: () => spectatorActive,
