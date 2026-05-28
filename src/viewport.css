@@ -99,6 +99,14 @@ body[data-grid="tiled"] .pane {
     flex: none;
     transform-origin: top left;
     transform: scale(0.5);
+    /* Clip to the pane. The flex layouts deliberately leave .pane
+       unclipped so the HUD / weapon can hang off the bottom and
+       per-pane overlays can stretch fullscreen (see .pane above) —
+       but here the `transform` already makes the pane a containing
+       block for those overlays, so clipping is consistent. Without
+       it the hidden HUD / weapon dip into the empty bottom row in
+       kiosk (top-row-only) tiled layouts. */
+    overflow: clip;
 }
 body[data-grid="tiled"] .pane[data-slot="0"] { top: 0;    left: 0; }
 body[data-grid="tiled"] .pane[data-slot="1"] { top: 0;    left: 50vw; }
