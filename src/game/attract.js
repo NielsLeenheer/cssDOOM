@@ -39,8 +39,6 @@
 
 import { state } from './state.js';
 import { swapLevel } from './level.js';
-import { getFloorHeightAt } from './physics.js';
-import { EYE_HEIGHT } from '../shared/constants.js';
 import { resetMatch, endMatch } from './match.js';
 import { isMenuOpen } from '../ui/menu.js';
 import { GAME_STATE, getGameState, setGameState } from './game-state.js';
@@ -155,16 +153,9 @@ export async function enterAttract() {
     // corpses lingering from the previous match).
     state.players[0].isDead = true; // force resetGameState path
     await swapLevel('E1M1');
-
-    // Resample real floor at each DM start. applyDeathmatchStarts seeds
-    // floorHeight from mapData.playerStart and relies on the next
-    // updateHeight() frame to correct it, but attract skips the game
-    // loop's movement update — without this the camera sits at the wrong
-    // height (sometimes below the actual sector floor).
-    for (const p of state.players) {
-        p.floorHeight = getFloorHeightAt(p.x, p.y);
-        p.z = p.floorHeight + EYE_HEIGHT;
-    }
+    // applyPlayerStart (inside swapLevel's Level.load) already resampled
+    // each player's real floor + set the eye-level camera height, so
+    // attract's view is correct without the game loop's movement update.
 
     entering = false;
     setGameState(GAME_STATE.ATTRACT);

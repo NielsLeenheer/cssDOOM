@@ -441,18 +441,22 @@ export class Game {
             }
         }
 
-        // DM: pick a DM start (type-11 thing), reset stats to DM
-        // defaults, fire spawn-fog + DSTELEPT for each player. Done
-        // HERE (right when the match actually begins) rather than at
-        // restartMatch time so the teleport sound + visual don't
-        // leak into the network-lobby phase that comes between match
-        // end and the host's next fire-to-start. SP isn't covered —
-        // Level.load's applyPlayerStart already positions the lone
-        // player at the map's PLAYER START and SP has no spawn-fog
-        // convention.
+        // DM: reset stats to DM defaults + fire spawn-fog + DSTELEPT
+        // for each player. Done HERE (right when the match actually
+        // begins) rather than at restartMatch time so the teleport
+        // sound + visual don't leak into the network-lobby phase that
+        // comes between match end and the host's next fire-to-start.
+        // Position was already chosen by applyPlayerStart before the
+        // reveal (keepPosition below). SP isn't covered — Level.load's
+        // applyPlayerStart positions the lone player at the map's
+        // PLAYER START and SP has no spawn-fog convention.
         if (this.gameMode === 'deathmatch') {
             for (const player of this.roster) {
-                if (player) spawnPlayer(player);
+                // keepPosition: applyPlayerStart (in Level.load, before
+                // the reveal) already placed each player at their DM
+                // start + resampled the floor. Reuse it so the scene
+                // doesn't reveal one spot then jump to another.
+                if (player) spawnPlayer(player, { keepPosition: true });
             }
         }
 
@@ -461,9 +465,8 @@ export class Game {
         // Level.load's awaited orchestrator.loadMap; remote joiners
         // confirmed by awaitAllReadyToPlay above). Doing this earlier
         // would race the joiners' still-building scenes and drop the
-        // create on the floor. spawnPlayer above already updated each
-        // player's x/y/floorHeight so the sprite spawns at the DM
-        // start, not the Level.load PLAYER START fallback.
+        // create on the floor. Each player's x/y/floorHeight is already
+        // at the DM start (applyPlayerStart + the spawnPlayer above).
         broadcastPlayerSprites();
 
         this.level.start();

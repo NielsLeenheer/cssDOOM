@@ -31,17 +31,25 @@ const SPAWN_AVOID_RADIUS_SQ = (PLAYER_RADIUS * 4) * (PLAYER_RADIUS * 4);
  * by another player, fall back to whichever spawn is furthest from any
  * living player so we don't materialise on top of someone.
  */
-export function spawnPlayer(player) {
-    const dmStarts = (mapData.things || []).filter(t => t.type === 11);
-    const spawn = dmStarts.length > 0
-        ? pickDmSpawn(dmStarts, player)
-        : mapDataPlayerStartFallback();
+export function spawnPlayer(player, { keepPosition = false } = {}) {
+    // keepPosition: the player is already placed and we only want the
+    // stat reset + spawn effects. The initial DM match-start spawn is
+    // chosen by applyPlayerStart before the scene is revealed; re-
+    // picking here would teleport the camera the frame after the
+    // reveal (the glitch this guards against). Respawn-after-death and
+    // mid-match join leave it false so they pick a fresh DM start.
+    if (!keepPosition) {
+        const dmStarts = (mapData.things || []).filter(t => t.type === 11);
+        const spawn = dmStarts.length > 0
+            ? pickDmSpawn(dmStarts, player)
+            : mapDataPlayerStartFallback();
 
-    if (spawn) {
-        player.x = spawn.x;
-        player.y = spawn.y;
-        // DM start `angle` is degrees, 0=east. Convert to north-radians.
-        player.angle = (spawn.angle * Math.PI / 180) - Math.PI / 2;
+        if (spawn) {
+            player.x = spawn.x;
+            player.y = spawn.y;
+            // DM start `angle` is degrees, 0=east. Convert to north-radians.
+            player.angle = (spawn.angle * Math.PI / 180) - Math.PI / 2;
+        }
     }
     player.floorHeight = getFloorHeightAt(player.x, player.y);
     player.z = player.floorHeight + EYE_HEIGHT;

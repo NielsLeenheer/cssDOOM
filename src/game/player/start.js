@@ -30,9 +30,9 @@
  * commands. shared/maps/ is the map-data layer only; these belong here.
  */
 
-import { PLAYER_RADIUS } from '../../shared/constants.js';
+import { PLAYER_RADIUS, EYE_HEIGHT } from '../../shared/constants.js';
 import { state } from '../state.js';
-import { getSectorAt } from '../physics.js';
+import { getSectorAt, getFloorHeightAt } from '../physics.js';
 import { mapData } from '../../shared/maps/index.js';
 import { orchestrator as renderer } from "../../orchestrator.js";
 
@@ -47,9 +47,11 @@ import { orchestrator as renderer } from "../../orchestrator.js";
  * Deathmatch: each player gets a different `type === 11` thing
  * (DOOM deathmatch-start markers; angle in degrees, no
  * floorHeight). With fewer starts than players, players cycle
- * through what's available. Floor height for DM spawns falls back
- * to playerStart's value — the first updateHeight() frame will
- * resample to the actual sector floor.
+ * through what's available. The real sector floor is resampled here
+ * so the camera is at the correct height the instant the scene is
+ * revealed — beginPlay's spawnPlayer reuses this position rather than
+ * re-picking (see spawnPlayer's keepPosition), so what Level.load
+ * reveals IS the final spawn.
  */
 export function applyPlayerStart() {
     if (state.gameMode === 'deathmatch') {
@@ -81,7 +83,6 @@ function applySinglePlayerStart() {
 
 function applyDeathmatchStarts() {
     const dmStarts = (mapData.things || []).filter(t => t.type === 11);
-    const fallbackFloor = mapData.playerStart?.floorHeight || 0;
 
     for (let i = 0; i < state.players.length; i++) {
         const player = state.players[i];
@@ -94,16 +95,17 @@ function applyDeathmatchStarts() {
             // radians, 0=north — same conversion as mapData.playerStart
             // minus π/2 north adjustment.
             player.angle = (start.angle * Math.PI / 180) - Math.PI / 2;
-            player.floorHeight = fallbackFloor;
         } else if (mapData.playerStart) {
             // No DM starts in this map — both players spawn together at
             // playerStart. Rare, but graceful fallback.
             player.x = mapData.playerStart.x;
             player.y = mapData.playerStart.y;
             player.angle = mapData.playerStart.angle - Math.PI / 2;
-            player.floorHeight = fallbackFloor;
         }
-        player.z = player.floorHeight + 80;
+        // Resample the actual sector floor at the chosen spawn (not a
+        // playerStart fallback) so the revealed camera height is final.
+        player.floorHeight = getFloorHeightAt(player.x, player.y);
+        player.z = player.floorHeight + EYE_HEIGHT;
     }
 }
 
