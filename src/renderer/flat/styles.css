@@ -4,164 +4,166 @@
    walls/floors/ceilings stand alone. The viewport sky is replaced
    with a flat solid color — the textured sky doesn't fit the
    flat-shaded aesthetic. */
-.pane.pane-flat .hud,
-.pane.pane-flat .weapon {
-    display: none;
-}
-.pane.pane-flat .viewport {
-    background: #5a5b60;
-}
+.pane.pane-flat {
+    .hud,
+    .weapon {
+        display: none;
+    }
+    .viewport {
+        background: #5a5b60;
+    }
 
-/* Outline each wall in the flat pane so individual planes read
-   distinctly against neighbours of similar color. Translucent
-   white border on top of the flat fill gives a subtle "drawn"
-   feel that reads as architecture rather than solid blocks. */
-.pane.pane-flat .wall {
-    border: 0.5px solid #fff8;
-}
+    /* Outline each wall in the flat pane so individual planes read
+       distinctly against neighbours of similar color. Translucent
+       white border on top of the flat fill gives a subtle "drawn"
+       feel that reads as architecture rather than solid blocks. */
+    .wall {
+        border: 0.5px solid #fff8;
+    }
 
-/* Suppress animated flats / scrolling-wall keyframes in the flat pane so
-   they don't churn. The solid colour itself comes from
-   texture-override.css, which forces `background-image: none` on every
-   [data-texture] surface so the precomputed colour reads through. */
-.pane.pane-flat .floor,
-.pane.pane-flat .ceiling,
-.pane.pane-flat .wall {
-    animation: none !important;
-}
+    /* Suppress animated flats / scrolling-wall keyframes in the flat pane
+       so they don't churn. The solid colour itself comes from
+       texture-override.css, which forces `background-image: none` on every
+       [data-texture] surface so the precomputed colour reads through. */
+    .floor,
+    .ceiling,
+    .wall {
+        animation: none !important;
+    }
 
-/* ── Things ─────────────────────────────────────────────────────────
-   Things (enemies, barrels, pickups, decorations, projectiles,
-   puffs, explosions, teleport fog) render as solid-color billboarded
-   rectangles. Two code paths:
+    /* ── Things ─────────────────────────────────────────────────────────
+       Things (enemies, barrels, pickups, decorations, projectiles,
+       puffs, explosions, teleport fog) render as solid-color billboarded
+       rectangles. Two code paths:
 
-   1. `.sprite` elements (enemies, barrels, animated pickups, player
-      billboards) already carry --w/--h sizing and the billboard
-      transform from src/renderer/dom/scene/entities/{sprites,things}.css.
-      We just wipe the sprite-sheet background image + sprite-cycle
-      animation and fill with a flat color.
+       1. `.sprite` elements (enemies, barrels, animated pickups, player
+          billboards) already carry --w/--h sizing and the billboard
+          transform from src/renderer/dom/scene/entities/{sprites,things}.css.
+          We just wipe the sprite-sheet background image + sprite-cycle
+          animation and fill with a flat color.
 
-   2. `<img>` children of `.pickup` / `.decoration` containers
-      (static pickups built at scene time, corpses created at
-      runtime by createCorpse). We can't put a background-color on
-      an `<img>` and have it show through, so we hide the img and
-      paint a sized ::before rectangle on the parent. Bottom-anchored,
-      billboarded by the same rotateY(--player-angle) the .sprite
-      rule uses, brightness-modulated by the sector --light. */
+       2. `<img>` children of `.pickup` / `.decoration` containers
+          (static pickups built at scene time, corpses created at
+          runtime by createCorpse). We can't put a background-color on
+          an `<img>` and have it show through, so we hide the img and
+          paint a sized ::before rectangle on the parent. Bottom-anchored,
+          billboarded by the same rotateY(--player-angle) the .sprite
+          rule uses, brightness-modulated by the sector --light. */
 
-.pane.pane-flat .sprite {
-    background-image: none !important;
-    animation: none !important;
-    background-color: #c84040; /* fallback for barrels and pickup .sprite */
-}
+    .sprite {
+        background-image: none !important;
+        animation: none !important;
+        background-color: #c84040; /* fallback for barrels and pickup .sprite */
+    }
 
-/* Combat-side things are hidden in the flat pane — enemies, corpses
-   (both runtime-spawned and static map-placed body/gore
-   decorations), projectiles, bullet puffs, fireball explosions,
-   teleport fog. Static decorations like columns, candles, trees,
-   firesticks stay visible. The flat scene's role in the talk is
-   showing the room shell + props; transient combat clutter would
-   distract from the geometry progression.
+    /* Combat-side things are hidden in the flat pane — enemies, corpses
+       (both runtime-spawned and static map-placed body/gore
+       decorations), projectiles, bullet puffs, fireball explosions,
+       teleport fog. Static decorations like columns, candles, trees,
+       firesticks stay visible. The flat scene's role in the talk is
+       showing the room shell + props; transient combat clutter would
+       distract from the geometry progression.
 
-   `:has(> img[src*="…"])` catches static map "bloody mess" / "dead
-   player" decorations (PLAYN0.png, PLAYW0.png) AND the runtime
-   corpse variants spawned by createCorpse (PLAYN0red.png etc.) —
-   the latter have the .corpse class too, but matching by sprite
-   name is enough and keeps both in one rule. */
-.pane.pane-flat .enemy,
-.pane.pane-flat .projectile,
-.pane.pane-flat .puff,
-.pane.pane-flat .fireball-explosion,
-.pane.pane-flat .teleport-fog,
-.pane.pane-flat .decoration:has(> img[src*="PLAYN0"]),
-.pane.pane-flat .decoration:has(> img[src*="PLAYW0"]),
-.pane.pane-flat .decoration:has(> img[src*="POL5A0"]),
-/* Exploded barrels — the textured pane fades them out via the
-   `sprite-hide` keyframe on `.sprite[data-state="dead"]`, but
-   we've stripped sprite animations in the flat pane so the
-   silhouette would otherwise hang around forever. Hide the
-   whole .barrel container as soon as its sprite enters the
-   dead state. */
-.pane.pane-flat .barrel:has(> .sprite[data-state="dead"]) {
-    display: none;
-}
+       `:has(> img[src*="…"])` catches static map "bloody mess" / "dead
+       player" decorations (PLAYN0.png, PLAYW0.png) AND the runtime
+       corpse variants spawned by createCorpse (PLAYN0red.png etc.) —
+       the latter have the .corpse class too, but matching by sprite
+       name is enough and keeps both in one rule. */
+    .enemy,
+    .projectile,
+    .puff,
+    .fireball-explosion,
+    .teleport-fog,
+    .decoration:has(> img[src*="PLAYN0"]),
+    .decoration:has(> img[src*="PLAYW0"]),
+    .decoration:has(> img[src*="POL5A0"]),
+    /* Exploded barrels — the textured pane fades them out via the
+       `sprite-hide` keyframe on `.sprite[data-state="dead"]`, but
+       we've stripped sprite animations in the flat pane so the
+       silhouette would otherwise hang around forever. Hide the
+       whole .barrel container as soon as its sprite enters the
+       dead state. */
+    .barrel:has(> .sprite[data-state="dead"]) {
+        display: none;
+    }
 
-.pane.pane-flat .pickup > img,
-.pane.pane-flat .decoration > img {
-    display: none;
-}
+    .pickup > img,
+    .decoration > img {
+        display: none;
+    }
 
-/* ── Outline stroke for clipped silhouettes ─────────────────────────
-   `border` lives on the bbox and gets cut away by clip-path;
-   `filter: drop-shadow` on the clipped element loses the outside
-   shadow to the same clip-path; `filter` on the PARENT flattens
-   transform-style and kills the 3D billboard. The remaining clean
-   option is to paint two layers: an outline layer (the same polygon
-   slightly scaled up, in white) BEHIND a body layer (the polygon at
-   real size, in the silhouette color). Both layers share the
-   billboard transform from the .sprite class or the bottom-anchored
-   ::after rule below, so 3D is preserved. */
+    /* ── Outline stroke for clipped silhouettes ─────────────────────────
+       `border` lives on the bbox and gets cut away by clip-path;
+       `filter: drop-shadow` on the clipped element loses the outside
+       shadow to the same clip-path; `filter` on the PARENT flattens
+       transform-style and kills the 3D billboard. The remaining clean
+       option is to paint two layers: an outline layer (the same polygon
+       slightly scaled up, in white) BEHIND a body layer (the polygon at
+       real size, in the silhouette color). Both layers share the
+       billboard transform from the .sprite class or the bottom-anchored
+       ::after rule below, so 3D is preserved. */
 
-/* Sheet sprites — .sprite element renders no body of its own; both
-   the outline and the body live on its pseudos so the .sprite's
-   own clip-path (none) doesn't crop the outline. */
-.pane.pane-flat .sprite {
-    background: none !important;
-}
-.pane.pane-flat .sprite::before,
-.pane.pane-flat .sprite::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    clip-path: var(--shape);
-}
-.pane.pane-flat .sprite::before {
-    background: #fff8;
-    /* `translateZ(-1px)` pushes the outline 1px behind the body
-       along the billboard's local Z axis (the sprite's parent has
-       the rotateY billboard transform, so the pseudo's local Z is
-       perpendicular to the billboard, pointing away from the
-       camera). Disambiguates painter's order when the outline and
-       body would otherwise be coplanar; not enough depth to
-       perceive as parallax. */
-    transform: translateZ(-1px) scale(1.05);
-    transform-origin: 50% 100%;
-}
-.pane.pane-flat .sprite::after {
-    background-color: var(--silhouette-color, #c84040);
-}
+    /* Sheet sprites — .sprite element renders no body of its own; both
+       the outline and the body live on its pseudos so the .sprite's
+       own clip-path (none) doesn't crop the outline. */
+    .sprite {
+        background: none !important;
+    }
+    .sprite::before,
+    .sprite::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        clip-path: var(--shape);
+    }
+    .sprite::before {
+        background: #fff8;
+        /* `translateZ(-1px)` pushes the outline 1px behind the body
+           along the billboard's local Z axis (the sprite's parent has
+           the rotateY billboard transform, so the pseudo's local Z is
+           perpendicular to the billboard, pointing away from the
+           camera). Disambiguates painter's order when the outline and
+           body would otherwise be coplanar; not enough depth to
+           perceive as parallax. */
+        transform: translateZ(-1px) scale(1.05);
+        transform-origin: 50% 100%;
+    }
+    .sprite::after {
+        background-color: var(--silhouette-color, #c84040);
+    }
 
-/* Img-based pickups / decorations — the container is a 0×0
-   positioning anchor; ::before paints the outline, ::after the
-   body. Both share size/position/billboard transform; ::before is
-   scaled 1.05× around the bottom-center so it stays bottom-aligned
-   with the body and the stroke only adds at the top + sides. */
-.pane.pane-flat .pickup:has(> img)::before,
-.pane.pane-flat .pickup:has(> img)::after,
-.pane.pane-flat .decoration:has(> img)::before,
-.pane.pane-flat .decoration:has(> img)::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: var(--bbox-w, 24px);
-    height: var(--bbox-h, 36px);
-    transform-origin: 50% 100%;
-    transform: translateX(-50%) rotateY(calc(var(--player-angle) * 1rad));
-    clip-path: var(--shape);
+    /* Img-based pickups / decorations — the container is a 0×0
+       positioning anchor; ::before paints the outline, ::after the
+       body. Both share size/position/billboard transform; ::before is
+       scaled 1.05× around the bottom-center so it stays bottom-aligned
+       with the body and the stroke only adds at the top + sides. */
+    .pickup:has(> img)::before,
+    .pickup:has(> img)::after,
+    .decoration:has(> img)::before,
+    .decoration:has(> img)::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: var(--bbox-w, 24px);
+        height: var(--bbox-h, 36px);
+        transform-origin: 50% 100%;
+        transform: translateX(-50%) rotateY(calc(var(--player-angle) * 1rad));
+        clip-path: var(--shape);
+    }
+    .pickup:has(> img)::before,
+    .decoration:has(> img)::before {
+        background: #fff8;
+        /* translateZ(-1px) AFTER the rotateY puts the outline 1px
+           behind the body along the billboard's local Z axis. Same
+           trick as the .sprite outline above — kills painter's-order
+           coin-flips with the ::after body without visible parallax. */
+        transform:
+            translateX(-50%)
+            rotateY(calc(var(--player-angle) * 1rad))
+            translateZ(-1px)
+            scale(1.05);
+    }
+    .pickup:has(> img)::after     { background-color: var(--silhouette-color, #40c060); }
+    .decoration:has(> img)::after { background-color: var(--silhouette-color, #909090); }
 }
-.pane.pane-flat .pickup:has(> img)::before,
-.pane.pane-flat .decoration:has(> img)::before {
-    background: #fff8;
-    /* translateZ(-1px) AFTER the rotateY puts the outline 1px
-       behind the body along the billboard's local Z axis. Same
-       trick as the .sprite outline above — kills painter's-order
-       coin-flips with the ::after body without visible parallax. */
-    transform:
-        translateX(-50%)
-        rotateY(calc(var(--player-angle) * 1rad))
-        translateZ(-1px)
-        scale(1.05);
-}
-.pane.pane-flat .pickup:has(> img)::after     { background-color: var(--silhouette-color, #40c060); }
-.pane.pane-flat .decoration:has(> img)::after { background-color: var(--silhouette-color, #909090); }

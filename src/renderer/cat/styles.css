@@ -1,35 +1,22 @@
-/* Cat pane — FlatRenderer's silly twin. Same HUD/weapon hide as
-   the flat pane, same wall outline + animation suppression, but
-   the wall background is preserved (the cat URLs set by
-   buildCatScene's inline `!important` win over the animation
-   suppression below). */
-.pane.pane-cat .hud,
-.pane.pane-cat .weapon {
-    display: none;
-}
-.pane.pane-cat .viewport {
-    background: #1a1a1a;
-}
+/* Cat pane — the cat element also carries `.pane-flat` (CatRenderer
+   extends FlatRenderer), so it inherits the flat pane's HUD/weapon
+   hide, animation suppression, and flat floor/ceiling colours from
+   flat/styles.css + texture-override.css. Only the cat-specific deltas
+   live here: a darker viewport and a black wall outline. Walls keep
+   their cat photo — buildCatScene sets it inline with `!important`, so
+   it wins over the inherited `[data-texture] { background-image: none }`
+   and the flat colour underneath. */
+.pane.pane-cat {
+    .viewport {
+        background: #1a1a1a;
+    }
 
-/* Outline each wall so individual cat-faced planes read distinctly
-   against neighbours of similar tone. */
-.pane.pane-cat .wall {
-    outline: 1px solid #000;
-}
-
-/* Animated flats / scrolling walls (NUKAGE keyframes, scroll-
-   texture keyframes) override `background-image` via CSS
-   animation, which would erase the cat URL. Suppress the
-   animations entirely; floors / ceilings keep their inline flat
-   colors, walls keep the cat. The cat backgrounds were set with
-   setProperty(..., 'important'), so they survive this `!important`
-   reset. */
-.pane.pane-cat .floor,
-.pane.pane-cat .ceiling,
-.pane.pane-cat .wall {
-    animation: none !important;
-}
-.pane.pane-cat .floor,
-.pane.pane-cat .ceiling {
-    background-image: none !important;
+    /* Black wall outline so individual cat-faced planes read distinctly
+       against neighbours of similar tone. `border: none` cancels the
+       flat pane's white wall border (inherited via .pane-flat) so the
+       two don't stack. */
+    .wall {
+        outline: 1px solid #000;
+        border: none;
+    }
 }

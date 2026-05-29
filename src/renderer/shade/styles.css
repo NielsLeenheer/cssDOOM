@@ -4,81 +4,83 @@
    cascade darkens white walls per sector to grey-scale. The viewport
    sky is pure black. Surface colours are set here in CSS (not in the
    scene builder) — see the rules below. */
-.pane.pane-shade .hud,
-.pane.pane-shade .weapon {
-    display: none;
-}
-.pane.pane-shade .viewport {
-    background: #000;
-}
+.pane.pane-shade {
+    .hud,
+    .weapon {
+        display: none;
+    }
+    .viewport {
+        background: #000;
+    }
 
-/* Light-effect animations override --light via @keyframes — kill
-   them on .pane-shade so each sector's static --light value reads
-   through. The class names come from buildSectorContainers (see
-   src/renderer/dom/scene/mechanics/lighting.css). */
-.pane.pane-shade .light-glow,
-.pane.pane-shade .light-blink,
-.pane.pane-shade .light-blink-fast,
-.pane.pane-shade .light-flicker,
-.pane.pane-shade .light-fire-flicker {
-    animation: none !important;
-}
+    /* Light-effect animations override --light via @keyframes — kill
+       them on .pane-shade so each sector's static --light value reads
+       through. The class names come from buildSectorContainers (see
+       src/renderer/dom/scene/mechanics/lighting.css). */
+    .light-glow,
+    .light-blink,
+    .light-blink-fast,
+    .light-flicker,
+    .light-fire-flicker {
+        animation: none !important;
+    }
 
-/* Door panels pin in the closed position — setDoorState is already
-   suppressed at dispatch on this renderer, but pinning the
-   transform here keeps the panel where the build placed it even if
-   the transition were already mid-flight when the renderer was
-   constructed. */
-.pane.pane-shade .door > .panel {
-    transition: none !important;
-    transform: none !important;
-}
+    /* Door panels pin in the closed position — setDoorState is already
+       suppressed at dispatch on this renderer, but pinning the
+       transform here keeps the panel where the build placed it even if
+       the transition were already mid-flight when the renderer was
+       constructed. */
+    .door > .panel {
+        transition: none !important;
+        transform: none !important;
+    }
 
-/* Strip textures + suppress animated flats / scrolling-wall keyframes
-   (NUKAGE, scroll-texture) so the fixed shade colours below read
-   through instead of the texture image. */
-.pane.pane-shade .floor,
-.pane.pane-shade .ceiling,
-.pane.pane-shade .wall {
-    animation: none !important;
-    background-image: none !important;
-}
+    /* Strip textures + suppress animated flats / scrolling-wall keyframes
+       (NUKAGE, scroll-texture) so the fixed shade colours below read
+       through instead of the texture image. */
+    .floor,
+    .ceiling,
+    .wall {
+        animation: none !important;
+        background-image: none !important;
+    }
 
-/* Fixed shade colours — moved here from buildShadeScene's JS
-   post-process; the builder now just emits structure. */
-.pane.pane-shade .wall    { background-color: #fff; }
-.pane.pane-shade .floor   { background-color: rgba(0, 255, 0, 0.5); }
-.pane.pane-shade .ceiling { background-color: rgba(0, 0, 255, 0.5); }
+    /* Fixed shade colours — moved here from buildShadeScene's JS
+       post-process; the builder now just emits structure. */
+    .wall    { background-color: #fff; }
+    .floor   { background-color: rgba(0, 255, 0, 0.5); }
+    .ceiling { background-color: rgba(0, 0, 255, 0.5); }
 
-/* Wall IDs — always on in the shade pane (the dom renderer ships
-   the same effect behind a `body.show-wall-ids` toggle in
-   walls.css; scoping to .pane-shade enables it here without
-   touching the global flag). The wall `id` attribute is set on
-   each wall element by the inherited buildWalls path. */
-.pane.pane-shade .wall::after {
-    content: attr(id);
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    translate: -50% -50%;
-    font-family: sans-serif;
-    font-size: 10px;    
-    color: white;
-    text-shadow: 0 0 2px black, 0 0 2px black;
-    pointer-events: none;
-}
+    /* Wall IDs — always on in the shade pane (the dom renderer ships
+       the same effect behind a `body.show-wall-ids` toggle in
+       walls.css; scoping to .pane-shade enables it here without
+       touching the global flag). The wall `id` attribute is set on
+       each wall element by the inherited buildWalls path. */
+    .wall::after {
+        content: attr(id);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        translate: -50% -50%;
+        font-family: sans-serif;
+        font-size: 10px;
+        color: white;
+        text-shadow: 0 0 2px black, 0 0 2px black;
+        pointer-events: none;
+    }
 
-/* Sector IDs — mirror of `body.show-sector-ids` from floors.css,
-   scoped so the labels render in the shade pane only. */
-.pane.pane-shade .floor::after {
-    content: attr(data-sector);
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    translate: -50% -50%;
-    font-family: sans-serif;
-    font-size: 20px;    
-    color: white;
-    text-shadow: 0 0 4px black, 0 0 4px black;
-    pointer-events: none;
+    /* Sector IDs — mirror of `body.show-sector-ids` from floors.css,
+       scoped so the labels render in the shade pane only. */
+    .floor::after {
+        content: attr(data-sector);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        translate: -50% -50%;
+        font-family: sans-serif;
+        font-size: 20px;
+        color: white;
+        text-shadow: 0 0 4px black, 0 0 4px black;
+        pointer-events: none;
+    }
 }

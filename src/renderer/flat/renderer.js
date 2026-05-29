@@ -47,13 +47,19 @@ export class FlatRenderer extends DomRenderer {
             await new Promise(resolve => setTimeout(resolve, IOS_GPU_RELEASE_DELAY_MS));
         }
         await maps.load(name);
-        const { fragment, sceneState } = await buildFlatScene(maps.mapData);
+        const { fragment, sceneState } = await this.buildScene(maps.mapData);
         this.sceneEl.replaceChildren(fragment);
         Object.assign(this.sceneState, sceneState);
         this._lastLoadedMap = name;
         if (this.state.camera) {
             this.updateCamera(this.state.camera);
         }
+    }
+
+    /** Scene-builder hook so subclasses (CatRenderer) can swap the
+     *  surface treatment without duplicating loadMap. */
+    buildScene(mapData) {
+        return buildFlatScene(mapData);
     }
 
     // updateCulling inherited from DomRenderer. It walks
