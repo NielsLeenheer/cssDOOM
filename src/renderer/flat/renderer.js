@@ -1,8 +1,8 @@
 /**
  * FlatRenderer — stripped-down DomRenderer for the talk's progression
  * visual. Same cssDOOM scene transform / perspective / lighting,
- * walls / floors / ceilings painted in flat colors from
- * `scripts/precompute-flat-colors.js`, things rendered as
+ * walls / floors / ceilings painted in flat colors via
+ * texture-override.css (keyed on [data-texture]), things rendered as
  * solid-color billboarded rectangles (see flat/styles.css). No HUD,
  * no weapon, no overlay screens.
  *

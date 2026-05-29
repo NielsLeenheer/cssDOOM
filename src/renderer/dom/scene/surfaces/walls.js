@@ -31,6 +31,7 @@ export function createWallElement(wall, floorZ, ceilZ) {
     el.style.setProperty('--end-y', wall.end.y);
     el.style.setProperty('--floor-z', floorZ);
     el.style.setProperty('--ceiling-z', ceilZ);
+    el.dataset.texture = wall.texture;
     el.style.backgroundImage = `url('/assets/textures/${wall.texture}.png')`;
     el.style.setProperty('--texture-offset-x', wall.xOffset);
     el.style.setProperty('--texture-offset-y', wall.yOffset);

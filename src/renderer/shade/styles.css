@@ -1,9 +1,9 @@
-/* Shade pane (top-right of the ?visualize layout): walls white, floors +
-   ceilings black, no animations on lighting or doors. Sector lights
-   still apply — the inherited `filter: brightness(var(--light))`
-   cascade darkens white walls per sector to grey-scale. The
-   viewport sky is pure black so floors / ceilings / sky read as one
-   unified silhouette behind the wall surfaces. */
+/* Shade pane (top-right of the ?visualize layout): walls white, floors
+   green, ceilings blue, no animations on lighting or doors. Sector
+   lights still apply — the inherited `filter: brightness(var(--light))`
+   cascade darkens white walls per sector to grey-scale. The viewport
+   sky is pure black. Surface colours are set here in CSS (not in the
+   scene builder) — see the rules below. */
 .pane.pane-shade .hud,
 .pane.pane-shade .weapon {
     display: none;
@@ -34,17 +34,21 @@
     transform: none !important;
 }
 
-/* Animated flats / scrolling walls (NUKAGE keyframes,
-   scroll-texture keyframes) override `background-image` via CSS
-   animation, which wins over the inline `style.backgroundImage =
-   "none"` we set in buildShadeScene. Suppress the animations
-   entirely so the solid black/white colors read through. */
+/* Strip textures + suppress animated flats / scrolling-wall keyframes
+   (NUKAGE, scroll-texture) so the fixed shade colours below read
+   through instead of the texture image. */
 .pane.pane-shade .floor,
 .pane.pane-shade .ceiling,
 .pane.pane-shade .wall {
     animation: none !important;
     background-image: none !important;
 }
+
+/* Fixed shade colours — moved here from buildShadeScene's JS
+   post-process; the builder now just emits structure. */
+.pane.pane-shade .wall    { background-color: #fff; }
+.pane.pane-shade .floor   { background-color: rgba(0, 255, 0, 0.5); }
+.pane.pane-shade .ceiling { background-color: rgba(0, 0, 255, 0.5); }
 
 /* Wall IDs — always on in the shade pane (the dom renderer ships
    the same effect behind a `body.show-wall-ids` toggle in

@@ -20,16 +20,14 @@
     border: 0.5px solid #fff8;
 }
 
-/* Animated flats / scrolling walls (NUKAGE keyframes, scroll-texture
-   keyframes) override `background-image` via CSS animation, which
-   wins over the inline `style.backgroundImage = "none"` we set in
-   buildFlatScene. Suppress the animations entirely in the flat pane
-   so the precomputed solid color reads through. */
+/* Suppress animated flats / scrolling-wall keyframes in the flat pane so
+   they don't churn. The solid colour itself comes from
+   texture-override.css, which forces `background-image: none` on every
+   [data-texture] surface so the precomputed colour reads through. */
 .pane.pane-flat .floor,
 .pane.pane-flat .ceiling,
 .pane.pane-flat .wall {
     animation: none !important;
-    background-image: none !important;
 }
 
 /* ── Things ─────────────────────────────────────────────────────────

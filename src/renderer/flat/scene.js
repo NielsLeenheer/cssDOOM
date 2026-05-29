@@ -2,10 +2,12 @@
  * Flat-shaded scene builder for FlatRenderer — the middle step in the
  * talk's progression visual (wireframe → flat → fully textured). Same
  * cssDOOM walls / floors / ceilings DOM as the full DomRenderer, but
- * with every surface painted in the texture's average RGB (precomputed
- * by `scripts/precompute-flat-colors.js`) instead of the actual
- * texture image. No things, no doors, no lifts, no crushers, no
- * player sprite — just the room shells.
+ * with every surface painted in the texture's average RGB instead of
+ * the actual texture image. The colours live in texture-override.css
+ * (generated; selected by the `[data-texture]` attribute every surface
+ * carries) — this builder just emits the same DOM the DomRenderer does
+ * and lets CSS recolour it. No things, no doors, no lifts, no crushers,
+ * no player sprite — just the room shells.
  *
  * Lighting reuses cssDOOM's existing `--light` CSS custom property
  * (set per sector container by buildSectorContainers, applied via
@@ -25,16 +27,7 @@ import { buildDoor } from '../dom/scene/mechanics/doors.js';
 import { buildLift } from '../dom/scene/mechanics/lifts.js';
 import { buildCrusher } from '../dom/scene/mechanics/crushers.js';
 
-let _colors = null;
-async function loadColors() {
-    if (_colors) return _colors;
-    const response = await fetch('/assets/flat-colors.json');
-    _colors = await response.json();
-    return _colors;
-}
-
-export async function buildFlatScene(mapData) {
-    const colors = await loadColors();
+export function buildFlatScene(mapData) {
     const ctx = {
         fragment: document.createDocumentFragment(),
         sceneState: makeSceneState(),
@@ -78,21 +71,10 @@ export async function buildFlatScene(mapData) {
         }
     }
 
-    // Repaint every surface from texture image → flat color. Walls
-    // built by buildWalls and floors/ceilings built by
-    // buildHorizontalSurface carry `dataset.texture`; walls built by
-    // createWallElement (door / lift / crusher track walls) don't,
-    // but they do stash the source wall data as `el._wall`. Fall
-    // back to that so door jambs render with the right flat color.
-    // Setting backgroundImage to 'none' wins over any cascading
-    // url() rule (e.g. animated NUKAGE keyframes in floors.css).
-    for (const el of ctx.fragment.querySelectorAll('.wall, .floor, .ceiling')) {
-        const tex = el.dataset.texture || el._wall?.texture;
-        const color = tex && colors[tex];
-        if (!color) continue;
-        el.style.backgroundImage = 'none';
-        el.style.backgroundColor = color;
-    }
-
+    // Surfaces are painted in their texture's average colour by
+    // texture-override.css, keyed on the [data-texture] attribute every
+    // wall / floor / ceiling carries (including door / lift / crusher
+    // track walls, since createWallElement now sets it too). No per-
+    // element JS repaint needed.
     return { fragment: ctx.fragment, sceneState: ctx.sceneState };
 }

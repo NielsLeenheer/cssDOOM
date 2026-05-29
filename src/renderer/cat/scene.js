@@ -28,16 +28,7 @@ const CAT_URLS = Array.from(
     (_, i) => `https://cataas.com/cat?width=256&height=256&i=${i + 1}`,
 );
 
-let _colors = null;
-async function loadColors() {
-    if (_colors) return _colors;
-    const response = await fetch('/assets/flat-colors.json');
-    _colors = await response.json();
-    return _colors;
-}
-
-export async function buildCatScene(mapData) {
-    const colors = await loadColors();
+export function buildCatScene(mapData) {
     const ctx = {
         fragment: document.createDocumentFragment(),
         sceneState: makeSceneState(),
@@ -74,16 +65,9 @@ export async function buildCatScene(mapData) {
         el.style.backgroundPosition = 'center';
     }
 
-    // Floors + ceilings keep the flat-color treatment from the
-    // flat renderer recipe — solid character colors so the room
-    // shape reads cleanly without competing with the wall cats.
-    for (const el of ctx.fragment.querySelectorAll('.floor, .ceiling')) {
-        const tex = el.dataset.texture || el._wall?.texture;
-        const color = tex && colors[tex];
-        if (!color) continue;
-        el.style.backgroundImage = 'none';
-        el.style.backgroundColor = color;
-    }
-
+    // Floors + ceilings keep the flat-color treatment — solid texture
+    // colours so the room shape reads cleanly without competing with the
+    // wall cats. Applied by texture-override.css via [data-texture]
+    // (image suppressed by cat/styles.css); no per-element JS repaint.
     return { fragment: ctx.fragment, sceneState: ctx.sceneState };
 }

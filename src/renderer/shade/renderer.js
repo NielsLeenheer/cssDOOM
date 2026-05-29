@@ -1,9 +1,9 @@
 /**
- * ShadeRenderer — black-and-white step in the talk's progression
- * visual (wireframe → shade → flat → fully textured). Walls render
- * white with sector lighting reading through as grey-scale shading;
- * floors / ceilings render pure black so room shapes read as
- * silhouetted planes against the wall surface.
+ * ShadeRenderer — shaded step in the talk's progression visual
+ * (wireframe → shade → flat → fully textured). Walls render white with
+ * sector lighting reading through as grey-scale shading; floors render
+ * green and ceilings blue so the room planes read distinctly against
+ * the white walls. Surface colours live in shade/styles.css.
  *
  * Implemented as a DomRenderer subclass for the same reason
  * FlatRenderer is: we inherit the pane DOM construction,

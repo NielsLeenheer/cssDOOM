@@ -1,17 +1,17 @@
 /**
  * Shade-shaded scene builder for ShadeRenderer — fourth step in the
  * talk's progression visual. Same cssDOOM walls / floors / ceilings
- * DOM as the full DomRenderer, but every wall painted pure white and
- * every floor / ceiling painted pure black. Sector lighting still
- * applies (the existing `filter: brightness(var(--light))` cascade
- * on `.wall` darkens white walls to grey-scale per sector). No
- * things, no doors that animate, no lifts, no crushers.
+ * DOM as the full DomRenderer; the surface colours (white walls, green
+ * floors, blue ceilings) are applied by shade/styles.css, keyed on the
+ * .wall / .floor / .ceiling classes. Sector lighting still applies (the
+ * existing `filter: brightness(var(--light))` cascade on `.wall`
+ * darkens white walls to grey-scale per sector). No things, no doors
+ * that animate, no lifts, no crushers.
  *
- * Why post-process instead of forking the build pipeline? The full
- * scene builder owns all the geometry math (sector containers,
- * wall splits, floor/ceiling slicing) — duplicating any of that is
- * a maintenance trap. So we build the scene exactly like the
- * textured pane and then wipe the surface colors in a final pass.
+ * We build the scene exactly like the textured pane — the full builder
+ * owns all the geometry math (sector containers, wall splits,
+ * floor/ceiling slicing) and duplicating it would be a maintenance
+ * trap — then let CSS recolour it. No per-element JS pass needed.
  */
 
 import { makeSceneState } from '../dom/renderer.js';
@@ -23,7 +23,7 @@ import { buildDoor } from '../dom/scene/mechanics/doors.js';
 import { buildLift } from '../dom/scene/mechanics/lifts.js';
 import { buildCrusher } from '../dom/scene/mechanics/crushers.js';
 
-export async function buildShadeScene(mapData) {
+export function buildShadeScene(mapData) {
     const ctx = {
         fragment: document.createDocumentFragment(),
         sceneState: makeSceneState(),
@@ -50,24 +50,8 @@ export async function buildShadeScene(mapData) {
         }
     }
 
-    // Strip textures + force fixed colors. backgroundImage: 'none'
-    // wins over cascading url() rules (e.g. NUKAGE animation
-    // keyframes in floors.css) even before .pane-shade CSS overrides
-    // animations, so the solid color reads through during the
-    // transient frame between build and first composited paint.
-    for (const el of ctx.fragment.querySelectorAll('.wall')) {
-        el.style.backgroundImage = 'none';
-        el.style.backgroundColor = '#fff';
-    }
-    for (const el of ctx.fragment.querySelectorAll('.floor')) {
-        el.style.backgroundImage = 'none';
-        el.style.backgroundColor = 'rgba(0, 255, 0, 0.5)';
-    }
-
-    for (const el of ctx.fragment.querySelectorAll('.ceiling')) {
-        el.style.backgroundImage = 'none';
-        el.style.backgroundColor = 'rgba(0, 0, 255, 0.5)';
-    }
-
+    // Surface colours (white walls, green floors, blue ceilings) and
+    // texture suppression are handled by shade/styles.css — no
+    // per-element JS pass needed.
     return { fragment: ctx.fragment, sceneState: ctx.sceneState };
 }
