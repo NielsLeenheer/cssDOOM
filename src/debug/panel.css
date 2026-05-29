@@ -1,7 +1,7 @@
 /* ========================================================================
    Debug Menu — developer affordance, not part of the in-game UI.
-   Companion to src/renderer/hud/debug.js (which builds the menu's
-   contents and wires its toggles). Lives at the top-left of the
+   Companion to src/debug/panel.js (which builds the menu's
+   contents from the registry). Lives at the top-left of the
    window, above the cssDOOM logo button.
    ======================================================================== */
 

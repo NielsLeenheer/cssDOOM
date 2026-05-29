@@ -77,36 +77,10 @@ export function initLiftsState() {
     state.liftState.forEach((entry, sectorIndex) => {
         liftEntries.push({ sectorIndex, entry });
     });
-
-    // Debug console commands
-    window.listTriggers = () => {
-        const triggers = mapData.triggers || [];
-        triggers.forEach((t, i) => {
-            console.log(`[${i}] type=${t.specialType} tag=${t.sectorTag} (${t.start.x},${t.start.y})→(${t.end.x},${t.end.y})${t._triggered ? ' [FIRED]' : ''}`);
-        });
-        console.log(`${triggers.length} trigger(s). Use triggerLinedef(index) to fire one.`);
-    };
-
-    window.triggerLinedef = (index) => {
-        const triggers = mapData.triggers || [];
-        const trigger = triggers[index];
-        if (!trigger) { console.error(`No trigger at index ${index}. Use listTriggers() to see available.`); return; }
-        console.log(`Firing trigger [${index}] type=${trigger.specialType} tag=${trigger.sectorTag}`);
-        for (let i = 0; i < liftEntries.length; i++) {
-            if (liftEntries[i].entry.tag === trigger.sectorTag) {
-                activateLift(liftEntries[i].sectorIndex);
-            }
-        }
-    };
-
-    window.activateLift = activateLift;
-
-    window.listLifts = () => {
-        liftEntries.forEach(({ sectorIndex, entry }) => {
-            console.log(`sector=${sectorIndex} tag=${entry.tag} height=${entry.currentHeight} (${entry.lowerHeight}..${entry.upperHeight}) moving=${entry.moving} oneWay=${entry.oneWay}`);
-        });
-    };
 }
+
+/** Live accessor for the cached lift entries — used by the debug console. */
+export function getLiftEntries() { return liftEntries; }
 
 export function activateLift(sectorIndex) {
     const liftState = state.liftState.get(sectorIndex);

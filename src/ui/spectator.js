@@ -59,7 +59,7 @@ function spectatorLoop() {
 // --- Spectator button ---
 const spectatorButton = document.getElementById('spectator-button');
 if (spectatorButton) {
-    spectatorButton.addEventListener('click', () => window.spectate());
+    spectatorButton.addEventListener('click', () => spectate());
 }
 
 // Player sprite rotation — same system as enemies (--heading/--mirror on sprite sheet)
@@ -100,7 +100,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
     orchestrator.setSpectatorAngle(cameraAngle);
 }
 
-window.spectate = function() {
+export function spectate() {
     // Spectator is single-player only — the camera follows state.players[0]
     // and the controls overlay isn't routed per-pane. Refuse to enter from
     // a DM session; allow exit if somehow already active.
@@ -135,7 +135,7 @@ window.spectate = function() {
             }
         }, 1500);
 
-        console.log('Spectator mode ON. Run spectate() again to exit.');
+        console.log('Spectator mode ON. Click the spectator button again to exit.');
     } else {
         spectatorLoopRunning = false;
         if (spectatorControls) spectatorControls.classList.add('hidden');
@@ -144,7 +144,7 @@ window.spectate = function() {
 
         console.log('Spectator mode OFF');
     }
-};
+}
 
 
 // --- Spectator drag to pan ---

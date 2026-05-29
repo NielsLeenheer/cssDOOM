@@ -23,7 +23,7 @@
 import { state } from './game/state.js';
 import { GAME_STATE, getGameState } from './game/game-state.js';
 import { mapData, currentMap } from './shared/maps/index.js';
-import { getCurrentLevel, onLevel, swapLevel } from './game/level.js';
+import { getCurrentLevel, onLevel } from './game/level.js';
 import { rendererManager } from './renderer/manager.js';
 import { updateMenuSelection } from './ui/menu.js';
 import { loadSavedGameMode, applyMode, ensurePlayerCount } from './mode.js';
@@ -33,7 +33,9 @@ import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
-import { initDebugMenu, updateDebugStats } from './renderer/dom/hud/debug.js';
+import { updateDebugStats } from './debug/panel.js';
+import { openDebugMenu, isDebugMenuOpen } from './debug/console.js';
+import { applyCssDefaults } from './debug/registry.js';
 import { attractTick, isAttractActive, setAttractWakeHandler } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
@@ -46,36 +48,8 @@ import { ensureMatchSize } from './game/match.js';
 import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { config } from '../config.js';
-import * as recorder from './debug/recorder.js';
 import { play as playRecording } from './debug/player.js';
 
-
-// ── Debug toggle ───────────────────────────────────────────────────────
-
-let debugEnabled = false;
-
-// Exposed at module load so the runtime debug-menu opener works even
-// before initMaster runs (rare, but matches previous behavior).
-window.debug = function () {
-    if (!debugEnabled) {
-        debugEnabled = true;
-        initDebugMenu();
-        console.log('Debug menu enabled');
-    }
-};
-
-// Render-command recording — capture every envelope flowing through
-// orchestrator.dispatch from a clean level state, save to local
-// storage, and replay via ?play=slot. Methods hang off the same
-// `window.debug` function so the console surface stays in one place.
-//
-//   debug.record()       — restart current level, start capturing
-//   debug.save('slot')   — write buffer to localStorage[`record:slot`]
-window.debug.record = async () => {
-    recorder.start();
-    await swapLevel(currentMap);
-};
-window.debug.save = (slot) => recorder.save(slot);
 
 // ── Render-all-panes ───────────────────────────────────────────────────
 
@@ -167,7 +141,7 @@ function gameLoop(timestamp) {
     getCurrentLevel()?.tick(timestamp);
     renderAllActivePanes();
 
-    if (import.meta.env.DEV || debugEnabled) updateDebugStats();
+    if (import.meta.env.DEV || isDebugMenuOpen()) updateDebugStats();
 
     requestAnimationFrame(gameLoop);
 }
@@ -502,7 +476,8 @@ function setupMasterBroadcast() {
  */
 export async function initMaster({ playSlot = null, exportFormat = null } = {}) {
     const isKiosk = document.body.dataset.layout === 'kiosk';
-    if (import.meta.env.DEV) { debugEnabled = true; initDebugMenu(); }
+    applyCssDefaults();
+    if (import.meta.env.DEV) openDebugMenu();
 
     // ?play=slot path — stand up the renderer infrastructure only,
     // then hand control to the recording player. We skip app.start

@@ -90,7 +90,7 @@ export const state = {
 
 // ── Debug flags ──────────────────────────────────────────────────────
 // Toggled from the debug menu at runtime.
-export const debug = {
+export const debugFlags = {
     noEnemyAttack: false,
     noEnemyMove: false,
     noclip: false,

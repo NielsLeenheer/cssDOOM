@@ -47,6 +47,7 @@ import {
 import { openRoom, closeRoom } from './network-host.js';
 import { orchestrator } from './orchestrator.js';
 import { app } from './app.js';
+import { spectate } from './ui/spectator.js';
 
 const MODE_STORAGE_KEY = 'cssdoom-game-mode';
 
@@ -207,7 +208,7 @@ export async function switchMode(name) {
     // away so its body classes and scene transforms don't bleed elsewhere.
     if (preset.gameMode !== 'singleplayer'
         && document.body.classList.contains('spectator')) {
-        window.spectate?.();
+        spectate();
     }
 
     applyMode(preset.gameMode, preset.networkMode);

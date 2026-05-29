@@ -17,8 +17,8 @@
  * 5 MB localStorage quota in seconds; IDB's quota typically scales
  * with available disk, so multi-minute recordings fit.
  *
- * Public surface is exposed on `window.debug.record / save` in
- * master.js — this module only holds state + helpers.
+ * Public surface is exposed on `debug.game.record / save` in
+ * debug/console.js — this module only holds state + helpers.
  */
 
 const DB_NAME = 'cssdoom-recordings';

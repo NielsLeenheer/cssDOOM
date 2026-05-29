@@ -13,7 +13,7 @@
  */
 
 import { PLAYER_RADIUS, PLAYER_HEIGHT, MAX_STEP_HEIGHT, BARREL_RADIUS, SOLID_THING_RADIUS, EYE_HEIGHT } from '../shared/constants.js';
-import { state, debug } from './state.js';
+import { state, debugFlags } from './state.js';
 import { isDoorClosed, getDoorEntry } from './mechanics/doors.js';
 import { circleLineCollision, pointInPolygon } from './geometry.js';
 import { forEachWallInAABB, forEachSectorAt } from './spatial-grid.js';
@@ -64,7 +64,7 @@ function crossesLinedef(fromX, fromY, newX, newY, _radius, wall) {
  * coordinates (movement.js: player.x/y, ai.js: enemy.x/y).
  */
 export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight = 0, maxDropHeight = Infinity, excludeThing = null, fromX = 0, fromY = 0) {
-    if (debug.noclip) return true;
+    if (debugFlags.noclip) return true;
 
     // Check collision against walls via spatial grid.
     // Solid walls and closed doors always block. Two-sided linedefs (windows,

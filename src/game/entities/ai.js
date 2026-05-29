@@ -8,7 +8,7 @@ import {
     MAX_STEP_HEIGHT,
 } from '../../shared/constants.js';
 
-import { state, debug } from '../state.js';
+import { state, debugFlags } from '../state.js';
 import { Player } from '../player/player.js';
 import { canMoveTo, getFloorHeightAt, getSectorAt } from '../physics.js';
 import { orchestrator as renderer } from "../../orchestrator.js";
@@ -213,7 +213,7 @@ function commitDirection(enemy, dir) {
  * Direction selection and timer mechanism match DOOM exactly.
  */
 function moveEnemyToward(enemy, targetX, targetY, deltaTime) {
-    if (debug.noEnemyMove) return;
+    if (debugFlags.noEnemyMove) return;
     const deltaX = targetX - enemy.x;
     const deltaY = targetY - enemy.y;
     const distSqToTarget = deltaX * deltaX + deltaY * deltaY;
@@ -491,7 +491,7 @@ function updateSingleEnemy(thingIndex, enemy, deltaTime, currentTime) {
             // Attack decision: DOOM checks melee first, then ranged.
             // Based on: linuxdoom-1.10/p_enemy.c:A_Chase() lines 405–440
             if ((currentTime - enemyAI.lastAttack) > enemyAI.cooldown * 1000) {
-                if (debug.noEnemyAttack && enemyAI.target instanceof Player) break;
+                if (debugFlags.noEnemyAttack && enemyAI.target instanceof Player) break;
 
                 // Melee attack: if enemy has a melee state and target is within MELEERANGE (64)
                 if (enemyAI.meleeRange && distSqToTarget < enemyAI.meleeRange * enemyAI.meleeRange) {
