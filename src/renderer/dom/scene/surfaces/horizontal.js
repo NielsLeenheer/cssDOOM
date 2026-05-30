@@ -102,8 +102,8 @@ export function buildHorizontalSurface(ctx, sector, height, textureName, surface
      * that the 64x64 flat textures tile seamlessly across adjacent sectors.
      */
     if (textureName && textureName !== NO_TEXTURE && textureName !== SKY_TEXTURE) {
+        // background-image comes from textures.css via [data-texture]
         surfaceElement.dataset.texture = textureName;
-        surfaceElement.style.backgroundImage = `url('/assets/flats/${textureName}.png')`;
     } else if (textureName === SKY_TEXTURE) {
         surfaceElement.style.backgroundColor = '#1a1a3a';
     } else {

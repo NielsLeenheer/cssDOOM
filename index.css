@@ -5,6 +5,7 @@
 @import url('src/renderer/dom/scene/surfaces/walls.css');
 @import url('src/renderer/dom/scene/surfaces/floors.css');
 @import url('src/renderer/dom/scene/surfaces/ceilings.css');
+@import url('src/renderer/dom/scene/surfaces/textures.css');
 @import url('src/renderer/dom/scene/mechanics/doors.css');
 @import url('src/renderer/dom/scene/mechanics/lifts.css');
 @import url('src/renderer/dom/scene/mechanics/crushers.css');
