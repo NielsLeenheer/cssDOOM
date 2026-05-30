@@ -861,7 +861,8 @@ body:has(.pane-attract.active, .pane-win.active, .pane-intermission.active, .pan
 body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .status,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .status,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .status,
-body.spectator .status {
+body.spectator .status,
+body.hide-hud .status {
     bottom: calc(-1 * var(--status-rows) * 32px * var(--scale));
 }
 
@@ -869,7 +870,8 @@ body:has(.pane-attract.active) .weapon,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="prompting"] .weapon,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="ready"] .weapon,
 body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .weapon,
-body.spectator .weapon {
+body.spectator .weapon,
+body.hide-hud .weapon {
     animation-play-state: paused !important;
     translate: 0 110%;
 }

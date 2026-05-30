@@ -215,13 +215,67 @@ world.lifts = () => {
     });
 };
 
-// ── debug.sectors — hide/show whole sector subtrees (.sector#s{id}) ────────
-// Pure DOM, spans every pane (per-pane DOM duplication is intentional).
+// ── debug.sectors — dissect the level for the talk's "anatomy of a
+// sector" animation. Pure DOM toggles on the .sector#s{id} containers;
+// the actual motion / fade lives in CSS (debug/sectors.css + the
+// surface transforms). Spans every pane (per-pane DOM duplication is
+// intentional). With no id, hide/show/explode act on every sector.
 const sectors = group('sectors');
 const sectorEls = (id) =>
     document.querySelectorAll(id == null ? '.sector' : `.sector#s${id}`);
+const allSectors = () => document.querySelectorAll('.sector');
+
+/** Hide a sector outright (display:none via the `hidden` attribute). */
 sectors.hide = (id) => sectorEls(id).forEach(el => el.setAttribute('hidden', ''));
+/** Reveal a hidden sector. */
 sectors.show = (id) => sectorEls(id).forEach(el => el.removeAttribute('hidden'));
+
+/** Animate a sector apart so its construction is visible — walls shrink in
+ *  place while floors/ceilings shrink and slide apart (down/up). CSS
+ *  handles the motion (per-surface --explode-scale / --explode-dist); call
+ *  reset() to re-assemble. */
+sectors.explode = (id) => sectorEls(id).forEach(el => el.classList.add('exploded'));
+
+/** Fade every sector EXCEPT the given one to transparent, so it stands
+ *  alone. id is required; surfaces fade via opacity (see debug/sectors.css). */
+sectors.only = (id) => allSectors().forEach(el =>
+    el.classList.toggle('faded', el.id !== `s${id}`));
+
+/** Rotate a sector's walls, floors and ceilings to face the camera
+ *  (animated). Meant to run after explode(id) — the surfaces billboard at
+ *  their exploded positions. CSS handles the motion (transition on
+ *  --billboard). */
+sectors.billboard = (id) => sectorEls(id).forEach(el => el.classList.add('billboarded'));
+
+/** Undo explode / billboard / only / hide on every sector. Explode, fade
+ *  and re-assembly animate; the billboard snaps back (its transform is
+ *  class-gated), so for a graceful reverse drop .billboarded on its own
+ *  first. */
+sectors.reset = () => allSectors().forEach(el => {
+    el.classList.remove('exploded', 'faded', 'billboarded');
+    el.removeAttribute('hidden');
+});
+
+// ── debug.fx — composed, timed set pieces for the talk ─────────────────────
+const fx = group('fx');
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Talk set piece: strip the chrome (HUD, sky, things, enemies), then
+ *  explode a sector and billboard it to the camera on a timeline. Pass a
+ *  sector id, or omit to act on every sector. */
+fx.billboard = async (id) => {
+    document.body.classList.add('hide-hud', 'hide-sky', 'hide-things', 'hide-enemies');
+    await delay(1000);
+
+    if (id != null) {
+        sectors.only(id);
+        await delay(1000);
+    }
+
+    sectors.explode(id);
+    await delay(3000);
+    sectors.billboard(id);
+};
 
 // ── debug.game — render-command recording ─────────────────────────────────
 // Capture every envelope through orchestrator.dispatch from a clean level

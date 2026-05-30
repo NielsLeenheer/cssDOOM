@@ -108,8 +108,9 @@ body.hide-things   .pickup,
 body.hide-things   .decoration,
 body.hide-things   .barrel  { display: none; }
 body.hide-enemies  .enemy   { display: none; }
-body.hide-hud      .hud,
-body.hide-hud      .weapon  { display: none; }
+/* hide-hud reuses the HUD's own off-screen slide (the same animation the
+   intermission / spectator states use) — see `body.hide-hud .status` and
+   `.weapon` in hud.css. So it animates out rather than snapping. */
 /* Sky is the .viewport background-image; null it out to leave a
    plain black background where the sky texture would be. */
 body.hide-sky      .viewport { background-image: none; }

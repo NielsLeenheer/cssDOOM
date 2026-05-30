@@ -55,6 +55,7 @@ export const SETTINGS = [
     { section: 'Renderer', kind: 'css', class: 'hide-enemies',  label: 'Enemies',  invert: true, grid: true },
     { section: 'Renderer', kind: 'css', class: 'hide-hud',      label: 'HUD',      invert: true, grid: true },
     { section: 'Renderer', kind: 'css', class: 'hide-sky',      label: 'Sky',      invert: true, grid: true },
+    { section: 'Renderer', kind: 'css', class: 'hide-chrome',   label: 'Chrome',   invert: true, grid: true },
 
     // ── Debug ── CSS-only development visualisations ──────────────────────
     { section: 'Debug', kind: 'css', class: 'show-sky-walls',  label: 'Show sky walls',  default: false },

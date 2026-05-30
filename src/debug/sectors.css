@@ -1,0 +1,185 @@
+/* ========================================================================
+   Sector debug visualisations — driven by the debug.sectors.* console
+   commands (see src/debug/console.js). Used to build the "anatomy of a
+   sector" animation for the CSS Day talk, alongside hide()/show().
+
+   All the transform work lives HERE — walls.css / floors.css /
+   ceilings.css stay pristine. Each surface's base transform is restated
+   below as --explode-transform (mirroring the renderer's, plus the
+   explode slide), and the scale + billboard extend that same property.
+   Because --explode-dist / --explode-scale default to 0 / 1,
+   --explode-transform and the scale wrapper are identical to the
+   renderer's base transform and stay static during gameplay (no per-frame
+   recompute) — only a sector being dissected pays any cost.
+
+   explode(id)   → .exploded pulls a sector apart, combining a slide and a
+                   shrink, tuned per surface so the construction reads well:
+                     • walls   shrink to --explode-scale 0.85 (no slide)
+                     • floors  shrink to 0.95 and slide down  (--explode-dist 6)
+                     • ceilings shrink to 0.95 and slide up   (--explode-dist 6)
+                   Each surface reads its own factors; removing the class
+                   animates the reverse (re-assemble).
+   only(id)      → .faded fades every OTHER sector's surfaces to
+                   transparent. Opacity is applied per-surface, not on the
+                   .sector node: it has transform-style: preserve-3d and
+                   opacity < 1 would flatten its 3D children mid-fade.
+   billboard(id) → .billboarded rotates the walls, floors and ceilings
+                   about their own centres to face the camera (--billboard
+                   animates 0 → 1), preserving the explode shrink + slide.
+                   This override reads var(--player-angle) (per-frame), so
+                   it is class-gated — never paid during gameplay. Removing
+                   the class snaps back (the override is gone); drop
+                   .billboarded on its own for a graceful reverse.
+   ======================================================================== */
+
+@property --explode-dist {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
+@property --explode-scale {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 1;
+}
+
+@property --billboard {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
+.sector {
+    /* --billboard is uniform across the sector (set by .billboarded and
+       inherited); the explode factors differ per surface, so they
+       transition on the surfaces below. */
+    transition: --billboard 2.4s ease;
+
+    &.billboarded {
+        --billboard: 1;
+    }
+}
+
+/* Per-surface explode targets + transitions. Walls shrink hard and stay
+   put; floors / ceilings shrink lightly and slide apart. */
+.sector :is(.wall, .floor, .ceiling) {
+    transition:
+        --explode-dist 0.6s ease,
+        --explode-scale 0.6s ease,
+        opacity 0.6s ease;
+}
+.sector.exploded {
+    .wall {
+        --explode-scale: 0.85;
+    }
+    :is(.floor, .ceiling) {
+        --explode-scale: 0.95;
+        --explode-dist: 6;
+    }
+}
+.sector.faded :is(.wall, .floor, .ceiling) {
+    opacity: 0;
+}
+
+/* ── Base + explode transforms ──────────────────────────────────────────
+   Mirror of walls.css / floors.css / ceilings.css with the explode slide
+   appended: after the wall's rotateY its local +Z is the inward normal, so
+   a negative Z slides it outward; after the floor/ceiling's rotateX(90deg)
+   local +Z is world-up, so floor uses -Z (down) and ceiling +Z (up).
+   Stored in --explode-transform so the billboard override can extend it.
+
+   The scale is then applied about the surface's own centre via the
+   translate(50%,50%) … translate(-50%,-50%) wrapper (which pivots about
+   the centre regardless of transform-origin). Inert at --explode-scale 1. */
+.sector .wall {
+    --explode-transform:
+        translate3d(
+            calc(var(--start-x) * 1px),
+            calc(var(--ceiling-z) * -1px),
+            calc(var(--start-y) * -1px)
+        )
+        rotateY(atan2(var(--delta-y), var(--delta-x)))
+        translateZ(calc(var(--explode-dist, 0) * -1px));
+    transform:
+        var(--explode-transform)
+        translate(50%, 50%)
+        scale(var(--explode-scale, 1))
+        translate(-50%, -50%);
+}
+
+.sector .ceiling {
+    --explode-transform:
+        translate3d(
+            calc(var(--min-x) * 1px),
+            calc((var(--ceiling-z) + (var(--max-y) - var(--min-y)) / 2) * -1px),
+            calc((var(--min-y) + var(--max-y)) / 2 * -1px)
+        )
+        rotateX(90deg)
+        translateZ(calc(var(--explode-dist, 0) * 1px));
+    transform:
+        var(--explode-transform)
+        translate(50%, 50%)
+        scale(var(--explode-scale, 1))
+        translate(-50%, -50%);
+}
+
+.sector .floor {
+    --explode-transform:
+        translate3d(
+            calc(var(--min-x) * 1px),
+            calc((var(--floor-z) + (var(--max-y) - var(--min-y)) / 2) * -1px),
+            calc((var(--min-y) + var(--max-y)) / 2 * -1px)
+        )
+        rotateX(90deg)
+        translateZ(calc(var(--explode-dist, 0) * -1px));
+    transform:
+        var(--explode-transform)
+        translate(50%, 50%)
+        scale(var(--explode-scale, 1))
+        translate(-50%, -50%);
+}
+
+/* ── Billboard overrides ────────────────────────────────────────────────
+   Same centre-pivot wrapper as above, with the camera-facing rotation
+   added after the scale (so the explode shrink + slide are preserved). At
+   --billboard 0 the rotation is 0 and, with --explode-scale 1, the wrapper
+   collapses to identity — activation is seamless. The yaw is wrapped to
+   [-180°,180°] via mod() so each surface takes the shortest route to
+   camera-facing. backface-visibility:visible so a surface mid-rotation
+   (back to camera) doesn't vanish during the animation.
+
+   Walls: net rotateY(--player-angle) faces the camera; the wall already
+   sits at rotateY(atan2(dy,dx)), so the added yaw is the difference.
+   Floors / ceilings: lift the flat plane (rotateX -90°) and yaw it. */
+.sector.billboarded {
+    .wall {
+        backface-visibility: visible;
+        transform:
+            var(--explode-transform)
+            translate(50%, 50%)
+            scale(var(--explode-scale, 1))
+            rotateY(calc(
+                (mod(
+                    var(--player-angle) * 1rad - atan2(var(--delta-y), var(--delta-x)) + 180deg,
+                    360deg
+                ) - 180deg)
+                * var(--billboard, 0)
+            ))
+            translate(-50%, -50%);
+    }
+
+    :is(.ceiling, .floor) {
+        backface-visibility: visible;
+        transform:
+            var(--explode-transform)
+            translate(50%, 50%)
+            scale(var(--explode-scale, 1))
+            rotateX(calc(-90deg * var(--billboard, 0)))
+            rotateY(calc(
+                (mod(var(--player-angle) * 1rad + 180deg, 360deg) - 180deg)
+                * var(--billboard, 0)
+            ))
+            translate(-50%, -50%);
+    }
+}

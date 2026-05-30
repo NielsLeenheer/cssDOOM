@@ -238,25 +238,20 @@ body[data-layout="kiosk"] #loading-overlay {
     background-position-x: calc(25vw - 82px * 4 * var(--screen-scale, 1) / 2);
 }
 
-/* ?visualize chrome — DOOM logo (#menu-button), top-right action
-   buttons (#ui-buttons), and the debug toggle (#debug-menu) all
-   render at opacity:0 by default so the four-pane talk capture is
-   just the panes. Hover reveals them at 0.4 opacity so you can
-   still find click targets. The debug toggle goes to full opacity
-   when expanded (details[open]) so its contents are usable while
-   inspecting. */
-body[data-layout="visualize"] #menu-button,
-body[data-layout="visualize"] #ui-buttons,
-body[data-layout="visualize"] #debug-menu {
+/* Hidden chrome — DOOM logo (#menu-button), top-right action buttons
+   (#ui-buttons), and the debug toggle (#debug-menu) render at opacity:0,
+   either in the ?visualize four-pane talk layout or via the debug "Chrome"
+   toggle (body.hide-chrome). Hover reveals them at 0.4 opacity so you can
+   still find click targets; the debug toggle goes to full opacity when
+   expanded (details[open]) so its contents stay usable while inspecting. */
+:is(body[data-layout="visualize"], body.hide-chrome) :is(#menu-button, #ui-buttons, #debug-menu) {
     opacity: 0;
     transition: opacity 0.15s;
 }
-body[data-layout="visualize"] #menu-button:hover,
-body[data-layout="visualize"] #ui-buttons:hover,
-body[data-layout="visualize"] #debug-menu:hover {
+:is(body[data-layout="visualize"], body.hide-chrome) :is(#menu-button, #ui-buttons, #debug-menu):hover {
     opacity: 0.4;
 }
-body[data-layout="visualize"] #debug-menu[open] {
+:is(body[data-layout="visualize"], body.hide-chrome) #debug-menu[open] {
     opacity: 1;
 }
 
