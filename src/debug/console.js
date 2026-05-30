@@ -17,6 +17,7 @@ import { swapLevel } from '../game/level.js';
 import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { activateLift, getLiftEntries } from '../game/mechanics/lifts.js';
 import * as recorder from './recorder.js';
+import * as pathModule from './path.js';
 import { initDebugMenu } from './panel.js';
 
 // ── Panel open state ──────────────────────────────────────────────────────
@@ -274,8 +275,31 @@ fx.billboard = async (id) => {
 
     sectors.explode(id);
     await delay(3000);
-    sectors.billboard(id);
+    // sectors.billboard(id);
 };
+
+// ── debug.path — record / replay the player's path (position + angle) ──────
+// Segment-based recording with a top-centre transport panel; replay moves the
+// PLAYER along a path while the game loop runs, so the camera follows and the
+// world reacts. The basis for hand-scripted talk shots — see src/debug/path.js.
+//   debug.path.record()                       — start a session (opens panel)
+//   .mark() .pause() .resume() .rewind() .review() .stop()  — transport
+//   .save('slot') / .load('slot') / .export() — persist / dump (per segment)
+//   .seek(pathOrSlot, { segment })  — teleport to a segment's start frame
+//   await debug.path.play(pathOrSlot, { speed, segment })  — replay it
+const path = group('path');
+path.record = pathModule.record;
+path.mark = pathModule.mark;
+path.pause = pathModule.pause;
+path.resume = pathModule.resume;
+path.rewind = pathModule.rewind;
+path.review = pathModule.review;
+path.stop = pathModule.stop;
+path.save = pathModule.save;
+path.load = pathModule.load;
+path.export = pathModule.exportPath;
+path.seek = pathModule.seek;
+path.play = pathModule.play;
 
 // ── debug.game — render-command recording ─────────────────────────────────
 // Capture every envelope through orchestrator.dispatch from a clean level

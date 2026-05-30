@@ -24,6 +24,7 @@
 @import url('src/renderer/dom/hud/hud.css');
 @import url('src/debug/panel.css');
 @import url('src/debug/sectors.css');
+@import url('src/debug/path-controls.css');
 @import url('src/ui/menu.css');
 @import url('src/renderer/dom/screens/lobby.css');
 @import url('src/ui/spectator.css');

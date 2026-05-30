@@ -1,0 +1,50 @@
+/* ========================================================================
+   Path recorder transport — the top-centre control bar shown while a
+   debug.path.record() session is active (built in src/debug/path.js).
+   Developer affordance; only exists during recording.
+   ======================================================================== */
+#path-controls {
+    position: fixed;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: 50%;
+    translate: -50%;
+    z-index: 2000;
+
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+
+    background: rgba(0, 0, 0, 0.82);
+    border: 1px solid #555;
+    border-radius: 6px;
+    font-family: sans-serif;
+    font-size: 12px;
+    color: #ddd;
+    user-select: none;
+
+    & .path-ctrl-status {
+        padding: 0 6px;
+        white-space: nowrap;
+        color: #f55; /* recording red */
+
+        &.paused {
+            color: #fc4; /* amber while paused */
+        }
+    }
+
+    & .path-ctrl-btn {
+        background: #333;
+        color: #ddd;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 4px 9px;
+        font-size: 12px;
+        cursor: pointer;
+
+        &:hover {
+            background: #444;
+            color: #fff;
+        }
+    }
+}

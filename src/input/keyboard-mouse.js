@@ -290,7 +290,7 @@ export function initKeyboardMouse() {
         // claim/fire happen on subsequent presses (handled by gates).
         if (pingActivity()) return;
         if (event.button !== 0 || spectatorActive || isTouchDevice) return;
-        if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #ui-buttons')) return;
+        if (event.target.closest('#debug-menu, #menu, .hud, #spectator, #touch-controls, #help-overlay, #ui-buttons, #path-controls')) return;
 
         handleMouseDown(event.button);
     });
