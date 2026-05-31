@@ -236,6 +236,69 @@ function trimSamples(samples) {
     return samples.slice(start, end + 1).map(s => ({ ...s, t: s.t - t0 }));
 }
 
+const DEG = Math.PI / 180;
+
+/** Box-blur x / y / angle over a window of `n` frames (clamped at the ends).
+ *  Angle is averaged shortest-route via sin/cos so it doesn't tear at the ±π
+ *  wrap. Takes the human jitter out of a recorded walk. n <= 1 is a no-op. */
+function smoothSamples(samples, n) {
+    if (!(n > 1) || samples.length < 3) return samples;
+    const k = Math.floor(n / 2);
+    return samples.map((s, i) => {
+        let sx = 0, sy = 0, sin = 0, cos = 0, c = 0;
+        for (let j = Math.max(0, i - k); j <= Math.min(samples.length - 1, i + k); j++) {
+            sx += samples[j].x; sy += samples[j].y;
+            sin += Math.sin(samples[j].angle); cos += Math.cos(samples[j].angle);
+            c++;
+        }
+        return { ...s, x: sx / c, y: sy / c, angle: Math.atan2(sin / c, cos / c) };
+    });
+}
+
+/** Bend a path so it starts / ends exactly on the given poses, spreading the
+ *  correction across the WHOLE segment (weighted by normalized time) so the
+ *  motion drifts smoothly onto the target instead of snapping. `start` / `end`
+ *  are { x?, y?, angle? } with angle in DEGREES; any field may be omitted.
+ *  Position deltas blend start→end along the path; angle eases shortest-route. */
+function retargetSamples(samples, start, end) {
+    if ((!start && !end) || samples.length < 2) return samples;
+    const t0 = samples[0].t;
+    const span = (samples.at(-1).t - t0) || 1;
+    const s0 = samples[0], e0 = samples.at(-1);
+    const num = (v) => typeof v === 'number';
+    const pin = (target, actual) => (target != null && num(target)) ? target - actual : 0;
+    const dsx = start ? pin(start.x, s0.x) : 0;
+    const dsy = start ? pin(start.y, s0.y) : 0;
+    const dex = end ? pin(end.x, e0.x) : 0;
+    const dey = end ? pin(end.y, e0.y) : 0;
+    // Shortest-route angle deltas, targets given in degrees.
+    const angDelta = (deg, from) => {
+        let d = (deg * DEG - from) % (2 * Math.PI);
+        return (d + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+    };
+    const dsa = start && num(start.angle) ? angDelta(start.angle, s0.angle) : 0;
+    const dea = end && num(end.angle) ? angDelta(end.angle, e0.angle) : 0;
+    return samples.map(s => {
+        const w = (s.t - t0) / span;          // 0 at start → 1 at end
+        return {
+            ...s,
+            x: s.x + dsx * (1 - w) + dex * w,
+            y: s.y + dsy * (1 - w) + dey * w,
+            angle: s.angle + dsa * (1 - w) + dea * w,
+        };
+    });
+}
+
+/** Shared seek/play post-processing, applied in order: trim → smooth →
+ *  retarget. opts: { trim, smooth, start, end } (see play()). Returns a new
+ *  sample list; the stored session is never mutated. */
+function processSamples(samples, opts = {}) {
+    if (opts.trim) samples = trimSamples(samples);
+    if (opts.smooth) samples = smoothSamples(samples, opts.smooth);
+    if (opts.start || opts.end) samples = retargetSamples(samples, opts.start, opts.end);
+    return samples;
+}
+
 /** Resolve a path argument to a flat sample list. `path` is a path object
  *  { samples }, a session { segments } (use opts.segment, default first), or a
  *  saved slot name. */
@@ -248,7 +311,9 @@ function resolveSamples(path, opts = {}) {
 /**
  * Teleport the player to a path's start frame (or any time via opts.t),
  * without playing. Use it to pre-position the camera for a shot, hold, then
- * play() — which continues seamlessly from there:
+ * play() — which continues seamlessly from there. Shares play()'s
+ * post-processing opts (trim / smooth / start / end), so pass the SAME ones to
+ * both and the seeked pose matches where the played path begins:
  *
  *   debug.path.seek('walk', { segment: 1 });   // jump to its first frame
  *   await delay(3000);                          // hold the shot
@@ -257,27 +322,31 @@ function resolveSamples(path, opts = {}) {
 export function seek(path, opts = {}) {
     let samples = resolveSamples(path, opts);
     if (!samples?.length) { console.warn('[path] nothing to seek'); return; }
-    if (opts.trim) samples = trimSamples(samples);
+    samples = processSamples(samples, opts);
     setPlayer(sampleAt(samples, opts.t ?? 0));
 }
 
 /**
  * Move the player along a path while the game loop runs. `path` may be a path
  * object { samples }, a whole session { segments } (plays each in order), or a
- * saved slot name. opts: { speed = 1, segment, trim } — `segment` is a 0-based
- * index to play just one segment; `trim` drops non-moving frames at the start
- * and end of each segment. Returns a promise that resolves when it finishes,
- * so you can `await` it between scripted steps (or not, to run it alongside
- * other debug.* calls).
+ * saved slot name. opts: { speed = 1, segment, trim, smooth, start, end }:
+ *   segment — 0-based index to play just one segment
+ *   trim    — drop non-moving frames at the start / end of each segment
+ *   smooth  — box-blur window (frames) over x / y / angle to de-jitter the walk
+ *   start / end — { x?, y?, angle? } (angle in DEGREES); bend the path so it
+ *     begins / lands exactly on these, spread across the whole segment
+ * Returns a promise that resolves when it finishes, so you can `await` it
+ * between scripted steps (or not, to run it alongside other debug.* calls).
  *
  *   debug.path.play('walk')                            — whole session
  *   debug.path.play('walk', { segment: 1 })            — just the 2nd segment
  *   debug.path.play('walk', { segment: 1, trim: true }) — …trimmed to motion
+ *   debug.path.play('walk', { segment: 1, smooth: 7, end: { x: 512, y: -64, angle: 90 } })
  */
 export async function play(path, opts = {}) {
     if (typeof path === 'string') path = load(path);
     if (path?.segments) {                       // a session
-        const pass = { speed: opts.speed, trim: opts.trim };
+        const pass = { speed: opts.speed, trim: opts.trim, smooth: opts.smooth, start: opts.start, end: opts.end };
         if (opts.segment != null) {             // …play just one segment
             const seg = path.segments[opts.segment];
             if (!seg) { console.warn(`[path] no segment ${opts.segment} (have ${path.segments.length})`); return; }
@@ -288,7 +357,7 @@ export async function play(path, opts = {}) {
     }
     let samples = path?.samples;
     if (!samples?.length) { console.warn('[path] nothing to play'); return; }
-    if (opts.trim) samples = trimSamples(samples);
+    samples = processSamples(samples, opts);
 
     const { speed = 1 } = opts;
     const player = state.players[0];
