@@ -1,0 +1,63 @@
+/* ========================================================================
+   debug.camera.offset — a view-relative ORBIT for talk shots.
+
+   DEBUG-ONLY. The renderer's own camera transform
+   (renderer/dom/scene/camera.css) stays pristine. When debug.camera.offset()
+   runs it adds the `debug-camera` class to <body> and sets the --cam-offset-*
+   custom properties; the rule below re-states the .scene camera transform with
+   a view-relative dolly AND a compensating re-aim, so you move to a new vantage
+   while keeping the same target framed:
+
+     • the dolly shifts the eye by x / y / z = right / up / back of where the
+       camera faces (world units; inverse camera ⇒ the scene moves opposite);
+     • the re-aim yaws / pitches back toward a pivot --cam-pivot units ahead —
+       move right ⇒ turn left, move up ⇒ look down — so the thing you were
+       looking at stays roughly centred (it's an orbit, not a pan).
+
+   It's an approximation (pivot is a fixed distance ahead, not the real hit
+   point), which is all the talk needs. Tune --cam-pivot (offset()'s 5th arg)
+   for stronger / weaker re-aim. Both the dolly and the re-aim are driven by the
+   same --cam-offset-* props, so the transition animates them together over t
+   (t = 0 ⇒ 0s ⇒ instant); "from the previous offset" is automatic.
+
+   Must be @imported AFTER renderer/dom/scene/camera.css (see index.css): it
+   deliberately overrides that file's `.scene` transform, winning on source
+   order — which also supersedes head-bob's transform (talk shots don't bob).
+   Mirrors the base transform; keep it in sync if that ever changes.
+
+   If a re-aim axis feels reversed, flip the `* -1` on that rotate below.
+   ======================================================================== */
+
+@property --cam-offset-x { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --cam-offset-y { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --cam-offset-z { syntax: "<number>"; inherits: true; initial-value: 0; }
+@property --cam-pivot    { syntax: "<number>"; inherits: true; initial-value: 512; }
+
+body.debug-camera .scene {
+    transform:
+        /* Re-aim: yaw/pitch back toward the pivot so the dolly orbits it.
+           pitch — move up ⇒ look down;  yaw — move right ⇒ turn left. */
+        rotateX(calc(atan2(var(--cam-offset-y, 0), var(--cam-pivot, 512)) * -1))
+        rotateY(calc(atan2(var(--cam-offset-x, 0), var(--cam-pivot, 512)) * -1))
+        /* View-relative dolly: right / up / back of where the camera faces. */
+        translate3d(
+            calc(var(--cam-offset-x, 0) * -1px),
+            calc(var(--cam-offset-y, 0) *  1px),
+            calc(var(--cam-offset-z, 0) * -1px)
+        )
+        /* Renderer's base camera: player yaw, then inverse position. */
+        rotateY(calc(var(--player-angle) * -1rad))
+        translate3d(
+            calc(var(--player-x) * -1px),
+            calc(var(--player-z) * 1px),
+            calc(var(--player-y) * 1px)
+        );
+
+    /* Keep the renderer's player-z fall transition; add the dolly easing
+       (the re-aim rides along, being a function of the same props). */
+    transition:
+        --player-z 0.25s ease-out,
+        --cam-offset-x var(--cam-offset-t, 0s) ease-in-out,
+        --cam-offset-y var(--cam-offset-t, 0s) ease-in-out,
+        --cam-offset-z var(--cam-offset-t, 0s) ease-in-out;
+}

@@ -18,6 +18,7 @@ import { forEachWallInAABB } from '../game/spatial-grid.js';
 import { activateLift, getLiftEntries } from '../game/mechanics/lifts.js';
 import * as recorder from './recorder.js';
 import * as pathModule from './path.js';
+import * as cameraModule from './camera.js';
 import { initDebugMenu } from './panel.js';
 
 // ── Panel open state ──────────────────────────────────────────────────────
@@ -302,6 +303,20 @@ const eachLayer = (layer) => layer ? [layer] : LAYER_NAMES;
 layers.fadeOut = (layer) => eachLayer(layer).forEach(l => document.body.classList.add(`fade-${l}`));
 /** Fade a scene layer (or all) back in. */
 layers.fadeIn = (layer) => eachLayer(layer).forEach(l => document.body.classList.remove(`fade-${l}`));
+
+// ── debug.camera — view-relative orbit for talk shots (see camera.css) ──────
+// Offset the eye AND re-aim to keep the target framed: x = right, y = up,
+// z = back (world units, relative to where the camera faces); the view yaws/
+// pitches back toward a pivot so move-right ⇒ turn-left, move-up ⇒ look-down.
+// Eases from the previous offset over t seconds (t = 0 instant). 5th arg sets
+// the pivot distance (gentler re-aim = larger). Debug-only; never touches the
+// renderer.
+//   debug.camera.offset(200, 120, 0, 2)   — orbit up/right over 2s, eyes on target
+//   debug.camera.offset(0, 80, 300, 2, 800) — rise & pull back, far pivot
+//   debug.camera.reset(1)                 — ease back to the eye over 1s
+const camera = group('camera');
+camera.offset = cameraModule.offset;
+camera.reset = cameraModule.reset;
 
 // ── debug.fx — composed, timed set pieces for the talk ─────────────────────
 const fx = group('fx');
