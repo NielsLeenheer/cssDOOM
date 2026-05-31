@@ -228,14 +228,21 @@ const allSectors = () => document.querySelectorAll('.sector');
 
 /** Hide a sector outright (display:none via the `hidden` attribute). */
 sectors.hide = (id) => sectorEls(id).forEach(el => el.setAttribute('hidden', ''));
-/** Reveal a hidden sector. */
-sectors.show = (id) => sectorEls(id).forEach(el => el.removeAttribute('hidden'));
+/** Reveal a sector — clears both hide() (the `hidden` attribute) and only()'s
+ *  fade (the `.faded` class), so it shows regardless of how it was hidden. */
+sectors.show = (id) => sectorEls(id).forEach(el => {
+    el.removeAttribute('hidden');
+    el.classList.remove('faded');
+});
 
 /** Animate a sector apart so its construction is visible — walls shrink in
  *  place while floors/ceilings shrink and slide apart (down/up). CSS
  *  handles the motion (per-surface --explode-scale / --explode-dist); call
  *  reset() to re-assemble. */
 sectors.explode = (id) => sectorEls(id).forEach(el => el.classList.add('exploded'));
+
+/** Reverse of explode — re-assemble the sector back to normal (animated). */
+sectors.implode = (id) => sectorEls(id).forEach(el => el.classList.remove('exploded'));
 
 /** Fade every sector EXCEPT the given one to transparent, so it stands
  *  alone. id is required; surfaces fade via opacity (see debug/sectors.css). */
