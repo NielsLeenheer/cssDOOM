@@ -16,11 +16,9 @@
  *                 join — unless you just Rewound, then it re-records over the
  *                 last segment) · Stop
  *
- * Capture runs at ~30fps and skips the leading "silence": a segment doesn't
- * start sampling until the player first moves, anchoring the standing pose as
- * t=0 (Mark starts the next segment immediately since the player is already
- * moving). Runs of identical frames are collapsed to a held pair so stationary
- * stretches stay compact and replay as a hold rather than a drift.
+ * Capture runs at ~30fps and records every frame, including any standing-
+ * still. play({ trim: true }) / seek({ trim: true }) drop the non-moving
+ * frames at the start and end of a segment so a shot begins and ends on motion.
  *
  * Exposed as debug.path.* in console.js.
  */
@@ -30,7 +28,7 @@ import { EYE_HEIGHT } from '../shared/constants.js';
 import { getFloorHeightAt } from '../game/physics.js';
 
 const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
-const POS_EPS = 0.1;  // movement threshold that ends the skip-silence wait
+const POS_EPS = 0.1;   // "moving" thresholds used by the play() trim
 const ANG_EPS = 0.002;
 
 // Sample at ~30fps regardless of refresh rate. The -4ms margin reliably
@@ -58,15 +56,12 @@ function setPlayer({ x, y, angle }) {
 let rec = null;
 let lastSession = null;  // { segments } after stop()
 
-function startSegment(skipSilence) {
-    rec.prev = null;
-    if (skipSilence) {
-        rec.cur = { samples: [], t0: null, lastMs: null };
-    } else {
-        // Immediate (mark mid-walk): anchor the current pose as t=0.
-        const now = performance.now();
-        rec.cur = { samples: [{ t: 0, ...pose(state.players[0]) }], t0: now, lastMs: now };
-    }
+function startSegment() {
+    // Record from the current pose immediately. Every frame is captured,
+    // including any standing-still — play({ trim: true }) drops the
+    // non-moving frames at the start/end.
+    const now = performance.now();
+    rec.cur = { samples: [{ t: 0, ...pose(state.players[0]) }], t0: now, lastMs: now };
 }
 
 function finalizeSegment() {
@@ -78,43 +73,11 @@ function sampleFrame() {
     if (!rec || rec.paused || !rec.cur) return;
     rec.rafId = requestAnimationFrame(sampleFrame);
 
-    // Throttle to ~30fps.
+    // Throttle to ~30fps; record every frame from there.
     const now = performance.now();
-    if (rec.cur.lastMs != null && now - rec.cur.lastMs < SAMPLE_INTERVAL_MS) return;
+    if (now - rec.cur.lastMs < SAMPLE_INTERVAL_MS) return;
     rec.cur.lastMs = now;
-
-    const cur = pose(state.players[0]);
-
-    if (rec.cur.t0 === null) {
-        // Skip leading silence — wait for the first real movement.
-        const moved = rec.prev && (
-            Math.abs(cur.x - rec.prev.x) > POS_EPS ||
-            Math.abs(cur.y - rec.prev.y) > POS_EPS ||
-            Math.abs(cur.angle - rec.prev.angle) > ANG_EPS
-        );
-        if (moved) {
-            rec.cur.t0 = now;
-            rec.cur.samples.push({ t: 0, ...rec.prev });  // standing pose as t=0
-        }
-        rec.prev = cur;
-        return;
-    }
-
-    // Record, collapsing runs of identical frames to two samples (the
-    // arrival + a held end whose time keeps extending) so a stationary
-    // stretch replays as a hold instead of a slow drift between endpoints.
-    const t = Math.round(now - rec.cur.t0);
-    const s = rec.cur.samples;
-    const last = s[s.length - 1];
-    const same = last && last.x === cur.x && last.y === cur.y && last.angle === cur.angle;
-    if (same) {
-        const prev2 = s[s.length - 2];
-        const holding = prev2 && prev2.x === cur.x && prev2.y === cur.y && prev2.angle === cur.angle;
-        if (holding) last.t = t;            // extend the held run
-        else s.push({ t, ...cur });         // mark the end of the held run
-    } else {
-        s.push({ t, ...cur });
-    }
+    rec.cur.samples.push({ t: Math.round(now - rec.cur.t0), ...pose(state.players[0]) });
 }
 
 function startSampling() { rec.rafId = requestAnimationFrame(sampleFrame); }
@@ -123,8 +86,8 @@ function stopSampling() { if (rec?.rafId) cancelAnimationFrame(rec.rafId); if (r
 /** Start a recording session (opens the transport panel). */
 export function record() {
     if (rec) { console.warn('[path] already recording'); return; }
-    rec = { segments: [], cur: null, prev: null, paused: false, rewound: false, rafId: null };
-    startSegment(true);
+    rec = { segments: [], cur: null, paused: false, rewound: false, rafId: null };
+    startSegment();
     startSampling();
     buildPanel();
     console.log('[path] recording — transport top-centre. Walk to record; mark / pause / stop.');
@@ -134,7 +97,7 @@ export function record() {
 export function mark() {
     if (!rec || rec.paused) { console.warn('[path] not recording'); return; }
     finalizeSegment();
-    startSegment(false);  // continue immediately (player is mid-walk)
+    startSegment();
     updatePanel();
     console.log(`[path] cut — ${rec.segments.length} segment(s)`);
 }
@@ -163,7 +126,7 @@ export function resume() {
         const last = rec.segments.at(-1);
         if (last) setPlayer(last.samples.at(-1));  // join at the last segment's end
     }
-    startSegment(true);   // skip-silence: wait for the player to walk on
+    startSegment();
     rec.paused = false;
     startSampling();
     updatePanel();
@@ -255,6 +218,24 @@ function sampleAt(samples, t) {
     };
 }
 
+/** Drop leading/trailing non-moving frames and re-base time to 0. Keeps the
+ *  pose just before the first move and the frame the last move lands on, so a
+ *  shot starts and ends on motion. Returns the list unchanged if it never moves. */
+function trimSamples(samples) {
+    if (samples.length < 2) return samples;
+    const moving = (a, b) =>
+        Math.abs(a.x - b.x) > POS_EPS ||
+        Math.abs(a.y - b.y) > POS_EPS ||
+        Math.abs(a.angle - b.angle) > ANG_EPS;
+    let start = 0;
+    while (start < samples.length - 1 && !moving(samples[start], samples[start + 1])) start++;
+    let end = samples.length - 1;
+    while (end > 0 && !moving(samples[end], samples[end - 1])) end--;
+    if (start >= end) return samples;
+    const t0 = samples[start].t;
+    return samples.slice(start, end + 1).map(s => ({ ...s, t: s.t - t0 }));
+}
+
 /** Resolve a path argument to a flat sample list. `path` is a path object
  *  { samples }, a session { segments } (use opts.segment, default first), or a
  *  saved slot name. */
@@ -274,35 +255,40 @@ function resolveSamples(path, opts = {}) {
  *   await debug.path.play('walk', { segment: 1 });
  */
 export function seek(path, opts = {}) {
-    const samples = resolveSamples(path, opts);
+    let samples = resolveSamples(path, opts);
     if (!samples?.length) { console.warn('[path] nothing to seek'); return; }
+    if (opts.trim) samples = trimSamples(samples);
     setPlayer(sampleAt(samples, opts.t ?? 0));
 }
 
 /**
  * Move the player along a path while the game loop runs. `path` may be a path
  * object { samples }, a whole session { segments } (plays each in order), or a
- * saved slot name. opts: { speed = 1, segment } — `segment` is a 0-based index
- * to play just one segment of a session/slot. Returns a promise that resolves
- * when it finishes, so you can `await` it between scripted steps (or not, to
- * run it alongside other debug.* calls).
+ * saved slot name. opts: { speed = 1, segment, trim } — `segment` is a 0-based
+ * index to play just one segment; `trim` drops non-moving frames at the start
+ * and end of each segment. Returns a promise that resolves when it finishes,
+ * so you can `await` it between scripted steps (or not, to run it alongside
+ * other debug.* calls).
  *
- *   debug.path.play('walk')                 — whole session, every segment
- *   debug.path.play('walk', { segment: 1 }) — just the 2nd segment
+ *   debug.path.play('walk')                            — whole session
+ *   debug.path.play('walk', { segment: 1 })            — just the 2nd segment
+ *   debug.path.play('walk', { segment: 1, trim: true }) — …trimmed to motion
  */
 export async function play(path, opts = {}) {
     if (typeof path === 'string') path = load(path);
     if (path?.segments) {                       // a session
+        const pass = { speed: opts.speed, trim: opts.trim };
         if (opts.segment != null) {             // …play just one segment
             const seg = path.segments[opts.segment];
             if (!seg) { console.warn(`[path] no segment ${opts.segment} (have ${path.segments.length})`); return; }
-            return play({ samples: seg.samples }, { speed: opts.speed });
+            return play({ samples: seg.samples }, pass);
         }
-        for (const seg of path.segments) await play({ samples: seg.samples }, { speed: opts.speed });
+        for (const seg of path.segments) await play({ samples: seg.samples }, pass);
         return;
     }
-    const samples = path?.samples;
+    let samples = path?.samples;
     if (!samples?.length) { console.warn('[path] nothing to play'); return; }
+    if (opts.trim) samples = trimSamples(samples);
 
     const { speed = 1 } = opts;
     const player = state.players[0];
