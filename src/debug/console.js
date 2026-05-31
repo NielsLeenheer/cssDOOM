@@ -282,6 +282,19 @@ sectors.reset = () => {
     document.querySelectorAll('.floor-grid').forEach(el => el.remove());
 };
 
+// ── debug.layers — cross-fade whole scene layers in / out ──────────────────
+// Opacity fade of every wall / floor / ceiling (vs the panel's instant
+// hide-* toggles). Pass a layer name, or omit to act on all three.
+//   debug.layers.fadeOut('walls')  ·  debug.layers.fadeIn('walls')
+const layers = group('layers');
+const LAYER_NAMES = ['walls', 'floors', 'ceilings'];
+const eachLayer = (layer) => layer ? [layer] : LAYER_NAMES;
+
+/** Fade a scene layer ('walls' | 'floors' | 'ceilings', or all) to transparent. */
+layers.fadeOut = (layer) => eachLayer(layer).forEach(l => document.body.classList.add(`fade-${l}`));
+/** Fade a scene layer (or all) back in. */
+layers.fadeIn = (layer) => eachLayer(layer).forEach(l => document.body.classList.remove(`fade-${l}`));
+
 // ── debug.fx — composed, timed set pieces for the talk ─────────────────────
 const fx = group('fx');
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));

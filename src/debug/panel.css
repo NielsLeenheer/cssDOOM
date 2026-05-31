@@ -114,3 +114,10 @@ body.hide-enemies  .enemy   { display: none; }
 /* Sky is the .viewport background-image; null it out to leave a
    plain black background where the sky texture would be. */
 body.hide-sky      .viewport { background-image: none; }
+
+/* Animated layer fades (debug.layers.fadeOut / fadeIn) — opacity instead of
+   the display:none above so the layer cross-fades in/out. The surfaces' own
+   opacity transition comes from sectors.css. */
+body.fade-floors   .floor   { opacity: 0; }
+body.fade-ceilings .ceiling { opacity: 0; }
+body.fade-walls    .wall    { opacity: 0; }
