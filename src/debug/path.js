@@ -20,16 +20,27 @@
  * still. play({ trim: true }) / seek({ trim: true }) drop the non-moving
  * frames at the start and end of a segment so a shot begins and ends on motion.
  *
+ * Action events (USE, FIRE, weapon switches) are captured alongside the pose
+ * and re-emitted on the input bus at the right moment during play(), so a
+ * replayed walk opens the same doors and fires the same shots it did live.
+ *
  * Exposed as debug.path.* in console.js.
  */
 
 import { state } from '../game/state.js';
 import { EYE_HEIGHT } from '../shared/constants.js';
 import { getFloorHeightAt } from '../game/physics.js';
+import * as A from '../input/actions.js';
+import { on, emit } from '../input/event-bus.js';
 
 const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 const POS_EPS = 0.1;   // "moving" thresholds used by the play() trim
 const ANG_EPS = 0.002;
+
+// Action events captured alongside the pose during a recording and re-emitted
+// on playback, so a replayed walk opens the same doors / fires the same shots
+// it did live. UI actions (menu toggle, kbm swap) are deliberately excluded.
+const RECORDED_ACTIONS = [A.USE, A.FIRE_DOWN, A.FIRE_UP, A.WEAPON_SELECT, A.WEAPON_PREV, A.WEAPON_NEXT];
 
 // Sample at ~30fps regardless of refresh rate. The -4ms margin reliably
 // catches the every-other-frame on a 60Hz display (which lands ~33ms apart).
@@ -49,10 +60,9 @@ function setPlayer({ x, y, angle }) {
 
 // ── Recording session ──────────────────────────────────────────────────────
 // rec while active:
-//   segments — finished segments, each { samples: [{t,x,y,angle}] }
-//   cur      — in-progress segment { samples, t0 }  (t0=null = waiting to move)
-//   prev     — previous pose, for the skip-silence movement test
-//   paused, rewound, rafId
+//   segments — finished segments, each { samples: [{t,x,y,angle}], events: [{t,kind,…}] }
+//   cur      — in-progress segment { samples, events, t0, lastMs }
+//   paused, rewound, rafId, unsubs (action-bus subscriptions)
 let rec = null;
 let lastSession = null;  // { segments } after stop()
 
@@ -61,12 +71,22 @@ function startSegment() {
     // including any standing-still — play({ trim: true }) drops the
     // non-moving frames at the start/end.
     const now = performance.now();
-    rec.cur = { samples: [{ t: 0, ...pose(state.players[0]) }], t0: now, lastMs: now };
+    rec.cur = { samples: [{ t: 0, ...pose(state.players[0]) }], events: [], t0: now, lastMs: now };
 }
 
 function finalizeSegment() {
-    if (rec.cur?.samples.length) rec.segments.push({ samples: rec.cur.samples });
+    if (rec.cur?.samples.length) rec.segments.push({ samples: rec.cur.samples, events: rec.cur.events });
     rec.cur = null;
+}
+
+/** Capture an action event into the current segment at its relative time.
+ *  Subscribed at high priority and never consumes, so gameplay is unaffected;
+ *  ignores events while paused (e.g. during a review() replay). */
+function recordEvent(event) {
+    if (!rec || rec.paused || !rec.cur) return;
+    const e = { t: Math.round(performance.now() - rec.cur.t0), kind: event.kind, slot: event.slot, deviceId: event.deviceId };
+    if (event.weapon != null) e.weapon = event.weapon;
+    rec.cur.events.push(e);
 }
 
 function sampleFrame() {
@@ -86,9 +106,12 @@ function stopSampling() { if (rec?.rafId) cancelAnimationFrame(rec.rafId); if (r
 /** Start a recording session (opens the transport panel). */
 export function record() {
     if (rec) { console.warn('[path] already recording'); return; }
-    rec = { segments: [], cur: null, paused: false, rewound: false, rafId: null };
+    rec = { segments: [], cur: null, paused: false, rewound: false, rafId: null, unsubs: [] };
     startSegment();
     startSampling();
+    // Observe the gameplay action bus (high priority, non-consuming) to capture
+    // doors / fire / weapon switches alongside the pose.
+    rec.unsubs = RECORDED_ACTIONS.map(kind => on(kind, recordEvent, { priority: 10_000 }));
     buildPanel();
     console.log('[path] recording — transport top-centre. Walk to record; mark / pause / stop.');
 }
@@ -150,13 +173,14 @@ export function review() {
     if (!last) { console.warn('[path] no segment to review'); return; }
     rec.rewound = false;  // watching to the end = keeping it
     updatePanel();
-    return play({ samples: last.samples });
+    return play({ samples: last.samples, events: last.events });
 }
 
 /** Finish the session; returns { segments }. */
 export function stop() {
     if (!rec) { console.warn('[path] not recording'); return null; }
     if (!rec.paused) { finalizeSegment(); stopSampling(); }
+    rec.unsubs?.forEach(u => u());
     lastSession = { segments: rec.segments };
     destroyPanel();
     const n = lastSession.segments.length;
@@ -185,7 +209,7 @@ export function load(slot) {
 /** Log + clipboard each segment as an independent playable path; returns the array. */
 export function exportPath(session = lastSession) {
     if (!session?.segments?.length) { console.warn('[path] nothing to export — record() first'); return null; }
-    const paths = session.segments.map(s => ({ samples: s.samples }));
+    const paths = session.segments.map(s => ({ samples: s.samples, events: s.events }));
     const json = JSON.stringify(paths);
     console.log(json);
     navigator.clipboard?.writeText(json).then(() => console.log('[path] copied to clipboard'), () => {});
@@ -218,11 +242,10 @@ function sampleAt(samples, t) {
     };
 }
 
-/** Drop leading/trailing non-moving frames and re-base time to 0. Keeps the
- *  pose just before the first move and the frame the last move lands on, so a
- *  shot starts and ends on motion. Returns the list unchanged if it never moves. */
-function trimSamples(samples) {
-    if (samples.length < 2) return samples;
+/** Index range [start, end] of the first and last MOVING frames — what trim
+ *  keeps. Returns the full range if the segment never moves. */
+function trimWindow(samples) {
+    if (samples.length < 2) return { start: 0, end: samples.length - 1 };
     const moving = (a, b) =>
         Math.abs(a.x - b.x) > POS_EPS ||
         Math.abs(a.y - b.y) > POS_EPS ||
@@ -231,9 +254,28 @@ function trimSamples(samples) {
     while (start < samples.length - 1 && !moving(samples[start], samples[start + 1])) start++;
     let end = samples.length - 1;
     while (end > 0 && !moving(samples[end], samples[end - 1])) end--;
-    if (start >= end) return samples;
+    if (start >= end) return { start: 0, end: samples.length - 1 };
+    return { start, end };
+}
+
+/** Drop leading/trailing non-moving frames and re-base time to 0. Keeps the
+ *  pose just before the first move and the frame the last move lands on, so a
+ *  shot starts and ends on motion. Returns the list unchanged if it never moves. */
+function trimSamples(samples) {
+    if (samples.length < 2) return samples;
+    const { start, end } = trimWindow(samples);
     const t0 = samples[start].t;
     return samples.slice(start, end + 1).map(s => ({ ...s, t: s.t - t0 }));
+}
+
+/** Shift / filter recorded events to match a trim of `samples` (the only opt
+ *  that changes timing): events outside the kept window drop, the rest re-base
+ *  by the same offset so they stay aligned with the trimmed poses. */
+function processEvents(events, samples, opts = {}) {
+    if (!events?.length || !opts.trim) return events ?? [];
+    const { start, end } = trimWindow(samples);
+    const t0 = samples[start].t, t1 = samples[end].t;
+    return events.filter(e => e.t >= t0 && e.t <= t1).map(e => ({ ...e, t: e.t - t0 }));
 }
 
 const DEG = Math.PI / 180;
@@ -327,9 +369,11 @@ export function seek(path, opts = {}) {
 }
 
 /**
- * Move the player along a path while the game loop runs. `path` may be a path
- * object { samples }, a whole session { segments } (plays each in order), or a
- * saved slot name. opts: { speed = 1, segment, trim, smooth, start, end }:
+ * Move the player along a path while the game loop runs, re-emitting its
+ * recorded actions (doors / fire / weapon switches) at their moments. `path`
+ * may be a path object { samples, events }, a whole session { segments } (plays
+ * each in order), or a saved slot name. opts: { speed = 1, segment, trim,
+ * smooth, start, end }:
  *   segment — 0-based index to play just one segment
  *   trim    — drop non-moving frames at the start / end of each segment
  *   smooth  — box-blur window (frames) over x / y / angle to de-jitter the walk
@@ -350,19 +394,21 @@ export async function play(path, opts = {}) {
         if (opts.segment != null) {             // …play just one segment
             const seg = path.segments[opts.segment];
             if (!seg) { console.warn(`[path] no segment ${opts.segment} (have ${path.segments.length})`); return; }
-            return play({ samples: seg.samples }, pass);
+            return play({ samples: seg.samples, events: seg.events }, pass);
         }
-        for (const seg of path.segments) await play({ samples: seg.samples }, pass);
+        for (const seg of path.segments) await play({ samples: seg.samples, events: seg.events }, pass);
         return;
     }
-    let samples = path?.samples;
-    if (!samples?.length) { console.warn('[path] nothing to play'); return; }
-    samples = processSamples(samples, opts);
+    const raw = path?.samples;
+    if (!raw?.length) { console.warn('[path] nothing to play'); return; }
+    const events = processEvents(path?.events, raw, opts);   // before processSamples reassigns
+    const samples = processSamples(raw, opts);
 
     const { speed = 1 } = opts;
     const player = state.players[0];
     const t1 = samples.at(-1).t;
     const startMs = performance.now();
+    let evCursor = 0;
 
     return new Promise(resolve => {
         const frame = () => {
@@ -376,6 +422,13 @@ export async function play(path, opts = {}) {
             player.angle = s.angle;
             player.floorHeight = getFloorHeightAt(s.x, s.y);
             player.z = player.floorHeight + EYE_HEIGHT;
+            // Re-emit any actions whose moment has passed — pose is already set
+            // this frame, so USE / FIRE act from the right spot.
+            const now = done ? t1 : t;
+            while (evCursor < events.length && events[evCursor].t <= now) {
+                const e = events[evCursor++];
+                emit({ kind: e.kind, slot: e.slot, deviceId: e.deviceId, ...(e.weapon != null ? { weapon: e.weapon } : {}) });
+            }
             if (done) { resolve(); return; }
             requestAnimationFrame(frame);
         };
