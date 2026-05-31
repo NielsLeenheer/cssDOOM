@@ -184,7 +184,7 @@
     }
 }
 
-/* ── Floor clip visualisation (debug.sectors.floorGrid) ──────────────────────
+/* ── Floor clip visualisation (debug.sectors.showFloorGrid / hideFloorGrid) ──
    A copy of a sector's floor, laid just below the real (clipped, textured) one
    with its clip-path removed so the FULL bounding rectangle shows. The real
    floor's texture covers the sector polygon on top; this copy reveals the

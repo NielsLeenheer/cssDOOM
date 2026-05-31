@@ -259,14 +259,14 @@ sectors.billboard = (id) => sectorEls(id).forEach(el => el.classList.add('billbo
 /** Lay a grid copy of a sector's floor just BELOW the real (clipped, textured)
  *  one, with the clip removed so the whole bounding rectangle shows: the
  *  texture covers the sector polygon on top, the grid + dotted border reveal
- *  the clipped-away "negative" space around it. Toggles; with no id, every
- *  floor. (CSS: `.floor.floor-grid` in sectors.css.) */
-sectors.floorGrid = (id) => {
+ *  the clipped-away "negative" space around it. Fades in (the grid rides the
+ *  sector's surface opacity transition, see sectors.css). With no id, every
+ *  floor; calling again is a no-op where a grid already exists. */
+sectors.showFloorGrid = (id) => {
     const realSel = id == null ? '.floor[data-sector]:not(.floor-grid)' : `.floor[data-sector="${id}"]:not(.floor-grid)`;
-    const gridSel = id == null ? '.floor-grid' : `.floor-grid[data-grid-for="${id}"]`;
-    const grids = document.querySelectorAll(gridSel);
-    if (grids.length) { grids.forEach(el => el.remove()); return; }  // toggle off
     document.querySelectorAll(realSel).forEach(floor => {
+        // Don't stack a second grid on a floor that already has one.
+        if (floor.previousElementSibling?.classList.contains('floor-grid')) return;
         const grid = floor.cloneNode(false);
         grid.classList.add('floor-grid');
         grid.dataset.gridFor = floor.dataset.sector;
@@ -274,7 +274,23 @@ sectors.floorGrid = (id) => {
         grid.style.clipPath = 'none';                  // ignore the clip → full rectangle
         const fz = parseFloat(floor.style.getPropertyValue('--floor-z')) || 0;
         grid.style.setProperty('--floor-z', fz - 0.1);
+        grid.style.opacity = '0';                      // start transparent → fade in next frame
         floor.before(grid);
+        requestAnimationFrame(() => { grid.style.opacity = '1'; });
+    });
+};
+
+/** Fade out and remove the floor grid(s) laid by showFloorGrid. No id = all. */
+sectors.hideFloorGrid = (id) => {
+    const gridSel = id == null ? '.floor-grid' : `.floor-grid[data-grid-for="${id}"]`;
+    document.querySelectorAll(gridSel).forEach(el => {
+        const onEnd = (e) => {
+            if (e.propertyName !== 'opacity') return;
+            el.removeEventListener('transitionend', onEnd);
+            el.remove();
+        };
+        el.addEventListener('transitionend', onEnd);
+        el.style.opacity = '0';
     });
 };
 
