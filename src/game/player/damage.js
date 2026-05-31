@@ -3,7 +3,7 @@
  */
 
 import { SECTOR_DAMAGE } from '../../shared/constants.js';
-import { state } from '../state.js';
+import { state, debugFlags } from '../state.js';
 import { orchestrator } from '../../orchestrator.js';
 import { pointInPolygon } from '../geometry.js';
 import { forEachSectorAt } from '../spatial-grid.js';
@@ -38,6 +38,7 @@ import { clearMovingState } from '../movement.js';
  * fully depleted and armorType resets to 0.
  */
 export function damagePlayer(player, damageAmount, attacker = null) {
+    if (debugFlags.noDamage) return;            // debug menu: No damage
     if (player.powerups.invulnerability) return;
 
     // Based on: linuxdoom-1.10/p_inter.c:P_DamageMobj() — skill 1 halves damage

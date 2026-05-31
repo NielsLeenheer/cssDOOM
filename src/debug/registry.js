@@ -29,6 +29,7 @@ export const SETTINGS = [
     { section: 'Game', kind: 'flag', target: debugFlags, key: 'noEnemyAttack', label: 'No enemy attack' },
     { section: 'Game', kind: 'flag', target: debugFlags, key: 'noEnemyMove',   label: 'No enemy movement' },
     { section: 'Game', kind: 'flag', target: debugFlags, key: 'noclip',        label: 'No collision (noclip)' },
+    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noDamage',      label: 'No damage' },
 
     // ── Culling ── JS flags read by updateCulling(); order matches its passes
     { section: 'Culling', kind: 'flag', target: culling, key: 'distance', label: 'Distance culling', stat: 'afterDistance' },

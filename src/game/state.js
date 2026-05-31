@@ -94,4 +94,5 @@ export const debugFlags = {
     noEnemyAttack: false,
     noEnemyMove: false,
     noclip: false,
+    noDamage: false,
 };
