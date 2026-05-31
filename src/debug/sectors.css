@@ -183,3 +183,24 @@
             translate(-50%, -50%);
     }
 }
+
+/* ── Floor clip visualisation (debug.sectors.floorGrid) ──────────────────────
+   A copy of a sector's floor, laid just below the real (clipped, textured) one
+   with its clip-path removed so the FULL bounding rectangle shows. The real
+   floor's texture covers the sector polygon on top; this copy reveals the
+   clipped-away "negative" space as a grid, with a dotted border around the
+   whole bounding box. It's positioned by the same .sector .floor rule above
+   (its --floor-z is nudged down a couple units in JS so the texture wins on
+   top). Grid is bbox-aligned (background-position 0 0); cells are 64u, the
+   flat-texture tile size. */
+.floor.floor-grid {
+    box-sizing: border-box;
+    filter: none;                       /* ignore the sector --light dimming */
+    outline: 1px solid #0ff6;
+    background-color: transparent;
+    background-position: 0 0;
+    background-image:
+        repeating-linear-gradient(0deg,  #0ff6 0 1px, transparent 1px 8px),
+        repeating-linear-gradient(90deg, #0ff6 0 1px, transparent 1px 8px);
+}
+

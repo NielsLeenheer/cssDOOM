@@ -248,14 +248,39 @@ sectors.only = (id) => allSectors().forEach(el =>
  *  --billboard). */
 sectors.billboard = (id) => sectorEls(id).forEach(el => el.classList.add('billboarded'));
 
-/** Undo explode / billboard / only / hide on every sector. Explode, fade
- *  and re-assembly animate; the billboard snaps back (its transform is
- *  class-gated), so for a graceful reverse drop .billboarded on its own
- *  first. */
-sectors.reset = () => allSectors().forEach(el => {
-    el.classList.remove('exploded', 'faded', 'billboarded');
-    el.removeAttribute('hidden');
-});
+/** Lay a grid copy of a sector's floor just BELOW the real (clipped, textured)
+ *  one, with the clip removed so the whole bounding rectangle shows: the
+ *  texture covers the sector polygon on top, the grid + dotted border reveal
+ *  the clipped-away "negative" space around it. Toggles; with no id, every
+ *  floor. (CSS: `.floor.floor-grid` in sectors.css.) */
+sectors.floorGrid = (id) => {
+    const realSel = id == null ? '.floor[data-sector]:not(.floor-grid)' : `.floor[data-sector="${id}"]:not(.floor-grid)`;
+    const gridSel = id == null ? '.floor-grid' : `.floor-grid[data-grid-for="${id}"]`;
+    const grids = document.querySelectorAll(gridSel);
+    if (grids.length) { grids.forEach(el => el.remove()); return; }  // toggle off
+    document.querySelectorAll(realSel).forEach(floor => {
+        const grid = floor.cloneNode(false);
+        grid.classList.add('floor-grid');
+        grid.dataset.gridFor = floor.dataset.sector;
+        grid.removeAttribute('data-texture');          // no texture
+        grid.style.clipPath = 'none';                  // ignore the clip → full rectangle
+        const fz = parseFloat(floor.style.getPropertyValue('--floor-z')) || 0;
+        grid.style.setProperty('--floor-z', fz - 0.1);
+        floor.before(grid);
+    });
+};
+
+/** Undo explode / billboard / only / hide on every sector and drop any floor
+ *  grids. Explode, fade and re-assembly animate; the billboard snaps back (its
+ *  transform is class-gated), so for a graceful reverse drop .billboarded on
+ *  its own first. */
+sectors.reset = () => {
+    allSectors().forEach(el => {
+        el.classList.remove('exploded', 'faded', 'billboarded');
+        el.removeAttribute('hidden');
+    });
+    document.querySelectorAll('.floor-grid').forEach(el => el.remove());
+};
 
 // ── debug.fx — composed, timed set pieces for the talk ─────────────────────
 const fx = group('fx');
