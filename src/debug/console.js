@@ -290,11 +290,12 @@ sectors.reset = () => {
 };
 
 // ── debug.layers — cross-fade whole scene layers in / out ──────────────────
-// Opacity fade of every wall / floor / ceiling (vs the panel's instant
-// hide-* toggles). Pass a layer name, or omit to act on all three.
-//   debug.layers.fadeOut('walls')  ·  debug.layers.fadeIn('walls')
+// Opacity fade of every wall / floor / ceiling / thing (pickups, decorations,
+// barrels) vs the panel's instant hide-* toggles; 'sky' fades the sky
+// background to black behind the scene. Pass a layer name, or omit for all.
+//   debug.layers.fadeOut('walls')  ·  debug.layers.fadeIn('sky')
 const layers = group('layers');
-const LAYER_NAMES = ['walls', 'floors', 'ceilings'];
+const LAYER_NAMES = ['walls', 'floors', 'ceilings', 'sky', 'things'];
 const eachLayer = (layer) => layer ? [layer] : LAYER_NAMES;
 
 /** Fade a scene layer ('walls' | 'floors' | 'ceilings', or all) to transparent. */

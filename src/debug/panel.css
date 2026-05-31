@@ -121,3 +121,26 @@ body.hide-sky      .viewport { background-image: none; }
 body.fade-floors   .floor   { opacity: 0; }
 body.fade-ceilings .ceiling { opacity: 0; }
 body.fade-walls    .wall    { opacity: 0; }
+
+/* Sky fade (debug.layers.fadeOut('sky')). The sky is the .viewport
+   background-image, which can't transition — so fade a black layer in over it
+   but BEHIND the 3D scene (z-index -1, the same trick spectator.css uses to dim
+   on ::after; ::before is otherwise unused). Only the sky gaps darken; solid
+   geometry already covers it. Inert until body.fade-sky. */
+.viewport::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+    z-index: -1;
+}
+body.fade-sky .viewport::before { opacity: 1; }
+
+/* Things fade (debug.layers.fadeOut('things')) — pickups / decorations /
+   barrels. They have no opacity transition of their own, so give them one
+   (collected pickups hide via visibility, not opacity, so this is fade-only). */
+.pickup, .decoration, .barrel { transition: opacity 0.6s ease; }
+body.fade-things :is(.pickup, .decoration, .barrel) { opacity: 0; }
