@@ -64,12 +64,15 @@ if (spectatorButton) {
 
 // Player sprite rotation — same system as enemies (--heading/--mirror on sprite sheet)
 // Walk animation is handled by CSS @keyframes sprite-cycle
-let lastPlayerHeading = -1;
-let lastPlayerMirror = -1;
-
 function updatePlayerSprite(cameraAngle, forceBack = false) {
-    const sprite = document.querySelector('#player > .sprite');
-    if (!sprite) return;
+    // Every pane has its own #player (built into each renderer's scene). Update
+    // them all — querySelector would only catch the first, leaving the other
+    // panes' sprites on the CSS default --heading: 0 (the FRONT row), so a
+    // kiosk/mirror layout would show the front in those panes. No change-guard:
+    // a cheap per-frame write to a couple of sprites, and it self-heals a pane
+    // that was rebuilt after the last heading change.
+    const sprites = document.querySelectorAll('#player > .sprite');
+    if (!sprites.length) return;
 
     // Determine which of the 8 DOOM rotation angles to show
     let sheetRow, mirrorScale;
@@ -90,9 +93,7 @@ function updatePlayerSprite(cameraAngle, forceBack = false) {
         }
     }
 
-    if (sheetRow !== lastPlayerHeading || mirrorScale !== lastPlayerMirror) {
-        lastPlayerHeading = sheetRow;
-        lastPlayerMirror = mirrorScale;
+    for (const sprite of sprites) {
         sprite.style.setProperty('--heading', sheetRow);
         sprite.style.setProperty('--mirror', mirrorScale);
     }
