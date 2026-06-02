@@ -27,6 +27,7 @@
 @import url('src/debug/path-controls.css');
 /* Overrides the renderer's .scene transform — must stay after camera.css. */
 @import url('src/debug/camera.css');
+@import url('src/debug/sprites.css');
 @import url('src/ui/menu.css');
 @import url('src/renderer/dom/screens/lobby.css');
 @import url('src/ui/spectator.css');
@@ -50,5 +51,6 @@
    come after flat/styles.css for the same cascade reason. */
 @import url('src/renderer/flat/texture-override.css');
 @import url('src/renderer/shade/styles.css');
+@import url('src/renderer/lighting/styles.css');
 @import url('src/renderer/cat/styles.css');
 @import url('src/renderer/axis/styles.css');
