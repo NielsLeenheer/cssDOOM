@@ -18,7 +18,7 @@
        white border on top of the flat fill gives a subtle "drawn"
        feel that reads as architecture rather than solid blocks. */
     .wall {
-        border: 0.5px solid #fff8;
+        /* border: 0.5px solid #fff8; */
     }
 
     /* Suppress animated flats / scrolling-wall keyframes in the flat pane
