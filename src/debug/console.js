@@ -227,6 +227,11 @@ const sectorEls = (id) =>
     document.querySelectorAll(id == null ? '.sector' : `.sector#s${id}`);
 const allSectors = () => document.querySelectorAll('.sector');
 
+/** Get a sector's DOM element (the `.sector#s{id}` container) to poke at
+ *  directly — add classes, set custom props, etc. Returns the first match (the
+ *  SP pane); for every pane use document.querySelectorAll(`.sector#s${id}`). */
+sectors.get = (id) => sectorEls(id)[0] ?? null;
+
 /** Hide a sector outright (display:none via the `hidden` attribute). */
 sectors.hide = (id) => sectorEls(id).forEach(el => el.setAttribute('hidden', ''));
 /** Reveal a sector — clears both hide() (the `hidden` attribute) and only()'s
