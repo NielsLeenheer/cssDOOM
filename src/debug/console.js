@@ -264,6 +264,33 @@ sectors.only = (...ids) => {
  *  --billboard). */
 sectors.billboard = (id) => sectorEls(id).forEach(el => el.classList.add('billboarded'));
 
+// Restore a sector's renderer --light (saved by highlight()); no-op if it
+// wasn't overridden.
+const restoreSectorLight = (el) => {
+    const saved = el.dataset.litLight;
+    if (saved === undefined) return;
+    if (saved) el.style.setProperty('--light', saved); else el.style.removeProperty('--light');
+    delete el.dataset.litLight;
+};
+
+/** Highlight a sector — flood its walls / floors / ceilings with a solid accent
+ *  (#F8BA00), drop their textures, and lift its base brightness to full so it
+ *  pops. The light-fx animations (blink / glow / flicker) still drive --light,
+ *  so dynamic lighting keeps playing — only the static dim level is overridden.
+ *  With no id, every sector. (CSS: `.sector.highlighted` in sectors.css.) */
+sectors.highlight = (id) => sectorEls(id).forEach(el => {
+    el.classList.add('highlighted');
+    // --light is set inline by the renderer; an fx animation (if any) overrides
+    // the inline value, so setting it to 1 here keeps fx while flooring the base.
+    if (el.dataset.litLight === undefined) el.dataset.litLight = el.style.getPropertyValue('--light');
+    el.style.setProperty('--light', '1');
+});
+/** Remove a sector highlight (or all) — restores the renderer's brightness. */
+sectors.unhighlight = (id) => sectorEls(id).forEach(el => {
+    el.classList.remove('highlighted');
+    restoreSectorLight(el);
+});
+
 /** Lay a grid copy of a sector's floor just BELOW the real (clipped, textured)
  *  one, with the clip removed so the whole bounding rectangle shows: the
  *  texture covers the sector polygon on top, the grid + dotted border reveal
