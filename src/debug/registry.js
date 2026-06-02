@@ -48,7 +48,7 @@ export const SETTINGS = [
     { section: 'Effects', kind: 'css', class: 'all-enemies-shadow', label: 'All enemies shadow', default: false },
 
     // ── Renderer ── select swaps the SP renderer; grid peels scene layers ──
-    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: ['dom', 'flat', 'shade', 'line', 'cat'] },
+    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: ['dom', 'flat', 'shade', 'lighting', 'line', 'cat'] },
     { section: 'Renderer', kind: 'css', class: 'hide-floors',   label: 'Floors',   invert: true, grid: true },
     { section: 'Renderer', kind: 'css', class: 'hide-ceilings', label: 'Ceilings', invert: true, grid: true },
     { section: 'Renderer', kind: 'css', class: 'hide-walls',    label: 'Walls',    invert: true, grid: true },

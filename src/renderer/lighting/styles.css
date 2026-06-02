@@ -1,0 +1,38 @@
+/* Lighting pane — like the shade pane, but every surface renders pure OPAQUE
+   WHITE so the inherited `filter: brightness(var(--light))` cascade (walls.css /
+   floors.css / ceilings.css) shows ONLY the per-sector lighting, in greyscale.
+   No surface colours, no transparency: a black-and-white lighting map of the
+   level. Structure is the shade scene builder; this CSS hook is the difference.
+   Must be @imported after the dom surface CSS (see index.css) so these rules win
+   the cascade. */
+.pane.pane-lighting {
+    .hud,
+    .weapon {
+        display: none;
+    }
+    .viewport {
+        background: #000;
+    }
+
+    /* Unlike the shade pane, the light-effect keyframes (glow / blink /
+       flicker, see dom/scene/mechanics/lighting.css) are LEFT RUNNING — they
+       animate --light, so the dynamic sector lighting plays through the
+       brightness filter. That's the whole point of this renderer. */
+
+    /* Doors pinned closed (setDoorState is suppressed at dispatch). */
+    .door > .panel {
+        transition: none !important;
+        transform: none !important;
+    }
+
+    /* Strip textures + animated-flat / scrolling keyframes, and paint every
+       surface opaque white. The per-surface `filter: brightness(var(--light))`
+       then darkens each to its sector's grey — the entire image is the lighting. */
+    .floor,
+    .ceiling,
+    .wall {
+        animation: none !important;
+        background-image: none !important;
+        background-color: #fff;
+    }
+}

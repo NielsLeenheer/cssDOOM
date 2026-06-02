@@ -26,6 +26,7 @@ import { DomRenderer } from './dom/renderer.js';
 import { LineRenderer } from './line/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
 import { ShadeRenderer } from './shade/renderer.js';
+import { LightingRenderer } from './lighting/renderer.js';
 import { CatRenderer } from './cat/renderer.js';
 import { AxisRenderer } from './axis/renderer.js';
 import { orchestrator } from '../orchestrator.js';
@@ -35,12 +36,13 @@ import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.
 // the URL values; values are the constructors. Missing entries (or
 // no `?renderer=`) fall back to DomRenderer.
 const RENDERERS = {
-    line:  LineRenderer,
-    flat:  FlatRenderer,
-    shade: ShadeRenderer,
-    cat:   CatRenderer,
-    axis:  AxisRenderer,
-    dom:   DomRenderer,
+    line:     LineRenderer,
+    flat:     FlatRenderer,
+    shade:    ShadeRenderer,
+    lighting: LightingRenderer,
+    cat:      CatRenderer,
+    axis:     AxisRenderer,
+    dom:      DomRenderer,
 };
 
 // Per-layout pane composition, all static. Each layout has:
