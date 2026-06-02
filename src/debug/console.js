@@ -250,10 +250,13 @@ sectors.explode = (id) => sectorEls(id).forEach(el => el.classList.add('exploded
 /** Reverse of explode — re-assemble the sector back to normal (animated). */
 sectors.implode = (id) => sectorEls(id).forEach(el => el.classList.remove('exploded'));
 
-/** Fade every sector EXCEPT the given one to transparent, so it stands
- *  alone. id is required; surfaces fade via opacity (see debug/sectors.css). */
-sectors.only = (id) => allSectors().forEach(el =>
-    el.classList.toggle('faded', el.id !== `s${id}`));
+/** Fade every sector EXCEPT the given one(s) to transparent, so they stand
+ *  alone. Pass one or more ids — debug.sectors.only(29) or .only(29, 32).
+ *  At least one id is required; surfaces fade via opacity (see sectors.css). */
+sectors.only = (...ids) => {
+    const keep = new Set(ids.map(id => `s${id}`));
+    allSectors().forEach(el => el.classList.toggle('faded', !keep.has(el.id)));
+};
 
 /** Rotate a sector's walls, floors and ceilings to face the camera
  *  (animated). Meant to run after explode(id) — the surfaces billboard at
