@@ -335,8 +335,9 @@ sectors.hideFloorGrid = (id) => {
  *  its own first. */
 sectors.reset = () => {
     allSectors().forEach(el => {
-        el.classList.remove('exploded', 'faded', 'billboarded');
+        el.classList.remove('exploded', 'faded', 'billboarded', 'highlighted');
         el.removeAttribute('hidden');
+        restoreSectorLight(el);
     });
     document.querySelectorAll('.floor-grid').forEach(el => el.remove());
 };
