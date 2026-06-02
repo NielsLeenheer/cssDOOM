@@ -22,7 +22,7 @@ import * as cameraModule from './camera.js';
 import * as spritesModule from './sprites.js';
 import { registerCustom } from './custom.js';
 import { initDebugMenu, switchRenderer } from './panel.js';
-import { spectate } from '../ui/spectator.js';
+import { spectate, spectatorActive } from '../ui/spectator.js';
 
 // ── Panel open state ──────────────────────────────────────────────────────
 let menuOpen = false;
@@ -457,7 +457,10 @@ debug.renderer = (kind) => {
     return switchRenderer(kind);
 };
 
-// ── debug.spectator — toggle spectator mode from the console ────────────────
-// Same toggle as the binoculars button (which the Chrome toggle hides). SP only
-// — refused in deathmatch. Call again to exit.
-debug.spectator = () => spectate();
+// ── debug.spectator — spectator mode from the console ──────────────────────
+// Same as the binoculars button (which the Chrome toggle hides). SP only —
+// refused in deathmatch. No arg toggles; pass a boolean to set it on/off.
+//   debug.spectator()  ·  debug.spectator(true)  ·  debug.spectator(false)
+debug.spectator = (on) => {
+    if (on === undefined || !!on !== spectatorActive) spectate();
+};
