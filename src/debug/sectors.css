@@ -82,6 +82,16 @@
     opacity: 0;
 }
 
+/* Highlight (debug.sectors.highlight) — flood a sector's surfaces with a solid
+   accent and drop their textures so it pops against the rest. Per-surface (not
+   on the .sector node, which is preserve-3d and would flatten under a grouping
+   override). The lighting renderer's brightness(--light) filter still shades
+   the accent per sector. */
+.sector.highlighted :is(.wall, .floor, .ceiling) {
+    background-color: #F8BA00 !important;   /* beat the renderer panes' own surface colours */
+    background-image: none !important;
+}
+
 /* ── Base + explode transforms ──────────────────────────────────────────
    Mirror of walls.css / floors.css / ceilings.css with the explode slide
    appended: after the wall's rotateY its local +Z is the inward normal, so

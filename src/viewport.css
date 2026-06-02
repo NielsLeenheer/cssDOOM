@@ -239,16 +239,17 @@ body[data-layout="kiosk"] #loading-overlay {
 }
 
 /* Hidden chrome — DOOM logo (#menu-button), top-right action buttons
-   (#ui-buttons), and the debug toggle (#debug-menu) render at opacity:0,
-   either in the ?visualize four-pane talk layout or via the debug "Chrome"
-   toggle (body.hide-chrome). Hover reveals them at 0.4 opacity so you can
-   still find click targets; the debug toggle goes to full opacity when
-   expanded (details[open]) so its contents stay usable while inspecting. */
-:is(body[data-layout="visualize"], body.hide-chrome) :is(#menu-button, #ui-buttons, #debug-menu) {
+   (#ui-buttons), the debug toggle (#debug-menu), and the spectator controls
+   (#spectator) render at opacity:0, either in the ?visualize four-pane talk
+   layout or via the debug "Chrome" toggle (body.hide-chrome). Hover reveals
+   them at 0.4 opacity so you can still find click targets; the debug toggle
+   goes to full opacity when expanded (details[open]) so its contents stay
+   usable while inspecting. */
+:is(body[data-layout="visualize"], body.hide-chrome) :is(#menu-button, #ui-buttons, #debug-menu, #spectator) {
     opacity: 0;
     transition: opacity 0.15s;
 }
-:is(body[data-layout="visualize"], body.hide-chrome) :is(#menu-button, #ui-buttons, #debug-menu):hover {
+:is(body[data-layout="visualize"], body.hide-chrome) :is(#menu-button, #ui-buttons, #debug-menu, #spectator):hover {
     opacity: 0.4;
 }
 :is(body[data-layout="visualize"], body.hide-chrome) #debug-menu[open] {

@@ -23,7 +23,7 @@ import { SETTINGS } from './registry.js';
  * renderer in the manager's list is the SP pane; bails if there isn't one
  * (e.g. in a join-only client window).
  */
-async function switchRenderer(kind) {
+export async function switchRenderer(kind) {
     const old = rendererManager.all[0];
     if (!old) return;
 

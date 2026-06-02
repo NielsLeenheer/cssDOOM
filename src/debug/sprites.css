@@ -1,0 +1,60 @@
+/* ========================================================================
+   debug.sprites.showSheet — sprite-sheet stepped-animation visualisation.
+
+   A half-transparent clone of a sprite, sized to the WHOLE sheet, laid over the
+   original AS A CHILD — so it inherits --w/--h/--frames/--cols/--rows/--heading
+   live and rides the sprite's billboard + mirror transform. The real sprite is
+   a --w×--h window that steps background-position across the sheet; this ghost
+   instead shows the whole sheet and TRANSLATES it by the same amount, so the
+   active frame stays pinned over the opaque original while the rest of the sheet
+   drifts around it. --viz-step is animated + start-time-synced to the sprite's
+   own sprite-cycle in debug/sprites.js. Debug-only: the sprite element is
+   untouched apart from this appended child.
+   ======================================================================== */
+@property --viz-step { syntax: "<number>"; inherits: false; initial-value: 0; }
+
+.sprite-sheet-ghost {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width:  calc(var(--w) * var(--cols, var(--frames)) * 1px);
+    height: calc(var(--h) * var(--rows, 1) * 1px);
+
+    outline: 1px solid #fff8;
+    background-color: #fff2;
+
+    background-image: inherit;                 /* the parent sprite's sheet */
+    background-repeat: no-repeat;
+    background-size:
+        calc(var(--w) * var(--cols, var(--frames)) * 1px)
+        calc(var(--h) * var(--rows, 1) * 1px);
+    background-position: 0 0;                   /* the whole sheet, from its origin */
+    image-rendering: pixelated;
+
+    opacity: 0.5;
+    pointer-events: none;
+
+    /* Mirror of the sprite's background-position: x steps across the columns
+       (synced via --viz-step), y picks the active heading row — so the active
+       cell lands exactly over the opaque original. */
+    translate:
+        calc(var(--viz-step, 0) * var(--w) * -1px)
+        calc(var(--heading, 0) * var(--h) * -1px);
+}
+
+/* While the viz is active, outline the original sprite's --w×--h window so you
+   can see which cell of the drifting sheet is the active frame. `outline` (not
+   border) keeps the sprite's own box + background-position unchanged. */
+.sprite:has(> .sprite-sheet-ghost) {
+    background-color: #fff4;
+    outline: 1px solid #fff8;
+}
+
+/* The culler hides off-screen / distant things by setting [hidden] (→
+   display:none) on their container. The ghost extends well beyond the sprite,
+   so that small-bounds cull would pop the whole viz the moment the sprite nears
+   a screen edge. While a sprite is showing the sheet, keep its container shown
+   regardless (author display beats the [hidden] UA rule). */
+:is(.enemy, .barrel, .pickup, .decoration):has(.sprite-sheet-ghost) {
+    display: block;
+}

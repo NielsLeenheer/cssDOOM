@@ -7,7 +7,7 @@
  * circular import). Loaded for its side effects at boot from master.js.
  */
 
-import { state } from '../game/state.js';
+import { state, debugFlags } from '../game/state.js';
 import { EYE_HEIGHT } from '../shared/constants.js';
 import { THING_NAMES } from '../renderer/dom/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
@@ -19,7 +19,10 @@ import { activateLift, getLiftEntries } from '../game/mechanics/lifts.js';
 import * as recorder from './recorder.js';
 import * as pathModule from './path.js';
 import * as cameraModule from './camera.js';
-import { initDebugMenu } from './panel.js';
+import * as spritesModule from './sprites.js';
+import { registerCustom } from './custom.js';
+import { initDebugMenu, switchRenderer } from './panel.js';
+import { spectate } from '../ui/spectator.js';
 
 // ── Panel open state ──────────────────────────────────────────────────────
 let menuOpen = false;
@@ -342,6 +345,16 @@ sectors.reset = () => {
     document.querySelectorAll('.floor-grid').forEach(el => el.remove());
 };
 
+// ── debug.sprites — sprite-sheet stepped-animation viz (see sprites.css) ────
+// Lay a half-transparent clone of the whole sheet over each sprite and translate
+// it in lockstep with the real stepped animation, so the active cell stays put
+// while the sheet slides — shows how the walk cycle indexes the sheet. Targets
+// the sprites in a sector (id), or every sprite with no id.
+//   debug.sprites.showSheet(29)  ·  debug.sprites.hideSheet(29)
+const sprites = group('sprites');
+sprites.showSheet = spritesModule.showSheet;
+sprites.hideSheet = spritesModule.hideSheet;
+
 // ── debug.layers — cross-fade whole scene layers in / out ──────────────────
 // Opacity fade of every wall / floor / ceiling / thing (pickups, decorations,
 // barrels) vs the panel's instant hide-* toggles; 'sky' fades the sky
@@ -370,26 +383,10 @@ const camera = group('camera');
 camera.offset = cameraModule.offset;
 camera.reset = cameraModule.reset;
 
-// ── debug.fx — composed, timed set pieces for the talk ─────────────────────
-const fx = group('fx');
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-/** Talk set piece: strip the chrome (HUD, sky, things, enemies), then
- *  explode a sector and billboard it to the camera on a timeline. Pass a
- *  sector id, or omit to act on every sector. */
-fx.billboard = async (id) => {
-    document.body.classList.add('hide-hud', 'hide-sky', 'hide-things', 'hide-enemies');
-    await delay(1000);
-
-    if (id != null) {
-        sectors.only(id);
-        await delay(1000);
-    }
-
-    sectors.explode(id);
-    await delay(3000);
-    // sectors.billboard(id);
-};
+// ── debug.custom — hand-authored talk set pieces (see src/debug/custom.js) ──
+// Scripts that string the debug.* commands together on a timeline. Authored
+// separately so the building-block commands above stay clean.
+registerCustom(debug);
 
 // ── debug.path — record / replay the player's path (position + angle) ──────
 // Segment-based recording with a top-centre transport panel; replay moves the
@@ -398,8 +395,12 @@ fx.billboard = async (id) => {
 //   debug.path.record()                       — start a session (opens panel)
 //   .mark() .pause() .resume() .rewind() .review() .stop()  — transport
 //   .save('slot') / .load('slot') / .export() — persist / dump (per segment)
-//   .seek(pathOrSlot, { segment })  — teleport to a segment's start frame
-//   await debug.path.play(pathOrSlot, { speed, segment })  — replay it
+//   .seek(pathOrSlot, opts)  — teleport to a segment's start frame
+//   await debug.path.play(pathOrSlot, opts)  — replay it
+//   opts: { speed, segment, trim, smooth, start, end } (seek shares trim/
+//     smooth/start/end). trim: drop non-moving frames at the start/end.
+//     smooth: box-blur window (frames). start/end: { x?, y?, angle° } to bend
+//     the path so it begins/lands exactly there (angles in degrees).
 const path = group('path');
 path.record = pathModule.record;
 path.mark = pathModule.mark;
@@ -413,6 +414,8 @@ path.load = pathModule.load;
 path.export = pathModule.exportPath;
 path.seek = pathModule.seek;
 path.play = pathModule.play;
+path.transition = pathModule.transition;
+path.move = pathModule.move;
 
 // ── debug.game — render-command recording ─────────────────────────────────
 // Capture every envelope through orchestrator.dispatch from a clean level
@@ -425,3 +428,36 @@ game.record = async () => {
     await swapLevel(currentMap);
 };
 game.save = (slot) => recorder.save(slot);
+
+// Console toggles for the Game debug flags (the same debugFlags the menu
+// checkboxes drive). No arg toggles; pass a boolean to set. The menu checkbox
+// won't redraw until reopened — the flag itself is the source of truth.
+//   debug.game.noDamage()  ·  .noAttack()  ·  .noMove()
+const flagToggle = (key, label) => (on = !debugFlags[key]) => {
+    debugFlags[key] = on;
+    console.log(`[debug] ${label} ${on ? 'ON' : 'OFF'}`);
+    return on;
+};
+game.noDamage = flagToggle('noDamage', 'no damage');
+game.noAttack = flagToggle('noEnemyAttack', 'no enemy attack');
+game.noMove = flagToggle('noEnemyMove', 'no enemy movement');
+
+// ── debug.renderer — swap the single-player renderer at runtime ─────────────
+// Same swap as the menu's Renderer picker: tears down the SP pane, rebuilds it
+// with the chosen renderer, reloads the map + catches up world state. SP only.
+// No arg logs the current renderer and the options.
+//   debug.renderer('flat')   ·   debug.renderer()  — show current + choices
+const RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat'];
+debug.renderer = (kind) => {
+    if (kind == null) {
+        console.log(`renderer: ${document.body.dataset.renderer || RENDERERS[0]} — options: ${RENDERERS.join(', ')}`);
+        return;
+    }
+    if (!RENDERERS.includes(kind)) { console.warn(`[debug] unknown renderer "${kind}" — try: ${RENDERERS.join(', ')}`); return; }
+    return switchRenderer(kind);
+};
+
+// ── debug.spectator — toggle spectator mode from the console ────────────────
+// Same toggle as the binoculars button (which the Chrome toggle hides). SP only
+// — refused in deathmatch. Call again to exit.
+debug.spectator = () => spectate();

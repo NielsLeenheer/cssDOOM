@@ -30,6 +30,7 @@
 import { state } from '../game/state.js';
 import { EYE_HEIGHT } from '../shared/constants.js';
 import { getFloorHeightAt } from '../game/physics.js';
+import { orchestrator } from '../orchestrator.js';
 import * as A from '../input/actions.js';
 import { on, emit } from '../input/event-bus.js';
 
@@ -56,6 +57,22 @@ function setPlayer({ x, y, angle }) {
     p.angle = angle;
     p.floorHeight = getFloorHeightAt(x, y);
     p.z = p.floorHeight + EYE_HEIGHT;
+}
+
+/** Flag the player moving (or not) during replay, so the walk cycle plays —
+ *  replay sets position directly, so the normal input-driven movement state in
+ *  movement.js never fires. Mirrors its setPlayerMoving (drives `.renderer.moving`
+ *  → the spectator #player sprite + head/weapon bob) and setThingMoving (the
+ *  opposing-player billboard in DM). Only toggles `.moving`; the gameloop's
+ *  updateMovingState only re-dispatches on a change, so an idle keyboard won't
+ *  fight it. */
+function setPlaybackMoving(moving) {
+    const p = state.players[0];
+    if (!p) return;
+    orchestrator.dispatch({ type: 'player', slot: p.viewportIndex, cmd: 'setPlayerMoving', args: [moving] });
+    if (p.thingIndex >= 0) {
+        orchestrator.dispatch({ type: 'world', cmd: 'setThingMoving', args: [p.thingIndex, moving] });
+    }
 }
 
 // ── Recording session ──────────────────────────────────────────────────────
@@ -379,6 +396,8 @@ export function seek(path, opts = {}) {
  *   smooth  — box-blur window (frames) over x / y / angle to de-jitter the walk
  *   start / end — { x?, y?, angle? } (angle in DEGREES); bend the path so it
  *     begins / lands exactly on these, spread across the whole segment
+ *   moving — flag the player as moving so the walk cycle runs (spectator /
+ *     3rd-person view) + head/weapon bob; off by default
  * Returns a promise that resolves when it finishes, so you can `await` it
  * between scripted steps (or not, to run it alongside other debug.* calls).
  *
@@ -390,7 +409,7 @@ export function seek(path, opts = {}) {
 export async function play(path, opts = {}) {
     if (typeof path === 'string') path = load(path);
     if (path?.segments) {                       // a session
-        const pass = { speed: opts.speed, trim: opts.trim, smooth: opts.smooth, start: opts.start, end: opts.end };
+        const pass = { speed: opts.speed, trim: opts.trim, smooth: opts.smooth, start: opts.start, end: opts.end, moving: opts.moving };
         if (opts.segment != null) {             // …play just one segment
             const seg = path.segments[opts.segment];
             if (!seg) { console.warn(`[path] no segment ${opts.segment} (have ${path.segments.length})`); return; }
@@ -410,6 +429,12 @@ export async function play(path, opts = {}) {
     const startMs = performance.now();
     let evCursor = 0;
 
+    // Replay sets position directly, so the input-driven movement state never
+    // fires. Opt in with { moving: true } to flag the player moving for the
+    // duration — drives the walk cycle (spectator / 3rd-person view) and the
+    // first-person head/weapon bob. Off by default (first-person shots usually
+    // don't want it).
+    if (opts.moving) setPlaybackMoving(true);
     return new Promise(resolve => {
         const frame = () => {
             const t = (performance.now() - startMs) * speed;
@@ -429,7 +454,7 @@ export async function play(path, opts = {}) {
                 const e = events[evCursor++];
                 emit({ kind: e.kind, slot: e.slot, deviceId: e.deviceId, ...(e.weapon != null ? { weapon: e.weapon } : {}) });
             }
-            if (done) { setPlaybackMoving(false); resolve(); return; }
+            if (done) { if (opts.moving) setPlaybackMoving(false); resolve(); return; }
             requestAnimationFrame(frame);
         };
         requestAnimationFrame(frame);
