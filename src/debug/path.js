@@ -436,6 +436,21 @@ export async function play(path, opts = {}) {
     });
 }
 
+/** Instantly move the player to a pose — angle in DEGREES, any field omitted
+ *  keeps its current value. The object-shaped, degrees counterpart to seek(),
+ *  handy for jumping to a transition's start/end while scripting.
+ *
+ *   debug.path.move({ x: 39, y: -3113, angle: 246 });
+ */
+export function move({ x, y, angle } = {}) {
+    const p = state.players[0];
+    setPlayer({
+        x: x ?? p.x,
+        y: y ?? p.y,
+        angle: angle != null ? angle * DEG : p.angle,
+    });
+}
+
 // ── Transport panel ────────────────────────────────────────────────────────
 let panelEl = null;
 
