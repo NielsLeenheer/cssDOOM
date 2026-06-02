@@ -8,6 +8,7 @@
  */
 
 import { state, debugFlags } from '../game/state.js';
+import { culling } from '../renderer/dom/scene/culling.js';
 import { EYE_HEIGHT } from '../shared/constants.js';
 import { THING_NAMES } from '../renderer/dom/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../game/physics.js';
@@ -441,6 +442,28 @@ const flagToggle = (key, label) => (on = !debugFlags[key]) => {
 game.noDamage = flagToggle('noDamage', 'no damage');
 game.noAttack = flagToggle('noEnemyAttack', 'no enemy attack');
 game.noMove = flagToggle('noEnemyMove', 'no enemy movement');
+
+// ── debug.culling — toggle the renderer's culling passes from the console ───
+// The same flags the menu's Culling section drives, live per-frame. No arg
+// toggles; pass a boolean to set. all() sets every pass at once — handy to
+// disable culling for a talk shot so nothing pops out at the screen edge.
+//   debug.culling.distance()  ·  .frustum(false)  ·  .all(false)
+const cull = group('culling');
+const cullToggle = (key) => (on = !culling[key]) => {
+    culling[key] = on;
+    console.log(`[debug] ${key} culling ${on ? 'ON' : 'OFF'}`);
+    return on;
+};
+cull.distance = cullToggle('distance');
+cull.backface = cullToggle('backface');
+cull.frustum = cullToggle('frustum');
+cull.sky = cullToggle('sky');
+/** Set every culling pass at once (default on); all(false) disables them. */
+cull.all = (on = true) => {
+    for (const k of ['distance', 'backface', 'frustum', 'sky']) culling[k] = on;
+    console.log(`[debug] all culling ${on ? 'ON' : 'OFF'}`);
+    return on;
+};
 
 // ── debug.renderer — swap the single-player renderer at runtime ─────────────
 // Same swap as the menu's Renderer picker: tears down the SP pane, rebuilds it
