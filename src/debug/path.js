@@ -429,7 +429,52 @@ export async function play(path, opts = {}) {
                 const e = events[evCursor++];
                 emit({ kind: e.kind, slot: e.slot, deviceId: e.deviceId, ...(e.weapon != null ? { weapon: e.weapon } : {}) });
             }
-            if (done) { resolve(); return; }
+            if (done) { setPlaybackMoving(false); resolve(); return; }
+            requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+    });
+}
+
+/**
+ * Smoothly ease the player from `start` to `end` over `duration` seconds —
+ * for hand-tuned turns and tiny moves between scripted shots, when recording a
+ * path would be overkill. Snaps to `start`, then eases (in-out) to `end`.
+ *
+ * Angles are in DEGREES (any field omitted falls back to the player's current
+ * pose). `direction` ('clockwise' | 'anti-clockwise') chooses which way the
+ * view rotates: anti-clockwise sweeps the angle up (the engine's increasing
+ * direction), clockwise sweeps it down — so a turn is honoured even when the
+ * named direction is the long way round. Returns a promise that resolves on
+ * arrival, so you can `await` it between steps.
+ *
+ *   await debug.path.transition({
+ *     duration: 2, direction: 'clockwise',
+ *     start: { x: 1024, y: -512, angle: 0 },
+ *     end:   { x: 1024, y: -512, angle: 90 },
+ *   });
+ */
+export function transition({ duration = 1, direction = 'clockwise', start = {}, end = {} } = {}) {
+    const p = state.players[0];
+    const sx = start.x ?? p.x, sy = start.y ?? p.y;
+    const ex = end.x ?? p.x, ey = end.y ?? p.y;
+    const sa = start.angle != null ? start.angle * DEG : p.angle;
+    const ea = end.angle != null ? end.angle * DEG : p.angle;
+
+    // Directed angle sweep. The [0, 2π) value is the anti-clockwise (increasing)
+    // arc from sa to ea; clockwise takes the decreasing arc (−2π, 0] instead.
+    const TWO_PI = 2 * Math.PI;
+    let dA = ((ea - sa) % TWO_PI + TWO_PI) % TWO_PI;
+    if (direction === 'clockwise') dA -= TWO_PI;
+
+    const ms = Math.max(1, duration * 1000);
+    const startMs = performance.now();
+    return new Promise(resolve => {
+        const frame = () => {
+            const raw = Math.min(1, (performance.now() - startMs) / ms);
+            const e = 0.5 - 0.5 * Math.cos(Math.PI * raw);   // ease in-out (sine)
+            setPlayer({ x: sx + (ex - sx) * e, y: sy + (ey - sy) * e, angle: sa + dA * e });
+            if (raw >= 1) { resolve(); return; }
             requestAnimationFrame(frame);
         };
         requestAnimationFrame(frame);
