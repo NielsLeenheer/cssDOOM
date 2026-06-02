@@ -56,7 +56,7 @@
 
 import { RenderSink } from './transport/render-sink.js';
 import { AudioRenderer } from './audio/renderer.js';
-import * as recorder from './debug/recorder.js';
+import * as recorder from './debug/features/recorder.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player

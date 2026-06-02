@@ -33,9 +33,9 @@ import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
-import { updateDebugStats } from './debug/panel.js';
-import { openDebugMenu, isDebugMenuOpen } from './debug/console.js';
-import { applyCssDefaults } from './debug/registry.js';
+import { updateDebugStats, openDebugMenu, isDebugMenuOpen } from './debug/ui/panel.js';
+import { applyCssDefaults } from './debug/ui/registry.js';
+import './debug/console/console.js';   // side effects: window.debug + command wiring
 import { attractTick, isAttractActive, setAttractWakeHandler } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
@@ -48,7 +48,7 @@ import { ensureMatchSize } from './game/match.js';
 import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { config } from '../config.js';
-import { play as playRecording } from './debug/player.js';
+import { play as playRecording } from './debug/features/player.js';
 
 
 // ── Render-all-panes ───────────────────────────────────────────────────

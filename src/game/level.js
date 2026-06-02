@@ -313,7 +313,7 @@ export class Level {
  * Used by master-side callers that swap maps mid-session WITHOUT
  * going through the full Game lifecycle:
  *   - attract.js::enterAttract — kiosk idle, no Game-managed match.
- *   - debug/console.js — debug.position.load save-slot warp.
+ *   - debug/console/console.js — debug.position.load save-slot warp.
  *   - gates.js — SP dead-respawn after cooldown (no Game.respawnSP()
  *     exists yet; future cleanup would add one and drop this caller).
  *

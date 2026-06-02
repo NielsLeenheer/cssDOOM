@@ -1,52 +1,16 @@
 /**
  * Builds the debug menu from the declarative SETTINGS registry. Iterates the
  * registry in order, opening a section header whenever `section` changes and
- * dispatching one builder per `kind`. The renderer swap and the per-frame
- * culling stats live here because they're bespoke; everything repetitive is
- * data in registry.js.
+ * dispatching one builder per `kind`. The per-frame culling stats live here
+ * because they're bespoke; everything repetitive is data in registry.js. The
+ * Renderer picker calls the shared switchRenderer feature.
  *
  * Companion stylesheet: panel.css.
  */
 
-import { culling, cullingStats } from '../renderer/dom/scene/culling.js';
-import { orchestrator } from '../orchestrator.js';
-import { currentMap } from '../shared/maps/index.js';
-import { rendererManager } from '../renderer/manager.js';
-import { buildCatchup, applyCatchupCmds } from '../game/catchup.js';
+import { culling, cullingStats } from '../../renderer/dom/scene/culling.js';
+import { switchRenderer } from '../features/renderer.js';
 import { SETTINGS } from './registry.js';
-
-/**
- * Swap the SP renderer at runtime. Tears down the existing pane, builds a
- * fresh one via manager.create() (which reads body.dataset.renderer), reloads
- * the current map, then replays a world-state catchup so the new renderer
- * arrives with the same door / lift / thing state the old one had. The first
- * renderer in the manager's list is the SP pane; bails if there isn't one
- * (e.g. in a join-only client window).
- */
-export async function switchRenderer(kind) {
-    const old = rendererManager.all[0];
-    if (!old) return;
-
-    const playerIndex = old.playerIndex;
-    const savedSlot = old.paneEl.dataset.slot;
-    const savedCamera = old.state?.camera ? { ...old.state.camera } : null;
-
-    orchestrator.removeTarget(old);
-    rendererManager.destroy(old);
-
-    document.body.dataset.renderer = kind;
-    const fresh = rendererManager.create(kind, playerIndex);
-    if (savedSlot !== undefined) fresh.paneEl.dataset.slot = savedSlot;
-    orchestrator.addTarget(fresh);
-
-    if (currentMap && typeof fresh.loadMap === 'function') {
-        await fresh.loadMap(currentMap);
-        applyCatchupCmds(fresh, buildCatchup(playerIndex));
-        if (savedCamera && typeof fresh.updateCamera === 'function') {
-            fresh.updateCamera(savedCamera);
-        }
-    }
-}
 
 // Per-frame culling stat elements, keyed by the registry entry's `stat`.
 const statElements = {};
@@ -118,7 +82,21 @@ function buildEntry(s, parent) {
     }
 }
 
-export function initDebugMenu() {
+// ── Open state ─────────────────────────────────────────────────────────────
+// The menu builds once. openDebugMenu() is the idempotent public entry — the
+// console's debug() and master's DEV boot both call it; isDebugMenuOpen() gates
+// the per-frame stats refresh. The menu is the UI's own concern, so this lives
+// here rather than in the console.
+let menuOpen = false;
+export function openDebugMenu() {
+    if (menuOpen) return;
+    menuOpen = true;
+    initDebugMenu();
+    console.log('Debug menu enabled');
+}
+export const isDebugMenuOpen = () => menuOpen;
+
+function initDebugMenu() {
     const details = document.createElement('details');
     details.id = 'debug-menu';
 

@@ -18,11 +18,11 @@
  * render in first-seen order) and dispatches one builder per `kind`.
  */
 
-import { debugFlags } from '../game/state.js';
-import { culling } from '../renderer/dom/scene/culling.js';
-import { endMatch } from '../game/match.js';
-import { enterAttract } from '../game/attract.js';
-import { app } from '../app.js';
+import { debugFlags } from '../../game/state.js';
+import { culling } from '../../renderer/dom/scene/culling.js';
+import { endMatch } from '../../game/match.js';
+import { enterAttract } from '../../game/attract.js';
+import { app } from '../../app.js';
 
 export const SETTINGS = [
     // ── Game ── JS flags read by physics / AI each tick ───────────────────

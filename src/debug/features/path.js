@@ -27,12 +27,12 @@
  * Exposed as debug.path.* in console.js.
  */
 
-import { state } from '../game/state.js';
-import { EYE_HEIGHT } from '../shared/constants.js';
-import { getFloorHeightAt } from '../game/physics.js';
-import { orchestrator } from '../orchestrator.js';
-import * as A from '../input/actions.js';
-import { on, emit } from '../input/event-bus.js';
+import { state } from '../../game/state.js';
+import { EYE_HEIGHT } from '../../shared/constants.js';
+import { getFloorHeightAt } from '../../game/physics.js';
+import { orchestrator } from '../../orchestrator.js';
+import * as A from '../../input/actions.js';
+import { on, emit } from '../../input/event-bus.js';
 
 const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
 const POS_EPS = 0.1;   // "moving" thresholds used by the play() trim

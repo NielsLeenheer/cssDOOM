@@ -18,7 +18,7 @@
  * Invoked from `initMaster` when the boot path detects ?play=slot.
  */
 
-import { orchestrator } from '../orchestrator.js';
+import { orchestrator } from '../../orchestrator.js';
 import { load } from './recorder.js';
 
 export async function play(slot, exportFormat = null) {
