@@ -223,14 +223,28 @@ export function load(slot) {
     return JSON.parse(json);
 }
 
-/** Log + clipboard each segment as an independent playable path; returns the array. */
-export function exportPath(session = lastSession) {
-    if (!session?.segments?.length) { console.warn('[path] nothing to export — record() first'); return null; }
-    const paths = session.segments.map(s => ({ samples: s.samples, events: s.events }));
-    const json = JSON.stringify(paths);
+/** Dump a path session as JSON to the console + clipboard for safekeeping — the
+ *  last recorded session, or a saved slot by name (export('slot')). It's the
+ *  same { segments } shape save() stores, so it round-trips: keep the JSON in a
+ *  file, then import('slot', json) to restore it. Returns the JSON string. */
+export function exportPath(slotOrSession = lastSession) {
+    const session = typeof slotOrSession === 'string' ? load(slotOrSession) : slotOrSession;
+    if (!session?.segments?.length) { console.warn('[path] nothing to export'); return null; }
+    const json = JSON.stringify(session);
     console.log(json);
     navigator.clipboard?.writeText(json).then(() => console.log('[path] copied to clipboard'), () => {});
-    return paths;
+    return json;
+}
+
+/** Restore an exported session JSON into a saved slot (the inverse of export()).
+ *  Validates it parses to a { segments } session before writing localStorage. */
+export function importPath(slot, json) {
+    if (typeof json !== 'string' || !json) { console.warn('[path] import needs the JSON string'); return; }
+    let session;
+    try { session = JSON.parse(json); } catch { console.warn('[path] import — invalid JSON'); return; }
+    if (!session?.segments?.length) { console.warn('[path] import — not a path session'); return; }
+    localStorage.setItem(KEY(slot), json);
+    console.log(`[path] imported into "${slot}" — ${session.segments.length} segment(s)`);
 }
 
 // ── Replay ───────────────────────────────────────────────────────────────

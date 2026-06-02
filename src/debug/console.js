@@ -395,7 +395,9 @@ registerCustom(debug);
 // world reacts. The basis for hand-scripted talk shots — see src/debug/path.js.
 //   debug.path.record()                       — start a session (opens panel)
 //   .mark() .pause() .resume() .rewind() .review() .stop()  — transport
-//   .save('slot') / .load('slot') / .export() — persist / dump (per segment)
+//   .save('slot') / .load('slot')  — persist / read a session in localStorage
+//   .export('slot'?) / .import('slot', json)  — dump a session as JSON for
+//     safekeeping (last recorded, or a saved slot) and restore it later
 //   .seek(pathOrSlot, opts)  — teleport to a segment's start frame
 //   await debug.path.play(pathOrSlot, opts)  — replay it
 //   opts: { speed, segment, trim, smooth, start, end } (seek shares trim/
@@ -413,6 +415,7 @@ path.stop = pathModule.stop;
 path.save = pathModule.save;
 path.load = pathModule.load;
 path.export = pathModule.exportPath;
+path.import = pathModule.importPath;
 path.seek = pathModule.seek;
 path.play = pathModule.play;
 path.transition = pathModule.transition;
