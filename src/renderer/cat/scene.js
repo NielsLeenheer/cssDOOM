@@ -57,7 +57,7 @@ export function buildCatScene(mapData) {
     // the .pane-cat CSS uses to suppress NUKAGE / scrolling-wall
     // keyframes (those animations would otherwise re-impose their
     // texture url via @keyframes and erase the cat).
-    for (const el of ctx.fragment.querySelectorAll('.wall')) {
+    for (const el of ctx.fragment.querySelectorAll('.wall,.ceiling,.floor')) {
         const cat = CAT_URLS[Math.floor(Math.random() * CAT_URLS.length)];
         el.style.setProperty('background-image', `url('${cat}')`, 'important');
         el.style.backgroundSize = 'cover';
