@@ -187,6 +187,7 @@ const ENTITY_COMMANDS = [
     'createTeleportFog',
     'createCorpse',
     'createPlayerSprite',
+    'setDoorState',
 ];
 
 for (const cmd of ENTITY_COMMANDS) {

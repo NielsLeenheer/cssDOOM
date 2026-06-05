@@ -57,6 +57,7 @@ for (let i = 0; i < 256; i++) LIGHT_LUT[i] = Math.min(256, ((i * 256 / 255) | 0)
 const TAU = Math.PI * 2;
 const WALK_FRAME_MS = 180;    // enemy walk-cycle frame duration
 const DEATH_FRAME_MS = 120;   // enemy death-animation frame duration
+const DOOR_SPEED = 100;       // door travel speed, world units per second
 
 // Per-enemy sprite animation, keyed by DOOM thing type. `spr` is the
 // 4-letter sprite base; `walk`/`attack` frame letters have full
@@ -129,6 +130,15 @@ export class SoftwareRenderer {
         this._sectorLight = [];       // sectorIndex → lightLevel
         this.viewerPlayerIndex = 0;   // which player this pane renders (hides own billboard)
 
+        // Doors. Each animates its sector ceiling + upper face walls
+        // between closed/open. `_wallBottomOffset` raises a door panel's
+        // bottom edge as it opens; `_ceilOverride` raises the door
+        // sector's ceiling so its floor/ceiling become visible.
+        this.doors = new Map();          // sectorIndex → door record
+        this._wallBottomOffset = new Map(); // wall ref → bottom-height delta
+        this._ceilOverride = new Map();     // sectorPolygon ref → ceiling height
+        this._lastFrameTime = 0;
+
         this._colAngle = null;    // per-column view-angle offset, rebuilt on resize
     }
 
@@ -168,6 +178,30 @@ export class SoftwareRenderer {
         this.things.clear();
         this.projectiles.clear();
         this.effects = [];
+        this.doors.clear();
+        this._wallBottomOffset.clear();
+        this._ceilOverride.clear();
+
+        // Build door records. A door is a sector whose ceiling rises from
+        // closedHeight (the stored, squished state) to openHeight; its
+        // upper face walls (the panels) slide up with it. Start closed.
+        const polyOf = new Map();
+        for (const sp of this.sectorPolygons) polyOf.set(sp.sectorIndex, sp);
+        for (const door of (data.doors || [])) {
+            const faceWalls = this.walls.filter(w => w.isUpperWall
+                && (w.frontSectorIndex === door.sectorIndex
+                    || w.backSectorIndex === door.sectorIndex));
+            const sectorPoly = polyOf.get(door.sectorIndex) || null;
+            this.doors.set(door.sectorIndex, {
+                closed: door.closedHeight,
+                open: door.openHeight,
+                current: door.closedHeight,
+                target: door.closedHeight,
+                faceWalls,
+                sectorPoly,
+            });
+            if (sectorPoly) this._ceilOverride.set(sectorPoly, door.closedHeight);
+        }
 
         for (const t of (data.things || [])) {
             if (t.category === undefined) continue;   // filtered out by skill / MP
@@ -213,6 +247,9 @@ export class SoftwareRenderer {
         this.things.clear();
         this.projectiles.clear();
         this.effects = [];
+        this.doors.clear();
+        this._wallBottomOffset.clear();
+        this._ceilOverride.clear();
     }
 
     // ── Dispatch commands (game loop → entity state) ─────────────────────
@@ -314,6 +351,29 @@ export class SoftwareRenderer {
         });
     }
 
+    setDoorState(sectorIndex, doorState) {
+        const door = this.doors.get(sectorIndex);
+        if (door) door.target = doorState === 'open' ? door.open : door.closed;
+    }
+
+    /** Advance door animations and refresh the wall / ceiling overrides
+     *  they drive. Called once per frame with the elapsed seconds. */
+    _updateDoors(dt) {
+        for (const door of this.doors.values()) {
+            if (door.current !== door.target) {
+                const dir = Math.sign(door.target - door.current);
+                door.current += dir * DOOR_SPEED * dt;
+                if ((dir > 0 && door.current > door.target)
+                    || (dir < 0 && door.current < door.target)) {
+                    door.current = door.target;
+                }
+                const offset = door.current - door.closed;
+                for (const w of door.faceWalls) this._wallBottomOffset.set(w, offset);
+                if (door.sectorPoly) this._ceilOverride.set(door.sectorPoly, door.current);
+            }
+        }
+    }
+
     createPlayerSprite(thingIndex, playerIndex, x, y, floorZ /* , sectorIndex */) {
         if (this.things.has(thingIndex)) return;   // idempotent
         this.things.set(thingIndex, {
@@ -342,6 +402,11 @@ export class SoftwareRenderer {
 
         fb.fill(0xFF000000);
         zb.fill(Infinity);
+
+        const now = performance.now();
+        const dt = this._lastFrameTime ? Math.min(0.1, (now - this._lastFrameTime) / 1000) : 0;
+        this._lastFrameTime = now;
+        this._updateDoors(dt);
 
         const aspect = W / H;
         const fovScale = Math.tan(FOV / 2);
@@ -450,8 +515,10 @@ export class SoftwareRenderer {
                 c2y = NEAR;
             }
 
+            // Door panels raise their bottom edge as the door opens.
+            const wallBottom = wall.bottomHeight + (this._wallBottomOffset.get(wall) || 0);
             const topZ = wall.topHeight - ez;
-            const botZ = wall.bottomHeight - ez;
+            const botZ = wallBottom - ez;
 
             let p1 = halfW + (c1x / c1y) * sxScale;
             let p2 = halfW + (c2x / c2y) * sxScale;
@@ -477,7 +544,7 @@ export class SoftwareRenderer {
 
             const span = p2 - p1 || 1e-6;
             const texW = tex.width, texH = tex.height, tdata = tex.data;
-            const wallH = wall.topHeight - wall.bottomHeight;
+            const wallH = wall.topHeight - wallBottom;
             const yOff = wall.yOffset || 0;
 
             // Fake contrast: E/W walls darker, N/S walls brighter.
@@ -530,7 +597,9 @@ export class SoftwareRenderer {
 
     _renderFlats(cam) {
         for (const sector of this.sectorPolygons) {
-            if (sector.ceilingHeight <= sector.floorHeight) continue;
+            // Door sectors animate their ceiling height as they open.
+            const ceilingHeight = this._ceilOverride.get(sector) ?? sector.ceilingHeight;
+            if (ceilingHeight <= sector.floorHeight) continue;
 
             const floorTex = getFlatTexture(sector.floorTexture);
             if (floorTex) {
@@ -541,7 +610,7 @@ export class SoftwareRenderer {
             if (sector.ceilingTexture === 'F_SKY1') continue;
             const ceilTex = getFlatTexture(sector.ceilingTexture);
             if (ceilTex) {
-                this._drawPlane(cam, sector.boundaries, sector.ceilingHeight,
+                this._drawPlane(cam, sector.boundaries, ceilingHeight,
                     ceilTex, sector.lightLevel);
             }
         }
