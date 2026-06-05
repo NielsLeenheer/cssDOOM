@@ -20,8 +20,7 @@
     width:  calc(var(--w) * var(--cols, var(--frames)) * 1px);
     height: calc(var(--h) * var(--rows, 1) * 1px);
 
-    outline: 1px solid #fff8;
-    background-color: #fff2;
+    background-color: #F8BA0066;
 
     background-image: inherit;                 /* the parent sprite's sheet */
     background-repeat: no-repeat;
@@ -46,8 +45,7 @@
    can see which cell of the drifting sheet is the active frame. `outline` (not
    border) keeps the sprite's own box + background-position unchanged. */
 .sprite:has(> .sprite-sheet-ghost) {
-    background-color: #fff4;
-    outline: 1px solid #fff8;
+    background-color: #F8BA0088;
 }
 
 /* The culler hides off-screen / distant things by setting [hidden] (→
