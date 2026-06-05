@@ -18,6 +18,7 @@ import * as spritesModule from '../features/sprites.js';
 import * as sectorsModule from '../features/sectors.js';
 import * as layersModule from '../features/layers.js';
 import * as flags from '../features/flags.js';
+import * as freeze from '../features/freeze.js';
 import { position as positionCmds, world as worldCmds } from '../features/world.js';
 import { registerCustom } from '../custom/custom.js';
 import { openDebugMenu } from '../ui/panel.js';
@@ -119,6 +120,10 @@ game.record = async () => {
     await swapLevel(currentMap);
 };
 game.save = (slot) => recorder.save(slot);
+// Freeze-frame: pause() stops the world tick + all CSS animations (freeze a
+// fireball mid-air); play() resumes both. See features/freeze.js.
+game.pause = freeze.pause;
+game.play = freeze.resume;
 // Game-flag toggles (debug.game.noDamage/.noAttack/.noMove) — see features/flags.js.
 game.noDamage = flags.noDamage;
 game.noAttack = flags.noAttack;

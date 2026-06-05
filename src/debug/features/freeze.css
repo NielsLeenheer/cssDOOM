@@ -1,0 +1,11 @@
+/* debug.game.pause() — freeze every CSS animation so an in-flight fireball /
+   walk cycle / light flicker holds its exact frame. The Level's tick is stopped
+   separately (so game state freezes too); resume both with debug.game.play().
+   The universal selector + !important overrides each element's own
+   animation-play-state; pausing preserves the current frame, so resuming
+   continues from there. */
+body.debug-frozen *,
+body.debug-frozen *::before,
+body.debug-frozen *::after {
+    animation-play-state: paused !important;
+}

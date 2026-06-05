@@ -175,6 +175,8 @@ and replay it deterministically; plus console toggles for the Game cheat flags
 | --- | --- |
 | `record()` | Restart the current level and start capturing. |
 | `save(slot)` | Write the captured buffer to storage. |
+| `pause()` | Freeze-frame — stop the world tick **and** all CSS animations (holds a fireball mid-air). |
+| `play()` | Resume both; in-flight motion continues from where it stopped. |
 | `noDamage(on?)` | Player takes no damage. No arg toggles; pass a boolean to set. |
 | `noAttack(on?)` | Enemies don't attack. |
 | `noMove(on?)` | Enemies don't move. |
