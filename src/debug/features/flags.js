@@ -23,6 +23,18 @@ export const noDamage = toggle(debugFlags, 'noDamage', 'no damage');
 export const noAttack = toggle(debugFlags, 'noEnemyAttack', 'no enemy attack');
 export const noMove   = toggle(debugFlags, 'noEnemyMove', 'no enemy movement');
 
+/** Combined "peaceful" toggle — flips no-damage + no-enemy-attack +
+ *  no-enemy-movement together. No arg toggles (off if all three are currently
+ *  on, else on); pass a boolean to set them all. */
+export const peaceful = (on) => {
+    if (on === undefined) {
+        on = !(debugFlags.noDamage && debugFlags.noEnemyAttack && debugFlags.noEnemyMove);
+    }
+    debugFlags.noDamage = debugFlags.noEnemyAttack = debugFlags.noEnemyMove = on;
+    console.log(`[debug] peaceful (no damage / attack / move) ${on ? 'ON' : 'OFF'}`);
+    return on;
+};
+
 // ── Culling passes (debug.culling.*) ───────────────────────────────────────
 const CULL_PASSES = ['distance', 'backface', 'frustum', 'sky'];
 export const cullDistance = toggle(culling, 'distance', 'distance culling');

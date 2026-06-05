@@ -180,6 +180,7 @@ and replay it deterministically; plus console toggles for the Game cheat flags
 | `noDamage(on?)` | Player takes no damage. No arg toggles; pass a boolean to set. |
 | `noAttack(on?)` | Enemies don't attack. |
 | `noMove(on?)` | Enemies don't move. |
+| `peaceful(on?)` | All three at once — no damage + no attack + no move. |
 
 Replay a captured slot by loading the page with **`?play=slot`**. Add
 **`?export=mp4`** or **`?export=webm`** to capture the replay to a downloaded video

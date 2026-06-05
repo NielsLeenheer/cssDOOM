@@ -124,10 +124,11 @@ game.save = (slot) => recorder.save(slot);
 // fireball mid-air); play() resumes both. See features/freeze.js.
 game.pause = freeze.pause;
 game.play = freeze.resume;
-// Game-flag toggles (debug.game.noDamage/.noAttack/.noMove) — see features/flags.js.
+// Game-flag toggles (see features/flags.js). peaceful() flips all three at once.
 game.noDamage = flags.noDamage;
 game.noAttack = flags.noAttack;
 game.noMove = flags.noMove;
+game.peaceful = flags.peaceful;
 
 // ── debug.culling — toggle the renderer's culling passes (see features/flags.js).
 // No arg toggles; pass a boolean to set. all(false) disables every pass — handy
