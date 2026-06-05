@@ -81,7 +81,10 @@ const PLAYER_CORPSE_VARIANT = ['', '-red', '-indigo', '-brown'];
 
 // Transient effect frame sequences (single-view).
 const PUFF_FRAMES = ['PUFFA0', 'PUFFB0', 'PUFFC0', 'PUFFD0'];
-const EXPLOSION_FRAMES = ['BEXPA0', 'BEXPB0', 'BEXPC0', 'BEXPD0', 'BEXPE0'];
+// Enemy fireball impact — the imp/baron ball's own burst frames.
+const EXPLOSION_FRAMES = ['BAL1C0', 'BAL1D0', 'BAL1E0'];
+// Barrel detonation — the larger explosion sprite.
+const BARREL_FRAMES = ['BEXPA0', 'BEXPB0', 'BEXPC0', 'BEXPD0', 'BEXPE0'];
 const TFOG_FRAMES = ['TFOGA0', 'TFOGB0', 'TFOGC0', 'TFOGD0', 'TFOGE0',
                      'TFOGF0', 'TFOGG0', 'TFOGH0', 'TFOGI0', 'TFOGJ0'];
 
@@ -251,7 +254,7 @@ export class SoftwareRenderer {
         if (!e) return;
         if (e.category === 'barrel') {
             // Barrels don't fall over — they detonate and vanish.
-            this.createExplosion(e.x, e.y, e.floorZ + 16);
+            this._spawnEffect(e.x, e.y, e.floorZ + 24, BARREL_FRAMES, 60, true);
             e.collected = true;
             return;
         }
@@ -357,9 +360,46 @@ export class SoftwareRenderer {
             halfW, halfH, sxScale, syScale, aspect, fovScale,
         };
 
+        this._renderSky(cam);
         this._renderWalls(cam);
         this._renderFlats(cam);
         this._renderEntities(cam);
+    }
+
+    // ── Sky backdrop ─────────────────────────────────────────────────────
+    //
+    // DOOM treats the sky as an infinitely distant backdrop, not a
+    // ceiling surface: every sky column is painted from the top of the
+    // screen down to the horizon, and the world (walls, floors, real
+    // ceilings) is then drawn over it. We do the same — fill the upper
+    // half with the sky at a sentinel far depth, so any later geometry
+    // overwrites it via the depth test, and whatever stays uncovered
+    // (the openings above walls in sky sectors) reads as sky. This side-
+    // steps the projected-ceiling-polygon coverage problem for tall sky
+    // sectors and keeps the sky locked to the view angle.
+    _renderSky(cam) {
+        const sky = getSkyTexture();
+        if (!sky) return;
+        const { W, H, fb, zb } = this;
+        const { angle, halfH } = cam;
+        const skyW = sky.width, skyH = sky.height, sdata = sky.data;
+        const colAngle = this._colAngle;
+        const uBase = (angle / (Math.PI * 2)) * skyW * 4;
+        const hY = Math.min(H, Math.ceil(halfH));
+        for (let y = 0; y < hY; y++) {
+            // Top of screen → top of texture; horizon → bottom of
+            // texture, so the dark lower band sits at the horizon.
+            const sv = Math.min(skyH - 1, ((y / halfH) * skyH) | 0);
+            const row = sv * skyW;
+            const base = y * W;
+            for (let x = 0; x < W; x++) {
+                let u = uBase - (colAngle[x] / (Math.PI * 2)) * skyW * 4;
+                u %= skyW;
+                if (u < 0) u += skyW;
+                fb[base + x] = sdata[row + (u | 0)] | 0xFF000000;
+                zb[base + x] = SKY_DEPTH;
+            }
+        }
     }
 
     // ── Walls ────────────────────────────────────────────────────────────
@@ -376,12 +416,16 @@ export class SoftwareRenderer {
             const bx = wall.end.x, by = wall.end.y;
             const dx = bx - ax, dy = by - ay;
 
-            // No back-face culling: the exported wall quads don't carry
-            // a reliable, consistent winding (each is one visible
-            // surface facing into its sector), so culling by normal
-            // drops walls that should be drawn. The per-pixel depth
-            // buffer already resolves occlusion correctly, and at this
-            // wall count the extra fill is negligible.
+            // Back-face cull. Each exported quad is one visible surface
+            // whose textured face looks into its sector; given the
+            // exporter's winding that front normal is (dy, -dx). Skip
+            // walls whose front faces away from the camera. This stops a
+            // two-sided surface (door panel, sky upper wall, masked
+            // mid-texture) from painting its hidden back face over the
+            // visible one, and lets the sky show through upper openings
+            // instead of a dark wall.
+            const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5;
+            if ((ex - mx) * dy - (ey - my) * dx <= 0) continue;
 
             // Camera-space endpoints.
             let c1x = (ax - ex) * ca + (ay - ey) * sa;
@@ -485,36 +529,27 @@ export class SoftwareRenderer {
     // ── Floors & ceilings ────────────────────────────────────────────────
 
     _renderFlats(cam) {
-        const sky = getSkyTexture();
         for (const sector of this.sectorPolygons) {
-            if (sector.ceilingHeight > sector.floorHeight) {
-                // Floor.
-                const floorTex = getFlatTexture(sector.floorTexture);
-                if (floorTex) {
-                    this._drawPlane(cam, sector.boundaries, sector.floorHeight,
-                        floorTex, sector.lightLevel, false, null);
-                }
-                // Ceiling (sky or flat).
-                const isSky = sector.ceilingTexture === 'F_SKY1';
-                if (isSky) {
-                    if (sky) {
-                        this._drawPlane(cam, sector.boundaries, sector.ceilingHeight,
-                            null, sector.lightLevel, true, sky);
-                    }
-                } else {
-                    const ceilTex = getFlatTexture(sector.ceilingTexture);
-                    if (ceilTex) {
-                        this._drawPlane(cam, sector.boundaries, sector.ceilingHeight,
-                            ceilTex, sector.lightLevel, false, null);
-                    }
-                }
+            if (sector.ceilingHeight <= sector.floorHeight) continue;
+
+            const floorTex = getFlatTexture(sector.floorTexture);
+            if (floorTex) {
+                this._drawPlane(cam, sector.boundaries, sector.floorHeight,
+                    floorTex, sector.lightLevel);
+            }
+            // Sky ceilings are painted by the backdrop pass, not here.
+            if (sector.ceilingTexture === 'F_SKY1') continue;
+            const ceilTex = getFlatTexture(sector.ceilingTexture);
+            if (ceilTex) {
+                this._drawPlane(cam, sector.boundaries, sector.ceilingHeight,
+                    ceilTex, sector.lightLevel);
             }
         }
     }
 
-    _drawPlane(cam, boundaries, planeZ, tex, lightLevel, isSky, sky) {
+    _drawPlane(cam, boundaries, planeZ, tex, lightLevel) {
         const { W, H, fb, zb } = this;
-        const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale, angle } = cam;
+        const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
         const cz = planeZ - ez;
         if (Math.abs(cz) < 0.01) return;   // plane at eye level — no coverage
 
@@ -566,13 +601,9 @@ export class SoftwareRenderer {
         const yBot = Math.min(H - 1, Math.floor(maxY - 0.5));
         if (yTop > yBot) return;
 
-        const skyW = sky ? sky.width : 0;
-        const skyH = sky ? sky.height : 0;
-        const skyData = sky ? sky.data : null;
-        const texW = tex ? tex.width : 0;
-        const texH = tex ? tex.height : 0;
-        const tdata = tex ? tex.data : null;
-        const colAngle = this._colAngle;
+        const texW = tex.width;
+        const texH = tex.height;
+        const tdata = tex.data;
 
         const xsBuf = this._xsBuf || (this._xsBuf = new Float32Array(64));
 
@@ -599,17 +630,14 @@ export class SoftwareRenderer {
                 xsBuf[j + 1] = v;
             }
 
-            // Precompute the per-row plane distance for non-sky flats:
-            // depth depends only on y, so do the divide once per row.
+            // Plane distance depends only on the row, so do the divide
+            // once: every pixel on this scanline of a horizontal plane is
+            // the same distance away.
             const denomY = halfH - yc;
-            const rowDepth = isSky ? SKY_DEPTH : (cz * syScale) / denomY;
-            if (!isSky && (rowDepth < NEAR || rowDepth > MAX_DIST)) continue;
-            const lf = isSky ? 256 : lightFor(lightLevel, rowDepth);
+            const rowDepth = (cz * syScale) / denomY;
+            if (rowDepth < NEAR || rowDepth > MAX_DIST) continue;
+            const lf = lightFor(lightLevel, rowDepth);
             const base = y * W;
-            // Sky vertical coordinate is fixed to the screen row.
-            const skyV = isSky
-                ? Math.min(skyH - 1, ((y / H) * skyH * 1.5) | 0)
-                : 0;
 
             for (let s = 0; s + 1 < count; s += 2) {
                 const xL = Math.max(0, Math.ceil(xsBuf[s] - 0.5));
@@ -617,16 +645,6 @@ export class SoftwareRenderer {
                 for (let x = xL; x <= xR; x++) {
                     const idx = base + x;
                     if (rowDepth >= zb[idx]) continue;
-
-                    if (isSky) {
-                        let u = ((angle + colAngle[x]) / (Math.PI * 2)) * skyW * 4;
-                        u %= skyW;
-                        if (u < 0) u += skyW;
-                        const texel = skyData[skyV * skyW + (u | 0)];
-                        fb[idx] = texel | 0xFF000000;
-                        zb[idx] = SKY_DEPTH;
-                        continue;
-                    }
 
                     // Back-project this pixel onto the plane.
                     const cx = (x + 0.5 - halfW) * rowDepth / sxScale;
