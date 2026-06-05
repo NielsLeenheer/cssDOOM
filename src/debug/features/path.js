@@ -273,9 +273,12 @@ function sampleAt(samples, t) {
     };
 }
 
-/** Index range [start, end] of the first and last MOVING frames — what trim
- *  keeps. Returns the full range if the segment never moves. */
-function trimWindow(samples) {
+/** Index range [start, end] trim keeps: the first/last MOVING frames, EXTENDED
+ *  to cover any recorded `events` so a use / fire / weapon switch during the
+ *  still lead-in or lead-out isn't trimmed off — trim is about where the shot
+ *  starts/ends, not about losing the world's reactions. Full range if neither
+ *  moves nor acts. */
+function trimWindow(samples, events) {
     if (samples.length < 2) return { start: 0, end: samples.length - 1 };
     const moving = (a, b) =>
         Math.abs(a.x - b.x) > POS_EPS ||
@@ -285,28 +288,48 @@ function trimWindow(samples) {
     while (start < samples.length - 1 && !moving(samples[start], samples[start + 1])) start++;
     let end = samples.length - 1;
     while (end > 0 && !moving(samples[end], samples[end - 1])) end--;
-    if (start >= end) return { start: 0, end: samples.length - 1 };
+    if (start >= end) { start = 0; end = samples.length - 1; }   // never moved → keep all
+    if (events?.length) {
+        // Only "active" actions (use / fire-down / weapon) extend the window —
+        // a fire-up is just a release with no visible effect, so a trailing one
+        // shouldn't hold dead frames after the player stops (processEvents
+        // clamps it to the end instead).
+        let firstT = null, lastT = null;
+        for (const e of events) {
+            if (e.kind === A.FIRE_UP) continue;
+            if (firstT === null || e.t < firstT) firstT = e.t;
+            if (lastT === null || e.t > lastT) lastT = e.t;
+        }
+        if (firstT !== null) {
+            while (start > 0 && samples[start].t > firstT) start--;
+            while (end < samples.length - 1 && samples[end].t < lastT) end++;
+        }
+    }
     return { start, end };
 }
 
-/** Drop leading/trailing non-moving frames and re-base time to 0. Keeps the
- *  pose just before the first move and the frame the last move lands on, so a
- *  shot starts and ends on motion. Returns the list unchanged if it never moves. */
-function trimSamples(samples) {
+/** Drop leading/trailing non-moving frames and re-base time to 0, keeping the
+ *  frames around any leading/trailing action (see trimWindow). `events` lets the
+ *  pose trim use the same window as the event trim. */
+function trimSamples(samples, events) {
     if (samples.length < 2) return samples;
-    const { start, end } = trimWindow(samples);
+    const { start, end } = trimWindow(samples, events);
     const t0 = samples[start].t;
     return samples.slice(start, end + 1).map(s => ({ ...s, t: s.t - t0 }));
 }
 
 /** Shift / filter recorded events to match a trim of `samples` (the only opt
  *  that changes timing): events outside the kept window drop, the rest re-base
- *  by the same offset so they stay aligned with the trimmed poses. */
+ *  by the same offset so they stay aligned with the trimmed poses. The window is
+ *  action-aware (it covers these events), so leading/trailing actions survive. */
 function processEvents(events, samples, opts = {}) {
     if (!events?.length || !opts.trim) return events ?? [];
-    const { start, end } = trimWindow(samples);
+    const { start, end } = trimWindow(samples, events);
     const t0 = samples[start].t, t1 = samples[end].t;
-    return events.filter(e => e.t >= t0 && e.t <= t1).map(e => ({ ...e, t: e.t - t0 }));
+    // Clamp each event into the kept window rather than dropping it — a trailing
+    // fire-up release still fires at the end (so held auto-fire stops) but holds
+    // no dead frames; clamping a time-sorted list keeps it sorted.
+    return events.map(e => ({ ...e, t: Math.min(Math.max(e.t, t0), t1) - t0 }));
 }
 
 const DEG = Math.PI / 180;
@@ -363,10 +386,11 @@ function retargetSamples(samples, start, end) {
 }
 
 /** Shared seek/play post-processing, applied in order: trim → smooth →
- *  retarget. opts: { trim, smooth, start, end } (see play()). Returns a new
- *  sample list; the stored session is never mutated. */
-function processSamples(samples, opts = {}) {
-    if (opts.trim) samples = trimSamples(samples);
+ *  retarget. opts: { trim, smooth, start, end } (see play()). `events` is passed
+ *  through to trim so the pose keeps the still frames around a leading/trailing
+ *  action. Returns a new sample list; the stored session is never mutated. */
+function processSamples(samples, opts = {}, events) {
+    if (opts.trim) samples = trimSamples(samples, events);
     if (opts.smooth) samples = smoothSamples(samples, opts.smooth);
     if (opts.start || opts.end) samples = retargetSamples(samples, opts.start, opts.end);
     return samples;
@@ -379,6 +403,14 @@ function resolveSamples(path, opts = {}) {
     if (typeof path === 'string') path = load(path);
     if (path?.segments) return path.segments[opts.segment ?? 0]?.samples;
     return path?.samples;
+}
+
+/** Resolve a path argument to its recorded action events (parallel to
+ *  resolveSamples) — so seek's trim uses the same action-aware window as play. */
+function resolveEvents(path, opts = {}) {
+    if (typeof path === 'string') path = load(path);
+    if (path?.segments) return path.segments[opts.segment ?? 0]?.events;
+    return path?.events;
 }
 
 /**
@@ -395,7 +427,7 @@ function resolveSamples(path, opts = {}) {
 export function seek(path, opts = {}) {
     let samples = resolveSamples(path, opts);
     if (!samples?.length) { console.warn('[path] nothing to seek'); return; }
-    samples = processSamples(samples, opts);
+    samples = processSamples(samples, opts, resolveEvents(path, opts));
     setPlayer(sampleAt(samples, opts.t ?? 0));
 }
 
@@ -435,7 +467,7 @@ export async function play(path, opts = {}) {
     const raw = path?.samples;
     if (!raw?.length) { console.warn('[path] nothing to play'); return; }
     const events = processEvents(path?.events, raw, opts);   // before processSamples reassigns
-    const samples = processSamples(raw, opts);
+    const samples = processSamples(raw, opts, path?.events);  // action-aware trim
 
     const { speed = 1 } = opts;
     const player = state.players[0];
