@@ -82,26 +82,32 @@ export class SoftwareRenderer {
         }
     }
 
-    /** Stash the geometry from a loaded map. */
+    /**
+     * Stash the geometry from the shared, already-enriched map data.
+     *
+     * Things are taken straight from the game's enrichment pass
+     * (`shared/maps/things.js::initThings`): entries that survived the
+     * skill-level / multiplayer filter carry a `category`, a resolved
+     * `sectorIndex` and a `floorHeight`; entries that were filtered out
+     * for the chosen difficulty have no `category`. We render exactly
+     * the surviving set, so the billboards match the difficulty the
+     * player selected instead of every enemy the map file lists.
+     */
     setMap(data) {
         this.walls = data.walls || [];
         this.sectorPolygons = data.sectorPolygons || [];
+        const sectors = data.sectors || [];
 
-        // Precompute the billboard list: every map thing that has a
-        // front-facing sprite and isn't a multiplayer-only spawn. Each
-        // gets the floor height + light of the sector it stands in so
-        // the billboard is anchored and shaded correctly.
         this.sprites = [];
         for (const t of (data.things || [])) {
+            if (t.category === undefined) continue;   // filtered out by skill / MP
             const name = THING_SPRITES[t.type];
             if (!name) continue;
-            if (t.flags & 16) continue;        // MP-only thing, skip in SP
-            if (!(t.flags & 7)) continue;      // not present on any skill
-            const sector = this._sectorAt(t.x, t.y);
+            const sector = sectors[t.sectorIndex];
             this.sprites.push({
                 x: t.x,
                 y: t.y,
-                floorZ: sector ? sector.floorHeight : 0,
+                floorZ: t.floorHeight ?? 0,
                 light: sector ? sector.lightLevel : 180,
                 name,
             });
@@ -482,22 +488,6 @@ export class SoftwareRenderer {
         }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────
-
-    /** Sector whose outer boundary contains (x, y), ignoring holes. */
-    _sectorAt(x, y) {
-        for (const s of this.sectorPolygons) {
-            const loops = s.boundaries;
-            if (!loops || !loops.length) continue;
-            if (!pointInLoop(x, y, loops[0])) continue;
-            let inHole = false;
-            for (let h = 1; h < loops.length; h++) {
-                if (pointInLoop(x, y, loops[h])) { inHole = true; break; }
-            }
-            if (!inHole) return s;
-        }
-        return null;
-    }
 }
 
 // Multiply an ABGR texel by a 0..256 light factor.
@@ -516,17 +506,4 @@ function lightFor(level, dist) {
     v -= v % LIGHT_BAND;          // colormap-style quantisation
     if (v < 0) v = 0; else if (v > 255) v = 255;
     return LIGHT_LUT[v | 0];
-}
-
-function pointInLoop(x, y, loop) {
-    let inside = false;
-    for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
-        const xi = loop[i].x, yi = loop[i].y;
-        const xj = loop[j].x, yj = loop[j].y;
-        if (((yi > y) !== (yj > y)) &&
-            (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi)) {
-            inside = !inside;
-        }
-    }
-    return inside;
 }

@@ -25,6 +25,7 @@
 import { RendererBase } from '../base.js';
 import { SoftwareRenderer } from './software.js';
 import { clearTextureCache } from './textures.js';
+import * as maps from '../../shared/maps/index.js';
 
 // Internal framebuffer height. The width is derived from the pane's
 // aspect ratio on resize. 200 rows matches the original game's vertical
@@ -84,15 +85,20 @@ export class CanvasRenderer extends RendererBase {
     // ── Active commands ──────────────────────────────────────────────────
 
     /**
-     * World loadMap fans here too. Fetch the same map JSON the
-     * DomRenderer uses and hand the geometry to the software renderer.
-     * Returns the fetch promise so the orchestrator's Promise.all sees
-     * this pane as a real participant in the load round.
+     * World loadMap fans here too. Resolve the map through the shared
+     * `maps` store — the same source the DomRenderer's scene builder
+     * uses — rather than fetching a private copy. `maps.load` is
+     * idempotent and runs the map-side enrichment (initThings), so
+     * `maps.mapData.things` arrives already filtered by the selected
+     * skill level and game mode and annotated with category /
+     * sectorIndex / floorHeight. Reading the raw JSON ourselves would
+     * bypass that filter and show enemies that don't belong to the
+     * chosen difficulty. Awaiting keeps this pane a real participant in
+     * the orchestrator's loadMap Promise.all round.
      */
     async loadMap(name) {
-        const response = await fetch(`maps/${name}.json`);
-        const data = await response.json();
-        this.software.setMap(data);
+        await maps.load(name);
+        this.software.setMap(maps.mapData);
         this._hasScene = true;
     }
 
