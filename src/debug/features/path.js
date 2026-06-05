@@ -516,8 +516,10 @@ export async function play(path, opts = {}) {
  * pose). `direction` ('clockwise' | 'anti-clockwise') chooses which way the
  * view rotates: anti-clockwise sweeps the angle up (the engine's increasing
  * direction), clockwise sweeps it down — so a turn is honoured even when the
- * named direction is the long way round. Returns a promise that resolves on
- * arrival, so you can `await` it between steps.
+ * named direction is the long way round. `moving` flags the player as moving for
+ * the duration so the walk cycle + head/weapon bob run (same as play()); off by
+ * default. Returns a promise that resolves on arrival, so you can `await` it
+ * between steps.
  *
  *   await debug.path.transition({
  *     duration: 2, direction: 'clockwise',
@@ -525,7 +527,7 @@ export async function play(path, opts = {}) {
  *     end:   { x: 1024, y: -512, angle: 90 },
  *   });
  */
-export function transition({ duration = 1, direction = 'clockwise', start = {}, end = {} } = {}) {
+export function transition({ duration = 1, direction = 'clockwise', start = {}, end = {}, moving = false } = {}) {
     const p = state.players[0];
     const sx = start.x ?? p.x, sy = start.y ?? p.y;
     const ex = end.x ?? p.x, ey = end.y ?? p.y;
@@ -540,12 +542,13 @@ export function transition({ duration = 1, direction = 'clockwise', start = {}, 
 
     const ms = Math.max(1, duration * 1000);
     const startMs = performance.now();
+    if (moving) setPlaybackMoving(true);
     return new Promise(resolve => {
         const frame = () => {
             const raw = Math.min(1, (performance.now() - startMs) / ms);
             const e = 0.5 - 0.5 * Math.cos(Math.PI * raw);   // ease in-out (sine)
             setPlayer({ x: sx + (ex - sx) * e, y: sy + (ey - sy) * e, angle: sa + dA * e });
-            if (raw >= 1) { resolve(); return; }
+            if (raw >= 1) { if (moving) setPlaybackMoving(false); resolve(); return; }
             requestAnimationFrame(frame);
         };
         requestAnimationFrame(frame);
