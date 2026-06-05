@@ -98,6 +98,11 @@ export function getSkyTexture() {
     return getByPath('assets/textures/SKY1.png');
 }
 
+export function getWeaponTexture(name) {
+    if (!name) return null;
+    return getByPath(`assets/weapons/${name}.png`);
+}
+
 /** Drop everything — used when the renderer is torn down. */
 export function clearTextureCache() {
     cache.clear();

@@ -188,6 +188,10 @@ const ENTITY_COMMANDS = [
     'createCorpse',
     'createPlayerSprite',
     'setDoorState',
+    'switchWeapon',
+    'startFiring',
+    'stopFiring',
+    'triggerFlash',
 ];
 
 for (const cmd of ENTITY_COMMANDS) {

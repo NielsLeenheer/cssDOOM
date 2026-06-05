@@ -39,6 +39,7 @@ import {
     getFlatTexture,
     getSpriteTexture,
     getSkyTexture,
+    getWeaponTexture,
 } from './textures.js';
 import { THING_SPRITES } from '../dom/scene/constants.js';
 
@@ -73,6 +74,40 @@ const LIGHT_EFFECT = {
     13: { type: 'blink',     sync: true },
     17: { type: 'fire',      sync: false },
 };
+
+const ANIM_FRAME_MS = 200;    // animated flat/wall frame duration
+
+// Animated flat / wall sequences (only those whose frames ship as
+// assets). Every member maps to the whole group so a surface cycles
+// through it in sync regardless of which frame the map referenced.
+const ANIM_SEQUENCES = [
+    ['NUKAGE1', 'NUKAGE2', 'NUKAGE3'],
+    ['SLADRIP1', 'SLADRIP2', 'SLADRIP3'],
+];
+const ANIM_OF = new Map();
+for (const seq of ANIM_SEQUENCES) for (const n of seq) ANIM_OF.set(n, seq);
+function animName(name, frame) {
+    const seq = ANIM_OF.get(name);
+    return seq ? seq[frame % seq.length] : name;
+}
+
+// On-screen weapon sprite sheets (single row: frame 0 idle, 1..N fire).
+const WEAPON_INFO = {
+    FIST:     { fw: 147, fh: 76,  frames: 4 },
+    PISTOL:   { fw: 79,  fh: 103, frames: 5 },
+    SHOTGUN:  { fw: 119, fh: 151, frames: 6 },
+    CHAINGUN: { fw: 114, fh: 103, frames: 3 },
+    ROCKET:   { fw: 105, fh: 119, frames: 5 },
+    CHAINSAW: { fw: 154, fh: 89,  frames: 4 },
+};
+
+// Screen-flash tints, keyed by the game's triggerFlash colour token.
+const FLASH_COLOR = {
+    hurt:             [255, 0, 0],
+    'pickup-flash':   [255, 215, 0],
+    'teleport-flash': [0, 255, 0],
+};
+const FLASH_MS = 300;
 
 // Small integer hash → [0,1), for the random light flickers.
 function hashRnd(a, b) {
@@ -178,6 +213,16 @@ export class SoftwareRenderer {
         // Sector light specials (flicker / blink / glow / fire).
         this._lightSectors = [];      // [{ sectorIndex, type, phase, seed }]
         this._sectorLightMul = [];    // sectorIndex → current multiplier (default 1)
+
+        // Screen-space HUD overlay: the player's weapon and damage /
+        // pickup flashes, drawn into the framebuffer after the world.
+        this.weapon = null;           // { name, info, firing, fireStart, fireRate, bob }
+        this.flash = null;            // { r, g, b, start }
+        this._animFrame = 0;          // current animated-texture frame
+        this._bobX = 0;
+        this._bobY = 0;
+        this._lastCamX = null;
+        this._lastCamY = null;
 
         this._colAngle = null;    // per-column view-angle offset, rebuilt on resize
     }
@@ -407,6 +452,27 @@ export class SoftwareRenderer {
         });
     }
 
+    // ── HUD overlay commands ─────────────────────────────────────────────
+
+    switchWeapon(name, fireRate) {
+        const info = WEAPON_INFO[name];
+        if (!info) { this.weapon = null; return; }
+        this.weapon = { name, info, fireRate: fireRate || 400, firing: false, fireStart: 0 };
+    }
+
+    startFiring() {
+        if (this.weapon) { this.weapon.firing = true; this.weapon.fireStart = performance.now(); }
+    }
+
+    stopFiring() {
+        if (this.weapon) this.weapon.firing = false;
+    }
+
+    triggerFlash(color) {
+        const rgb = FLASH_COLOR[color];
+        if (rgb) this.flash = { r: rgb[0], g: rgb[1], b: rgb[2], start: performance.now() };
+    }
+
     setDoorState(sectorIndex, doorState) {
         const door = this.doors.get(sectorIndex);
         if (door) door.target = doorState === 'open' ? door.open : door.closed;
@@ -467,6 +533,7 @@ export class SoftwareRenderer {
         for (const e of this._lightSectors) {
             this._sectorLightMul[e.sectorIndex] = lightMul(e, tSec);
         }
+        this._animFrame = (now / ANIM_FRAME_MS) | 0;
 
         const aspect = W / H;
         const fovScale = Math.tan(FOV / 2);
@@ -489,6 +556,76 @@ export class SoftwareRenderer {
         this._renderWalls(cam);
         this._renderFlats(cam);
         this._renderEntities(cam);
+        this._renderWeapon(cam, now, dt);
+        this._renderFlash(now);
+    }
+
+    // ── HUD overlay: weapon sprite + screen flash ────────────────────────
+
+    _renderWeapon(cam, now, dt) {
+        const wpn = this.weapon;
+        if (!wpn) return;
+        const tex = getWeaponTexture(wpn.name);
+        if (!tex || tex.width <= 1) return;
+        const { fw, fh, frames } = wpn.info;
+
+        // Pick the frame: idle (0) unless mid fire animation.
+        let frame = 0;
+        if (wpn.firing) {
+            const e = now - wpn.fireStart;
+            if (e < wpn.fireRate) {
+                frame = 1 + Math.min(frames - 2, ((e / wpn.fireRate) * (frames - 1)) | 0);
+            }
+        }
+
+        // Weapon bob: a small figure-eight that builds while the view is
+        // moving and eases back to centre when it stops.
+        const moving = this._lastCamX !== null
+            && (Math.abs(cam.ex - this._lastCamX) > 0.5 || Math.abs(cam.ey - this._lastCamY) > 0.5);
+        this._lastCamX = cam.ex;
+        this._lastCamY = cam.ey;
+        const targetMag = moving ? 1 : 0;
+        const phase = (now / 1000) * 6;
+        const ease = 6 * dt;
+        this._bobX += ((Math.cos(phase) * 5 * targetMag) - this._bobX) * Math.min(1, ease);
+        this._bobY += ((Math.abs(Math.sin(phase)) * 4 * targetMag) - this._bobY) * Math.min(1, ease);
+
+        const { W, H, fb } = this;
+        const destX = Math.round((W - fw) / 2 + this._bobX);
+        const destY = Math.round(H - fh + this._bobY);
+        const sheetW = tex.width, sdata = tex.data;
+        const sxBase = frame * fw;
+
+        for (let sy = 0; sy < fh; sy++) {
+            const dy = destY + sy;
+            if (dy < 0 || dy >= H) continue;
+            const srcRow = sy * sheetW + sxBase;
+            const dstRow = dy * W;
+            for (let sx = 0; sx < fw; sx++) {
+                const dx = destX + sx;
+                if (dx < 0 || dx >= W) continue;
+                const texel = sdata[srcRow + sx];
+                if ((texel >>> 24) < 128) continue;
+                fb[dstRow + dx] = texel;
+            }
+        }
+    }
+
+    _renderFlash(now) {
+        if (!this.flash) return;
+        const e = now - this.flash.start;
+        if (e >= FLASH_MS) { this.flash = null; return; }
+        const a = 0.35 * (1 - e / FLASH_MS);
+        const ia = 1 - a;
+        const fr = this.flash.r * a, fg = this.flash.g * a, fb_ = this.flash.b * a;
+        const { fb } = this;
+        for (let i = 0, n = fb.length; i < n; i++) {
+            const px = fb[i];
+            const r = ((px & 0xff) * ia + fr) | 0;
+            const g = (((px >> 8) & 0xff) * ia + fg) | 0;
+            const b = (((px >> 16) & 0xff) * ia + fb_) | 0;
+            fb[i] = 0xff000000 | (b << 16) | (g << 8) | r;
+        }
     }
 
     // ── Sky backdrop ─────────────────────────────────────────────────────
@@ -534,7 +671,7 @@ export class SoftwareRenderer {
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
         for (const wall of this.walls) {
-            const tex = getWallTexture(wall.texture);
+            const tex = getWallTexture(animName(wall.texture, this._animFrame));
             if (!tex) continue;
 
             const ax = wall.start.x, ay = wall.start.y;
@@ -662,13 +799,13 @@ export class SoftwareRenderer {
             if (ceilingHeight <= sector.floorHeight) continue;
 
             const light = sector.lightLevel * (this._sectorLightMul[sector.sectorIndex] ?? 1);
-            const floorTex = getFlatTexture(sector.floorTexture);
+            const floorTex = getFlatTexture(animName(sector.floorTexture, this._animFrame));
             if (floorTex) {
                 this._drawPlane(cam, sector.boundaries, sector.floorHeight, floorTex, light);
             }
             // Sky ceilings are painted by the backdrop pass, not here.
             if (sector.ceilingTexture === 'F_SKY1') continue;
-            const ceilTex = getFlatTexture(sector.ceilingTexture);
+            const ceilTex = getFlatTexture(animName(sector.ceilingTexture, this._animFrame));
             if (ceilTex) {
                 this._drawPlane(cam, sector.boundaries, ceilingHeight, ceilTex, light);
             }
