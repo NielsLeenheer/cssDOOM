@@ -25,6 +25,7 @@ import { openDebugMenu } from '../ui/panel.js';
 import { switchRenderer } from '../features/renderer.js';
 import { setSpectator } from '../features/spectator.js';
 import { isolateHud } from '../features/isolate.js';
+import * as loadout from '../features/loadout.js';
 
 // ── Callable namespace ────────────────────────────────────────────────────
 // Calling debug() opens the menu (the UI owns that — see ui/panel.js).
@@ -164,3 +165,13 @@ debug.spectator = setSpectator;
 // the HUD (status bar + weapon) for the talk's HUD-anatomy shot (see
 // features/isolate.js + .css). No arg toggles; a boolean sets it on/off.
 debug.isolateHud = isolateHud;
+
+// ── debug.player — set the slot-0 player's vitals for talk shots (see
+// features/loadout.js). Mutates the live player + flags the HUD dirty.
+//   debug.player.health(100)      ·  debug.player.armor(200)
+//   debug.player.armor(100, 1)    — green (1/3 absorb) instead of blue
+//   debug.player.ammo('shells', 50)  ·  ammo(50) all pools  ·  ammo() fill to max
+const player = group('player');
+player.health = loadout.setHealth;
+player.armor = loadout.setArmor;
+player.ammo = loadout.setAmmo;
