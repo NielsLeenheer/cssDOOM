@@ -54,6 +54,56 @@ const LIGHT_BAND = 12;        // colormap-style quantisation step
 const LIGHT_LUT = new Uint16Array(256);
 for (let i = 0; i < 256; i++) LIGHT_LUT[i] = Math.min(256, ((i * 256 / 255) | 0));
 
+const TAU = Math.PI * 2;
+const WALK_FRAME_MS = 180;    // enemy walk-cycle frame duration
+const DEATH_FRAME_MS = 120;   // enemy death-animation frame duration
+
+// Per-enemy sprite animation, keyed by DOOM thing type. `spr` is the
+// 4-letter sprite base; `walk`/`attack` frame letters have full
+// 8-rotation art on disk; `death` letters are single-view (rotation 0)
+// and the last one is the resting corpse frame. Verified against the
+// PNGs in public/assets/sprites. Cacodemon (3005) / Lost Soul (3006)
+// have no per-frame PNGs here (sheet-only) and aren't in early E1, so
+// they're intentionally absent — they fall back to a static billboard.
+const ENEMY_ANIM = {
+    3004: { spr: 'POSS', walk: ['A', 'B'], attack: 'E', death: ['H', 'I', 'J', 'K', 'L'] },           // Zombieman
+    9:    { spr: 'SPOS', walk: ['A', 'B'], attack: 'E', death: ['H', 'I', 'J', 'K', 'L'] },           // Shotgun Guy
+    3001: { spr: 'TROO', walk: ['A', 'B'], attack: 'E', death: ['I', 'J', 'K', 'L', 'M'] },           // Imp
+    3002: { spr: 'SARG', walk: ['A', 'B'], attack: 'E', death: ['I', 'J', 'K', 'L', 'M', 'N'] },      // Demon
+    58:   { spr: 'SARG', walk: ['A', 'B'], attack: 'E', death: ['I', 'J', 'K', 'L', 'M', 'N'] },      // Spectre
+    3003: { spr: 'BOSS', walk: ['A', 'B'], attack: 'E', death: ['I', 'J', 'K', 'L', 'M', 'N', 'O'] }, // Baron
+};
+
+// Other players' billboards (deathmatch). Death is handled by collectItem
+// + createCorpse, so no death frames are needed here.
+const PLAYER_ANIM = { spr: 'PLAY', walk: ['A', 'B'], attack: 'E', death: null };
+const PLAYER_CORPSE_VARIANT = ['', '-red', '-indigo', '-brown'];
+
+// Transient effect frame sequences (single-view).
+const PUFF_FRAMES = ['PUFFA0', 'PUFFB0', 'PUFFC0', 'PUFFD0'];
+const EXPLOSION_FRAMES = ['BEXPA0', 'BEXPB0', 'BEXPC0', 'BEXPD0', 'BEXPE0'];
+const TFOG_FRAMES = ['TFOGA0', 'TFOGB0', 'TFOGC0', 'TFOGD0', 'TFOGE0',
+                     'TFOGF0', 'TFOGG0', 'TFOGH0', 'TFOGI0', 'TFOGJ0'];
+
+/**
+ * Resolve a DOOM sprite filename + horizontal mirror flag for an
+ * 8-rotation frame. Mirrored rotations (6,7,8) reuse the 2/3/4 art
+ * flipped, matching the WAD lump naming (e.g. TROOA2A8 serves rotation
+ * 2 and, flipped, rotation 8).
+ */
+function buildRotName(spr, frame, rot) {
+    switch (rot) {
+        case 5:  return { name: `${spr}${frame}5`, mirror: false };
+        case 2:  return { name: `${spr}${frame}2${frame}8`, mirror: false };
+        case 8:  return { name: `${spr}${frame}2${frame}8`, mirror: true };
+        case 3:  return { name: `${spr}${frame}3${frame}7`, mirror: false };
+        case 7:  return { name: `${spr}${frame}3${frame}7`, mirror: true };
+        case 4:  return { name: `${spr}${frame}4${frame}6`, mirror: false };
+        case 6:  return { name: `${spr}${frame}4${frame}6`, mirror: true };
+        default: return { name: `${spr}${frame}1`, mirror: false }; // rotation 1 (front)
+    }
+}
+
 export class SoftwareRenderer {
     constructor() {
         this.W = 0;
@@ -63,7 +113,19 @@ export class SoftwareRenderer {
         this.imageData = null;    // ImageData backing fb
         this.walls = [];
         this.sectorPolygons = [];
-        this.sprites = [];        // [{ x, y, floorZ, light, name }]
+
+        // Entities. Static, non-interactive billboards live in `statics`
+        // (decorations + corpses). Game-driven things are keyed by their
+        // gameId in `things` so the dispatch commands (move, collect,
+        // kill, rotate, …) can find them. Projectiles and transient
+        // effects have their own short-lived collections.
+        this.statics = [];
+        this.things = new Map();      // gameId → entry
+        this.projectiles = new Map(); // projectileId → entry
+        this.effects = [];            // [{ x, y, z, frames, start, frameMs, centered }]
+        this._sectorLight = [];       // sectorIndex → lightLevel
+        this.viewerPlayerIndex = 0;   // which player this pane renders (hides own billboard)
+
         this._colAngle = null;    // per-column view-angle offset, rebuilt on resize
     }
 
@@ -97,19 +159,46 @@ export class SoftwareRenderer {
         this.walls = data.walls || [];
         this.sectorPolygons = data.sectorPolygons || [];
         const sectors = data.sectors || [];
+        this._sectorLight = sectors.map(s => s.lightLevel);
 
-        this.sprites = [];
+        this.statics = [];
+        this.things.clear();
+        this.projectiles.clear();
+        this.effects = [];
+
         for (const t of (data.things || [])) {
             if (t.category === undefined) continue;   // filtered out by skill / MP
             const name = THING_SPRITES[t.type];
             if (!name) continue;
-            const sector = sectors[t.sectorIndex];
-            this.sprites.push({
+            const light = sectors[t.sectorIndex]?.lightLevel ?? 180;
+
+            // Things the game simulates carry a gameId — the key the
+            // dispatch commands address them by. Register those in the
+            // things map so they can move / be collected / die. Passive
+            // decorations (no gameId) become static billboards.
+            if (t.gameId === undefined) {
+                this.statics.push({ x: t.x, y: t.y, floorZ: t.floorHeight ?? 0, light, name });
+                continue;
+            }
+
+            const anim = ENEMY_ANIM[t.type] || null;
+            this.things.set(t.gameId, {
+                type: t.type,
+                category: t.category,
                 x: t.x,
                 y: t.y,
                 floorZ: t.floorHeight ?? 0,
-                light: sector ? sector.lightLevel : 180,
-                name,
+                light,
+                isEnemy: anim !== null,
+                anim,
+                fixedName: name,                       // used for pickups / barrels
+                rotation: 1,
+                facing: (t.angle ?? 0) * Math.PI / 180, // DOOM degrees → radians
+                state: 'idle',
+                collected: false,
+                deathStart: 0,
+                walkPhase: Math.random() * 1000,
+                playerIndex: undefined,
             });
         }
     }
@@ -117,7 +206,129 @@ export class SoftwareRenderer {
     clear() {
         this.walls = [];
         this.sectorPolygons = [];
-        this.sprites = [];
+        this.statics = [];
+        this.things.clear();
+        this.projectiles.clear();
+        this.effects = [];
+    }
+
+    // ── Dispatch commands (game loop → entity state) ─────────────────────
+
+    updateThingPosition(i, x, y, floorZ) {
+        const e = this.things.get(i);
+        if (e) { e.x = x; e.y = y; e.floorZ = floorZ; }
+    }
+
+    reparentThingToSector(i, sectorIndex) {
+        const e = this.things.get(i);
+        const l = this._sectorLight[sectorIndex];
+        if (e && l != null) e.light = l;
+    }
+
+    collectItem(i) { const e = this.things.get(i); if (e) e.collected = true; }
+    uncollectItem(i) { const e = this.things.get(i); if (e) { e.collected = false; e.state = 'idle'; e.deathStart = 0; } }
+
+    setEnemyState(i, _type, newState) {
+        const e = this.things.get(i);
+        if (!e || e.state === 'dead') return;
+        e.state = newState === 'attacking' ? 'attack'
+                : newState === 'idle' ? 'idle'
+                : 'walk';
+    }
+
+    setThingMoving(i, moving) {
+        const e = this.things.get(i);
+        if (e && e.state !== 'dead') e.state = moving ? 'walk' : 'idle';
+    }
+
+    playPlayerAttack(i) {
+        const e = this.things.get(i);
+        if (e && e.state !== 'dead') e.state = 'attack';
+    }
+
+    killEnemy(i, _type, instant /* , gib */) {
+        const e = this.things.get(i);
+        if (!e) return;
+        if (e.category === 'barrel') {
+            // Barrels don't fall over — they detonate and vanish.
+            this.createExplosion(e.x, e.y, e.floorZ + 16);
+            e.collected = true;
+            return;
+        }
+        e.state = 'dead';
+        e.deathStart = instant ? -1 : performance.now();
+    }
+
+    resetEnemy(i, _type, x, y, floorZ) {
+        const e = this.things.get(i);
+        if (!e) return;
+        e.state = 'idle';
+        e.deathStart = 0;
+        e.collected = false;
+        if (x !== undefined) { e.x = x; e.y = y; e.floorZ = floorZ; }
+    }
+
+    updateEnemyRotation(i, enemy, viewers) {
+        const e = this.things.get(i);
+        if (!e || !e.isEnemy) return;
+        e.x = enemy.x; e.y = enemy.y; e.facing = enemy.facing;
+        const v = viewers[this.viewerPlayerIndex] ?? viewers[0];
+        if (!v) return;
+        const toViewer = Math.atan2(v.y - enemy.y, v.x - enemy.x);
+        let rel = toViewer - enemy.facing;
+        rel = ((rel % TAU) + TAU) % TAU;
+        e.rotation = (Math.floor((rel + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
+    }
+
+    createProjectile(id, spec) {
+        this.projectiles.set(id, {
+            sprite: spec.sprite,
+            sx: spec.startX, sy: spec.startY, sz: spec.startZ,
+            ex: spec.endX, ey: spec.endY, ez: spec.endZ,
+            duration: spec.duration || 1,
+            start: performance.now(),
+        });
+    }
+
+    removeProjectile(id) { this.projectiles.delete(id); }
+
+    // Note the argument orders: puff / teleport-fog are (x, z, y); the
+    // explosion is (x, y, z) — matching the game's dispatch sites.
+    createPuff(x, z, y) { this._spawnEffect(x, y, z, PUFF_FRAMES, 50, true); }
+    createExplosion(x, y, z) { this._spawnEffect(x, y, z, EXPLOSION_FRAMES, 60, true); }
+    createTeleportFog(x, z, y) { this._spawnEffect(x, y, z, TFOG_FRAMES, 45, false); }
+
+    _spawnEffect(x, y, z, frames, frameMs, centered) {
+        this.effects.push({ x, y, z, frames, frameMs, centered, start: performance.now() });
+    }
+
+    createCorpse(x, y, floorZ, sectorIndex, playerIndex, gib) {
+        const variant = PLAYER_CORPSE_VARIANT[playerIndex] ?? '';
+        this.statics.push({
+            x, y, floorZ,
+            light: this._sectorLight[sectorIndex] ?? 200,
+            name: (gib ? 'PLAYW0' : 'PLAYN0') + variant,
+        });
+    }
+
+    createPlayerSprite(thingIndex, playerIndex, x, y, floorZ /* , sectorIndex */) {
+        if (this.things.has(thingIndex)) return;   // idempotent
+        this.things.set(thingIndex, {
+            type: -1,
+            category: 'player',
+            x, y, floorZ,
+            light: 220,
+            isEnemy: true,
+            anim: PLAYER_ANIM,
+            fixedName: 'PLAYA1',
+            rotation: 1,
+            facing: 0,
+            state: 'idle',
+            collected: false,
+            deathStart: 0,
+            walkPhase: Math.random() * 1000,
+            playerIndex,
+        });
     }
 
     // ── Per-frame entry point ────────────────────────────────────────────
@@ -148,7 +359,7 @@ export class SoftwareRenderer {
 
         this._renderWalls(cam);
         this._renderFlats(cam);
-        this._renderSprites(cam);
+        this._renderEntities(cam);
     }
 
     // ── Walls ────────────────────────────────────────────────────────────
@@ -433,57 +644,127 @@ export class SoftwareRenderer {
         }
     }
 
-    // ── Sprites (billboards) ─────────────────────────────────────────────
+    // ── Entities (billboards: things, projectiles, effects) ──────────────
 
-    _renderSprites(cam) {
+    _renderEntities(cam) {
+        const now = performance.now();
+
+        // Static decorations + corpses.
+        for (const s of this.statics) {
+            const tex = getSpriteTexture(s.name);
+            if (tex && tex.width > 1) {
+                this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false);
+            }
+        }
+
+        // Game-driven things (enemies, pickups, barrels, players).
+        for (const e of this.things.values()) {
+            if (e.collected) continue;
+            // Don't draw this viewer's own player billboard.
+            if (e.playerIndex !== undefined && e.playerIndex === this.viewerPlayerIndex) continue;
+            const spr = this._thingSprite(e, now);
+            if (!spr) continue;
+            const tex = getSpriteTexture(spr.name);
+            if (!tex || tex.width <= 1) continue;
+            this._drawBillboard(cam, e.x, e.y, e.floorZ, tex, e.light, spr.mirror, false);
+        }
+
+        // Projectiles — linear interpolation start → end over duration.
+        for (const [id, p] of this.projectiles) {
+            const t = (now - p.start) / (p.duration * 1000);
+            if (t >= 1) { this.projectiles.delete(id); continue; }
+            const tex = getSpriteTexture(p.sprite);
+            if (tex && tex.width > 1) {
+                this._drawBillboard(cam,
+                    p.sx + (p.ex - p.sx) * t,
+                    p.sy + (p.ey - p.sy) * t,
+                    p.sz + (p.ez - p.sz) * t,
+                    tex, 250, false, true);
+            }
+        }
+
+        // Transient effects — advance frames, drop when finished.
+        for (let i = this.effects.length - 1; i >= 0; i--) {
+            const fx = this.effects[i];
+            const frame = ((now - fx.start) / fx.frameMs) | 0;
+            if (frame >= fx.frames.length) { this.effects.splice(i, 1); continue; }
+            const tex = getSpriteTexture(fx.frames[frame]);
+            if (tex && tex.width > 1) {
+                this._drawBillboard(cam, fx.x, fx.y, fx.z, tex, 250, false, fx.centered);
+            }
+        }
+    }
+
+    /** Current sprite frame + mirror flag for a thing entry. */
+    _thingSprite(e, now) {
+        if (!e.isEnemy) return { name: e.fixedName, mirror: false };
+        const anim = e.anim;
+
+        if (e.state === 'dead' && anim.death) {
+            const fr = anim.death;
+            const idx = e.deathStart < 0
+                ? fr.length - 1                                  // instant: rest frame
+                : Math.min(fr.length - 1, ((now - e.deathStart) / DEATH_FRAME_MS) | 0);
+            return { name: `${anim.spr}${fr[idx]}0`, mirror: false };
+        }
+
+        const frame = e.state === 'attack' ? anim.attack
+            : e.state === 'idle' ? anim.walk[0]
+            : anim.walk[(((now + e.walkPhase) / WALK_FRAME_MS) | 0) % anim.walk.length];
+        return buildRotName(anim.spr, frame, e.rotation);
+    }
+
+    /**
+     * Draw a camera-facing billboard. `centered` floats the sprite about
+     * `z` (projectiles, puffs, explosions); otherwise it stands on `z`
+     * (things, corpses, fog). `mirror` flips it horizontally for the
+     * reused rotation art.
+     */
+    _drawBillboard(cam, wx, wy, z, tex, level, mirror, centered) {
         const { W, H, fb, zb } = this;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
-        for (const sprite of this.sprites) {
-            const tex = getSpriteTexture(sprite.name);
-            if (!tex) continue;
+        const cx = (wx - ex) * ca + (wy - ey) * sa;
+        const cy = ca * (wy - ey) - sa * (wx - ex);
+        if (cy < NEAR || cy > MAX_DIST) return;
 
-            const cx = (sprite.x - ex) * ca + (sprite.y - ey) * sa;
-            const cy = ca * (sprite.y - ey) - sa * (sprite.x - ex);
-            if (cy < NEAR || cy > MAX_DIST) continue;
+        const sw = tex.width, sh = tex.height, sdata = tex.data;
+        const halfWorld = sw * 0.5;
 
-            const sw = tex.width, sh = tex.height, sdata = tex.data;
-            const halfWorld = sw * 0.5;
+        const pxL = halfW + ((cx - halfWorld) / cy) * sxScale;
+        const pxR = halfW + ((cx + halfWorld) / cy) * sxScale;
+        const topZ = (centered ? z + sh * 0.5 : z + sh) - ez;
+        const botZ = (centered ? z - sh * 0.5 : z) - ez;
+        const pyTop = halfH - (topZ / cy) * syScale;
+        const pyBot = halfH - (botZ / cy) * syScale;
 
-            const pxL = halfW + ((cx - halfWorld) / cy) * sxScale;
-            const pxR = halfW + ((cx + halfWorld) / cy) * sxScale;
-            const topZ = (sprite.floorZ + sh) - ez;
-            const botZ = sprite.floorZ - ez;
-            const pyTop = halfH - (topZ / cy) * syScale;
-            const pyBot = halfH - (botZ / cy) * syScale;
+        const x0 = Math.max(0, Math.ceil(pxL - 0.5));
+        const x1 = Math.min(W - 1, Math.floor(pxR - 0.5));
+        const y0 = Math.max(0, Math.ceil(pyTop - 0.5));
+        const y1 = Math.min(H - 1, Math.floor(pyBot - 0.5));
+        if (x0 > x1 || y0 > y1) return;
 
-            const x0 = Math.max(0, Math.ceil(pxL - 0.5));
-            const x1 = Math.min(W - 1, Math.floor(pxR - 0.5));
-            const y0 = Math.max(0, Math.ceil(pyTop - 0.5));
-            const y1 = Math.min(H - 1, Math.floor(pyBot - 0.5));
-            if (x0 > x1 || y0 > y1) continue;
+        const invW = sw / (pxR - pxL || 1e-6);
+        const invH = sh / (pyBot - pyTop || 1e-6);
+        const lf = lightFor(level, cy);
 
-            const invW = sw / (pxR - pxL || 1e-6);
-            const invH = sh / (pyBot - pyTop || 1e-6);
-            const lf = lightFor(sprite.light, cy);
-
-            for (let y = y0; y <= y1; y++) {
-                let ty = ((y + 0.5 - pyTop) * invH) | 0;
-                if (ty < 0 || ty >= sh) continue;
-                const row = ty * sw;
-                const base = y * W;
-                for (let x = x0; x <= x1; x++) {
-                    const idx = base + x;
-                    // 2-unit lenience so a sprite sits in front of the
-                    // floor it stands on without z-fighting it.
-                    if (cy > zb[idx] + 2) continue;
-                    let tx = ((x + 0.5 - pxL) * invW) | 0;
-                    if (tx < 0 || tx >= sw) continue;
-                    const texel = sdata[row + tx];
-                    if ((texel >>> 24) < 128) continue;
-                    fb[idx] = shade(texel, lf);
-                    zb[idx] = cy;
-                }
+        for (let y = y0; y <= y1; y++) {
+            const ty = ((y + 0.5 - pyTop) * invH) | 0;
+            if (ty < 0 || ty >= sh) continue;
+            const row = ty * sw;
+            const base = y * W;
+            for (let x = x0; x <= x1; x++) {
+                const idx = base + x;
+                // 2-unit lenience so a billboard sits in front of the
+                // surface it rests on without z-fighting it.
+                if (cy > zb[idx] + 2) continue;
+                let tx = ((x + 0.5 - pxL) * invW) | 0;
+                if (tx < 0 || tx >= sw) continue;
+                if (mirror) tx = sw - 1 - tx;
+                const texel = sdata[row + tx];
+                if ((texel >>> 24) < 128) continue;
+                fb[idx] = shade(texel, lf);
+                zb[idx] = cy;
             }
         }
     }

@@ -151,6 +151,9 @@ export class CanvasRenderer extends RendererBase {
         this._raf = requestAnimationFrame(this._tick);
         if (!this._hasScene || !this._camera) return;
 
+        // Keep the software renderer's notion of "which player is this
+        // pane" current so it hides this viewer's own billboard.
+        this.software.viewerPlayerIndex = this.playerIndex;
         this.software.render(this._camera);
         this.internalCtx.putImageData(this.software.imageData, 0, 0);
 
@@ -161,6 +164,33 @@ export class CanvasRenderer extends RendererBase {
     };
 }
 
-// Commands this renderer doesn't implement (updateHud, lobby/overlay
-// screens, enemy state machine, …) no-op automatically via
-// RendererBase.dispatch, which only calls `this[cmd]` when it exists.
+// World commands that drive live entity state. Each is a thin forwarder
+// to the software renderer, which owns the entity collections. Bound on
+// the prototype so RendererBase.dispatch routes `this[cmd](...args)`
+// here; commands not listed (HUD, lobby/overlay screens, …) no-op
+// automatically because the method simply doesn't exist.
+const ENTITY_COMMANDS = [
+    'updateThingPosition',
+    'reparentThingToSector',
+    'collectItem',
+    'uncollectItem',
+    'setEnemyState',
+    'setThingMoving',
+    'playPlayerAttack',
+    'killEnemy',
+    'resetEnemy',
+    'updateEnemyRotation',
+    'createProjectile',
+    'removeProjectile',
+    'createPuff',
+    'createExplosion',
+    'createTeleportFog',
+    'createCorpse',
+    'createPlayerSprite',
+];
+
+for (const cmd of ENTITY_COMMANDS) {
+    CanvasRenderer.prototype[cmd] = function (...args) {
+        return this.software[cmd](...args);
+    };
+}
