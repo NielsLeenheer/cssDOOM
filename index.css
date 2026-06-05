@@ -26,6 +26,7 @@
 @import url('src/debug/features/sectors.css');
 @import url('src/debug/features/layers.css');
 @import url('src/debug/features/freeze.css');
+@import url('src/debug/features/isolate.css');
 @import url('src/debug/features/path-controls.css');
 /* Overrides the renderer's .scene transform — must stay after camera.css. */
 @import url('src/debug/features/camera.css');

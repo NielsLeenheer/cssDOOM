@@ -24,6 +24,7 @@ import { registerCustom } from '../custom/custom.js';
 import { openDebugMenu } from '../ui/panel.js';
 import { switchRenderer } from '../features/renderer.js';
 import { setSpectator } from '../features/spectator.js';
+import { isolateHud } from '../features/isolate.js';
 
 // ── Callable namespace ────────────────────────────────────────────────────
 // Calling debug() opens the menu (the UI owns that — see ui/panel.js).
@@ -158,3 +159,8 @@ debug.renderer = (kind) => {
 // ── debug.spectator — toggle spectator mode (see features/spectator.js). SP
 // only (refused in DM); no arg toggles, a boolean sets it on/off.
 debug.spectator = setSpectator;
+
+// ── debug.isolateHud — fade the scene out to a flat grey field, leaving just
+// the HUD (status bar + weapon) for the talk's HUD-anatomy shot (see
+// features/isolate.js + .css). No arg toggles; a boolean sets it on/off.
+debug.isolateHud = isolateHud;

@@ -1,0 +1,22 @@
+/* debug.isolateHud() (features/isolate.js) — fade the 3D scene out behind a flat
+   grey field so only the HUD (status bar + weapon) is left, for the talk's
+   HUD-anatomy shot. A grey #434343 layer eases in on .renderer::after, which
+   sits between .renderer's two children: above .viewport (z-index auto, the
+   scene + sky) and below .hud (z-index 1000, which carries both the status bar
+   and the weapon) — so the HUD stays fully lit while the world dims away.
+
+   NOT on .viewport::after: that pseudo is the sky dim (scene/sky.css) reused by
+   spectator mode (scene/spectator.css), and .viewport::before is the layers sky
+   fade — both of .viewport's pseudos are taken. .renderer's are free. Inert
+   until body.debug-isolate-hud. */
+.renderer::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: #434343;
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+    z-index: 1;   /* above .viewport, below .hud */
+}
+body.debug-isolate-hud .renderer::after { opacity: 1; }
