@@ -84,7 +84,10 @@ edges.
 
 Animated fades of a whole layer (vs the menu's instant hide toggles). Pass
 `'walls'`, `'floors'`, `'ceilings'`, `'things'` (pickups / decorations / barrels),
-or `'sky'`, or omit to act on all of them. Surfaces and things fade via opacity;
+`'enemies'`, or `'sky'`, or omit to act on all of them. `'corpses'` is an extra
+sub-layer — just the map's dead-body / gore decorations (a subset of `'things'`,
+not in the "all" set; pass it explicitly). Surfaces, things and enemies fade via
+opacity;
 `'sky'` fades a black layer in over the sky background (which can't transition) but
 behind the scene. ([`features/layers.css`](src/debug/features/layers.css).)
 

@@ -53,8 +53,8 @@ sprites.showSheet = spritesModule.showSheet;
 sprites.hideSheet = spritesModule.hideSheet;
 
 // ── debug.layers — animated scene-layer fades (see features/layers.js + .css).
-// Opacity fade of every wall / floor / ceiling / thing plus the sky, vs the
-// menu's instant hide-* toggles. fadeOut(layer) / fadeIn(layer), or omit for all.
+// Opacity fade of every wall / floor / ceiling / thing / enemy plus the sky, vs
+// the menu's instant hide-* toggles. fadeOut(layer) / fadeIn(layer), or omit for all.
 Object.assign(group('layers'), layersModule);
 
 // ── debug.camera — view-relative orbit for talk shots (see camera.css) ──────

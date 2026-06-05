@@ -27,3 +27,25 @@ body.fade-sky .viewport::before { opacity: 1; }
    (collected pickups hide via visibility, not opacity, so this is fade-only). */
 .pickup, .decoration, .barrel { transition: opacity 0.6s ease; }
 body.fade-things :is(.pickup, .decoration, .barrel) { opacity: 0; }
+
+/* Enemies fade (debug.layers.fadeOut('enemies')). Fade the enemy SPRITE rather
+   than the .enemy container — the container carries the renderer's --floor-z
+   lift transition, which we don't want to clobber. The sprite has no transition
+   of its own (only the walk-cycle animation), so adding opacity here is safe. */
+.enemy > .sprite { transition: opacity 0.6s ease; }
+body.fade-enemies .enemy > .sprite { opacity: 0; }
+
+/* Corpses fade (debug.layers.fadeOut('corpses')). Map-placed dead-body / gore
+   decorations are a subset of .decoration with no class to single them out, so
+   pick them by sprite filename. Lets you keep `things` but drop the corpses. */
+.decoration > img:is(
+    [src$="PLAYN0.png"],   /* Dead Player */
+    [src$="PLAYW0.png"],   /* Bloody Mess */
+    [src$="POL5A0.png"],   /* Pool of Blood */
+    [src$="POL1A0.png"],   /* Impaled Human */
+    [src$="POL6A0.png"]    /* Twitching Impaled */
+) { transition: opacity 0.6s ease; }
+body.fade-corpses .decoration > img:is(
+    [src$="PLAYN0.png"], [src$="PLAYW0.png"], [src$="POL5A0.png"],
+    [src$="POL1A0.png"], [src$="POL6A0.png"]
+) { opacity: 0; }
