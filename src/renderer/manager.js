@@ -24,6 +24,7 @@
 
 import { DomRenderer } from './dom/renderer.js';
 import { LineRenderer } from './line/renderer.js';
+import { CanvasRenderer } from './canvas/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
 import { ShadeRenderer } from './shade/renderer.js';
 import { LightingRenderer } from './lighting/renderer.js';
@@ -37,6 +38,7 @@ import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.
 // no `?renderer=`) fall back to DomRenderer.
 const RENDERERS = {
     line:     LineRenderer,
+    canvas:   CanvasRenderer,
     flat:     FlatRenderer,
     shade:    ShadeRenderer,
     lighting: LightingRenderer,
