@@ -59,6 +59,42 @@ const WALK_FRAME_MS = 180;    // enemy walk-cycle frame duration
 const DEATH_FRAME_MS = 120;   // enemy death-animation frame duration
 const DOOR_SPEED = 100;       // door travel speed, world units per second
 
+// Sector light specials, keyed by DOOM sector specialType. Each maps to
+// a time-varying multiplier on the sector's base light level. `sync`
+// types share a global phase; the rest get a per-sector random phase so
+// they don't pulse in lockstep. Mirrors the DOM renderer's CSS light
+// animations (sectors.js LIGHT_EFFECT_CLASS).
+const LIGHT_EFFECT = {
+    1:  { type: 'flicker',   sync: false },
+    2:  { type: 'blinkfast', sync: false },
+    3:  { type: 'blink',     sync: false },
+    8:  { type: 'glow',      sync: false },
+    12: { type: 'blinkfast', sync: true },
+    13: { type: 'blink',     sync: true },
+    17: { type: 'fire',      sync: false },
+};
+
+// Small integer hash → [0,1), for the random light flickers.
+function hashRnd(a, b) {
+    let h = (a ^ Math.imul(b, 374761393)) >>> 0;
+    h = Math.imul(h ^ (h >>> 15), 2246822519);
+    h ^= h >>> 13;
+    return (h >>> 0) / 4294967296;
+}
+
+// Light multiplier for a special-light sector at time t (seconds).
+function lightMul(e, t) {
+    const p = t + e.phase;
+    switch (e.type) {
+        case 'glow':      return 0.75 + 0.25 * (0.5 - 0.5 * Math.cos(p * Math.PI)); // ~2s
+        case 'blink':     return (p % 1) < 0.5 ? 1 : 0.5;                            // 1s
+        case 'blinkfast': return (p % 0.5) < 0.25 ? 1 : 0.5;                         // 0.5s
+        case 'flicker':   return hashRnd(e.seed, (t * 10) | 0) < 0.5 ? 1 : 0.5;
+        case 'fire':      return 0.6 + 0.4 * hashRnd(e.seed, (t * 18) | 0);
+        default:          return 1;
+    }
+}
+
 // Per-enemy sprite animation, keyed by DOOM thing type. `spr` is the
 // 4-letter sprite base; `walk`/`attack` frame letters have full
 // 8-rotation art on disk; `death` letters are single-view (rotation 0)
@@ -139,6 +175,10 @@ export class SoftwareRenderer {
         this._ceilOverride = new Map();     // sectorPolygon ref → ceiling height
         this._lastFrameTime = 0;
 
+        // Sector light specials (flicker / blink / glow / fire).
+        this._lightSectors = [];      // [{ sectorIndex, type, phase, seed }]
+        this._sectorLightMul = [];    // sectorIndex → current multiplier (default 1)
+
         this._colAngle = null;    // per-column view-angle offset, rebuilt on resize
     }
 
@@ -173,6 +213,20 @@ export class SoftwareRenderer {
         this.sectorPolygons = data.sectorPolygons || [];
         const sectors = data.sectors || [];
         this._sectorLight = sectors.map(s => s.lightLevel);
+
+        // Sector light specials.
+        this._lightSectors = [];
+        this._sectorLightMul = new Array(sectors.length).fill(1);
+        for (const sp of this.sectorPolygons) {
+            const eff = LIGHT_EFFECT[sp.specialType];
+            if (!eff) continue;
+            this._lightSectors.push({
+                sectorIndex: sp.sectorIndex,
+                type: eff.type,
+                phase: eff.sync ? 0 : Math.random() * 10,
+                seed: (sp.sectorIndex * 2654435761) >>> 0,
+            });
+        }
 
         this.statics = [];
         this.things.clear();
@@ -250,6 +304,8 @@ export class SoftwareRenderer {
         this.doors.clear();
         this._wallBottomOffset.clear();
         this._ceilOverride.clear();
+        this._lightSectors = [];
+        this._sectorLightMul = [];
     }
 
     // ── Dispatch commands (game loop → entity state) ─────────────────────
@@ -407,6 +463,10 @@ export class SoftwareRenderer {
         const dt = this._lastFrameTime ? Math.min(0.1, (now - this._lastFrameTime) / 1000) : 0;
         this._lastFrameTime = now;
         this._updateDoors(dt);
+        const tSec = now / 1000;
+        for (const e of this._lightSectors) {
+            this._sectorLightMul[e.sectorIndex] = lightMul(e, tSec);
+        }
 
         const aspect = W / H;
         const fovScale = Math.tan(FOV / 2);
@@ -548,7 +608,7 @@ export class SoftwareRenderer {
             const yOff = wall.yOffset || 0;
 
             // Fake contrast: E/W walls darker, N/S walls brighter.
-            let baseLight = wall.lightLevel;
+            let baseLight = wall.lightLevel * (this._sectorLightMul[wall.sectorIndex] ?? 1);
             baseLight += Math.abs(dx) > Math.abs(dy) ? -16 : 16;
 
             for (let x = xs; x <= xe; x++) {
@@ -601,17 +661,16 @@ export class SoftwareRenderer {
             const ceilingHeight = this._ceilOverride.get(sector) ?? sector.ceilingHeight;
             if (ceilingHeight <= sector.floorHeight) continue;
 
+            const light = sector.lightLevel * (this._sectorLightMul[sector.sectorIndex] ?? 1);
             const floorTex = getFlatTexture(sector.floorTexture);
             if (floorTex) {
-                this._drawPlane(cam, sector.boundaries, sector.floorHeight,
-                    floorTex, sector.lightLevel);
+                this._drawPlane(cam, sector.boundaries, sector.floorHeight, floorTex, light);
             }
             // Sky ceilings are painted by the backdrop pass, not here.
             if (sector.ceilingTexture === 'F_SKY1') continue;
             const ceilTex = getFlatTexture(sector.ceilingTexture);
             if (ceilTex) {
-                this._drawPlane(cam, sector.boundaries, ceilingHeight,
-                    ceilTex, sector.lightLevel);
+                this._drawPlane(cam, sector.boundaries, ceilingHeight, ceilTex, light);
             }
         }
     }
