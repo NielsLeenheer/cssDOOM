@@ -14,7 +14,7 @@ import './features/freeze.css';
 import './features/isolate.css';
 import './features/path-controls.css';
 import './features/camera.css';
-import './features/sprites.css';
+import './features/spritesheet.css';
 
 // Side effect: wires window.debug + every debug.* command group.
 import './console/console.js';

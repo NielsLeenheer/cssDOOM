@@ -1,5 +1,5 @@
 /* ========================================================================
-   debug.sprites.showSheet — sprite-sheet stepped-animation visualisation.
+   debug.view.spritesheet.show — sprite-sheet stepped-animation visualisation.
 
    A half-transparent clone of a sprite, sized to the WHOLE sheet, laid over the
    original AS A CHILD — so it inherits --w/--h/--frames/--cols/--rows/--heading

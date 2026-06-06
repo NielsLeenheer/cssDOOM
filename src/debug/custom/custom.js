@@ -123,7 +123,7 @@ export function registerCustom(debug) {
         await delay(1000);
 
         /* Show the sprite sheets for all things and enemies */
-        debug.sprites.showSheet() 
+        debug.view.spritesheet.show() 
 
         await debug.player.path.play(four, { 
             trim: true, speed: 0.75, smooth: 7, 
@@ -543,7 +543,7 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        debug.sprites.showSheet()
+        debug.view.spritesheet.show()
 
 
         let fight = debug.player.path.play('fight', { 
@@ -619,7 +619,7 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        debug.sprites.showSheet()
+        debug.view.spritesheet.show()
 
 
         let fight = debug.player.path.play('alt-fight-3', { 
@@ -668,7 +668,7 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        debug.sprites.showSheet()
+        debug.view.spritesheet.show()
 
 
         let fight = debug.player.path.play('alt-fight-3', { 
@@ -708,7 +708,7 @@ export function registerCustom(debug) {
             x: 2172, y: -2388, angle: 293
         });
 
-        debug.sprites.hideSheet()
+        debug.view.spritesheet.hide()
     };    
 
 
@@ -760,7 +760,7 @@ export function registerCustom(debug) {
         debug.layers.enemies.show();
 
         debug.layers.hud.show();
-        debug.sprites.hideSheet()
+        debug.view.spritesheet.hide()
 
         await delay(1000);
 
@@ -787,7 +787,7 @@ export function registerCustom(debug) {
         // debug.layers.enemies.show();
 
         debug.layers.hud.show();
-        debug.sprites.hideSheet()
+        debug.view.spritesheet.hide()
 
         await delay(1000);
 

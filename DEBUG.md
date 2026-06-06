@@ -67,18 +67,18 @@ Each visualisation is a `show`/`hide` pair (like `debug.layers.*`).
 | `grid.show(id?)` · `grid.hide(id?)` | Fade in / out a grid copy of the floor showing its clipped-away space. |
 | `reset()` | Undo explode / billboard / fade / hide / highlight everywhere and drop floor grids. |
 
-## `debug.sprites` — sprite-sheet stepped-animation viz
+## `debug.view.spritesheet` — sprite-sheet stepped-animation viz
 
 Lay a half-transparent clone of the **whole sprite sheet** over a sprite and
 translate it in lockstep with the real stepped animation, so the active cell stays
 pinned over the opaque original while the sheet slides — showing how the walk cycle
 indexes the sheet. The original frame gets an outline.
-([`features/sprites.css`](src/debug/features/sprites.css).)
+([`features/spritesheet.css`](src/debug/features/spritesheet.css).)
 
 | Command | Description |
 | --- | --- |
-| `showSheet(sectorId?)` | Ghost the sheet over every sprite in a sector (or all sprites). |
-| `hideSheet(sectorId?)` | Remove the ghosts. |
+| `show(sectorId?)` | Ghost the sheet over every sprite in a sector (or all sprites). |
+| `hide(sectorId?)` | Remove the ghosts. |
 
 Synced via the Web Animations API and follows state changes (walk → attack → die).
 While active, the ghosted sprite is exempt from culling so it doesn't pop at screen

@@ -14,7 +14,7 @@ import { swapLevel } from '../../game/level.js';
 import * as recorder from '../features/recorder.js';
 import * as pathModule from '../features/path.js';
 import * as cameraModule from '../features/camera.js';
-import * as spritesModule from '../features/sprites.js';
+import { spritesheet } from '../features/spritesheet.js';
 import * as sectorsModule from '../features/sectors.js';
 import * as layersModule from '../features/layers.js';
 import * as flags from '../features/flags.js';
@@ -43,16 +43,6 @@ Object.assign(group('world'), worldCmds);
 //   debug.sectors.explode.show(40)  ·  .highlight.show(40)
 //   debug.sectors.grid.show(40)     ·  .billboard.show(40)
 Object.assign(group('sectors'), sectorsModule);
-
-// ── debug.sprites — sprite-sheet stepped-animation viz (see sprites.css) ────
-// Lay a half-transparent clone of the whole sheet over each sprite and translate
-// it in lockstep with the real stepped animation, so the active cell stays put
-// while the sheet slides — shows how the walk cycle indexes the sheet. Targets
-// the sprites in a sector (id), or every sprite with no id.
-//   debug.sprites.showSheet(29)  ·  debug.sprites.hideSheet(29)
-const sprites = group('sprites');
-sprites.showSheet = spritesModule.showSheet;
-sprites.hideSheet = spritesModule.hideSheet;
 
 // ── debug.layers — per-layer visibility, one object per layer (see
 // features/layers.js + .css). Scene layers cross-fade; hud / chrome hide
@@ -149,6 +139,9 @@ cull.all = flags.cullAll;
 //   record() / save('slot')  — capture the renderer-command envelope stream from
 //     a clean level (record() restarts the current level) and write it to storage;
 //     replay via ?play=slot. Records the RENDERER's commands, not game state.
+//   spritesheet.show(id?) / .hide(id?)  — ghost the sprite sheet over sprites to
+//     show the stepped animation (see features/spritesheet.js). camera.* is the
+//     view-relative orbit, wired above.
 const view = group('view');
 const RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat'];
 view.renderer = (kind) => {
@@ -165,6 +158,7 @@ view.record = async () => {
     await swapLevel(currentMap);
 };
 view.save = (slot) => recorder.save(slot);
+view.spritesheet = spritesheet;
 
 // ── debug.player — the slot-0 player: placement (position.*) + vitals (see
 // features/world.js + loadout.js). Vitals mutate the live player + flag the HUD.
