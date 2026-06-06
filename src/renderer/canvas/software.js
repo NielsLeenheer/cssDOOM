@@ -927,6 +927,10 @@ export class SoftwareRenderer {
 
     _renderWalls(cam) {
         for (const wall of this.walls) {
+            // Lift boundary walls are drawn by _renderLiftWalls at the
+            // animated platform height; skip them here so the static and
+            // moving copies don't z-fight (matches the DOM's buildWalls).
+            if (wall.isLiftWall) continue;
             const tex = getWallTexture(animName(wall.texture, this._animFrame));
             if (!tex) continue;
 
