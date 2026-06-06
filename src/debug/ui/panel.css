@@ -97,23 +97,12 @@
 body:not([data-game-mode="deathmatch"]) #debug-menu .debug-button-dm    { display: none; }
 body:not([data-layout="kiosk"])         #debug-menu .debug-button-kiosk { display: none; }
 
-/* Geometry / entity hide toggles — companions to HIDE_TOGGLES in
-   debug.js. Each `body.hide-…` class drops the corresponding
-   layer so the talk visuals can build up the scene one element
-   type at a time. */
-body.hide-floors   .floor   { display: none; }
-body.hide-ceilings .ceiling { display: none; }
-body.hide-walls    .wall    { display: none; }
-body.hide-things   .pickup,
-body.hide-things   .decoration,
-body.hide-things   .barrel  { display: none; }
-body.hide-enemies  .enemy   { display: none; }
 /* hide-hud reuses the HUD's own off-screen slide (the same animation the
    intermission / spectator states use) — see `body.hide-hud .status` and
    `.weapon` in hud.css. So it animates out rather than snapping. */
-/* Sky is the .viewport background-image; null it out to leave a
-   plain black background where the sky texture would be. */
-body.hide-sky      .viewport { background-image: none; }
 
-/* The animated layer fades (body.fade-*) moved to features/layers.css alongside
-   the debug.layers feature. */
+/* Layer toggles (floors / ceilings / walls / things / enemies / sky / hud /
+   chrome) drive features/layers.js show()/hide() — the same objects the console
+   exposes as debug.layers.* — so the panel and console share one codepath.
+   Scene layers cross-fade (body.fade-*, features/layers.css); hud and chrome
+   hide via body.hide-hud / body.hide-chrome (hud.css / viewport.css). */

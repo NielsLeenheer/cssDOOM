@@ -6,6 +6,10 @@
  *                  invert:true  → checkbox checked means the class is ABSENT
  *                                 (reads as "Floors visible", not "Hide floors").
  *                  grid:true    → laid out in the Renderer two-column grid.
+ *   kind:'layer' → a layer object from features/layers.js (`layer`), with
+ *                  show()/hide()/`shown`. The SAME object the console drives as
+ *                  debug.layers.* — checkbox checked = shown; scene layers fade,
+ *                  hud/chrome hide instantly. Panel + console, one codepath.
  *   kind:'flag'  → a property on a JS object, read ONLY by JS (game / render
  *                  logic). target is the live object; the game loop reads it
  *                  directly without ever touching the DOM.
@@ -23,6 +27,7 @@ import { culling } from '../../renderer/dom/scene/culling.js';
 import { endMatch } from '../../game/match.js';
 import { enterAttract } from '../../game/attract.js';
 import { app } from '../../app.js';
+import { layers } from '../features/layers.js';
 
 export const SETTINGS = [
     // ── Game ── JS flags read by physics / AI each tick ───────────────────
@@ -53,14 +58,17 @@ export const SETTINGS = [
 
     // ── Renderer ── select swaps the SP renderer; grid peels scene layers ──
     { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: ['dom', 'flat', 'shade', 'lighting', 'line', 'cat'] },
-    { section: 'Renderer', kind: 'css', class: 'hide-floors',   label: 'Floors',   invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-ceilings', label: 'Ceilings', invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-walls',    label: 'Walls',    invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-things',   label: 'Things',   invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-enemies',  label: 'Enemies',  invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-hud',      label: 'HUD',      invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-sky',      label: 'Sky',      invert: true, grid: true },
-    { section: 'Renderer', kind: 'css', class: 'hide-chrome',   label: 'Chrome',   invert: true, grid: true },
+    // Layer visibility — the SAME features/layers.js objects the console drives
+    // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
+    // instantly. Checkbox checked = layer shown.
+    { section: 'Renderer', kind: 'layer', layer: layers.floors,   label: 'Floors',   grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.ceilings, label: 'Ceilings', grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.walls,    label: 'Walls',    grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.things,   label: 'Things',   grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.enemies,  label: 'Enemies',  grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.hud,      label: 'HUD',      grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.sky,      label: 'Sky',      grid: true },
+    { section: 'Renderer', kind: 'layer', layer: layers.chrome,   label: 'Chrome',   grid: true },
 
     // ── Debug ── CSS-only development visualisations ──────────────────────
     { section: 'Debug', kind: 'css', class: 'show-sky-walls',  label: 'Show sky walls',  default: false },

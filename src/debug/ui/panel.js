@@ -42,6 +42,12 @@ function buildEntry(s, parent) {
             parent.appendChild(makeRow(cb, s.label));
             break;
         }
+        case 'layer': {
+            // Same features/layers.js object the console drives — checked = shown.
+            const cb = makeCheckbox(s.layer.shown, (checked) => (checked ? s.layer.show() : s.layer.hide()));
+            parent.appendChild(makeRow(cb, s.label));
+            break;
+        }
         case 'flag': {
             const cb = makeCheckbox(!!s.target[s.key], (checked) => { s.target[s.key] = checked; });
             parent.appendChild(makeRow(cb, s.label));
