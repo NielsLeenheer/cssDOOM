@@ -120,6 +120,7 @@ export class GLEngine {
     setMap(data) {
         this.scene.setMap(data);
         this._buildFlatGeometry();
+        this._buildWallPegging();
     }
 
     clear() {

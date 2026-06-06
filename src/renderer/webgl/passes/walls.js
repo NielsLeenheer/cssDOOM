@@ -19,8 +19,29 @@ import { DynamicBuffer } from '../glutil.js';
 import { animName } from '../../canvas/tables.js';
 
 export const wallPassMethods = {
+    /**
+     * Precompute which walls are lower-unpegged (texture pinned to the
+     * wall bottom rather than the top), mirroring the DomRenderer:
+     *
+     *   - a regular wall with the ML_DONTPEGBOTTOM flag (`wall.isUnpegged`);
+     *   - every door face wall (doors.js force-adds `unpegged`);
+     *   - every door track jamb (createWallElement force-adds `unpegged`).
+     *
+     * Lift shaft walls are also always unpegged, but they're emitted from
+     * their own loop so they pass the flag directly. Called from the
+     * engine's setMap after the scene has ingested the map.
+     */
+    _buildWallPegging() {
+        const scene = this.scene;
+        const set = this._unpegged = new Set();
+        for (const w of scene.walls) if (w.isUnpegged) set.add(w);
+        for (const door of scene.doors.values()) for (const w of door.faceWalls) set.add(w);
+        for (const w of scene._wallTopOverride.keys()) set.add(w); // door tracks
+    },
+
     _renderWalls(cam) {
         const scene = this.scene;
+        if (!this._unpegged) this._buildWallPegging();
         // name → flat vertex array (x,y,z,u,v,light per vertex).
         const groups = this._wallGroups || (this._wallGroups = new Map());
         for (const arr of groups.values()) arr.length = 0;
@@ -34,19 +55,26 @@ export const wallPassMethods = {
             const tex = this._getWall(name);
             if (!tex) continue;
 
+            // Door panels raise their visible bottom edge as the door
+            // opens (bottomOffset). The texture offset stays the wall's
+            // own yOffset: door panels are unpegged, so pinning the
+            // texture to the (rising) bottom makes it slide up with the
+            // panel on its own — no need to fold bottomOffset into yOff.
             const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
             const wallBottom = wall.bottomHeight + bottomOffset;
             const wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
-            const yOff = (wall.yOffset || 0) + bottomOffset;
+            const yOff = wall.yOffset || 0;
             const light = wall.lightLevel * (scene._sectorLightMul[wall.sectorIndex] ?? 1);
             const u1 = (wall.xOffset || 0) + (wall.isScrolling ? scene._scrollOffset : 0);
-            this._emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, light, u1, false);
+            this._emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, light, u1,
+                false, this._unpegged.has(wall));
         }
 
         // Lift shaft walls — drawn at the live platform height. The
         // platform-face walls span platform↔facing floor (growing as the
         // lift drops); the static shaft sides span the full travel so the
-        // shaft isn't see-through once the platform moves away.
+        // shaft isn't see-through once the platform moves away. Lift walls
+        // are always unpegged (the DOM mechanic builds them that way).
         for (const lift of scene.lifts.values()) {
             for (const wall of lift.shaftWalls) {
                 const tex = this._getWall(wall.texture);
@@ -64,7 +92,7 @@ export const wallPassMethods = {
                 if (top - bottom < 0.5) continue;
                 const light = wall.lightLevel ?? lift.light;
                 this._emitWall(groups, wall.texture, cam, wall, bottom, top,
-                    wall.yOffset || 0, light, wall.xOffset || 0, true);
+                    wall.yOffset || 0, light, wall.xOffset || 0, true, true);
             }
         }
 
@@ -96,9 +124,18 @@ export const wallPassMethods = {
         }
     },
 
-    /** Append one wall quad's six vertices to its texture group, after the
-     *  geometric back-face cull (lift walls opt out via `noCull`). */
-    _emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, baseLight, u1, noCull) {
+    /**
+     * Append one wall quad's six vertices to its texture group, after the
+     * geometric back-face cull (lift walls opt out via `noCull`).
+     *
+     * Vertical texture coordinate (world texel units, the FS REPEAT-wraps
+     * by the texture height): top-pegged walls run yOff at the top to
+     * yOff+wallH at the bottom; lower-unpegged walls pin the texture's
+     * bottom to the wall's bottom instead — yOff at the bottom, yOff−wallH
+     * at the top (mod the texture height, which the REPEAT wrap handles).
+     * This matches the DomRenderer's `background-position-y: 100%` rule.
+     */
+    _emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, baseLight, u1, noCull, unpegged) {
         const wallH = wallTop - wallBottom;
         if (wallH <= 0) return;
 
@@ -114,7 +151,8 @@ export const wallPassMethods = {
         // Fake contrast: E/W walls darker, N/S walls brighter.
         const light = baseLight + (Math.abs(dx) > Math.abs(dy) ? -16 : 16);
         const u2 = u1 + Math.hypot(dx, dy);
-        const vTop = yOff, vBot = wallH + yOff;
+        const vTop = unpegged ? yOff - wallH : yOff;
+        const vBot = unpegged ? yOff : yOff + wallH;
 
         let arr = groups.get(name);
         if (!arr) groups.set(name, arr = []);
