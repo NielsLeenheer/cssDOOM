@@ -25,6 +25,7 @@
 import { DomRenderer } from './dom/renderer.js';
 import { LineRenderer } from './line/renderer.js';
 import { CanvasRenderer } from './canvas/renderer.js';
+import { WebGLRenderer } from './webgl/renderer.js';
 import { FlatRenderer } from './flat/renderer.js';
 import { ShadeRenderer } from './shade/renderer.js';
 import { LightingRenderer } from './lighting/renderer.js';
@@ -39,6 +40,7 @@ import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.
 const RENDERERS = {
     line:     LineRenderer,
     canvas:   CanvasRenderer,
+    webgl:    WebGLRenderer,
     flat:     FlatRenderer,
     shade:    ShadeRenderer,
     lighting: LightingRenderer,
@@ -133,6 +135,16 @@ const LAYOUT_SPECS = {
         slots: [
             { kind: 'dom' },
             { kind: 'canvas' },
+        ],
+        players: { singleplayer: { standalone: [0, 0] } },
+    },
+    // ?layout=compare-gl SP: DomRenderer (left) beside WebGLRenderer
+    // (right), both mirroring player 0, for side-by-side comparison of
+    // the CSS renderer against the WebGL one. Flex 50/50, full height.
+    'compare-gl': {
+        slots: [
+            { kind: 'dom' },
+            { kind: 'webgl' },
         ],
         players: { singleplayer: { standalone: [0, 0] } },
     },
