@@ -40,11 +40,15 @@ export const SETTINGS = [
     { section: 'Culling', kind: 'css', class: 'css-frustum-culling',  label: 'CSS frustum culling',  default: false },
 
     // ── Effects ── CSS-only render toggles ────────────────────────────────
-    { section: 'Effects', kind: 'css', class: 'sector-lights',   label: 'Sector light effects', default: true },
-    { section: 'Effects', kind: 'css', class: 'light-falloff',   label: 'Light falloff',        default: false },
-    { section: 'Effects', kind: 'css', class: 'scroll-textures', label: 'Scrolling textures',   default: true },
-    { section: 'Effects', kind: 'css', class: 'animated-flats',  label: 'Animated flats',       default: true },
-    { section: 'Effects', kind: 'css', class: 'head-bob',        label: 'Head bob',             default: true },
+    // These four effects are ON by default in the renderer CSS; the menu
+    // disables each via a `no-*` body class (invert: checked = class absent =
+    // effect on). The render default lives in CSS, not here — see
+    // lighting/walls/floors/camera.css.
+    { section: 'Effects', kind: 'css', class: 'no-sector-lights',   label: 'Sector light effects', invert: true },
+    { section: 'Effects', kind: 'css', class: 'light-falloff',      label: 'Light falloff',        default: false },
+    { section: 'Effects', kind: 'css', class: 'no-scroll-textures', label: 'Scrolling textures',   invert: true },
+    { section: 'Effects', kind: 'css', class: 'no-animated-flats',  label: 'Animated flats',       invert: true },
+    { section: 'Effects', kind: 'css', class: 'no-head-bob',        label: 'Head bob',             invert: true },
     { section: 'Effects', kind: 'css', class: 'all-enemies-shadow', label: 'All enemies shadow', default: false },
 
     // ── Renderer ── select swaps the SP renderer; grid peels scene layers ──

@@ -60,9 +60,17 @@ button.wall {
     to   { --scroll-offset: -128px; }
 }
 
-body.scroll-textures .wall.scroll-texture {
+/* Scrolling textures are on by default; the debug menu disables them by adding
+   body.no-scroll-textures (see debug/ui/registry.js). With the animation off,
+   --scroll-offset stays at its @property initial 0px, so background-position-x
+   falls back to the static texture offset on its own. */
+.wall.scroll-texture {
     animation: scroll-texture 3.66s linear infinite;
     background-position-x: calc(var(--texture-offset-x, 0) * -1px + var(--scroll-offset));
+}
+
+body.no-scroll-textures .wall.scroll-texture {
+    animation: none;
 }
 
 /* Lower-unpegged walls: texture pinned to bottom (doors, lifts) */

@@ -46,8 +46,13 @@ body.show-sector-ids .floor::after {
     66%, 100%{ background-image: url('/assets/flats/NUKAGE3.png'); }
 }
 
-body.animated-flats {
-    .floor[data-texture^="NUKAGE"] {
-        animation: nukage 1s steps(1) infinite;
-    }
+/* Animated flats are on by default; the debug menu disables them by adding
+   body.no-animated-flats (see debug/ui/registry.js). With the animation off the
+   floor shows its static base texture. */
+.floor[data-texture^="NUKAGE"] {
+    animation: nukage 1s steps(1) infinite;
+}
+
+body.no-animated-flats .floor[data-texture^="NUKAGE"] {
+    animation: none;
 }

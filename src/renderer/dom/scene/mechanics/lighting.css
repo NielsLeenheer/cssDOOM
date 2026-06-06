@@ -39,12 +39,20 @@
     74%, 100%{ --light: 1; }
 }
 
-body.sector-lights {
-    .light-glow { animation: light-glow 1s ease-in-out infinite; }
-    .light-blink { animation: light-blink 1s steps(1) infinite; }
-    .light-blink-fast { animation: light-blink-fast 0.5s steps(1) infinite; }
-    .light-flicker { animation: light-flicker 2s steps(1) infinite; }
-    .light-fire-flicker { animation: light-fire-flicker 1.5s steps(1) infinite; }
+/* Sector light effects are on by default; the debug menu disables them by
+   adding body.no-sector-lights (see debug/ui/registry.js). */
+.light-glow { animation: light-glow 1s ease-in-out infinite; }
+.light-blink { animation: light-blink 1s steps(1) infinite; }
+.light-blink-fast { animation: light-blink-fast 0.5s steps(1) infinite; }
+.light-flicker { animation: light-flicker 2s steps(1) infinite; }
+.light-fire-flicker { animation: light-fire-flicker 1.5s steps(1) infinite; }
+
+body.no-sector-lights {
+    .light-glow,
+    .light-blink,
+    .light-blink-fast,
+    .light-flicker,
+    .light-fire-flicker { animation: none; }
 }
 
 

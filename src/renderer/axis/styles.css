@@ -51,12 +51,11 @@
         display: none;
     }
 
-    /* The body.head-bob rule in camera.css runs the head-bob animation
-       on every .scene. The axis-x/y panes still pick up `--bob` in the
-       inherited scene transform, and even the axis-z pane (which
-       overrides the transform) keeps a useless animation ticking. Off-
-       axis views aren't through the player's eyes, so the bob has no
-       business showing up here at all. */
+    /* camera.css arms the head-bob animation on every .scene by default.
+       The axis-x/y panes still pick up `--bob` in the inherited scene
+       transform, and even the axis-z pane (which overrides the transform)
+       keeps a useless animation ticking. Off-axis views aren't through the
+       player's eyes, so the bob has no business showing up here at all. */
     .scene {
         animation: none;
     }

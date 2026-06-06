@@ -7,12 +7,26 @@
         rotateY(calc(var(--player-angle) * -1rad))
         translate3d(
             calc(var(--player-x) * -1px),
-            calc(var(--player-z) * 1px),
+            calc(var(--player-z) * 1px + var(--bob, 0) * 1px),
             calc(var(--player-y) * 1px)
         );
 
     /* Transition player Z for falling effect */
     transition: --player-z 0.25s ease-out;
+
+    /* Head bob is on by default. The animation is always armed but paused,
+       running only while moving (see .moving .scene below) — pausing freezes
+       at the current frame instead of snapping back to base, so stopping
+       mid-stride doesn't feel jarring (same pattern as the player billboard
+       walk cycle in enemies.css). With --bob at its @property initial 0, the
+       paused state is identical to a bob-free transform. The debug menu
+       disables it via body.no-head-bob (see debug/ui/registry.js). */
+    animation: head-bob 400ms ease-in-out infinite;
+    animation-play-state: paused;
+}
+
+.moving .scene {
+    animation-play-state: running;
 }
 
 
@@ -29,24 +43,6 @@
     50%      { --bob: 6; }
 }
 
-body.head-bob {
-    .scene {
-        transform:
-            rotateY(calc(var(--player-angle) * -1rad))
-            translate3d(
-                calc(var(--player-x) * -1px),
-                calc(var(--player-z) * 1px + var(--bob, 0) * 1px),
-                calc(var(--player-y) * 1px)
-            );
-        /* Animation is always on — paused by default, runs only while
-           moving. Pausing freezes at the current frame instead of
-           snapping back to base position, so stopping mid-stride no
-           longer feels jarring. Same pattern as the player billboard
-           sprite walk cycle in enemies.css. */
-        animation: head-bob 400ms ease-in-out infinite;
-        animation-play-state: paused;
-    }
-    .moving .scene {
-        animation-play-state: running;
-    }
+body.no-head-bob .scene {
+    animation: none;
 }
