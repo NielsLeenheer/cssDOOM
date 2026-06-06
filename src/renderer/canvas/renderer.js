@@ -34,9 +34,9 @@ import * as maps from '../../shared/maps/index.js';
 const RENDER_HEIGHT_BASE = 200;
 const MIN_WIDTH_BASE = 200;
 const MAX_WIDTH_BASE = 640;
-const MAX_RESOLUTION = 3;
+const MAX_RESOLUTION = 4;
 
-// `?resolution=1x|2x|3x` → 1..3 integer factor, defaulting to 1. Any
+// `?resolution=1x..4x` → 1..4 integer factor, defaulting to 1. Any
 // garbage value falls back to 1 silently rather than producing a giant
 // framebuffer no machine could keep at 60 fps.
 function parseResolution() {
@@ -78,14 +78,16 @@ export class CanvasRenderer extends RendererBase {
         this.internalCanvas = document.createElement('canvas');
         this.internalCtx = this.internalCanvas.getContext('2d');
 
-        // Framebuffer-resolution multiplier (1x/2x/3x). The world is
-        // sampled at `factor`× the density; screen-space UI (HUD, weapon)
-        // scales by the same factor so its relative size on screen is
-        // unchanged.
+        // Framebuffer-resolution multiplier (1x..4x). The world is sampled
+        // at `factor`× the density. The screen-space UI (HUD, weapon)
+        // deliberately scales *less* than the world — `max(1, factor-1)`
+        // — so at higher resolutions the bar/weapon take up relatively
+        // less of the screen (a big chunky status bar reads as oversized
+        // once the world is crisp). So: 1x→1, 2x→1, 3x→2, 4x→3.
         this.resolution = parseResolution();
 
         this.software = new SoftwareRenderer();
-        this.software.uiScale = this.resolution;
+        this.software.uiScale = Math.max(1, this.resolution - 1);
         this._camera = null;
         this._hasScene = false;
 

@@ -270,11 +270,10 @@ export class SoftwareRenderer {
         this.weapon = null;           // { name, info, firing, fireStart, fireRate, bob }
         this.flash = null;            // { r, g, b, start }
         this.hud = null;              // { health, armor, ammo, maxAmmo, currentWeapon, ownedWeapons }
-        // Pixel scale for screen-space UI (HUD + weapon). Set by the
-        // CanvasRenderer from `?resolution=Nx`. At 1x the HUD and weapon
-        // are at their DOOM-native size in the framebuffer; at 2x/3x they
-        // grow to match the framebuffer's higher pixel density so their
-        // relative on-screen size stays the same.
+        // Pixel scale for screen-space UI (HUD + weapon), in framebuffer
+        // pixels per source pixel. Set by the CanvasRenderer; it scales
+        // below the render factor so the bar/weapon get relatively smaller
+        // as the world resolution rises (1x→1, 2x→1, 3x→2, 4x→3).
         this.uiScale = 1;
         this._animFrame = 0;          // current animated-texture frame
         this._scrollOffset = 0;       // current scrolling-wall texture offset
