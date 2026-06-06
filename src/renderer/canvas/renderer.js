@@ -27,14 +27,25 @@ import { SoftwareRenderer } from './software.js';
 import { clearTextureCache } from './textures.js';
 import * as maps from '../../shared/maps/index.js';
 
-// Internal framebuffer height. The width is derived from the pane's
-// aspect ratio on resize. 200 rows matches the original game's vertical
-// resolution and gives the recognisable chunky upscaled look; the world
-// geometry still frames identically to the other panes because the
-// projection uses the pane aspect.
-const RENDER_HEIGHT = 200;
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 640;
+// Internal framebuffer base dimensions. Height matches the original
+// game's vertical resolution; width is derived from the pane aspect on
+// resize and clamped so degenerate aspects don't produce wild buffer
+// sizes. A `?resolution=Nx` URL param multiplies all three at boot.
+const RENDER_HEIGHT_BASE = 200;
+const MIN_WIDTH_BASE = 200;
+const MAX_WIDTH_BASE = 640;
+const MAX_RESOLUTION = 3;
+
+// `?resolution=1x|2x|3x` → 1..3 integer factor, defaulting to 1. Any
+// garbage value falls back to 1 silently rather than producing a giant
+// framebuffer no machine could keep at 60 fps.
+function parseResolution() {
+    const v = document.body.dataset.resolution;
+    if (!v) return 1;
+    const m = /^(\d+)x?$/i.exec(v);
+    if (!m) return 1;
+    return Math.max(1, Math.min(MAX_RESOLUTION, parseInt(m[1], 10)));
+}
 
 export class CanvasRenderer extends RendererBase {
     /**
@@ -67,9 +78,23 @@ export class CanvasRenderer extends RendererBase {
         this.internalCanvas = document.createElement('canvas');
         this.internalCtx = this.internalCanvas.getContext('2d');
 
+        // Framebuffer-resolution multiplier (1x/2x/3x). The world is
+        // sampled at `factor`× the density; screen-space UI (HUD, weapon)
+        // scales by the same factor so its relative size on screen is
+        // unchanged.
+        this.resolution = parseResolution();
+
         this.software = new SoftwareRenderer();
+        this.software.uiScale = this.resolution;
         this._camera = null;
         this._hasScene = false;
+
+        // Rolling frame-time stats. Shown as a small overlay on the
+        // display canvas whenever `?resolution=` is explicit, so the
+        // perf cost of higher resolutions is visible.
+        this._frameTimes = new Float32Array(60);
+        this._frameTimeIdx = 0;
+        this._showStats = document.body.dataset.resolution != null;
 
         this._resizeObserver = new ResizeObserver(() => this._resize());
         this._resizeObserver.observe(this.paneEl);
@@ -139,12 +164,16 @@ export class CanvasRenderer extends RendererBase {
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
 
-        // Internal framebuffer: fixed height, width from pane aspect.
-        const iw = Math.max(MIN_WIDTH,
-            Math.min(MAX_WIDTH, Math.round(RENDER_HEIGHT * w / h)));
+        // Internal framebuffer: base dimensions multiplied by the
+        // resolution factor, so the world is sampled at `factor`× the
+        // density while keeping the same aspect.
+        const f = this.resolution;
+        const ih = RENDER_HEIGHT_BASE * f;
+        const iw = Math.max(MIN_WIDTH_BASE * f,
+            Math.min(MAX_WIDTH_BASE * f, Math.round(ih * w / h)));
         this.internalCanvas.width = iw;
-        this.internalCanvas.height = RENDER_HEIGHT;
-        this.software.resize(iw, RENDER_HEIGHT, this.internalCtx);
+        this.internalCanvas.height = ih;
+        this.software.resize(iw, ih, this.internalCtx);
 
         // Repaint at the new size right away. Setting canvas.width above
         // clears the display, and browsers commonly pause requestAnimation-
@@ -161,6 +190,7 @@ export class CanvasRenderer extends RendererBase {
         // Keep the software renderer's notion of "which player is this
         // pane" current so it hides this viewer's own billboard.
         this.software.viewerPlayerIndex = this.playerIndex;
+        const t0 = performance.now();
         this.software.render(this._camera);
         this.internalCtx.putImageData(this.software.imageData, 0, 0);
 
@@ -168,6 +198,37 @@ export class CanvasRenderer extends RendererBase {
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.drawImage(this.internalCanvas, 0, 0, this.canvas.width, this.canvas.height);
+        const t1 = performance.now();
+
+        // Roll the elapsed ms into a 60-frame window for the readout.
+        this._frameTimes[this._frameTimeIdx] = t1 - t0;
+        this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
+        if (this._showStats) this._drawStats();
+    }
+
+    /** Top-left frame-time overlay. Drawn on the display canvas (not the
+     *  framebuffer) so the text stays crisp instead of getting upscaled
+     *  with the world. */
+    _drawStats() {
+        let sum = 0, n = 0;
+        for (let i = 0; i < this._frameTimes.length; i++) {
+            const v = this._frameTimes[i];
+            if (v > 0) { sum += v; n++; }
+        }
+        const avg = n ? sum / n : 0;
+        const fps = avg > 0 ? Math.min(999, 1000 / avg) : 0;
+        const dpr = window.devicePixelRatio || 1;
+        const ctx = this.ctx;
+        ctx.save();
+        ctx.font = `${12 * dpr}px monospace`;
+        ctx.textBaseline = 'top';
+        const text = `${this.resolution}x  ${this.internalCanvas.width}×${this.internalCanvas.height}  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
+        const m = ctx.measureText(text);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillRect(0, 0, m.width + 12 * dpr, 18 * dpr);
+        ctx.fillStyle = '#ffdd55';
+        ctx.fillText(text, 6 * dpr, 3 * dpr);
+        ctx.restore();
     }
 
     _tick = () => {

@@ -270,6 +270,12 @@ export class SoftwareRenderer {
         this.weapon = null;           // { name, info, firing, fireStart, fireRate, bob }
         this.flash = null;            // { r, g, b, start }
         this.hud = null;              // { health, armor, ammo, maxAmmo, currentWeapon, ownedWeapons }
+        // Pixel scale for screen-space UI (HUD + weapon). Set by the
+        // CanvasRenderer from `?resolution=Nx`. At 1x the HUD and weapon
+        // are at their DOOM-native size in the framebuffer; at 2x/3x they
+        // grow to match the framebuffer's higher pixel density so their
+        // relative on-screen size stays the same.
+        this.uiScale = 1;
         this._animFrame = 0;          // current animated-texture frame
         this._scrollOffset = 0;       // current scrolling-wall texture offset
         this._bobX = 0;
@@ -767,18 +773,21 @@ export class SoftwareRenderer {
         if (!stbar || stbar.width <= 1) return;
 
         const { W, H } = this;
-        // Draw the bar at its native 320×32 resolution, bottom-centred.
-        // Narrower framebuffers clip the sides rather than downscaling the
-        // bar (which softened the digits/face on non-widescreen panes).
-        const scale = 1;
-        const barH = 32;
+        // Draw the bar at its native 320×32 resolution times uiScale,
+        // bottom-centred. Narrower framebuffers clip the sides rather
+        // than downscaling the bar; at higher resolutions the bar grows
+        // with the framebuffer so its relative on-screen size is the
+        // same as at 1x.
+        const scale = this.uiScale;
+        const barW = 320 * scale;
+        const barH = 32 * scale;
         const barY = H - barH;
-        const barX = Math.round((W - 320) / 2);   // negative → sides clip
+        const barX = Math.round((W - barW) / 2);   // negative → sides clip
         const dx = nx => barX + nx * scale;
         const dy = ny => barY + ny * scale;
 
         // Bar background.
-        this._blit(stbar, 0, 0, 320, 32, barX, barY, 320, 32);
+        this._blit(stbar, 0, 0, 320, 32, barX, barY, barW, barH);
 
         const digits = getHudTexture('DIGITS_SHEET');
 
@@ -889,25 +898,12 @@ export class SoftwareRenderer {
         this._bobX += ((Math.cos(phase) * 5 * targetMag) - this._bobX) * Math.min(1, ease);
         this._bobY += ((Math.abs(Math.sin(phase)) * 4 * targetMag) - this._bobY) * Math.min(1, ease);
 
-        const { W, H, fb } = this;
-        const destX = Math.round((W - fw) / 2 + this._bobX);
-        const destY = Math.round(H - fh + this._bobY);
-        const sheetW = tex.width, sdata = tex.data;
-        const sxBase = frame * fw;
-
-        for (let sy = 0; sy < fh; sy++) {
-            const dy = destY + sy;
-            if (dy < 0 || dy >= H) continue;
-            const srcRow = sy * sheetW + sxBase;
-            const dstRow = dy * W;
-            for (let sx = 0; sx < fw; sx++) {
-                const dx = destX + sx;
-                if (dx < 0 || dx >= W) continue;
-                const texel = sdata[srcRow + sx];
-                if ((texel >>> 24) < 128) continue;
-                fb[dstRow + dx] = texel;
-            }
-        }
+        const { W, H } = this;
+        const ui = this.uiScale;
+        const destW = fw * ui, destH = fh * ui;
+        const destX = Math.round((W - destW) / 2 + this._bobX * ui);
+        const destY = Math.round(H - destH + this._bobY * ui);
+        this._blit(tex, frame * fw, 0, fw, fh, destX, destY, destW, destH);
     }
 
     _renderFlash(now) {

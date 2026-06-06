@@ -29,6 +29,12 @@ const layout = params.get('layout') ?? (params.has('kiosk') ? 'kiosk' : null);
 // still receive the same world / per-player envelopes, just paint
 // them differently.
 const rendererKind = params.get('renderer');
+// `?resolution=1x | 2x | 3x` lets the CanvasRenderer multiply its
+// framebuffer base resolution (200 rows × paneAspect). Higher values
+// give a sharper, less chunky image at the cost of ~factor² more
+// per-frame CPU. Stashed on body.dataset.resolution so the renderer
+// can read it without re-parsing the URL; ignored by other renderers.
+const resolution = params.get('resolution');
 // `?play=slot` replays a recorded envelope stream from IndexedDB.
 // Bypasses both client and server boot paths — initMaster runs a
 // stripped sequence (renderers + culling only) and hands off to the
@@ -42,6 +48,7 @@ const exportFormat = params.get('export');
 
 if (layout) document.body.dataset.layout = layout;
 if (rendererKind) document.body.dataset.renderer = rendererKind;
+if (resolution) document.body.dataset.resolution = resolution;
 // `body.recording` is added later (in the player, after the
 // click-to-start overlay is dismissed) so the debug menu stays
 // reachable while the user configures the recording.
