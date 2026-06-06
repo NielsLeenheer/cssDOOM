@@ -272,6 +272,10 @@ const ENTITY_COMMANDS = [
     'updateHud',
     'showIntermission',
     'hideIntermission',
+    'showResults',
+    'hideResults',
+    'showLobby',
+    'hideLobby',
 ];
 
 for (const cmd of ENTITY_COMMANDS) {

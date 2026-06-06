@@ -42,6 +42,7 @@ import {
     getWeaponTexture,
     getHudTexture,
     getIntermissionTexture,
+    getFontTexture,
 } from './textures.js';
 import { THING_SPRITES } from '../dom/scene/constants.js';
 
@@ -151,6 +152,8 @@ const INTER_ROW_Y = [50, 68, 86, 110];   // KILLS, ITEMS, SECRET, TIME
 const INTER_LABEL_X = 50;                // label left edge
 const INTER_VALUE_R = 270;               // value right edge
 const INTER_LABELS = ['WIOSTK', 'WIOSTI', 'WIOSTS', 'WITIME'];
+// Player slot → colour name for the DM results winner banner.
+const RESULT_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 
 // Small integer hash → [0,1), for the random light flickers.
 function hashRnd(a, b) {
@@ -287,6 +290,8 @@ export class SoftwareRenderer {
         this.flash = null;            // { r, g, b, start }
         this.hud = null;              // { health, armor, ammo, maxAmmo, currentWeapon, ownedWeapons }
         this.intermission = null;     // null | { mapName, stats, startTime }
+        this.results = null;          // null | { scores, kills, winnerIndex, mapName }
+        this.lobby = null;            // null | lobby payload
         // Pixel scale for screen-space UI (HUD + weapon), in framebuffer
         // pixels per source pixel. Set by the CanvasRenderer; it scales
         // below the render factor so the bar/weapon get relatively smaller
@@ -631,6 +636,12 @@ export class SoftwareRenderer {
         this.intermission = null;
     }
 
+    showResults(payload) { this.results = payload || null; }
+    hideResults() { this.results = null; }
+
+    showLobby(payload) { this.lobby = payload || null; }
+    hideLobby() { this.lobby = null; }
+
     setDoorState(sectorIndex, doorState) {
         const door = this.doors.get(sectorIndex);
         if (door) door.target = doorState === 'open' ? door.open : door.closed;
@@ -733,13 +744,13 @@ export class SoftwareRenderer {
 
         const now = performance.now();
 
-        // When the SP intermission is up the game freezes the player and
-        // the screen owns the full pane — skip every world / HUD / weapon
-        // pass and let _renderIntermission paint the whole framebuffer.
-        if (this.intermission) {
-            this._renderIntermission(now);
-            return;
-        }
+        // Full-screen overlays (lobby before a match, intermission /
+        // results between or after) freeze the world and own the whole
+        // pane — paint the screen and skip every world / HUD / weapon
+        // pass. At most one is ever set; check in display priority.
+        if (this.results) { this._renderResults(now); return; }
+        if (this.intermission) { this._renderIntermission(now); return; }
+        if (this.lobby) { this._renderLobby(now); return; }
 
         const dt = this._lastFrameTime ? Math.min(0.1, (now - this._lastFrameTime) / 1000) : 0;
         this._lastFrameTime = now;
@@ -1031,6 +1042,134 @@ export class SoftwareRenderer {
                 WINUM_W * scale, WINUM_H * scale);
         }
         return x;
+    }
+
+    // ── Text (DOOM small font) ───────────────────────────────────────────
+
+    /** Total width of `str` in framebuffer px at the given scale. */
+    _measureText(str, scale) {
+        const s = str.toUpperCase();
+        let w = 0;
+        for (let i = 0; i < s.length; i++) {
+            const c = s.charCodeAt(i);
+            if (c === 32) { w += 4 * scale; continue; }
+            const g = getFontTexture(c);
+            w += ((g && g.width > 1 ? g.width : 4) + 1) * scale;
+        }
+        return w;
+    }
+
+    /**
+     * Draw `str` with the DOOM small font (red, uppercase). `align` is
+     * 'left' (x is the left edge) or 'center' (x is the centre). Returns
+     * the right edge. Unknown glyphs advance as a space.
+     */
+    _text(str, x, y, scale, align = 'left') {
+        const s = str.toUpperCase();
+        let cx = align === 'center' ? Math.round(x - this._measureText(s, scale) / 2) : x;
+        for (let i = 0; i < s.length; i++) {
+            const c = s.charCodeAt(i);
+            if (c === 32) { cx += 4 * scale; continue; }
+            const g = getFontTexture(c);
+            if (!g || g.width <= 1) { cx += 5 * scale; continue; }
+            this._blit(g, 0, 0, g.width, g.height, cx, y, g.width * scale, g.height * scale);
+            cx += (g.width + 1) * scale;
+        }
+        return cx;
+    }
+
+    // ── Deathmatch results (frag matrix) ─────────────────────────────────
+    //
+    // DOOM's net-game summary: a "FINISHED" header, a winner banner, then
+    // a killers×victims frag grid with a TOTAL column. Drawn in native
+    // 320×200 coords scaled by screenScale, like the intermission.
+    _renderResults(now) {
+        const res = this.results;
+        const { W, H } = this;
+        const scale = this.screenScale;
+        const bgW = INTERMISSION_W * scale, bgH = INTERMISSION_H * scale;
+        const bgX = Math.round((W - bgW) / 2), bgY = Math.round((H - bgH) / 2);
+        const dx = nx => bgX + nx * scale;
+        const dy = ny => bgY + ny * scale;
+
+        const wimap = getIntermissionTexture('WIMAP0');
+        if (wimap && wimap.width > 1) this._blit(wimap, 0, 0, INTERMISSION_W, INTERMISSION_H, bgX, bgY, bgW, bgH);
+
+        const wif = getIntermissionTexture('WIF');
+        if (wif && wif.width > 1) {
+            this._blit(wif, 0, 0, wif.width, wif.height,
+                dx(160 - wif.width / 2), dy(4), wif.width * scale, wif.height * scale);
+        }
+
+        // Winner banner.
+        const banner = res.winnerIndex >= 0
+            ? `${RESULT_COLOR_NAME[res.winnerIndex] ?? `PLAYER ${res.winnerIndex + 1}`} WINS`
+            : 'TIE';
+        this._text(banner, dx(160), dy(24), 2 * scale, 'center');
+
+        // Frag grid: a column per victim + a TOTAL column, a row per
+        // killer. Cells are killer→victim frag counts; the right column
+        // is each killer's score.
+        const kills = res.kills || [];
+        const scores = res.scores || [];
+        const n = scores.length;
+        if (!n) return;
+        const gridTop = 64, rowH = 16, col0 = 90, colW = 30;
+        // Header: victim labels P1..Pn, then TOTAL.
+        for (let v = 0; v < n; v++) {
+            this._text(`P${v + 1}`, dx(col0 + v * colW), dy(gridTop - 14), scale, 'center');
+        }
+        this._text('TOT', dx(col0 + n * colW), dy(gridTop - 14), scale, 'center');
+        for (let k = 0; k < n; k++) {
+            const y = gridTop + k * rowH;
+            this._text(`P${k + 1}`, dx(col0 - 30), dy(y), scale, 'left');
+            for (let v = 0; v < n; v++) {
+                const val = (kills[k] && kills[k][v]) || 0;
+                this._text(String(val), dx(col0 + v * colW), dy(y), scale, 'center');
+            }
+            this._text(String(scores[k] ?? 0), dx(col0 + n * colW), dy(y), scale, 'center');
+        }
+    }
+
+    // ── Match lobby ──────────────────────────────────────────────────────
+    //
+    // Simplified vs the DOM lobby (no QR code): title, room code for
+    // network games, a per-slot occupancy list, and a status prompt.
+    _renderLobby(now) {
+        const lob = this.lobby;
+        const { W, H } = this;
+        const scale = this.screenScale;
+        const cx = W / 2;
+
+        // Plain dark backdrop (no WIMAP0 — the lobby precedes any level).
+        this.fb.fill(0xFF101010);
+
+        let y = Math.round(H * 0.18);
+        const line = (text, sc, align = 'center', x = cx) => {
+            this._text(text, x, y, sc * scale, align);
+            y += Math.round((10 * sc + 4) * scale);
+        };
+
+        line('DEATHMATCH', 2);
+        y += Math.round(8 * scale);
+        if (lob.variant === 'network' && lob.roomCode) line(`ROOM ${lob.roomCode}`, 1.5);
+        y += Math.round(6 * scale);
+
+        const occ = lob.slotOccupants || lob.slotsClaimed || [];
+        for (let i = 0; i < occ.length; i++) {
+            let status;
+            if (lob.variant === 'network') {
+                status = occ[i] === 'empty' || occ[i] === false ? '----'
+                       : i === this.viewerPlayerIndex ? 'YOU' : 'READY';
+            } else {
+                status = occ[i] ? (i === this.viewerPlayerIndex ? 'YOU' : 'JOINED') : '----';
+            }
+            line(`PLAYER ${i + 1}   ${status}`, 1);
+        }
+
+        y += Math.round(10 * scale);
+        const prompt = lob.canStart ? 'PRESS FIRE TO START' : 'WAITING FOR PLAYERS';
+        line(prompt, 1);
     }
 
     // ── HUD overlay: weapon sprite + screen flash ────────────────────────

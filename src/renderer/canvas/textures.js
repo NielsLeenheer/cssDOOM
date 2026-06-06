@@ -113,6 +113,14 @@ export function getIntermissionTexture(name) {
     return getByPath(`assets/intermission/${name}.png`);
 }
 
+// DOOM small font glyph: STCFNnnn.png where nnn is the ASCII code
+// (033..097), e.g. 'A' (65) → STCFN065. Used for on-screen text on the
+// results / lobby screens.
+export function getFontTexture(code) {
+    if (code < 33 || code > 97) return null;
+    return getByPath(`assets/font/STCFN${String(code).padStart(3, '0')}.png`);
+}
+
 /** Drop everything — used when the renderer is torn down. */
 export function clearTextureCache() {
     cache.clear();
