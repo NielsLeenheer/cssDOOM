@@ -123,6 +123,12 @@ const WEAPON_AMMO = { 1: null, 2: 'bullets', 3: 'shells', 4: 'bullets',
                       5: 'rockets', 6: 'cells', 7: 'cells', 8: null };
 // The four per-type ammo rows, top to bottom (BULL / SHEL / RCKT / CELL).
 const HUD_AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
+// Keycards, top to bottom, with their 7×5 status-bar icon.
+const HUD_KEYS = [
+    { color: 'blue', icon: 'STKEYS0' },
+    { color: 'yellow', icon: 'STKEYS1' },
+    { color: 'red', icon: 'STKEYS2' },
+];
 
 // Small integer hash → [0,1), for the random light flickers.
 function hashRnd(a, b) {
@@ -508,6 +514,7 @@ export class SoftwareRenderer {
             maxAmmo: player.maxAmmo || {},
             currentWeapon: player.currentWeapon ?? 2,
             ownedWeapons: new Set(player.ownedWeapons || []),
+            keys: new Set(player.collectedKeys || []),
         };
     }
 
@@ -708,6 +715,16 @@ export class SoftwareRenderer {
             const col = h <= 0 ? 0 : ((now / 500) | 0) % 3;
             this._blit(face, col * FACE_W, row * FACE_H, FACE_W, FACE_H,
                 dx(143 + (36 - FACE_W) / 2), dy(1), FACE_W * scale, FACE_H * scale);
+        }
+
+        // Collected keycards: 7×5 icons stacked in the keys section
+        // (native x 236-249), centred horizontally and spaced down the bar.
+        for (let i = 0; i < HUD_KEYS.length; i++) {
+            if (!hud.keys.has(HUD_KEYS[i].color)) continue;
+            const icon = getHudTexture(HUD_KEYS[i].icon);
+            if (!icon || icon.width <= 1) continue;
+            this._blit(icon, 0, 0, 7, 5,
+                dx(239), dy(4 + i * 9), 7 * scale, 5 * scale);
         }
     }
 
