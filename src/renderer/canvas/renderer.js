@@ -28,11 +28,13 @@ import { clearTextureCache } from './textures.js';
 import * as maps from '../../shared/maps/index.js';
 
 // Internal framebuffer base dimensions. Height matches the original
-// game's vertical resolution; width is derived from the pane aspect on
-// resize and clamped so degenerate aspects don't produce wild buffer
-// sizes. A `?resolution=Nx` URL param multiplies all three at boot.
+// game's vertical resolution; width follows the pane aspect on resize so
+// the FB→display upscale is uniform (the world keeps its proportions at
+// any window size). A `?resolution=Nx` URL param multiplies both at boot.
+// MAX_WIDTH_BASE caps the FB width for ultra-wide aspects so we don't
+// allocate an unbounded buffer; once it kicks in we shrink the height
+// to preserve the aspect rather than letting the image distort.
 const RENDER_HEIGHT_BASE = 200;
-const MIN_WIDTH_BASE = 200;
 const MAX_WIDTH_BASE = 640;
 const MAX_RESOLUTION = 4;
 const DEFAULT_RESOLUTION = 2;
@@ -170,13 +172,27 @@ export class CanvasRenderer extends RendererBase {
         this.canvas.style.width = `${w}px`;
         this.canvas.style.height = `${h}px`;
 
-        // Internal framebuffer: base dimensions multiplied by the
-        // resolution factor, so the world is sampled at `factor`× the
-        // density while keeping the same aspect.
+        // Internal framebuffer: sized so its aspect ratio matches the
+        // pane's, so the nearest-neighbour upscale to the display canvas
+        // is a uniform stretch and the world keeps its proportions at
+        // any window size. Height starts at the base × resolution factor
+        // and width follows the pane aspect; if that exceeds the width
+        // budget (very wide panes), we instead pin to the max width and
+        // shrink the height to keep the aspect. Either way, the FB and
+        // pane aspects are identical, so resizing the window doesn't
+        // squish or stretch the rendered scene.
         const f = this.resolution;
-        const ih = RENDER_HEIGHT_BASE * f;
-        const iw = Math.max(MIN_WIDTH_BASE * f,
-            Math.min(MAX_WIDTH_BASE * f, Math.round(ih * w / h)));
+        const aspect = w / h;
+        const maxIH = RENDER_HEIGHT_BASE * f;
+        const maxIW = MAX_WIDTH_BASE * f;
+        let iw, ih;
+        if (maxIH * aspect <= maxIW) {
+            ih = maxIH;
+            iw = Math.max(1, Math.round(ih * aspect));
+        } else {
+            iw = maxIW;
+            ih = Math.max(1, Math.round(iw / aspect));
+        }
         this.internalCanvas.width = iw;
         this.internalCanvas.height = ih;
         this.software.resize(iw, ih, this.internalCtx);
