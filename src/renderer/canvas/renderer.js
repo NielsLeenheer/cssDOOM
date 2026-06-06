@@ -97,12 +97,13 @@ export class CanvasRenderer extends RendererBase {
         this._camera = null;
         this._hasScene = false;
 
-        // Rolling frame-time stats. Shown as a small overlay on the
-        // display canvas whenever `?resolution=` is explicit, so the
-        // perf cost of higher resolutions is visible.
+        // Rolling frame-time stats. The overlay (`_drawStats`) is wired
+        // up but off by default; flipping `_showStats` to true at runtime
+        // turns it on. The plan is to hook it to a flag in the debug
+        // panel — until then it's only enableable by hand.
         this._frameTimes = new Float32Array(60);
         this._frameTimeIdx = 0;
-        this._showStats = document.body.dataset.resolution != null;
+        this._showStats = false;
 
         this._resizeObserver = new ResizeObserver(() => this._resize());
         this._resizeObserver.observe(this.paneEl);
