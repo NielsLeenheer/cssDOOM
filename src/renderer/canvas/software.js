@@ -207,6 +207,7 @@ export class SoftwareRenderer {
         // sector's ceiling so its floor/ceiling become visible.
         this.doors = new Map();          // sectorIndex → door record
         this._wallBottomOffset = new Map(); // wall ref → bottom-height delta
+        this._wallTopOverride = new Map();  // wall ref → absolute top height (door tracks)
         this._ceilOverride = new Map();     // sectorPolygon ref → ceiling height
         this._lastFrameTime = 0;
 
@@ -279,6 +280,7 @@ export class SoftwareRenderer {
         this.effects = [];
         this.doors.clear();
         this._wallBottomOffset.clear();
+        this._wallTopOverride.clear();
         this._ceilOverride.clear();
 
         // Build door records. A door is a sector whose ceiling rises from
@@ -300,6 +302,13 @@ export class SoftwareRenderer {
                 sectorPoly,
             });
             if (sectorPoly) this._ceilOverride.set(sectorPoly, door.closedHeight);
+
+            // Door track jambs (DOORTRAK) ship as zero-height walls; give
+            // them the door's full travel span so the slot the panel
+            // slides through is solid instead of see-through.
+            for (const track of (door.trackWalls || [])) {
+                this._wallTopOverride.set(track, door.openHeight);
+            }
         }
 
         for (const t of (data.things || [])) {
@@ -348,6 +357,7 @@ export class SoftwareRenderer {
         this.effects = [];
         this.doors.clear();
         this._wallBottomOffset.clear();
+        this._wallTopOverride.clear();
         this._ceilOverride.clear();
         this._lightSectors = [];
         this._sectorLightMul = [];
@@ -632,13 +642,11 @@ export class SoftwareRenderer {
     //
     // DOOM treats the sky as an infinitely distant backdrop, not a
     // ceiling surface: every sky column is painted from the top of the
-    // screen down to the horizon, and the world (walls, floors, real
-    // ceilings) is then drawn over it. We do the same — fill the upper
-    // half with the sky at a sentinel far depth, so any later geometry
-    // overwrites it via the depth test, and whatever stays uncovered
-    // (the openings above walls in sky sectors) reads as sky. This side-
-    // steps the projected-ceiling-polygon coverage problem for tall sky
-    // sectors and keeps the sky locked to the view angle.
+    // screen down to the top of the wall in that column (which can sit
+    // below the horizon when looking over a low wall into an open area),
+    // and the world is then drawn over it. We fill the whole frame with
+    // the sky at a sentinel far depth so any later geometry overwrites it
+    // via the depth test, and whatever stays uncovered reads as sky.
     _renderSky(cam) {
         const sky = getSkyTexture();
         if (!sky) return;
@@ -647,11 +655,11 @@ export class SoftwareRenderer {
         const skyW = sky.width, skyH = sky.height, sdata = sky.data;
         const colAngle = this._colAngle;
         const uBase = (angle / (Math.PI * 2)) * skyW * 4;
-        const hY = Math.min(H, Math.ceil(halfH));
-        for (let y = 0; y < hY; y++) {
+        for (let y = 0; y < H; y++) {
             // Top of screen → top of texture; horizon → bottom of
-            // texture, so the dark lower band sits at the horizon.
-            const sv = Math.min(skyH - 1, ((y / halfH) * skyH) | 0);
+            // texture. Below the horizon the bottom row repeats (it's
+            // almost always overdrawn by floors/walls anyway).
+            const sv = Math.min(skyH - 1, Math.max(0, ((y / halfH) * skyH) | 0));
             const row = sv * skyW;
             const base = y * W;
             for (let x = 0; x < W; x++) {
@@ -712,9 +720,12 @@ export class SoftwareRenderer {
                 c2y = NEAR;
             }
 
-            // Door panels raise their bottom edge as the door opens.
-            const wallBottom = wall.bottomHeight + (this._wallBottomOffset.get(wall) || 0);
-            const topZ = wall.topHeight - ez;
+            // Door panels raise their bottom edge as the door opens;
+            // track jambs override their (zero) top to the travel span.
+            const bottomOffset = this._wallBottomOffset.get(wall) || 0;
+            const wallBottom = wall.bottomHeight + bottomOffset;
+            const wallTop = this._wallTopOverride.get(wall) ?? wall.topHeight;
+            const topZ = wallTop - ez;
             const botZ = wallBottom - ez;
 
             let p1 = halfW + (c1x / c1y) * sxScale;
@@ -741,8 +752,11 @@ export class SoftwareRenderer {
 
             const span = p2 - p1 || 1e-6;
             const texW = tex.width, texH = tex.height, tdata = tex.data;
-            const wallH = wall.topHeight - wallBottom;
-            const yOff = wall.yOffset || 0;
+            const wallH = wallTop - wallBottom;
+            // Adding the door's rise to the vertical texture offset pins
+            // the panel texture to its moving bottom edge, so the door
+            // texture slides up with the panel instead of squashing.
+            const yOff = (wall.yOffset || 0) + bottomOffset;
 
             // Fake contrast: E/W walls darker, N/S walls brighter.
             let baseLight = wall.lightLevel * (this._sectorLightMul[wall.sectorIndex] ?? 1);
