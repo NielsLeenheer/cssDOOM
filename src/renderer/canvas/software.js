@@ -1010,10 +1010,14 @@ export class SoftwareRenderer {
 
         // Back-face cull against the front normal (dy, -dx). Lift shaft
         // walls opt out (noCull): their winding isn't guaranteed to face
-        // the viewer and the depth buffer resolves any overdraw.
+        // the viewer and the depth buffer resolves any overdraw. Use a
+        // strict `< 0` test (not `<= 0`) so that a wall the camera lies
+        // *exactly* on its line still draws — the player can hug a wall
+        // and the cull math then evaluates to 0, which is the boundary
+        // between front- and back-facing and should be treated as visible.
         if (!noCull) {
             const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5;
-            if ((ex - mx) * dy - (ey - my) * dx <= 0) return;
+            if ((ex - mx) * dy - (ey - my) * dx < 0) return;
         }
 
         let c1x = (ax - ex) * ca + (ay - ey) * sa;
