@@ -252,6 +252,7 @@ export class SoftwareRenderer {
         this.flash = null;            // { r, g, b, start }
         this.hud = null;              // { health, armor, ammo, maxAmmo, currentWeapon, ownedWeapons }
         this._animFrame = 0;          // current animated-texture frame
+        this._scrollOffset = 0;       // current scrolling-wall texture offset
         this._bobX = 0;
         this._bobY = 0;
         this._lastCamX = null;
@@ -682,6 +683,9 @@ export class SoftwareRenderer {
             this._sectorLightMul[e.sectorIndex] = lightMul(e, tSec);
         }
         this._animFrame = (now / ANIM_FRAME_MS) | 0;
+        // Scrolling-wall texture offset: DOOM scrolls 1 unit/tic ≈ 35
+        // units/sec. Kept bounded so it stays power-of-two aligned.
+        this._scrollOffset = (now * 0.035) % 4096;
 
         const aspect = W / H;
         const fovScale = Math.tan(FOV / 2);
@@ -998,7 +1002,7 @@ export class SoftwareRenderer {
         let c2x = (bx - ex) * ca + (by - ey) * sa;
         let c2y = ca * (by - ey) - sa * (bx - ex);
 
-        let u1 = wall.xOffset || 0;
+        let u1 = (wall.xOffset || 0) + (wall.isScrolling ? this._scrollOffset : 0);
         let u2 = u1 + Math.hypot(dx, dy);
 
         if (c1y < NEAR && c2y < NEAR) return;
