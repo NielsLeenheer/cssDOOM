@@ -145,12 +145,19 @@ export class CanvasRenderer extends RendererBase {
         this.internalCanvas.width = iw;
         this.internalCanvas.height = RENDER_HEIGHT;
         this.software.resize(iw, RENDER_HEIGHT, this.internalCtx);
+
+        // Repaint at the new size right away. Setting canvas.width above
+        // clears the display, and browsers commonly pause requestAnimation-
+        // Frame during a resize drag — so without this the view would sit
+        // blank/stale until the drag ends. ResizeObserver callbacks fire
+        // regardless of RAF, so painting here keeps the render live.
+        this._paint();
     }
 
-    _tick = () => {
-        this._raf = requestAnimationFrame(this._tick);
+    /** Render the current frame into the framebuffer and blit it, scaled
+     *  with nearest-neighbour, onto the display canvas. */
+    _paint() {
         if (!this._hasScene || !this._camera) return;
-
         // Keep the software renderer's notion of "which player is this
         // pane" current so it hides this viewer's own billboard.
         this.software.viewerPlayerIndex = this.playerIndex;
@@ -161,6 +168,11 @@ export class CanvasRenderer extends RendererBase {
         ctx.imageSmoothingEnabled = false;
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         ctx.drawImage(this.internalCanvas, 0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    _tick = () => {
+        this._raf = requestAnimationFrame(this._tick);
+        this._paint();
     };
 }
 
