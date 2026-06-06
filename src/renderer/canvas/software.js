@@ -123,7 +123,12 @@ const WEAPON_AMMO = { 1: null, 2: 'bullets', 3: 'shells', 4: 'bullets',
                       5: 'rockets', 6: 'cells', 7: 'cells', 8: null };
 // The four per-type ammo rows, top to bottom (BULL / SHEL / RCKT / CELL).
 const HUD_AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
-// Keycards, top to bottom, with their 7×5 status-bar icon.
+// Arms panel slots (weapon 2-7) in a 3×2 grid, bar-relative pixel
+// coordinates; each shows a 4×6 number glyph (grey unowned / yellow owned).
+const ARMS_SLOTS = [
+    { slot: 2, x: 111, y: 4 },  { slot: 3, x: 123, y: 4 },  { slot: 4, x: 135, y: 4 },
+    { slot: 5, x: 111, y: 14 }, { slot: 6, x: 123, y: 14 }, { slot: 7, x: 135, y: 14 },
+];
 const HUD_KEYS = [
     { color: 'blue', icon: 'STKEYS0' },
     { color: 'yellow', icon: 'STKEYS1' },
@@ -694,17 +699,17 @@ export class SoftwareRenderer {
             }
         }
 
-        // Arms panel (weapon ownership): grey = not owned, yellow = owned.
+        // Arms panel (weapon ownership): the ARMS background plus a per-
+        // slot number — yellow STYSNUM if owned, grey STGNUM otherwise.
         const arms = getHudTexture('STARMS');
         if (arms && arms.width > 1) {
-            // STARMS is a 2-row sheet: row 0 grey (40×16 unowned), row 1
-            // yellow (owned). We can only swap the whole panel, so show
-            // the owned-coloured panel when the player has any weapon past
-            // the pistol, else the grey one. (Per-slot tinting would need
-            // the individual number glyphs.)
-            const ownedExtra = [3, 4, 5, 6, 7].some(s => hud.ownedWeapons.has(s));
-            const armsRow = arms.height >= 32 && ownedExtra ? 16 : 0;
-            this._blit(arms, 0, armsRow, 40, 16, dx(104), dy(4), 40 * scale, 16 * scale);
+            this._blit(arms, 0, 0, 40, 32, dx(104), dy(0), 40 * scale, 32 * scale);
+            for (const s of ARMS_SLOTS) {
+                const owned = hud.ownedWeapons.has(s.slot);
+                const glyph = getHudTexture(`${owned ? 'STYSNUM' : 'STGNUM'}${s.slot}`);
+                if (!glyph || glyph.width <= 1) continue;
+                this._blit(glyph, 0, 0, 4, 6, dx(s.x), dy(s.y), 4 * scale, 6 * scale);
+            }
         }
 
         // Face: row by health band, column animates while alive.
