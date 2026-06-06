@@ -655,11 +655,16 @@ export class SoftwareRenderer {
         const skyW = sky.width, skyH = sky.height, sdata = sky.data;
         const colAngle = this._colAngle;
         const uBase = (angle / (Math.PI * 2)) * skyW * 4;
+        // DOOM draws the sky at a fixed vertical scale (≈1 texel per row
+        // at 200px tall) anchored so the texture's mountain base sits at
+        // the horizon, rather than stretching the whole texture from the
+        // top of the screen to the horizon. Stretching dragged SKY1's
+        // dark lower rows up into a fat black band above distant walls.
+        const iscale = 200 / H;
+        const skyHorizon = skyH - 28;     // texel row shown at the horizon
         for (let y = 0; y < H; y++) {
-            // Top of screen → top of texture; horizon → bottom of
-            // texture. Below the horizon the bottom row repeats (it's
-            // almost always overdrawn by floors/walls anyway).
-            const sv = Math.min(skyH - 1, Math.max(0, ((y / halfH) * skyH) | 0));
+            let sv = (((y - halfH) * iscale) + skyHorizon) | 0;
+            if (sv < 0) sv = 0; else if (sv >= skyH) sv = skyH - 1;
             const row = sv * skyW;
             const base = y * W;
             for (let x = 0; x < W; x++) {
