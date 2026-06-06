@@ -80,8 +80,12 @@ export const flatPassMethods = {
         gl.uniform1i(prog.u('u_tex'), 0);
         gl.activeTexture(gl.TEXTURE0);
 
+        // Single-bit stencil: INVERT toggles bit 0 only (0↔1), so the
+        // even-odd mark lands on exactly 1 and the cover test below can
+        // match it. (A full 0xff mask would INVERT 0x00→0xff, which never
+        // equals the ref value 1 — nothing would ever draw.)
         gl.enable(gl.STENCIL_TEST);
-        gl.stencilMask(0xff);
+        gl.stencilMask(0x1);
 
         const loc = prog.a('a_xy');
 
@@ -114,7 +118,7 @@ export const flatPassMethods = {
         gl.colorMask(false, false, false, false);
         gl.depthMask(false);
         gl.disable(gl.DEPTH_TEST);
-        gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+        gl.stencilFunc(gl.ALWAYS, 0, 0x1);
         gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
         gl.bindBuffer(gl.ARRAY_BUFFER, f.fan.buffer);
         gl.enableVertexAttribArray(loc);
@@ -125,7 +129,7 @@ export const flatPassMethods = {
         gl.colorMask(true, true, true, true);
         gl.depthMask(true);
         gl.enable(gl.DEPTH_TEST);
-        gl.stencilFunc(gl.EQUAL, 1, 0xff);
+        gl.stencilFunc(gl.EQUAL, 1, 0x1);
         gl.stencilOp(gl.KEEP, gl.KEEP, gl.KEEP);
         gl.bindTexture(gl.TEXTURE_2D, tex.tex);
         gl.uniform1f(prog.u('u_light'), light);
@@ -137,7 +141,7 @@ export const flatPassMethods = {
         gl.colorMask(false, false, false, false);
         gl.depthMask(false);
         gl.disable(gl.DEPTH_TEST);
-        gl.stencilFunc(gl.ALWAYS, 0, 0xff);
+        gl.stencilFunc(gl.ALWAYS, 0, 0x1);
         gl.stencilOp(gl.KEEP, gl.KEEP, gl.INVERT);
         gl.bindBuffer(gl.ARRAY_BUFFER, f.fan.buffer);
         gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);

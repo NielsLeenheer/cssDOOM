@@ -63,10 +63,9 @@ void main() {
     v_dist = vz;
     // Sprites pass u_zbias>0 to pull their depth a couple of world units
     // toward the camera (so a billboard sits in front of the floor it
-    // stands on). Floor the biased distance at the near plane so the bias
-    // can never shove a close sprite behind the near plane and clip it.
-    float vzb = max(vz - u_zbias, 4.0);
-    gl_Position = vec4(vx, vy * u_aspect, u_A * vzb + u_B, vz);
+    // stands on). Walls/flats pass 0 so they project exactly — biasing
+    // them would shift where they cross the near plane.
+    gl_Position = vec4(vx, vy * u_aspect, u_A * (vz - u_zbias) + u_B, vz);
 }`;
 
 export const WORLD_FS = /* glsl */`#version 300 es
