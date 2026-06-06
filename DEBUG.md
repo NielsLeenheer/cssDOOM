@@ -109,7 +109,7 @@ leave just the HUD (status bar + weapon) for the HUD-anatomy shot
 | `hud.isolate(on?)` | Fade the scene to grey, leaving just the HUD. No arg toggles; a boolean sets it. |
 | `chrome.hide()` · `chrome.show()` | Instantly hide / show the menu buttons + spectator overlay. |
 
-## `debug.camera` — view-relative orbit (talk shots)
+## `debug.view.camera` — view-relative orbit (talk shots)
 
 A debug-only **orbit** of the render camera: shifts the eye *and* re-aims to keep
 the target framed. `x / y / z` are right / up / back of where the camera faces
@@ -123,12 +123,12 @@ turn-left, move-up ⇒ look-down**. It overrides the scene transform from
 | `reset(t = 0)` | Ease back to the player's eye. |
 
 ```js
-debug.camera.offset(200, 120, 0, 2)        // orbit up & right over 2s, eyes on target
-debug.camera.offset(0, 80, 300, 2, 800)    // rise + pull back, distant pivot
-debug.camera.reset(1)
+debug.view.camera.offset(200, 120, 0, 2)        // orbit up & right over 2s, eyes on target
+debug.view.camera.offset(0, 80, 300, 2, 800)    // rise + pull back, distant pivot
+debug.view.camera.reset(1)
 ```
 
-## `debug.path` — record & replay the player's path
+## `debug.player.path` — record & replay the player's path
 
 Segment-based recording for hand-scripted camera moves. `record()` opens a
 top-centre transport panel; replay moves the **player** along the path while the
@@ -171,10 +171,10 @@ recording), or a path object.
 `{ x, y, angle° }`.
 
 ```js
-debug.path.play('test', { segment: 1, trim: true, speed: 0.75,
+debug.player.path.play('test', { segment: 1, trim: true, speed: 0.75,
                           smooth: 7, end: { x: 512, y: -64, angle: 90 } });
 
-await debug.path.transition({ duration: 2, direction: 'clockwise',
+await debug.player.path.transition({ duration: 2, direction: 'clockwise',
   start: { x: -17, y: -3128, angle: 121 }, end: { x: 39, y: -3113, angle: 246 } });
 ```
 

@@ -3,7 +3,7 @@
  *
  * `window.debug` is a callable object: calling it opens the debug menu; every
  * command hangs off it in grouped sub-objects (debug.player.*, debug.sectors.*,
- * debug.path.*, …). This module is a thin PRESENTER — it imports each capability
+ * debug.view.*, …). This module is a thin PRESENTER — it imports each capability
  * from ../features/* and wires it onto a debug.* group; the menu (../ui) presents
  * the same features as checkboxes/buttons. Loaded for its side effects at boot
  * from master.js.
@@ -59,17 +59,17 @@ sprites.hideSheet = spritesModule.hideSheet;
 //   debug.layers.chrome.hide() — menu buttons / spectator overlay
 Object.assign(group('layers'), layersModule.layers);
 
-// ── debug.camera — view-relative orbit for talk shots (see camera.css) ──────
+// ── debug.view.camera — view-relative orbit for talk shots (see camera.css) ──
 // Offset the eye AND re-aim to keep the target framed: x = right, y = up,
 // z = back (world units, relative to where the camera faces); the view yaws/
 // pitches back toward a pivot so move-right ⇒ turn-left, move-up ⇒ look-down.
 // Eases from the previous offset over t seconds (t = 0 instant). 5th arg sets
 // the pivot distance (gentler re-aim = larger). Debug-only; never touches the
 // renderer.
-//   debug.camera.offset(200, 120, 0, 2)   — orbit up/right over 2s, eyes on target
-//   debug.camera.offset(0, 80, 300, 2, 800) — rise & pull back, far pivot
-//   debug.camera.reset(1)                 — ease back to the eye over 1s
-const camera = group('camera');
+//   debug.view.camera.offset(200, 120, 0, 2)   — orbit up/right over 2s, eyes on target
+//   debug.view.camera.offset(0, 80, 300, 2, 800) — rise & pull back, far pivot
+//   debug.view.camera.reset(1)                 — ease back to the eye over 1s
+const camera = (group('view').camera ??= {});
 camera.offset = cameraModule.offset;
 camera.reset = cameraModule.reset;
 
@@ -83,22 +83,22 @@ if (import.meta.env.DEV) {
     import('../custom/custom.js').then(({ registerCustom }) => registerCustom(debug));
 }
 
-// ── debug.path — record / replay the player's path (position + angle) ──────
+// ── debug.player.path — record / replay the player's path (position + angle) ─
 // Segment-based recording with a top-centre transport panel; replay moves the
 // PLAYER along a path while the game loop runs, so the camera follows and the
 // world reacts. The basis for hand-scripted talk shots — see features/path.js.
-//   debug.path.record()                       — start a session (opens panel)
+//   debug.player.path.record()                       — start a session (opens panel)
 //   .mark() .pause() .resume() .rewind() .review() .stop()  — transport
 //   .save('slot') / .load('slot')  — persist / read a session in localStorage
 //   .export('slot'?) / .import('slot', json)  — dump a session as JSON for
 //     safekeeping (last recorded, or a saved slot) and restore it later
 //   .seek(pathOrSlot, opts)  — teleport to a segment's start frame
-//   await debug.path.play(pathOrSlot, opts)  — replay it
+//   await debug.player.path.play(pathOrSlot, opts)  — replay it
 //   opts: { speed, segment, trim, smooth, start, end } (seek shares trim/
 //     smooth/start/end). trim: drop non-moving frames at the start/end.
 //     smooth: box-blur window (frames). start/end: { x?, y?, angle° } to bend
 //     the path so it begins/lands exactly there (angles in degrees).
-const path = group('path');
+const path = (group('player').path ??= {});
 path.record = pathModule.record;
 path.mark = pathModule.mark;
 path.pause = pathModule.pause;

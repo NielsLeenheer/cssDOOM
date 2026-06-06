@@ -2,14 +2,14 @@
  * debug.custom — hand-authored talk scripts.
  *
  * The rest of the debug layer is building-block commands grouped by domain
- * (debug.path.*, debug.sectors.*, debug.layers.*, …). THIS file is the
+ * (debug.player.path.*, debug.sectors.*, debug.layers.*, …). THIS file is the
  * scratchpad for the set pieces performed live during the CSS Day talk: each
  * function strings those commands together on a timeline — play a recorded
  * path, explode a sector, fade a layer, drop in a floor grid, and so on. Add
  * your own as custom.two, custom.three, …
  *
  * Wired by console.js via registerCustom(debug): it hands in the live `debug`
- * namespace, so a script just calls debug.path.play(...),
+ * namespace, so a script just calls debug.player.path.play(...),
  * debug.sectors.explode(...), debug.layers.walls.hide() directly.
  */
 
@@ -37,11 +37,11 @@ export function registerCustom(debug) {
         debug.game.noMove(true);
 
         /* Go to starting position and wait for a beat */
-        await debug.path.seek(one, { segment: 0 });
+        await debug.player.path.seek(one, { segment: 0 });
         await delay(1000);
 
         /* Play the path to the first door */
-        await debug.path.play(one, { trim: true, speed: 0.75, smooth: 7 });
+        await debug.player.path.play(one, { trim: true, speed: 0.75, smooth: 7 });
     };
     
     custom.two = async () => {
@@ -53,11 +53,11 @@ export function registerCustom(debug) {
         debug.game.noMove(false);
 
         /* Go to starting position and wait for a beat */
-        await debug.path.seek(two, { segment: 0 });
+        await debug.player.path.seek(two, { segment: 0 });
         await delay(1000);
 
         /* Move towards the door */
-        await debug.path.play(two, { 
+        await debug.player.path.play(two, { 
             trim: true, speed: 0.75, smooth: 7, 
             end: { x: 1043, y: -3527, angle: 161 } 
         });
@@ -85,7 +85,7 @@ export function registerCustom(debug) {
         debug.layers.sky.show();
 
         /* Move up the stairs */
-        let segment2 = debug.path.play(three, { 
+        let segment2 = debug.player.path.play(three, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: 1043, y: -3527, angle: 161 }, 
             end: { x: -17, y: -3128, angle: 121 } 
@@ -93,7 +93,7 @@ export function registerCustom(debug) {
         
         await delay(5000);
         debug.layers.ceilings.hide();
-        debug.camera.offset(0, 60, -100, 2, 100);
+        debug.view.camera.offset(0, 60, -100, 2, 100);
 
         await segment2;
 
@@ -111,7 +111,7 @@ export function registerCustom(debug) {
         await delay(10000);
 
         /* Restore camera position */
-        debug.camera.offset(0, 0, 0, 2, 100);
+        debug.view.camera.offset(0, 0, 0, 2, 100);
 
         /* Show enemies, things and hide the floor grid again. */
         debug.layers.enemies.show();
@@ -125,7 +125,7 @@ export function registerCustom(debug) {
         /* Show the sprite sheets for all things and enemies */
         debug.sprites.showSheet() 
 
-        await debug.path.play(four, { 
+        await debug.player.path.play(four, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: -17, y: -3128, angle: 121 } 
         });    
@@ -147,7 +147,7 @@ export function registerCustom(debug) {
 
 
         /* Go to starting position and wait for a beat */
-        await debug.path.seek(three, { 
+        await debug.player.path.seek(three, { 
             start: { x: 1043, y: -3527, angle: 210 }
         });
 
@@ -168,7 +168,7 @@ export function registerCustom(debug) {
         // debug.layers.sky.show();
 
         /* Move up the stairs */
-        let segment2 = debug.path.play(three, { 
+        let segment2 = debug.player.path.play(three, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: 1043, y: -3527, angle: 210 }, 
             end: { x: -17, y: -3128, angle: 121 } 
@@ -178,7 +178,7 @@ export function registerCustom(debug) {
 
         await delay(5000);
         debug.layers.ceilings.hide();
-        debug.camera.offset(0, 60, -100, 2, 100);
+        debug.view.camera.offset(0, 60, -100, 2, 100);
 
         await segment2;
 
@@ -206,17 +206,17 @@ export function registerCustom(debug) {
         // y = -3113
         // angle = 246
 
-        debug.camera.offset(0, 60, -100, 2, 100);
+        debug.view.camera.offset(0, 60, -100, 2, 100);
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: -17, y: -3128, angle: 121
         });
 
         await delay(5000);
 
-        debug.camera.offset(0, 0, 0, 2, 100);
+        debug.view.camera.offset(0, 0, 0, 2, 100);
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 2,
             direction: 'anti-clockwise',
             start: { x: -17, y: -3128, angle: 121 },
@@ -235,7 +235,7 @@ export function registerCustom(debug) {
         debug.layers.sky.hide();
         debug.layers.things.hide()
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 39, y: -3113, angle: 246
         });
 
@@ -294,13 +294,13 @@ export function registerCustom(debug) {
         debug.layers.sky.hide();
         debug.layers.things.hide()
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 39, y: -3113, angle: 246
         });
 
         await delay(2000);
 
-        debug.path.play(downthestairs, { 
+        debug.player.path.play(downthestairs, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: 39, y: -3113, angle: 246 }, 
             end: { x: 997, y: -3276, angle: 308 } 
@@ -320,7 +320,7 @@ export function registerCustom(debug) {
         // debug.layers.sky.hide();
         // debug.layers.things.hide()
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 997, y: -3276, angle: 308
         });
 
@@ -330,14 +330,14 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        await debug.path.play(spectator, { 
+        await debug.player.path.play(spectator, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: 997, y: -3276, angle: 308 }, 
             end: { x: 1520, y: -2496, angle: 278 },
             moving: true 
         })
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'clockwise',
             start: { x: 1520, y: -2496, angle: 278 }, 
@@ -358,7 +358,7 @@ export function registerCustom(debug) {
         // debug.layers.sky.hide();
         // debug.layers.things.hide()
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 997, y: -3276, angle: 308
         });
 
@@ -368,14 +368,14 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        await debug.path.play(spectatorStart, { 
+        await debug.player.path.play(spectatorStart, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: 997, y: -3276, angle: 308 }, 
             end: { x: 1212, y: -3265, angle: 276 },
             moving: true 
         })
 
-        // await debug.path.transition({
+        // await debug.player.path.transition({
         //     duration: 1,
         //     direction: 'anti-clockwise',
         //     start: { x: 1212, y: -3265, angle: 276 }, 
@@ -383,14 +383,14 @@ export function registerCustom(debug) {
         // });
 
 
-        // await debug.path.transition({
+        // await debug.player.path.transition({
         //     duration: 1,
         //     direction: 'clockwise',
         //     start: { x: 1226, y: -3304, angle: 294 }, 
         //     end:   { x: 1244, y: -3168, angle: 218 }
         // });
 
-        // await debug.path.transition({
+        // await debug.player.path.transition({
         //     duration: 1,
         //     direction: 'anti-clockwise',
         //     start: { x: 1244, y: -3168, angle: 218 }, 
@@ -409,7 +409,7 @@ export function registerCustom(debug) {
         // debug.layers.sky.hide();
         // debug.layers.things.hide()
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 1212, y: -3265, angle: 276
         });
 
@@ -421,7 +421,7 @@ export function registerCustom(debug) {
 
         /* */
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 0.6,
             direction: 'anti-clockwise',
             start: { x: 1212, y: -3265, angle: 276 }, 
@@ -430,7 +430,7 @@ export function registerCustom(debug) {
         });
 
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'clockwise',
             start: { x: 1238, y: -3314, angle: 303 }, 
@@ -438,7 +438,7 @@ export function registerCustom(debug) {
             moving: true 
         });
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'anti-clockwise',
             start: { x: 1244, y: -3168, angle: 218 }, 
@@ -447,7 +447,7 @@ export function registerCustom(debug) {
         });
 
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'clockwise',
             start: { x: 1238, y: -3314, angle: 303 }, 
@@ -455,7 +455,7 @@ export function registerCustom(debug) {
             moving: true 
         });
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'anti-clockwise',
             start: { x: 1244, y: -3168, angle: 218 }, 
@@ -476,7 +476,7 @@ export function registerCustom(debug) {
         // debug.layers.sky.hide();
         // debug.layers.things.hide()
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 1212, y: -3265, angle: 276
         });
 
@@ -486,14 +486,14 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        await debug.path.play(spectatorEnd, { 
+        await debug.player.path.play(spectatorEnd, { 
             trim: true, speed: 0.75, smooth: 7, 
             start: { x: 1212, y: -3265, angle: 276 }, 
             end:   { x: 1520, y: -2496, angle: 278 },
             moving: true 
         })
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'clockwise',
             start: { x: 1520, y: -2496, angle: 278 }, 
@@ -510,7 +510,7 @@ export function registerCustom(debug) {
         debug.layers.chrome.hide();
         debug.layers.hud.hide();
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 1520, y: -2496, angle: 246
         });
 
@@ -520,7 +520,7 @@ export function registerCustom(debug) {
 
         await delay(5000);
 
-        await debug.path.play(door, { 
+        await debug.player.path.play(door, { 
         })
     };
 
@@ -532,7 +532,7 @@ export function registerCustom(debug) {
         debug.layers.chrome.hide();
         debug.layers.hud.hide();
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 1520, y: -2496, angle: 246
         });
 
@@ -546,7 +546,7 @@ export function registerCustom(debug) {
         debug.sprites.showSheet()
 
 
-        let fight = debug.path.play('fight', { 
+        let fight = debug.player.path.play('fight', { 
             trim: true, 
             start: { x: 1520, y: -2496, angle: 246 }, 
         })
@@ -563,7 +563,7 @@ export function registerCustom(debug) {
 
         await delay(1000);
 
-        let fight2 = debug.path.play('fight2', { 
+        let fight2 = debug.player.path.play('fight2', { 
             trim: true,
         })
 
@@ -575,7 +575,7 @@ export function registerCustom(debug) {
 
         debug.layers.sky.hide();
 
-        let fight4 = debug.path.play('fight4', { 
+        let fight4 = debug.player.path.play('fight4', { 
             trim: true,
         })
 
@@ -608,7 +608,7 @@ export function registerCustom(debug) {
         debug.layers.chrome.hide();
         debug.layers.hud.hide();
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 1520, y: -2496, angle: 246
         });
 
@@ -622,7 +622,7 @@ export function registerCustom(debug) {
         debug.sprites.showSheet()
 
 
-        let fight = debug.path.play('alt-fight-3', { 
+        let fight = debug.player.path.play('alt-fight-3', { 
             trim: true, 
             start: { x: 1520, y: -2496, angle: 246 }, 
             end: { x: 2192, y: -2380, angle: 293 },
@@ -657,7 +657,7 @@ export function registerCustom(debug) {
         debug.layers.chrome.hide();
         debug.layers.hud.hide();
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 1520, y: -2496, angle: 246
         });
 
@@ -671,7 +671,7 @@ export function registerCustom(debug) {
         debug.sprites.showSheet()
 
 
-        let fight = debug.path.play('alt-fight-3', { 
+        let fight = debug.player.path.play('alt-fight-3', { 
             trim: true, 
             start: { x: 1520, y: -2496, angle: 246 }, 
             end: { x: 2172, y: -2388, angle: 293 },
@@ -704,7 +704,7 @@ export function registerCustom(debug) {
         debug.view.renderer('dom')
         debug.culling.all(false)
 
-        await debug.path.move({
+        await debug.player.path.move({
             x: 2172, y: -2388, angle: 293
         });
 
@@ -713,35 +713,35 @@ export function registerCustom(debug) {
 
 
     custom.swing = async () => {
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'anti-clockwise',
             start:  { x: 2192, y: -2380, angle: 293 },
             end:    { x: 2192, y: -2380, angle: 356 },
         });
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 2,
             direction: 'clockwise',
             start:  { x: 2192, y: -2380, angle: 356 },
             end:    { x: 2192, y: -2380, angle: 279 },
         });
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 2,
             direction: 'anti-clockwise',
             start:  { x: 2192, y: -2380, angle: 279 },
             end:    { x: 2192, y: -2380, angle: 356 },
         });
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 2,
             direction: 'clockwise',
             start:  { x: 2192, y: -2380, angle: 356 },
             end:    { x: 2192, y: -2380, angle: 279 },
         });
 
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 1,
             direction: 'anti-clockwise',
             start:  { x: 2192, y: -2380, angle: 279 },
@@ -750,7 +750,7 @@ export function registerCustom(debug) {
     };
 
     custom.eleven = async () => {
-        await debug.path.move({
+        await debug.player.path.move({
             x: 2192, y: -2380, angle: 293
         });
 
@@ -769,7 +769,7 @@ export function registerCustom(debug) {
         debug.game.peaceful(false);
         debug.game.noDamage(true);
 
-        let fight = debug.path.play('fireball-1', { 
+        let fight = debug.player.path.play('fireball-1', { 
             trim: true, 
             start: { x: 2192, y: -2380, angle: 293 }, 
             end: { x: 3020, y: -3066, angle: 218 },
@@ -777,7 +777,7 @@ export function registerCustom(debug) {
     };
 
     custom.elevenAlt = async () => {
-        await debug.path.move({
+        await debug.player.path.move({
             x: 2172, y: -2388, angle: 293
         });
 
@@ -796,7 +796,7 @@ export function registerCustom(debug) {
         debug.game.peaceful(false);
         debug.game.noDamage(true);
 
-        let fight = debug.path.play('fireball-1', { 
+        let fight = debug.player.path.play('fireball-1', { 
             trim: true, 
             start: { x: 2172, y: -2388, angle: 293 }, 
             end: { x: 3020, y: -3066, angle: 218 },
@@ -804,12 +804,12 @@ export function registerCustom(debug) {
     };
 
     custom.twelve = async () => {
-        await debug.path.move({
+        await debug.player.path.move({
             x: 3020, y: -3066, angle: 218
         });
         
 
-        let fight = debug.path.play('fireball-3', { 
+        let fight = debug.player.path.play('fireball-3', { 
             trim: true, 
             start: { x: 3020, y: -3066, angle: 218 }, 
             end: { x: 2996, y: -3752, angle: 348 },
@@ -823,7 +823,7 @@ export function registerCustom(debug) {
 
 
     custom.thirteen = async () => {
-        await debug.path.transition({
+        await debug.player.path.transition({
             duration: 2,
             direction: 'clockwise',
             start:  { x: 2996, y: -3752, angle: 348 },

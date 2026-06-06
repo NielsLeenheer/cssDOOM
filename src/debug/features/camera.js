@@ -1,5 +1,5 @@
 /**
- * debug.camera — a view-relative camera ORBIT for hand-scripted talk shots.
+ * debug.view.camera — a view-relative camera ORBIT for hand-scripted talk shots.
  *
  * Pure debug overlay: it never touches the renderer. offset() adds the
  * `debug-camera` class to <body> (which activates the override in
@@ -13,7 +13,7 @@
  * over t seconds (t = 0 = instant).
  *
  * Single-player talk tool: the props go on <body>, so every pane's .scene
- * inherits them. Exposed as debug.camera.* in console.js.
+ * inherits them. Exposed as debug.view.camera.* in console.js.
  */
 
 /** Orbit the camera to (x right, y up, z back) world units, re-aiming at a

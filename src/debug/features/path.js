@@ -8,7 +8,7 @@
  * camera follows because renderAllActivePanes() pushes it from the player,
  * and AI / triggers see the player move. Floor/z derive from the map.
  *
- * Transport (panel buttons; also on debug.path.*):
+ * Transport (panel buttons; also on debug.player.path.*):
  *   recording:  Mark (cut a segment, keep going) · Pause (cut + pause) · Stop
  *   paused:     Rewind (jump to start of last segment, arms overwrite) ·
  *               Review (replay last segment) ·
@@ -24,7 +24,7 @@
  * and re-emitted on the input bus at the right moment during play(), so a
  * replayed walk opens the same doors and fires the same shots it did live.
  *
- * Exposed as debug.path.* in console.js.
+ * Exposed as debug.player.path.* in console.js.
  */
 
 import { state } from '../../game/state.js';
@@ -420,9 +420,9 @@ function resolveEvents(path, opts = {}) {
  * post-processing opts (trim / smooth / start / end), so pass the SAME ones to
  * both and the seeked pose matches where the played path begins:
  *
- *   debug.path.seek('walk', { segment: 1 });   // jump to its first frame
+ *   debug.player.path.seek('walk', { segment: 1 });   // jump to its first frame
  *   await delay(3000);                          // hold the shot
- *   await debug.path.play('walk', { segment: 1 });
+ *   await debug.player.path.play('walk', { segment: 1 });
  */
 export function seek(path, opts = {}) {
     let samples = resolveSamples(path, opts);
@@ -447,10 +447,10 @@ export function seek(path, opts = {}) {
  * Returns a promise that resolves when it finishes, so you can `await` it
  * between scripted steps (or not, to run it alongside other debug.* calls).
  *
- *   debug.path.play('walk')                            — whole session
- *   debug.path.play('walk', { segment: 1 })            — just the 2nd segment
- *   debug.path.play('walk', { segment: 1, trim: true }) — …trimmed to motion
- *   debug.path.play('walk', { segment: 1, smooth: 7, end: { x: 512, y: -64, angle: 90 } })
+ *   debug.player.path.play('walk')                            — whole session
+ *   debug.player.path.play('walk', { segment: 1 })            — just the 2nd segment
+ *   debug.player.path.play('walk', { segment: 1, trim: true }) — …trimmed to motion
+ *   debug.player.path.play('walk', { segment: 1, smooth: 7, end: { x: 512, y: -64, angle: 90 } })
  */
 export async function play(path, opts = {}) {
     if (typeof path === 'string') path = load(path);
@@ -521,7 +521,7 @@ export async function play(path, opts = {}) {
  * default. Returns a promise that resolves on arrival, so you can `await` it
  * between steps.
  *
- *   await debug.path.transition({
+ *   await debug.player.path.transition({
  *     duration: 2, direction: 'clockwise',
  *     start: { x: 1024, y: -512, angle: 0 },
  *     end:   { x: 1024, y: -512, angle: 90 },
@@ -559,7 +559,7 @@ export function transition({ duration = 1, direction = 'clockwise', start = {}, 
  *  keeps its current value. The object-shaped, degrees counterpart to seek(),
  *  handy for jumping to a transition's start/end while scripting.
  *
- *   debug.path.move({ x: 39, y: -3113, angle: 246 });
+ *   debug.player.path.move({ x: 39, y: -3113, angle: 246 });
  */
 export function move({ x, y, angle } = {}) {
     const p = state.players[0];
