@@ -18,7 +18,7 @@
  * renderer sizes these screens against its pane.
  */
 
-import { getIntermissionTexture, getFontTexture, getHudTexture } from './textures.js';
+import { getIntermissionTexture, getFontTexture, getHudTexture, getMenuTexture } from './textures.js';
 import {
     INTERMISSION_W, INTERMISSION_H,
     INTER_COUNT_UP_MS, INTER_STEP_MS, INTER_LABELS, INTER_LABEL_X,
@@ -148,108 +148,169 @@ export const screenMethods = {
         const n = scores.length;
         if (!n) return;
 
-        // Grid metrics. Cells are sized to fit a 3-digit score with a
-        // little breathing room. The killer-face column sits before the
-        // victim columns; the TOTAL column sits after, capped by the
-        // WIMSTT label above it.
-        const faceW = 24, faceH = 20;
-        const cellW = 36, cellH = 22;
-        const headTop = 50;
-        const gridLeft = 60;
+        // Grid metrics in 320-wide composition coords. Cells host a face
+        // swatch in the header / left column and a centred 1-3 digit
+        // WINUM score in the data cells. The TOTAL column is sized to
+        // the WIMSTT label (62×12) so the label doesn't bleed into the
+        // adjacent victim column. The whole grid is centred horizontally
+        // for any n (1..4).
+        const faceW = 26, faceH = 22;
+        const dataW = 44, totalW = 70;
+        const cellH = 26;
+        const headTop = 56;
+
+        const gridW = faceW + 8 + n * dataW + totalW;
+        const gridLeft = (320 - gridW) / 2 | 0;
         const faceColX = gridLeft;
         const dataX0 = gridLeft + faceW + 8;
+        const totalColX = dataX0 + n * dataW;
 
-        // Header row: empty corner, victim face swatches, TOTAL label.
+        // Header row: corner is empty; each victim column gets a face
+        // swatch (centred in its cell); the TOTAL column shows the WIMSTT
+        // label centred in its (wider) cell.
         for (let v = 0; v < n; v++) {
-            this._drawFaceSwatch(v, dx(dataX0 + v * cellW + (cellW - faceW) / 2 | 0),
+            this._drawFaceSwatch(v, dx(dataX0 + v * dataW + (dataW - faceW) / 2 | 0),
                 dy(headTop), faceW, faceH);
         }
         const totalLabel = getIntermissionTexture('WIMSTT');
         if (totalLabel && totalLabel.width > 1) {
             this._blit(totalLabel, 0, 0, totalLabel.width, totalLabel.height,
-                dx(dataX0 + n * cellW + (cellW - totalLabel.width) / 2 | 0),
+                dx(totalColX + (totalW - totalLabel.width) / 2 | 0),
                 dy(headTop + (faceH - totalLabel.height) / 2 | 0),
                 totalLabel.width, totalLabel.height);
         }
 
-        // Killer rows.
-        const rowsTop = headTop + faceH + 6;
+        // Killer rows: left face swatch, n victim cells, TOTAL cell.
+        const rowsTop = headTop + faceH + 8;
         for (let k = 0; k < n; k++) {
             const ry = rowsTop + k * cellH;
-            this._drawFaceSwatch(k, dx(faceColX), dy(ry + (cellH - faceH) / 2 | 0), faceW, faceH);
+            this._drawFaceSwatch(k, dx(faceColX),
+                dy(ry + (cellH - faceH) / 2 | 0), faceW, faceH);
             for (let v = 0; v < n; v++) {
                 const val = (kills[k] && kills[k][v]) || 0;
                 this._drawCenteredNumber(val,
-                    dx(dataX0 + v * cellW + cellW / 2 | 0),
+                    dx(dataX0 + v * dataW + dataW / 2 | 0),
                     dy(ry + (cellH - WINUM_H) / 2 | 0));
             }
             this._drawCenteredNumber(scores[k] ?? 0,
-                dx(dataX0 + n * cellW + cellW / 2 | 0),
+                dx(totalColX + totalW / 2 | 0),
                 dy(ry + (cellH - WINUM_H) / 2 | 0));
         }
     },
 
     // ── Match lobby ──────────────────────────────────────────────────
     //
-    // Simplified vs the DOM lobby: plain dark backdrop (no level scene
-    // behind it yet, no WIMAP0 — the lobby precedes the chosen map's
-    // intermission backdrop), centred DEATHMATCH header, room code for
-    // network games, per-slot status with face swatches, action prompt.
+    // Two variants matching the DOM renderer:
+    //
+    //   network — full-screen panel over the WIMAP0 backdrop. M_NEWG
+    //             title, level-name sprite, slot list with face swatches
+    //             and the viewer's row marked by a `>>` chevron, room
+    //             code, action prompt. No QR sprite — too heavy to draw
+    //             pixel-art QR inside the framebuffer.
+    //
+    //   local   — no panel at all. The live (pre-match) scene shows
+    //             through; this only paints a small per-pane prompt over
+    //             it. The world render happens elsewhere; `render()`
+    //             only routes here for variant='network' to take over
+    //             the framebuffer, while local lobbies fall through to
+    //             world rendering with `_overlayLocalLobby` invoked
+    //             after the world pass.
     _renderLobby(now) {
         const lob = this.lobby;
-        this.fb.fill(0xFF101010);
-        const { ox, oy } = this._screenOrigin();
-        // Native-coord helpers — every coordinate below is inside the
-        // centred 320×200 composition.
+        const { ox, oy } = this._beginScreen('WIMAP0');
         const dx = nx => ox + nx;
         const dy = ny => oy + ny;
-        const cx = 160;
 
-        this._textScaled('DEATHMATCH', dx(cx), dy(30), 2, 'center');
-
-        let y = 60;
-        if (lob.variant === 'network' && lob.roomCode) {
-            this._textScaled(`ROOM ${lob.roomCode}`, dx(cx), dy(y), 1, 'center');
-            y += 16;
+        // Title: M_NEWG "NEW GAME" (121×15) centred near the top, with
+        // the level-name sprite WILV0N tucked beneath it.
+        const newg = getMenuTexture('M_NEWG');
+        this._blitSprite(newg, dx(160 - (newg?.width ?? 0) / 2 | 0), dy(20));
+        const m = /^E1M([1-9])$/.exec(lob.mapCursor || '');
+        if (m) {
+            const wilv = getIntermissionTexture(`WILV0${Number(m[1]) - 1}`);
+            this._blitSprite(wilv, dx(160 - (wilv?.width ?? 0) / 2 | 0), dy(40));
         }
 
-        // Network DM provides `slotOccupants` (string per slot); Local DM
-        // provides `slotsClaimed` (boolean per slot). Either array's
-        // length is the slot count to draw — never both. `slotOccupants`
-        // is `[]` for the local variant, so don't use plain `||` (an
-        // empty array is truthy and would suppress the fallback).
+        // Slot list. Network DM provides `slotOccupants` (string per
+        // slot); the viewer's row gets a `>>` chevron in the gutter to
+        // self-identify, matching the DOM lobby's per-pane marker.
         const occ = lob.slotOccupants?.length ? lob.slotOccupants : (lob.slotsClaimed ?? []);
-        const swatchW = 18, swatchH = 14;
-        const rowH = 20;
-        // Lay the per-slot row out around the composition centre: face
-        // swatch, then label, then status. Widths picked so "PLAYER N"
-        // (~50px in the small font) and a 5-char status don't run into
-        // each other.
-        const swatchX = cx - 60;
-        const labelX = cx - 35;
-        const statusX = cx + 25;
-        y += 8;
+        const swatchW = 20, swatchH = 16;
+        const rowH = 22;
+        // Layout columns in composition coords (320 wide):
+        //   chevron — swatch — label — — — — status
+        const chevronX = 70, swatchX = 88, labelX = 116, statusX = 200;
+        let y = 70;
         for (let i = 0; i < occ.length; i++) {
-            const claimed = lob.variant === 'network'
-                ? occ[i] !== 'empty' && occ[i] !== false
-                : !!occ[i];
-            this._drawFaceSwatch(i, dx(swatchX), dy(y), swatchW, swatchH);
-            let status;
-            if (!claimed) {
-                status = '----';
-            } else if (i === this.viewerPlayerIndex) {
-                status = 'YOU';
-            } else {
-                status = lob.variant === 'network' ? 'READY' : 'JOINED';
+            if (i === this.viewerPlayerIndex) {
+                this._text('>>', dx(chevronX), dy(y + 4), 'left');
             }
-            this._text(`PLAYER ${i + 1}`, dx(labelX), dy(y + 3), 'left');
-            this._text(status, dx(statusX), dy(y + 3), 'left');
+            this._drawFaceSwatch(i, dx(swatchX), dy(y), swatchW, swatchH);
+            const claimed = occ[i] !== 'empty' && occ[i] !== false && occ[i] != null;
+            const status = !claimed ? 'WAITING'
+                : i === this.viewerPlayerIndex ? 'YOU'
+                : 'READY';
+            this._text(`PLAYER ${i + 1}`, dx(labelX), dy(y + 4), 'left');
+            this._text(status, dx(statusX), dy(y + 4), 'left');
             y += rowH;
         }
 
-        y += 12;
-        const prompt = lob.canStart ? 'PRESS FIRE TO START' : 'WAITING FOR PLAYERS';
-        this._text(prompt, dx(cx), dy(y), 'center');
+        // Room code (host's invite — joiners already entered it).
+        if (lob.roomCode) {
+            y += 8;
+            this._text(`ROOM CODE: ${lob.roomCode}`, dx(160), dy(y), 'center');
+            y += 14;
+        }
+
+        // Per-pane action prompt — host fires, joiners wait.
+        y += 6;
+        const prompt = lob.canStart
+            ? (this.viewerPlayerIndex === 0 ? 'PRESS FIRE TO START GAME' : 'WAITING FOR GAME TO START')
+            : 'WAITING FOR PLAYERS';
+        this._text(prompt, dx(160), dy(y), 'center');
+    },
+
+    /** Local DM lobby overlay — draws on top of the live world. The DOM
+     *  equivalent toggles a per-pane CSS overlay via `data-claim-state`;
+     *  here we paint the equivalent prompt directly. Reads `lob` off
+     *  the renderer so the caller doesn't have to thread it through. */
+    _overlayLocalLobby(now) {
+        const lob = this.lobby;
+        const slot = this.viewerPlayerIndex;
+        if (slot == null) return;
+
+        // Mirror DomRenderer.renderLocalLobby's claim-state mapping:
+        // claimed-and-not-carried → READY!, prompting → "PRESS BUTTON
+        // TO CONNECT CONTROLLER", everyone else → no overlay.
+        const carried = lob.slotsCarriedOver?.[slot];
+        const claimed = lob.slotsClaimed?.[slot];
+        let overlay;
+        if (claimed && !carried) {
+            overlay = 'READY!';
+        } else if (slot === lob.promptingSlot) {
+            overlay = 'PRESS BUTTON TO\nCONNECT CONTROLLER';
+        } else {
+            return;
+        }
+
+        // Slightly darken the world so the red overlay text reads.
+        // 64-step alpha fade on the framebuffer's existing ABGR pixels.
+        const fb = this.fb, n = fb.length;
+        for (let i = 0; i < n; i++) {
+            const px = fb[i];
+            const r = (px >>> 0) & 0xff, g = (px >>> 8) & 0xff, b = (px >>> 16) & 0xff;
+            fb[i] = 0xff000000 | (r >> 1) | ((g >> 1) << 8) | ((b >> 1) << 16);
+        }
+
+        const { W, H } = this;
+        const lines = overlay.split('\n');
+        const lineH = 10;
+        const blockH = lines.length * lineH;
+        let y = (H - blockH) / 2 | 0;
+        for (const line of lines) {
+            this._text(line, W / 2, y, 'center');
+            y += lineH;
+        }
     },
 
     // ── Screen helpers ───────────────────────────────────────────────

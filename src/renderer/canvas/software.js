@@ -559,13 +559,18 @@ export class SoftwareRenderer {
 
         const now = performance.now();
 
-        // Full-screen overlays (lobby before a match, intermission /
-        // results between or after) freeze the world and own the whole
-        // pane — paint the screen and skip every world / HUD / weapon
-        // pass. At most one is ever set; check in display priority.
+        // Full-screen overlays (intermission, results) freeze the world
+        // and own the whole pane. The Network DM lobby behaves the same
+        // way — there's no level loaded behind it. The Local DM lobby
+        // doesn't: the level pre-loads in standalone mode so the world
+        // is visible behind a per-pane prompt, mirroring what DomRenderer
+        // shows. Locally we fall through to the world pass and overlay
+        // the prompt at the end via `_overlayLocalLobby`.
         if (this.results) { this._renderResults(now); return; }
         if (this.intermission) { this._renderIntermission(now); return; }
-        if (this.lobby) { this._renderLobby(now); return; }
+        if (this.lobby?.variant === 'network' || (this.lobby && this.walls.length === 0)) {
+            this._renderLobby(now); return;
+        }
 
         const dt = this._lastFrameTime ? Math.min(0.1, (now - this._lastFrameTime) / 1000) : 0;
         this._lastFrameTime = now;
@@ -605,6 +610,10 @@ export class SoftwareRenderer {
         this._renderWeapon(cam, now, dt);
         this._renderHud(now);
         this._renderFlash(now);
+        // Local DM lobby — world is rendered above, this paints the
+        // per-pane prompt overlay on top, matching the DOM lobby's
+        // CSS-driven `data-claim-state` panel.
+        if (this.lobby?.variant === 'local') this._overlayLocalLobby(now);
     }
 
     // ── HUD status bar ───────────────────────────────────────────────────
