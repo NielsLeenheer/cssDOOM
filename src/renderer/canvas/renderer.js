@@ -88,6 +88,7 @@ export class CanvasRenderer extends RendererBase {
 
         this.software = new SoftwareRenderer();
         this.software.uiScale = Math.max(1, this.resolution - 1);
+        this.software.screenScale = this.resolution;
         this._camera = null;
         this._hasScene = false;
 
