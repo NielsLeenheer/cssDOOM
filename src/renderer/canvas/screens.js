@@ -270,43 +270,59 @@ export const screenMethods = {
         this._text(prompt, dx(160), dy(y), 'center');
     },
 
-    /** Local DM lobby overlay — draws on top of the live world. The DOM
-     *  equivalent toggles a per-pane CSS overlay via `data-claim-state`;
-     *  here we paint the equivalent prompt directly. Reads `lob` off
-     *  the renderer so the caller doesn't have to thread it through. */
+    /** Local DM lobby overlay — draws on top of the live world. Mirrors
+     *  the DomRenderer's per-pane `data-claim-state` CSS:
+     *
+     *    prompting → world dimmed + "PRESS BUTTON TO CONNECT CONTROLLER"
+     *    ready     → "READY!" over the live (un-dimmed) world
+     *    waiting   → world dimmed to ~30% brightness, no text
+     *    active    → nothing (this method returns)
+     */
     _overlayLocalLobby(now) {
         const lob = this.lobby;
         const slot = this.viewerPlayerIndex;
         if (slot == null) return;
 
-        // Mirror DomRenderer.renderLocalLobby's claim-state mapping:
-        // claimed-and-not-carried → READY!, prompting → "PRESS BUTTON
-        // TO CONNECT CONTROLLER", everyone else → no overlay.
         const carried = lob.slotsCarriedOver?.[slot];
         const claimed = lob.slotsClaimed?.[slot];
-        let overlay;
-        if (claimed && !carried) {
-            overlay = 'READY!';
+        let claimState;
+        if (claimed) {
+            claimState = carried ? 'active' : 'ready';
         } else if (slot === lob.promptingSlot) {
-            overlay = 'PRESS BUTTON TO\nCONNECT CONTROLLER';
+            claimState = 'prompting';
         } else {
-            return;
+            claimState = 'waiting';
+        }
+        if (claimState === 'active') return;
+
+        // 'waiting' and 'prompting' both dim the world to focus attention
+        // on the prompting pane; 'ready' keeps full brightness so the
+        // just-claimed player sees the live scene clearly with READY!
+        // pinned over it. DOM matches via `filter: brightness(0.3)` on
+        // the pane itself — same arithmetic per pixel here.
+        if (claimState === 'waiting' || claimState === 'prompting') {
+            const fb = this.fb, n = fb.length;
+            for (let i = 0; i < n; i++) {
+                const px = fb[i];
+                const r = px & 0xff;
+                const g = (px >>> 8) & 0xff;
+                const b = (px >>> 16) & 0xff;
+                fb[i] = 0xff000000
+                    | ((r * 77) >>> 8)
+                    | (((g * 77) >>> 8) << 8)
+                    | (((b * 77) >>> 8) << 16);
+            }
         }
 
-        // Slightly darken the world so the red overlay text reads.
-        // 64-step alpha fade on the framebuffer's existing ABGR pixels.
-        const fb = this.fb, n = fb.length;
-        for (let i = 0; i < n; i++) {
-            const px = fb[i];
-            const r = (px >>> 0) & 0xff, g = (px >>> 8) & 0xff, b = (px >>> 16) & 0xff;
-            fb[i] = 0xff000000 | (r >> 1) | ((g >> 1) << 8) | ((b >> 1) << 16);
-        }
+        if (claimState === 'waiting') return;
 
+        const text = claimState === 'ready'
+            ? 'READY!'
+            : 'PRESS BUTTON TO\nCONNECT CONTROLLER';
         const { W, H } = this;
-        const lines = overlay.split('\n');
+        const lines = text.split('\n');
         const lineH = 10;
-        const blockH = lines.length * lineH;
-        let y = (H - blockH) / 2 | 0;
+        let y = (H - lines.length * lineH) / 2 | 0;
         for (const line of lines) {
             this._text(line, W / 2, y, 'center');
             y += lineH;
