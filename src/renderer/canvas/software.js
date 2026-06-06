@@ -238,6 +238,8 @@ export class SoftwareRenderer {
         this._wallTopOverride = new Map();  // wall ref → absolute top height (door tracks)
         this._ceilOverride = new Map();     // sectorPolygon ref → ceiling height
         this._floorOverride = new Map();    // sectorPolygon ref → floor height (lifts)
+        this._skyCeil = new Map();          // sectorIndex → ceiling height (sky sectors)
+        this._skyCtx = null;                // per-frame sky sampling parameters
         this._lastFrameTime = 0;
 
         // Sector light specials (flicker / blink / glow / fire).
@@ -362,6 +364,19 @@ export class SoftwareRenderer {
             if (sectorPoly) this._floorOverride.set(sectorPoly, raised);
         }
 
+        // Sky ceilings, keyed by sector index → ceiling height. In DOOM the
+        // sky is the visible ceiling of whichever sky sector you're looking
+        // at: it's drawn opaquely above the walls of that sector and
+        // occludes anything beyond. We reproduce that in the wall pass — a
+        // wall whose sector has a sky ceiling paints the sky from its top
+        // edge upward at the wall's own depth (see _drawWall), so distant
+        // geometry behind the opening is depth-rejected, no occluder
+        // objects or culling required.
+        this._skyCeil.clear();
+        for (const sp of this.sectorPolygons) {
+            if (sp.ceilingTexture === 'F_SKY1') this._skyCeil.set(sp.sectorIndex, sp.ceilingHeight);
+        }
+
         for (const t of (data.things || [])) {
             if (t.category === undefined) continue;   // filtered out by skill / MP
             const name = THING_SPRITES[t.type];
@@ -419,6 +434,7 @@ export class SoftwareRenderer {
         this._wallTopOverride.clear();
         this._ceilOverride.clear();
         this._floorOverride.clear();
+        this._skyCeil.clear();
         this._lightSectors = [];
         this._sectorLightMul = [];
     }
@@ -884,40 +900,41 @@ export class SoftwareRenderer {
         }
     }
 
-    // ── Sky backdrop ─────────────────────────────────────────────────────
+    // ── Sky ───────────────────────────────────────────────────────────────
     //
-    // DOOM treats the sky as an infinitely distant backdrop, not a
-    // ceiling surface: every sky column is painted from the top of the
-    // screen down to the top of the wall in that column (which can sit
-    // below the horizon when looking over a low wall into an open area),
-    // and the world is then drawn over it. We fill the whole frame with
-    // the sky at a sentinel far depth so any later geometry overwrites it
-    // via the depth test, and whatever stays uncovered reads as sky.
+    // The sky is the ceiling of whichever sky sector you're looking at.
+    // We first lay it down as a full-frame backdrop at a sentinel far
+    // depth (so any solid geometry overwrites it), then in the wall pass a
+    // wall under a sky ceiling repaints the sky above its top edge at the
+    // wall's own depth — exactly the front sector's ceiling visplane —
+    // which is what makes distant geometry behind a sky opening disappear
+    // (DOOM r_plane: the sky plane is drawn opaquely above the segs).
+    //
+    // DOOM draws the sky at a fixed vertical scale (≈1 texel per row at
+    // 200px tall) anchored so the texture's mountain base sits at the
+    // horizon; the params are stashed in `_skyCtx` so the wall pass paints
+    // it identically. (Stretching the whole texture to the horizon
+    // dragged SKY1's dark lower rows up into a fat band above the walls.)
     _renderSky(cam) {
         const sky = getSkyTexture();
-        if (!sky) return;
+        if (!sky) { this._skyCtx = null; return; }
         const { W, H, fb, zb } = this;
         const { angle, halfH } = cam;
         const skyW = sky.width, skyH = sky.height, sdata = sky.data;
         const colAngle = this._colAngle;
-        const uBase = (angle / (Math.PI * 2)) * skyW * 4;
-        // DOOM draws the sky at a fixed vertical scale (≈1 texel per row
-        // at 200px tall) anchored so the texture's mountain base sits at
-        // the horizon, rather than stretching the whole texture from the
-        // top of the screen to the horizon. Stretching dragged SKY1's
-        // dark lower rows up into a fat black band above distant walls.
-        const iscale = 200 / H;
-        const skyHorizon = skyH - 28;     // texel row shown at the horizon
+        const ctx = this._skyCtx = {
+            sdata, skyW, skyH, colAngle, halfH,
+            uBase: (angle / (Math.PI * 2)) * skyW * 4,
+            iscale: 200 / H,
+            skyHorizon: skyH - 28,
+            twoPi: Math.PI * 2,
+        };
         for (let y = 0; y < H; y++) {
-            let sv = (((y - halfH) * iscale) + skyHorizon) | 0;
-            if (sv < 0) sv = 0; else if (sv >= skyH) sv = skyH - 1;
+            const sv = skyRow(ctx, y);
             const row = sv * skyW;
             const base = y * W;
             for (let x = 0; x < W; x++) {
-                let u = uBase - (colAngle[x] / (Math.PI * 2)) * skyW * 4;
-                u %= skyW;
-                if (u < 0) u += skyW;
-                fb[base + x] = sdata[row + (u | 0)] | 0xFF000000;
+                fb[base + x] = sdata[row + skyCol(ctx, x)] | 0xFF000000;
                 zb[base + x] = SKY_DEPTH;
             }
         }
@@ -945,7 +962,13 @@ export class SoftwareRenderer {
             const yOff = (wall.yOffset || 0) + bottomOffset;
             const light = wall.lightLevel * (this._sectorLightMul[wall.sectorIndex] ?? 1);
 
-            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light);
+            // If this wall reaches its sector's sky ceiling, the area above
+            // its top edge is that sector's sky — paint it at the wall's
+            // depth so it occludes whatever lies beyond the opening.
+            const skyCeil = this._skyCeil.get(wall.sectorIndex);
+            const skyAbove = skyCeil !== undefined && Math.abs(wallTop - skyCeil) < 1;
+
+            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light, false, skyAbove);
         }
     }
 
@@ -954,7 +977,7 @@ export class SoftwareRenderer {
      * camera space, near-plane clip, project, then fill each screen
      * column with a perspective-correct textured strip, depth-tested.
      */
-    _drawWall(cam, wall, tex, wallBottom, wallTop, yOff, baseLight, noCull = false) {
+    _drawWall(cam, wall, tex, wallBottom, wallTop, yOff, baseLight, noCull = false, skyAbove = false) {
         const { W, H, fb, zb } = this;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
@@ -1022,6 +1045,7 @@ export class SoftwareRenderer {
 
         // Fake contrast: E/W walls darker, N/S walls brighter.
         const light = baseLight + (Math.abs(dx) > Math.abs(dy) ? -16 : 16);
+        const skyCtx = skyAbove ? this._skyCtx : null;
 
         for (let x = xs; x <= xe; x++) {
             const t = (x + 0.5 - p1) / span;
@@ -1036,6 +1060,20 @@ export class SoftwareRenderer {
 
             const ytop = yt1 + (yt2 - yt1) * t;
             const ybot = yb1 + (yb2 - yb1) * t;
+
+            // Ceiling visplane: paint this sector's sky above the wall top
+            // at the wall's depth, occluding anything farther in the column.
+            if (skyCtx) {
+                const skyEnd = Math.min(H, Math.ceil(ytop - 0.5));
+                const sCol = skyCol(skyCtx, x);
+                for (let y = 0; y < skyEnd; y++) {
+                    const idx = y * W + x;
+                    if (cy >= zb[idx]) continue;
+                    fb[idx] = skyCtx.sdata[skyRow(skyCtx, y) * skyCtx.skyW + sCol] | 0xff000000;
+                    zb[idx] = cy;
+                }
+            }
+
             const colH = ybot - ytop;
             if (colH <= 0) continue;
 
@@ -1327,6 +1365,21 @@ export class SoftwareRenderer {
         }
     }
 
+}
+
+// Sky texture row for screen row y, given the per-frame sky context.
+function skyRow(c, y) {
+    let sv = (((y - c.halfH) * c.iscale) + c.skyHorizon) | 0;
+    if (sv < 0) sv = 0; else if (sv >= c.skyH) sv = c.skyH - 1;
+    return sv;
+}
+
+// Sky texture column for screen column x.
+function skyCol(c, x) {
+    let u = c.uBase - (c.colAngle[x] / c.twoPi) * c.skyW * 4;
+    u %= c.skyW;
+    if (u < 0) u += c.skyW;
+    return u | 0;
 }
 
 // Character → DIGITS_SHEET / SMALL_DIGITS glyph index (0-9, % = 10, - = 11).
