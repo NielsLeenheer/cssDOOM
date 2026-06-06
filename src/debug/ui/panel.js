@@ -10,10 +10,26 @@
 
 import { culling, cullingStats } from '../../renderer/dom/scene/culling.js';
 import { switchRenderer } from '../features/renderer.js';
+import { rendererType } from '../../renderer/manager.js';
 import { SETTINGS } from './registry.js';
 
 // Per-frame culling stat elements, keyed by the registry entry's `stat`.
 const statElements = {};
+
+// Checkboxes gated by renderer type ({ input, label, type }). Disabled +
+// greyed when the active renderer's type doesn't match (see applyRendererTypes).
+const typedControls = [];
+
+/** Disable the type-gated checkboxes that don't apply to the active renderer
+ *  (CSS toggles under a canvas renderer, canvas Stats under a DOM renderer). */
+function applyRendererTypes() {
+    const active = rendererType(document.body.dataset.renderer || 'dom');
+    for (const c of typedControls) {
+        const off = c.type !== active;
+        c.input.disabled = off;
+        c.label.classList.toggle('debug-disabled', off);
+    }
+}
 
 function makeCheckbox(checked, onChange) {
     const cb = document.createElement('input');
@@ -30,6 +46,14 @@ function makeRow(checkbox, label) {
     return lbl;
 }
 
+/** Append a checkbox row, registering it for renderer-type gating if the entry
+ *  declares a `rendererType` (disabled when the active renderer doesn't match). */
+function addCheckboxRow(s, cb, parent) {
+    const row = makeRow(cb, s.label);
+    parent.appendChild(row);
+    if (s.rendererType) typedControls.push({ input: cb, label: row, type: s.rendererType });
+}
+
 /** Build one registry entry's DOM into `parent`. */
 function buildEntry(s, parent) {
     switch (s.kind) {
@@ -39,18 +63,18 @@ function buildEntry(s, parent) {
             const cb = makeCheckbox(s.invert ? !has : has, (checked) => {
                 document.body.classList.toggle(s.class, s.invert ? !checked : checked);
             });
-            parent.appendChild(makeRow(cb, s.label));
+            addCheckboxRow(s, cb, parent);
             break;
         }
         case 'layer': {
             // Same features/layers.js object the console drives — checked = shown.
             const cb = makeCheckbox(s.layer.shown, (checked) => (checked ? s.layer.show() : s.layer.hide()));
-            parent.appendChild(makeRow(cb, s.label));
+            addCheckboxRow(s, cb, parent);
             break;
         }
         case 'flag': {
             const cb = makeCheckbox(!!s.target[s.key], (checked) => { s.target[s.key] = checked; });
-            parent.appendChild(makeRow(cb, s.label));
+            addCheckboxRow(s, cb, parent);
             if (s.stat) {
                 const stat = document.createElement('div');
                 stat.className = 'debug-stat';
@@ -104,6 +128,11 @@ export function openDebugMenu() {
     menuEl = initDebugMenu();
     menuEl.addEventListener('toggle', () => (menuEl.open ? startStats() : stopStats()));
     if (menuEl.open) startStats();
+    // Gate type-specific checkboxes on the active renderer, and re-gate whenever
+    // the renderer changes (the picker / debug.view.renderer set body.dataset.renderer).
+    applyRendererTypes();
+    new MutationObserver(applyRendererTypes)
+        .observe(document.body, { attributes: true, attributeFilter: ['data-renderer'] });
     console.log('Debug menu enabled');
 }
 

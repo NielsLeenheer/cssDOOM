@@ -143,7 +143,7 @@ cull.all = flags.cullAll;
 //     show the stepped animation (see features/spritesheet.js). camera.* is the
 //     view-relative orbit, wired above.
 const view = group('view');
-const RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat'];
+const RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat', 'canvas'];
 view.renderer = (kind) => {
     if (kind == null) {
         console.log(`renderer: ${document.body.dataset.renderer || RENDERERS[0]} — options: ${RENDERERS.join(', ')}`);

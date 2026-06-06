@@ -214,7 +214,7 @@ the renderer's command stream for deterministic replay (it records the
 | `save(slot)` | Write the captured buffer to storage. |
 
 ```js
-debug.view.renderer('lighting')   // dom · flat · shade · lighting · line · cat
+debug.view.renderer('lighting')   // dom · flat · shade · lighting · line · cat · canvas
 debug.view.renderer()             // show current + choices
 debug.view.spectator(true)        // force spectator on (no arg toggles)
 ```
@@ -250,6 +250,6 @@ Open with `debug()` or the logo button. Defined in
 - **Effects** (CSS render toggles) — Sector light effects · Light falloff ·
   Scrolling textures · Animated flats · Head bob · All enemies shadow.
 - **Renderer** — renderer picker (`dom` / `flat` / `shade` / `lighting` / `line` /
-  `cat`) · show/hide Floors · Ceilings · Walls · Things · Enemies · HUD · Sky · Chrome.
+  `cat` / `canvas`) · show/hide Floors · Ceilings · Walls · Things · Enemies · HUD · Sky · Chrome.
 - **Debug** — Show sky walls · Show wall IDs · Show sector IDs.
 - **State** — End level · End match (deathmatch only) · Enter attract (kiosk only).

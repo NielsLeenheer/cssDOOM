@@ -53,7 +53,15 @@ function parseResolution() {
     return Math.max(1, Math.min(MAX_RESOLUTION, parseInt(m[1], 10)));
 }
 
+// Frame-time / size overlay toggle, shared across all CanvasRenderer instances.
+// Off by default; the debug panel's Renderer → "Stats" checkbox flips it (and it
+// can still be set by hand: `canvasStats.enabled = true`). Lives here, owned by
+// the renderer, the same way the DOM renderer's culling flags live in culling.js.
+export const canvasStats = { enabled: false };
+
 export class CanvasRenderer extends RendererBase {
+    static type = 'canvas';   // software framebuffer on a <canvas>, not CSS/DOM
+
     /**
      * @param {object} options
      * @param {number} options.playerIndex   the player this renderer is for
@@ -97,13 +105,11 @@ export class CanvasRenderer extends RendererBase {
         this._camera = null;
         this._hasScene = false;
 
-        // Rolling frame-time stats. The overlay (`_drawStats`) is wired
-        // up but off by default; flipping `_showStats` to true at runtime
-        // turns it on. The plan is to hook it to a flag in the debug
-        // panel — until then it's only enableable by hand.
+        // Rolling frame-time stats for the overlay (`_drawStats`), gated by the
+        // shared `canvasStats.enabled` flag — off by default, toggled from the
+        // debug panel's Renderer → "Stats" checkbox.
         this._frameTimes = new Float32Array(60);
         this._frameTimeIdx = 0;
-        this._showStats = false;
 
         this._resizeObserver = new ResizeObserver(() => this._resize());
         this._resizeObserver.observe(this.paneEl);
@@ -226,7 +232,7 @@ export class CanvasRenderer extends RendererBase {
         // Roll the elapsed ms into a 60-frame window for the readout.
         this._frameTimes[this._frameTimeIdx] = t1 - t0;
         this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
-        if (this._showStats) this._drawStats();
+        if (canvasStats.enabled) this._drawStats();
     }
 
     /** Top-left frame-time overlay. Drawn on the display canvas (not the

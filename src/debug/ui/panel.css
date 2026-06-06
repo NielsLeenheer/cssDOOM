@@ -87,6 +87,13 @@
         grid-template-columns: 1fr 1fr;
         column-gap: 8px;
     }
+
+    /* A checkbox row gated off for the active renderer (panel.js sets the
+       class + the input's `disabled`) — greyed and click-through-dead. */
+    & label.debug-disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+    }
 }
 
 /* Conditional State-group buttons.

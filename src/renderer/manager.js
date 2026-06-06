@@ -47,6 +47,13 @@ const RENDERERS = {
     dom:      DomRenderer,
 };
 
+/** The rendering technology of a renderer kind — 'dom' (CSS/DOM scene) or
+ *  'canvas' (a <canvas> framebuffer). Read by the debug panel to disable
+ *  CSS-only toggles when a canvas renderer is active. Unknown kinds → 'dom'. */
+export function rendererType(kind) {
+    return RENDERERS[kind]?.type ?? 'dom';
+}
+
 // Per-layout pane composition, all static. Each layout has:
 //
 //   grid     — pane positioning model, written to `body.dataset.grid`.

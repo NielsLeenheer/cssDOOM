@@ -32,6 +32,8 @@ setRendererSettings({
 });
 
 export class LineRenderer extends RendererBase {
+    static type = 'canvas';   // draws on a <canvas>, not the CSS/DOM scene
+
     /**
      * @param {object} options
      * @param {number} options.playerIndex   the player this renderer is for

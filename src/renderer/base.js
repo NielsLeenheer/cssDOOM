@@ -25,6 +25,12 @@
  */
 
 export class RendererBase {
+    // Rendering technology: 'dom' (CSS/DOM scene — most renderers) or 'canvas'
+    // (a <canvas> framebuffer). The debug panel reads this (via the manager) to
+    // disable CSS-only toggles when a 'canvas' renderer is active. Subclasses
+    // that aren't DOM-based override it (LineRenderer, CanvasRenderer).
+    static type = 'dom';
+
     dispatch(env) {
         const fn = this[env.cmd];
         if (typeof fn === 'function') return fn.apply(this, env.args);
