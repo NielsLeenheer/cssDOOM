@@ -269,6 +269,8 @@ const ENTITY_COMMANDS = [
     'stopFiring',
     'triggerFlash',
     'updateHud',
+    'showIntermission',
+    'hideIntermission',
 ];
 
 for (const cmd of ENTITY_COMMANDS) {

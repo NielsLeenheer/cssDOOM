@@ -108,6 +108,11 @@ export function getHudTexture(name) {
     return getByPath(`assets/hud/${name}.png`);
 }
 
+export function getIntermissionTexture(name) {
+    if (!name) return null;
+    return getByPath(`assets/intermission/${name}.png`);
+}
+
 /** Drop everything — used when the renderer is torn down. */
 export function clearTextureCache() {
     cache.clear();

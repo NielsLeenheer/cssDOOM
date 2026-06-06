@@ -41,6 +41,7 @@ import {
     getSkyTexture,
     getWeaponTexture,
     getHudTexture,
+    getIntermissionTexture,
 } from './textures.js';
 import { THING_SPRITES } from '../dom/scene/constants.js';
 
@@ -135,6 +136,21 @@ const HUD_KEYS = [
     { color: 'yellow', icon: 'STKEYS1' },
     { color: 'red', icon: 'STKEYS2' },
 ];
+
+// SP intermission screen, drawn in native DOOM 320x200 coordinates and
+// scaled by uiScale just like the HUD. Glyph dimensions match the
+// shipped assets.
+const WINUM_W = 11, WINUM_H = 12;     // big yellow digits 0-9
+const WIPCNT_W = 13, WIPCNT_H = 12;   // percent sign
+const WICOLON_W = 5, WICOLON_H = 10;  // m:ss colon
+const INTERMISSION_W = 320, INTERMISSION_H = 200;
+const INTER_COUNT_UP_MS = 1200;       // per-row duration, matches DOM
+const INTER_STEP_DELAY_MS = 250;      // gap between rows
+const INTER_STEP_MS = INTER_COUNT_UP_MS + INTER_STEP_DELAY_MS;
+const INTER_ROW_Y = [50, 68, 86, 110];   // KILLS, ITEMS, SECRET, TIME
+const INTER_LABEL_X = 50;                // label left edge
+const INTER_VALUE_R = 270;               // value right edge
+const INTER_LABELS = ['WIOSTK', 'WIOSTI', 'WIOSTS', 'WITIME'];
 
 // Small integer hash → [0,1), for the random light flickers.
 function hashRnd(a, b) {
@@ -270,6 +286,7 @@ export class SoftwareRenderer {
         this.weapon = null;           // { name, info, firing, fireStart, fireRate, bob }
         this.flash = null;            // { r, g, b, start }
         this.hud = null;              // { health, armor, ammo, maxAmmo, currentWeapon, ownedWeapons }
+        this.intermission = null;     // null | { mapName, stats, startTime }
         // Pixel scale for screen-space UI (HUD + weapon), in framebuffer
         // pixels per source pixel. Set by the CanvasRenderer; it scales
         // below the render factor so the bar/weapon get relatively smaller
@@ -597,6 +614,19 @@ export class SoftwareRenderer {
         };
     }
 
+    showIntermission(payload) {
+        if (!payload?.stats) return;
+        this.intermission = {
+            mapName: payload.mapName ?? null,
+            stats: payload.stats,
+            startTime: performance.now(),
+        };
+    }
+
+    hideIntermission() {
+        this.intermission = null;
+    }
+
     setDoorState(sectorIndex, doorState) {
         const door = this.doors.get(sectorIndex);
         if (door) door.target = doorState === 'open' ? door.open : door.closed;
@@ -698,6 +728,15 @@ export class SoftwareRenderer {
         zb.fill(Infinity);
 
         const now = performance.now();
+
+        // When the SP intermission is up the game freezes the player and
+        // the screen owns the full pane — skip every world / HUD / weapon
+        // pass and let _renderIntermission paint the whole framebuffer.
+        if (this.intermission) {
+            this._renderIntermission(now);
+            return;
+        }
+
         const dt = this._lastFrameTime ? Math.min(0.1, (now - this._lastFrameTime) / 1000) : 0;
         this._lastFrameTime = now;
         this._updateDoors(dt);
@@ -865,6 +904,127 @@ export class SoftwareRenderer {
             this._blit(icon, 0, 0, 7, 5,
                 dx(239), dy(4 + i * 9), 7 * scale, 5 * scale);
         }
+    }
+
+    // ── SP intermission screen ───────────────────────────────────────────
+    //
+    // DOOM's post-level summary: WIMAP0 backdrop, WILV0N + "FINISHED"
+    // header, then KILLS / ITEMS / SECRET as percentages and TIME as
+    // m:ss. Each row counts up from zero to its final reading in turn.
+    // Composed in native 320×200 coords and scaled by uiScale, like the
+    // HUD bar — bigger framebuffers get black margins around it rather
+    // than stretching the art.
+    _renderIntermission(now) {
+        const im = this.intermission;
+        const { W, H } = this;
+        const scale = this.uiScale;
+        const bgW = INTERMISSION_W * scale;
+        const bgH = INTERMISSION_H * scale;
+        const bgX = Math.round((W - bgW) / 2);
+        const bgY = Math.round((H - bgH) / 2);
+        const dx = nx => bgX + nx * scale;
+        const dy = ny => bgY + ny * scale;
+
+        // Backdrop.
+        const wimap = getIntermissionTexture('WIMAP0');
+        if (wimap && wimap.width > 1) {
+            this._blit(wimap, 0, 0, INTERMISSION_W, INTERMISSION_H,
+                bgX, bgY, bgW, bgH);
+        }
+
+        // Header: level-name (WILV0N) stacked above "FINISHED" (WIF),
+        // both centred horizontally on the 320-wide column.
+        const m = /^E1M([1-9])$/.exec(im.mapName || '');
+        if (m) {
+            const wilv = getIntermissionTexture(`WILV0${Number(m[1]) - 1}`);
+            if (wilv && wilv.width > 1) {
+                this._blit(wilv, 0, 0, wilv.width, wilv.height,
+                    dx(160 - wilv.width / 2), dy(2),
+                    wilv.width * scale, wilv.height * scale);
+            }
+        }
+        const wif = getIntermissionTexture('WIF');
+        if (wif && wif.width > 1) {
+            this._blit(wif, 0, 0, wif.width, wif.height,
+                dx(160 - wif.width / 2), dy(20),
+                wif.width * scale, wif.height * scale);
+        }
+
+        // Stat rows. Targets are captured at showIntermission time;
+        // elapsed-since-start drives the count-up progress per row.
+        const elapsed = now - im.startTime;
+        const progress = i => Math.max(0, Math.min(1,
+            (elapsed - i * INTER_STEP_MS) / INTER_COUNT_UP_MS));
+        const kills   = percentValue(im.stats.kills);
+        const items   = percentValue(im.stats.items);
+        const secrets = percentValue(im.stats.secrets);
+        const timeSec = (im.stats.elapsedMs ?? 0) / 1000;
+
+        for (let i = 0; i < INTER_LABELS.length; i++) {
+            const lbl = getIntermissionTexture(INTER_LABELS[i]);
+            if (lbl && lbl.width > 1) {
+                this._blit(lbl, 0, 0, lbl.width, lbl.height,
+                    dx(INTER_LABEL_X), dy(INTER_ROW_Y[i]),
+                    lbl.width * scale, lbl.height * scale);
+            }
+        }
+
+        const xR = (nx) => bgX + nx * scale;
+        this._drawInterPercent(Math.round(kills   * progress(0)), xR(INTER_VALUE_R), dy(INTER_ROW_Y[0]), scale);
+        this._drawInterPercent(Math.round(items   * progress(1)), xR(INTER_VALUE_R), dy(INTER_ROW_Y[1]), scale);
+        this._drawInterPercent(Math.round(secrets * progress(2)), xR(INTER_VALUE_R), dy(INTER_ROW_Y[2]), scale);
+        this._drawInterTime(timeSec * progress(3),                xR(INTER_VALUE_R), dy(INTER_ROW_Y[3]), scale);
+    }
+
+    /** Render an integer percentage right-anchored at the given pixel
+     *  coordinates. WIPCNT sits at the rightmost slot; WINUM digits step
+     *  leftward. */
+    _drawInterPercent(value, xR, yTop, scale) {
+        const pct = getIntermissionTexture('WIPCNT');
+        let x = xR;
+        if (pct && pct.width > 1) {
+            x -= WIPCNT_W * scale;
+            this._blit(pct, 0, 0, WIPCNT_W, WIPCNT_H, x, yTop,
+                WIPCNT_W * scale, WIPCNT_H * scale);
+        }
+        this._drawInterDigits(String(Math.max(0, value | 0)), x, yTop, scale);
+    }
+
+    /** Render seconds as "m:ss" (or "mm:ss" when the minutes overflow)
+     *  right-anchored at the given pixel coordinates. */
+    _drawInterTime(totalSec, xR, yTop, scale) {
+        const t = Math.max(0, Math.floor(totalSec));
+        const mm = Math.floor(t / 60);
+        const ss = t % 60;
+        let x = xR;
+        // Seconds — always two digits.
+        x = this._drawInterDigits(ss.toString().padStart(2, '0'), x, yTop, scale);
+        // Colon, vertically aligned to the digit baseline.
+        const colon = getIntermissionTexture('WICOLON');
+        if (colon && colon.width > 1) {
+            x -= WICOLON_W * scale;
+            const yColon = yTop + (WINUM_H - WICOLON_H) * scale;
+            this._blit(colon, 0, 0, WICOLON_W, WICOLON_H, x, yColon,
+                WICOLON_W * scale, WICOLON_H * scale);
+        }
+        // Minutes — variable width.
+        this._drawInterDigits(String(mm), x, yTop, scale);
+    }
+
+    /** Blit a digit string right-aligned ending at `xR`; returns the new
+     *  left edge so a caller can append further glyphs to the left. */
+    _drawInterDigits(str, xR, yTop, scale) {
+        let x = xR;
+        for (let i = str.length - 1; i >= 0; i--) {
+            const d = str.charCodeAt(i) - 48;
+            if (d < 0 || d > 9) continue;
+            const tex = getIntermissionTexture(`WINUM${d}`);
+            if (!tex || tex.width <= 1) continue;
+            x -= WINUM_W * scale;
+            this._blit(tex, 0, 0, WINUM_W, WINUM_H, x, yTop,
+                WINUM_W * scale, WINUM_H * scale);
+        }
+        return x;
     }
 
     // ── HUD overlay: weapon sprite + screen flash ────────────────────────
@@ -1409,6 +1569,14 @@ function skyCol(c, x) {
 }
 
 // Character → DIGITS_SHEET / SMALL_DIGITS glyph index (0-9, % = 10, - = 11).
+// Convert a {collected,total} pair to an integer 0..100 percent. Matches
+// the DOM intermission: an empty objective (no kills available, etc.) is
+// treated as 100% so the row doesn't sit at 0.
+function percentValue(p) {
+    if (!p || !p.total) return 100;
+    return Math.round(100 * p.collected / p.total);
+}
+
 function glyphIndex(ch) {
     if (ch >= '0' && ch <= '9') return ch.charCodeAt(0) - 48;
     if (ch === '%') return 10;
