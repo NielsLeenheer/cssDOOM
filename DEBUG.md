@@ -185,8 +185,8 @@ Freeze the world for a freeze-frame, plus console toggles for the Game cheat fla
 
 | Command | Description |
 | --- | --- |
-| `pause()` | Freeze-frame — stop the world tick **and** all CSS animations (holds a fireball mid-air). |
-| `play()` | Resume both; in-flight motion continues from where it stopped. |
+| `freeze()` | Freeze-frame — stop the world tick **and** all CSS animations (holds a fireball mid-air). |
+| `unfreeze()` | Resume both; in-flight motion continues from where it stopped. |
 | `noDamage(on?)` | Player takes no damage. No arg toggles; pass a boolean to set. |
 | `noAttack(on?)` | Enemies don't attack. |
 | `noMove(on?)` | Enemies don't move. |

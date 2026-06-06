@@ -18,7 +18,7 @@ import * as spritesModule from '../features/sprites.js';
 import * as sectorsModule from '../features/sectors.js';
 import * as layersModule from '../features/layers.js';
 import * as flags from '../features/flags.js';
-import * as freeze from '../features/freeze.js';
+import { freeze, unfreeze } from '../features/freeze.js';
 import { position as positionCmds, world as worldCmds } from '../features/world.js';
 import { openDebugMenu } from '../ui/panel.js';
 import { switchRenderer } from '../features/renderer.js';
@@ -116,12 +116,12 @@ path.transition = pathModule.transition;
 path.move = pathModule.move;
 
 // ── debug.game — freeze-frame + cheat flags (see features/freeze.js + flags.js).
-// pause() stops the world tick + all CSS animations (freeze a fireball mid-air);
-// play() resumes both. noDamage / noAttack / noMove toggle cheats; peaceful()
+// freeze() stops the world tick + all CSS animations (hold a fireball mid-air);
+// unfreeze() resumes both. noDamage / noAttack / noMove toggle cheats; peaceful()
 // flips all three at once. (Render-command recording lives in debug.view.)
 const game = group('game');
-game.pause = freeze.pause;
-game.play = freeze.resume;
+game.freeze = freeze;
+game.unfreeze = unfreeze;
 game.noDamage = flags.noDamage;
 game.noAttack = flags.noAttack;
 game.noMove = flags.noMove;

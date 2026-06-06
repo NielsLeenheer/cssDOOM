@@ -4,7 +4,7 @@
  *
  * Each setter mutates the live Player and flags player._hudDirty; the game loop
  * (master.js renderAllActivePanes) polls that every frame — even while frozen
- * (debug.game.pause) — and re-dispatches updateHud, so the bar updates on its
+ * (debug.game.freeze) — and re-dispatches updateHud, so the bar updates on its
  * own. The same path every pickup / damage hit uses. Console: debug.player.*.
  */
 
