@@ -35,15 +35,19 @@ const RENDER_HEIGHT_BASE = 200;
 const MIN_WIDTH_BASE = 200;
 const MAX_WIDTH_BASE = 640;
 const MAX_RESOLUTION = 4;
+const DEFAULT_RESOLUTION = 2;
 
-// `?resolution=1x..4x` → 1..4 integer factor, defaulting to 1. Any
-// garbage value falls back to 1 silently rather than producing a giant
-// framebuffer no machine could keep at 60 fps.
+// `?resolution=1x..4x` → 1..4 integer factor. Defaults to 2x — at 1x the
+// 200-tall framebuffer reads as very coarse on modern displays, and 2x
+// is comfortably within frame budget on any machine that can run the
+// renderer at all. An explicit `?resolution=` overrides this; any
+// garbage value falls back to the default silently rather than producing
+// a giant framebuffer no machine could keep at 60 fps.
 function parseResolution() {
     const v = document.body.dataset.resolution;
-    if (!v) return 1;
+    if (!v) return DEFAULT_RESOLUTION;
     const m = /^(\d+)x?$/i.exec(v);
-    if (!m) return 1;
+    if (!m) return DEFAULT_RESOLUTION;
     return Math.max(1, Math.min(MAX_RESOLUTION, parseInt(m[1], 10)));
 }
 
