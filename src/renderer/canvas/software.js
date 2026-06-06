@@ -452,7 +452,13 @@ export class SoftwareRenderer {
     showResults(payload) { this.results = payload || null; }
     hideResults() { this.results = null; }
 
-    showLobby(payload) { this.lobby = payload || null; }
+    // The Game re-fires showLobby AFTER it has transitioned to PLAYING
+    // (with inLobby:false) so the DM lobby's per-pane claim overlays can
+    // flip 'ready'→'active' — see Game.beginPlay. For this renderer that
+    // late fire would otherwise latch the lobby panel back on top of the
+    // running world, so treat inLobby:false as a hide, exactly like the
+    // DomRenderer's showLobby does.
+    showLobby(payload) { this.lobby = payload && payload.inLobby ? payload : null; }
     hideLobby() { this.lobby = null; }
 
     setDoorState(sectorIndex, doorState) {

@@ -126,6 +126,16 @@ const LAYOUT_SPECS = {
         ],
         players: { singleplayer: { standalone: [0, 0, 0, 0] } },
     },
+    // ?layout=compare SP: DomRenderer (left) beside CanvasRenderer
+    // (right), both mirroring player 0, for side-by-side renderer
+    // comparison. Flex 50/50, full height.
+    compare: {
+        slots: [
+            { kind: 'dom' },
+            { kind: 'canvas' },
+        ],
+        players: { singleplayer: { standalone: [0, 0] } },
+    },
 };
 
 class RendererManager {
