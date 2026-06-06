@@ -37,8 +37,11 @@ function group(name) { return (debug[name] ??= {}); }
 Object.assign(group('world'), worldCmds);
 
 // ── debug.sectors — dissect the level for the talk's "anatomy of a sector"
-// animation (see features/sectors.js + features/sectors.css). Pure DOM toggles
-// on the .sector#s{id} containers, spanning every pane.
+// build-up (see features/sectors.js + .css). Pure DOM toggles on the
+// .sector#s{id} containers, spanning every pane. Each viz is a show/hide pair:
+//   debug.sectors.show(40) / .hide(40) / .only(29, 32) / .get(40) / .reset()
+//   debug.sectors.explode.show(40)  ·  .highlight.show(40)
+//   debug.sectors.grid.show(40)     ·  .billboard.show(40)
 Object.assign(group('sectors'), sectorsModule);
 
 // ── debug.sprites — sprite-sheet stepped-animation viz (see sprites.css) ────

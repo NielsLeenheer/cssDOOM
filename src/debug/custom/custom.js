@@ -10,7 +10,7 @@
  *
  * Wired by console.js via registerCustom(debug): it hands in the live `debug`
  * namespace, so a script just calls debug.player.path.play(...),
- * debug.sectors.explode(...), debug.layers.walls.hide() directly.
+ * debug.sectors.explode.show(...), debug.layers.walls.hide() directly.
  */
 
 // The talk path recordings (recordings.js) are a large data blob — the player's
@@ -72,13 +72,13 @@ export function registerCustom(debug) {
         await delay(1000);
 
         /* Explode the sector's walls */
-        debug.sectors.explode(40);
+        debug.sectors.explode.show(40);
 
         /* Delay to insert explanation in Keynote with looped light fx */
         await delay(10000);
 
         /* Re-assemble the sector */
-        debug.sectors.implode(40);
+        debug.sectors.explode.hide(40);
         debug.sectors.show();
         await delay(1000);
 
@@ -105,8 +105,8 @@ export function registerCustom(debug) {
         await delay(1000);
 
         /* Show floor grid on the current sector to reveal its structure */
-        debug.sectors.showFloorGrid(29);
-        debug.sectors.showFloorGrid(32);
+        debug.sectors.grid.show(29);
+        debug.sectors.grid.show(32);
 
         await delay(10000);
 
@@ -116,8 +116,8 @@ export function registerCustom(debug) {
         /* Show enemies, things and hide the floor grid again. */
         debug.layers.enemies.show();
         debug.layers.things.show()
-        debug.sectors.hideFloorGrid(29);
-        debug.sectors.hideFloorGrid(32);
+        debug.sectors.grid.hide(29);
+        debug.sectors.grid.hide(32);
         debug.sectors.show();
         
         await delay(1000);
@@ -154,14 +154,14 @@ export function registerCustom(debug) {
         await delay(1000);
 
         debug.sectors.only(40);
-        debug.sectors.explode(40);
+        debug.sectors.explode.show(40);
 
         // return;
 
         await delay(5000);
 
         /* Re-assemble the sector */
-        debug.sectors.implode(40);
+        debug.sectors.explode.hide(40);
         debug.sectors.show();
         await delay(1000);
 
@@ -241,42 +241,42 @@ export function registerCustom(debug) {
 
         await delay(2000);
 
-        debug.sectors.highlight(42);
+        debug.sectors.highlight.show(42);
         await delay(500);
         debug.sectors.reset();
 
-        debug.sectors.highlight(43);
+        debug.sectors.highlight.show(43);
         await delay(500);
         debug.sectors.reset();
 
-        debug.sectors.highlight(25);
+        debug.sectors.highlight.show(25);
         await delay(500);
         debug.sectors.reset();
 
-        debug.sectors.highlight(26);
+        debug.sectors.highlight.show(26);
         await delay(500);
         debug.sectors.reset();
 
-        debug.sectors.highlight(27);
+        debug.sectors.highlight.show(27);
         await delay(500);
         debug.sectors.reset();
 
-        debug.sectors.highlight(36);
+        debug.sectors.highlight.show(36);
         await delay(500);
 
-        // debug.sectors.highlight(27);
+        // debug.sectors.highlight.show(27);
         // await delay(500);
 
-        debug.sectors.highlight(26);
+        debug.sectors.highlight.show(26);
         await delay(500);
         
-        // debug.sectors.highlight(25);
+        // debug.sectors.highlight.show(25);
         // await delay(500);
 
-        debug.sectors.highlight(43);
+        debug.sectors.highlight.show(43);
         await delay(500);
 
-        // debug.sectors.highlight(42);
+        // debug.sectors.highlight.show(42);
         // await delay(500);
 
         // debug.sectors.reset();

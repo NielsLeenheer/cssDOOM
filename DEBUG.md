@@ -54,19 +54,17 @@ lives in CSS ([`features/sectors.css`](src/debug/features/sectors.css)). They sp
 every pane. With **no `id`**, the per-sector commands act on every sector; `only`
 takes one or more ids.
 
+Each visualisation is a `show`/`hide` pair (like `debug.layers.*`).
+
 | Command | Description |
 | --- | --- |
 | `get(id)` | Return the sector's DOM element (first pane) to poke at directly. |
-| `hide(id?)` | Hide a sector outright (`display:none`). |
-| `show(id?)` | Reveal it — clears both `hide()` and `only()`'s fade. |
-| `explode(id?)` | Animate the surfaces apart so the construction reads. |
-| `implode(id?)` | Re-assemble (reverse of `explode`). |
+| `show(id?)` · `hide(id?)` | Reveal (clears `hide()` + `only()`'s fade) / hide a sector outright (`display:none`). |
 | `only(...ids)` | Fade every sector **except** the given one(s) — `only(29)` or `only(29, 32)`. |
-| `billboard(id?)` | Rotate the surfaces to face the camera (run after `explode`). |
-| `highlight(id?)` | Flood the surfaces with a solid accent (`#F8BA00`), drop textures, lift brightness to full (light FX still play). |
-| `unhighlight(id?)` | Remove the highlight and restore the renderer's brightness. |
-| `showFloorGrid(id?)` | Fade in a grid copy of the floor showing its clipped-away space. |
-| `hideFloorGrid(id?)` | Fade it back out and remove it. |
+| `explode.show(id?)` · `explode.hide(id?)` | Animate the surfaces apart so the construction reads / re-assemble. |
+| `highlight.show(id?)` · `highlight.hide(id?)` | Flood with a solid accent (`#F8BA00`), drop textures, lift brightness to full (light FX still play) / restore brightness. |
+| `billboard.show(id?)` · `billboard.hide(id?)` | Rotate the surfaces to face the camera (run after `explode.show`) / rotate back. |
+| `grid.show(id?)` · `grid.hide(id?)` | Fade in / out a grid copy of the floor showing its clipped-away space. |
 | `reset()` | Undo explode / billboard / fade / hide / highlight everywhere and drop floor grids. |
 
 ## `debug.sprites` — sprite-sheet stepped-animation viz
