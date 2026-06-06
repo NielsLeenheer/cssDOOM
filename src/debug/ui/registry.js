@@ -72,14 +72,3 @@ export const SETTINGS = [
     { section: 'State', kind: 'button', label: 'End match',     onClick: () => endMatch(),     showClass: 'debug-button-dm' },
     { section: 'State', kind: 'button', label: 'Enter attract', onClick: () => enterAttract(), showClass: 'debug-button-kiosk' },
 ];
-
-/**
- * Apply CSS-toggle defaults to <body>. Called once at boot so the declared
- * default state holds whether or not the debug menu is ever opened. No
- * persistence — every load resets to these declared defaults.
- */
-export function applyCssDefaults() {
-    for (const s of SETTINGS) {
-        if (s.kind === 'css' && s.default) document.body.classList.add(s.class);
-    }
-}

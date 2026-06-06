@@ -33,9 +33,7 @@ import { initKeyboardMouse } from './input/keyboard-mouse.js';
 import { initTouchInput } from './input/touch.js';
 import { initGamepadInput } from './input/gamepad.js';
 import { initActions } from './actions/index.js';
-import { updateDebugStats, openDebugMenu, isDebugMenuOpen } from './debug/ui/panel.js';
-import { applyCssDefaults } from './debug/ui/registry.js';
-import './debug/console/console.js';   // side effects: window.debug + command wiring
+import { installDebugTrigger } from './debug/boot.js';
 import { attractTick, isAttractActive, setAttractWakeHandler } from './game/attract.js';
 import { spectatorActive } from './ui/spectator.js';
 import { orchestrator } from './orchestrator.js';
@@ -48,7 +46,6 @@ import { ensureMatchSize } from './game/match.js';
 import { buildCatchup, applyCatchupCmds } from './game/catchup.js';
 import { spawnPlayer } from './game/player/spawn.js';
 import { config } from '../config.js';
-import { play as playRecording } from './debug/features/player.js';
 
 
 // ── Render-all-panes ───────────────────────────────────────────────────
@@ -140,8 +137,6 @@ function gameLoop(timestamp) {
     // a Level instance themselves.
     getCurrentLevel()?.tick(timestamp);
     renderAllActivePanes();
-
-    if (import.meta.env.DEV || isDebugMenuOpen()) updateDebugStats();
 
     requestAnimationFrame(gameLoop);
 }
@@ -476,8 +471,9 @@ function setupMasterBroadcast() {
  */
 export async function initMaster({ playSlot = null, exportFormat = null } = {}) {
     const isKiosk = document.body.dataset.layout === 'kiosk';
-    applyCssDefaults();
-    if (import.meta.env.DEV) openDebugMenu();
+    // DEV: load the debug system now (menu auto-opens). PROD: install the
+    // window.debug accessor so it loads only when the user types `debug`.
+    installDebugTrigger();
 
     // ?play=slot path — stand up the renderer infrastructure only,
     // then hand control to the recording player. We skip app.start
@@ -493,6 +489,9 @@ export async function initMaster({ playSlot = null, exportFormat = null } = {}) 
             getSpectatorActive: () => false,
         });
         hideInitialOverlay();
+        // Player lives in the debug chunk — load it on demand for ?play=slot
+        // so it never ships in the main bundle.
+        const { play: playRecording } = await import('./debug/features/player.js');
         playRecording(playSlot, exportFormat);
         return;
     }

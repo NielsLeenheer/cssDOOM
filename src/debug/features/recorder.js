@@ -4,13 +4,14 @@
  * so the sequence can be saved to IndexedDB and later replayed by
  * ?play=slot.
  *
- * Hook: orchestrator.dispatch checks `isRecording()` and calls
- * `capture(env)` before fanning to targets. Envelopes are JSON-
- * cloned at capture so any mutation after dispatch (e.g. the
- * `{...player.ammo}` payload going stale or being recycled) is
- * frozen at the dispatch moment. JSON round-trip is the same
- * serialisation RenderSink uses for the wire, so any envelope safe
- * to ship to a remote is safe to capture here.
+ * Hook: start() subscribes `capture` to the orchestrator's 'dispatch'
+ * event (and stop() unsubscribes), so capturing only costs anything
+ * while a recording is running and the orchestrator never imports
+ * debug. Envelopes are JSON-cloned at capture so any mutation after
+ * dispatch (e.g. the `{...player.ammo}` payload going stale or being
+ * recycled) is frozen at the dispatch moment. JSON round-trip is the
+ * same serialisation RenderSink uses for the wire, so any envelope
+ * safe to ship to a remote is safe to capture here.
  *
  * Storage: IndexedDB, not localStorage. A modest recording
  * (updateCamera at 60Hz alone is ~30 KB/s of JSON) exceeds the
@@ -20,6 +21,8 @@
  * Public surface is exposed on `debug.game.record / save` in
  * debug/console.js — this module only holds state + helpers.
  */
+
+import { orchestrator } from '../../orchestrator.js';
 
 const DB_NAME = 'cssdoom-recordings';
 const STORE = 'recordings';
@@ -64,11 +67,13 @@ export function start() {
     active = true;
     t0 = performance.now();
     buffer = [];
+    orchestrator.on('dispatch', capture);
     console.log('[record] capturing envelopes…');
 }
 
 export function stop() {
     active = false;
+    orchestrator.off('dispatch', capture);
 }
 
 export function isRecording() {

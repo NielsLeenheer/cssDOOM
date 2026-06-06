@@ -22,15 +22,9 @@
 @import url('src/renderer/dom/scene/spectator.css');
 @import url('src/renderer/dom/hud/weapons.css');
 @import url('src/renderer/dom/hud/hud.css');
-@import url('src/debug/ui/panel.css');
-@import url('src/debug/features/sectors.css');
-@import url('src/debug/features/layers.css');
-@import url('src/debug/features/freeze.css');
-@import url('src/debug/features/isolate.css');
-@import url('src/debug/features/path-controls.css');
-/* Overrides the renderer's .scene transform — must stay after camera.css. */
-@import url('src/debug/features/camera.css');
-@import url('src/debug/features/sprites.css');
+/* Debug CSS (menu + feature visualisations) is NOT imported here — it ships in
+   the lazy debug chunk (src/debug/bootstrap.js imports each .css) and Vite
+   injects it only when the debug system bootstraps. */
 @import url('src/ui/menu.css');
 @import url('src/renderer/dom/screens/lobby.css');
 @import url('src/ui/spectator.css');

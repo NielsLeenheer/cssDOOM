@@ -84,17 +84,32 @@ function buildEntry(s, parent) {
 
 // ── Open state ─────────────────────────────────────────────────────────────
 // The menu builds once. openDebugMenu() is the idempotent public entry — the
-// console's debug() and master's DEV boot both call it; isDebugMenuOpen() gates
-// the per-frame stats refresh. The menu is the UI's own concern, so this lives
-// here rather than in the console.
+// console's debug() and the debug bootstrap (DEV) both call it. The menu owns
+// its own per-frame culling-stats refresh: a rAF loop that runs only while the
+// <details> is expanded (the stats are invisible when collapsed). No game-loop
+// involvement — updateDebugStats() just reads the shared cullingStats object.
 let menuOpen = false;
+let menuEl = null;
+let statsRAF = 0;
+
 export function openDebugMenu() {
     if (menuOpen) return;
     menuOpen = true;
-    initDebugMenu();
+    menuEl = initDebugMenu();
+    menuEl.addEventListener('toggle', () => (menuEl.open ? startStats() : stopStats()));
+    if (menuEl.open) startStats();
     console.log('Debug menu enabled');
 }
-export const isDebugMenuOpen = () => menuOpen;
+
+function startStats() {
+    if (statsRAF) return;
+    const tick = () => { updateDebugStats(); statsRAF = requestAnimationFrame(tick); };
+    statsRAF = requestAnimationFrame(tick);
+}
+
+function stopStats() {
+    if (statsRAF) { cancelAnimationFrame(statsRAF); statsRAF = 0; }
+}
 
 function initDebugMenu() {
     const details = document.createElement('details');
@@ -128,10 +143,12 @@ function initDebugMenu() {
     }
 
     document.body.appendChild(details);
+    return details;
 }
 
-/** Update the per-step culling stats text. Called each frame from the loop. */
-export function updateDebugStats() {
+/** Update the per-step culling stats text. Driven by the rAF loop above while
+ *  the menu is expanded; reads the shared cullingStats the renderer fills. */
+function updateDebugStats() {
     const { total } = cullingStats;
     const anyCulling = culling.frustum || culling.distance || culling.backface;
 

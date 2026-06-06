@@ -56,7 +56,6 @@
 
 import { RenderSink } from './transport/render-sink.js';
 import { AudioRenderer } from './audio/renderer.js';
-import * as recorder from './debug/features/recorder.js';
 
 // Master-side cap on pane count. Slot 0 is always the host's local view;
 // slots 1..MAX_SLOTS-1 can be filled by either a Local-on-master player
@@ -152,6 +151,26 @@ class Orchestrator {
         // render target.
         this._audioEnabled = true;
         this._audioSlots = [];
+
+        // Observer registry (same on/_emit pattern as App / Game / Level).
+        // Used by the debug recorder to tap the envelope stream without the
+        // orchestrator importing debug — it subscribes to 'dispatch' while
+        // recording. Empty by default, so dispatch() pays only a Map lookup.
+        this._listeners = new Map();
+    }
+
+    on(event, handler) {
+        if (!this._listeners.has(event)) this._listeners.set(event, new Set());
+        this._listeners.get(event).add(handler);
+    }
+
+    off(event, handler) {
+        this._listeners.get(event)?.delete(handler);
+    }
+
+    _emit(event, payload) {
+        const set = this._listeners.get(event);
+        if (set) for (const h of set) h(payload);
     }
 
     /**
@@ -658,10 +677,11 @@ class Orchestrator {
  * → its targets. No field renaming or repackaging at any step.
  */
 Orchestrator.prototype.dispatch = function (env) {
-    // Debug recorder hook — when active, captures every envelope
-    // with a relative timestamp so the run can be saved to
-    // localStorage and replayed via ?play=slot.
-    if (recorder.isRecording()) recorder.capture(env);
+    // Notify observers of every envelope. The debug recorder subscribes to
+    // 'dispatch' while recording (debug/features/recorder.js) so a run can be
+    // saved and replayed via ?play=slot. No-op (one Map lookup) when nobody's
+    // subscribed — keeps debug out of the main bundle and off the hot path.
+    this._emit('dispatch', env);
 
     if (env.type === 'player') {
         for (const t of this.targets) {
