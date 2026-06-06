@@ -103,6 +103,11 @@ export function getWeaponTexture(name) {
     return getByPath(`assets/weapons/${name}.png`);
 }
 
+export function getHudTexture(name) {
+    if (!name) return null;
+    return getByPath(`assets/hud/${name}.png`);
+}
+
 /** Drop everything — used when the renderer is torn down. */
 export function clearTextureCache() {
     cache.clear();

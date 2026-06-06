@@ -192,6 +192,7 @@ const ENTITY_COMMANDS = [
     'startFiring',
     'stopFiring',
     'triggerFlash',
+    'updateHud',
 ];
 
 for (const cmd of ENTITY_COMMANDS) {

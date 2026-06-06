@@ -40,6 +40,7 @@ import {
     getSpriteTexture,
     getSkyTexture,
     getWeaponTexture,
+    getHudTexture,
 } from './textures.js';
 import { THING_SPRITES } from '../dom/scene/constants.js';
 
@@ -108,6 +109,20 @@ const FLASH_COLOR = {
     'teleport-flash': [0, 255, 0],
 };
 const FLASH_MS = 300;
+
+// Status bar. The bar is DOOM's native 320×32; element positions below
+// are in bar-relative pixel coordinates and get scaled to the actual
+// framebuffer width when drawn. DIGITS_SHEET = 12 glyphs of 14×16
+// (0-9, then % and -); SMALL_DIGITS = 10 glyphs of 4×6; FACE_SHEET =
+// 3 animation columns × 5 health rows of 24×31.
+const BIG_GLYPH_W = 14, BIG_GLYPH_H = 16;
+const SMALL_GLYPH_W = 4, SMALL_GLYPH_H = 6;
+const FACE_W = 24, FACE_H = 31;
+// Current-weapon ammo type per weapon slot.
+const WEAPON_AMMO = { 1: null, 2: 'bullets', 3: 'shells', 4: 'bullets',
+                      5: 'rockets', 6: 'cells', 7: 'cells', 8: null };
+// The four per-type ammo rows, top to bottom (BULL / SHEL / RCKT / CELL).
+const HUD_AMMO_TYPES = ['bullets', 'shells', 'rockets', 'cells'];
 
 // Small integer hash → [0,1), for the random light flickers.
 function hashRnd(a, b) {
@@ -219,6 +234,7 @@ export class SoftwareRenderer {
         // pickup flashes, drawn into the framebuffer after the world.
         this.weapon = null;           // { name, info, firing, fireStart, fireRate, bob }
         this.flash = null;            // { r, g, b, start }
+        this.hud = null;              // { health, armor, ammo, maxAmmo, currentWeapon, ownedWeapons }
         this._animFrame = 0;          // current animated-texture frame
         this._bobX = 0;
         this._bobY = 0;
@@ -483,6 +499,18 @@ export class SoftwareRenderer {
         if (rgb) this.flash = { r: rgb[0], g: rgb[1], b: rgb[2], start: performance.now() };
     }
 
+    updateHud(player) {
+        if (!player) return;
+        this.hud = {
+            health: Math.round(player.health ?? 0),
+            armor: Math.round(player.armor ?? 0),
+            ammo: player.ammo || {},
+            maxAmmo: player.maxAmmo || {},
+            currentWeapon: player.currentWeapon ?? 2,
+            ownedWeapons: new Set(player.ownedWeapons || []),
+        };
+    }
+
     setDoorState(sectorIndex, doorState) {
         const door = this.doors.get(sectorIndex);
         if (door) door.target = doorState === 'open' ? door.open : door.closed;
@@ -567,7 +595,120 @@ export class SoftwareRenderer {
         this._renderFlats(cam);
         this._renderEntities(cam);
         this._renderWeapon(cam, now, dt);
+        this._renderHud(now);
         this._renderFlash(now);
+    }
+
+    // ── HUD status bar ───────────────────────────────────────────────────
+
+    /**
+     * Blit a source rectangle of `tex` into the framebuffer, nearest-
+     * neighbour scaled to the destination rectangle, alpha-tested. Used
+     * for all the screen-space overlay graphics (status bar, digits,
+     * face). No depth test — overlays sit on top of the world.
+     */
+    _blit(tex, sx, sy, sw, sh, dx, dy, dw, dh) {
+        const { W, H, fb } = this;
+        const data = tex.data, texW = tex.width;
+        const x0 = Math.max(0, dx | 0), x1 = Math.min(W, (dx + dw) | 0);
+        const y0 = Math.max(0, dy | 0), y1 = Math.min(H, (dy + dh) | 0);
+        const ix = sw / dw, iy = sh / dh;
+        for (let y = y0; y < y1; y++) {
+            const srcY = sy + ((y - dy) * iy | 0);
+            const srcRow = srcY * texW;
+            const dstRow = y * W;
+            for (let x = x0; x < x1; x++) {
+                const srcX = sx + ((x - dx) * ix | 0);
+                const texel = data[srcRow + srcX];
+                if ((texel >>> 24) < 128) continue;
+                fb[dstRow + x] = texel | 0xff000000;
+            }
+        }
+    }
+
+    _renderHud(now) {
+        const hud = this.hud;
+        if (!hud) return;
+        const stbar = getHudTexture('STBAR');
+        if (!stbar || stbar.width <= 1) return;
+
+        const { W, H } = this;
+        const scale = W / 320;                 // bar fills the frame width
+        const barH = Math.round(32 * scale);
+        const barY = H - barH;
+        const dx = nx => nx * scale;
+        const dy = ny => barY + ny * scale;
+
+        // Bar background.
+        this._blit(stbar, 0, 0, 320, 32, 0, barY, W, barH);
+
+        const digits = getHudTexture('DIGITS_SHEET');
+
+        // Big number, right-aligned so its last glyph ends at native xR.
+        const bigNum = (str, xR, yT) => {
+            if (!digits || digits.width <= 1) return;
+            let x = xR;
+            for (let i = str.length - 1; i >= 0; i--) {
+                const g = glyphIndex(str[i]);
+                if (g < 0) continue;
+                x -= BIG_GLYPH_W;
+                this._blit(digits, g * BIG_GLYPH_W, 0, BIG_GLYPH_W, BIG_GLYPH_H,
+                    dx(x), dy(yT), BIG_GLYPH_W * scale, BIG_GLYPH_H * scale);
+            }
+        };
+
+        // Ammo (current weapon), health, armor.
+        // Right-edge anchors follow cssDOOM's STBAR section layout
+        // (ammo 0-48, health 48-106, armor 179-236).
+        const ammoType = WEAPON_AMMO[hud.currentWeapon];
+        if (ammoType) bigNum(String(Math.round(hud.ammo[ammoType] ?? 0)), 44, 3);
+        bigNum(`${hud.health}%`, 104, 3);
+        bigNum(`${hud.armor}%`, 235, 3);
+
+        // Per-type ammo: current (right edge 288) and max (right edge 314),
+        // four rows 6px apart from y=5.
+        const small = getHudTexture('SMALL_DIGITS_SHEET');
+        if (small && small.width > 1) {
+            const smallNum = (str, xR, yT) => {
+                let x = xR;
+                for (let i = str.length - 1; i >= 0; i--) {
+                    const g = glyphIndex(str[i]);
+                    if (g < 0 || g > 9) continue;
+                    x -= SMALL_GLYPH_W;
+                    this._blit(small, g * SMALL_GLYPH_W, 0, SMALL_GLYPH_W, SMALL_GLYPH_H,
+                        dx(x), dy(yT), SMALL_GLYPH_W * scale, SMALL_GLYPH_H * scale);
+                }
+            };
+            for (let i = 0; i < HUD_AMMO_TYPES.length; i++) {
+                const t = HUD_AMMO_TYPES[i];
+                const yT = 5 + i * 6;
+                smallNum(String(Math.round(hud.ammo[t] ?? 0)), 288, yT);
+                smallNum(String(hud.maxAmmo[t] ?? 0), 314, yT);
+            }
+        }
+
+        // Arms panel (weapon ownership): grey = not owned, yellow = owned.
+        const arms = getHudTexture('STARMS');
+        if (arms && arms.width > 1) {
+            // STARMS is a 2-row sheet: row 0 grey (40×16 unowned), row 1
+            // yellow (owned). We can only swap the whole panel, so show
+            // the owned-coloured panel when the player has any weapon past
+            // the pistol, else the grey one. (Per-slot tinting would need
+            // the individual number glyphs.)
+            const ownedExtra = [3, 4, 5, 6, 7].some(s => hud.ownedWeapons.has(s));
+            const armsRow = arms.height >= 32 && ownedExtra ? 16 : 0;
+            this._blit(arms, 0, armsRow, 40, 16, dx(104), dy(4), 40 * scale, 16 * scale);
+        }
+
+        // Face: row by health band, column animates while alive.
+        const face = getHudTexture('FACE_SHEET');
+        if (face && face.width > 1) {
+            const h = hud.health;
+            const row = h >= 80 ? 0 : h >= 60 ? 1 : h >= 40 ? 2 : h >= 20 ? 3 : 4;
+            const col = h <= 0 ? 0 : ((now / 500) | 0) % 3;
+            this._blit(face, col * FACE_W, row * FACE_H, FACE_W, FACE_H,
+                dx(143 + (36 - FACE_W) / 2), dy(1), FACE_W * scale, FACE_H * scale);
+        }
     }
 
     // ── HUD overlay: weapon sprite + screen flash ────────────────────────
@@ -1071,6 +1212,14 @@ export class SoftwareRenderer {
         }
     }
 
+}
+
+// Character → DIGITS_SHEET / SMALL_DIGITS glyph index (0-9, % = 10, - = 11).
+function glyphIndex(ch) {
+    if (ch >= '0' && ch <= '9') return ch.charCodeAt(0) - 48;
+    if (ch === '%') return 10;
+    if (ch === '-') return 11;
+    return -1;
 }
 
 // Multiply an ABGR texel by a 0..256 light factor.
