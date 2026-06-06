@@ -24,7 +24,7 @@ export const skyMethods = {
     _renderSky(cam) {
         const sky = getSkyTexture();
         if (!sky) { this._skyCtx = null; return; }
-        const { W, H, fb, zb } = this;
+        const { W, H, fb, zb } = this.framebuffer;
         const { angle, halfH } = cam;
         const skyW = sky.width, skyH = sky.height, sdata = sky.data;
         const colAngle = this._colAngle;

@@ -48,7 +48,7 @@ export const wallMethods = {
      * column with a perspective-correct textured strip, depth-tested.
      */
     _drawWall(cam, wall, tex, wallBottom, wallTop, yOff, baseLight, noCull = false, skyAbove = false) {
-        const { W, H, fb, zb } = this;
+        const { W, H, fb, zb } = this.framebuffer;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
         const ax = wall.start.x, ay = wall.start.y;

@@ -88,7 +88,7 @@ export const entityMethods = {
      * reused rotation art.
      */
     _drawBillboard(cam, wx, wy, z, tex, level, mirror, centered) {
-        const { W, H, fb, zb } = this;
+        const { W, H, fb, zb } = this.framebuffer;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
         const cx = (wx - ex) * ca + (wy - ey) * sa;

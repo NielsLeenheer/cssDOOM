@@ -6,7 +6,7 @@
  * Mixed onto SoftwareRenderer.prototype (see software.js), so the
  * methods run with `this` bound to the renderer — they read its
  * per-frame screen state (`this.intermission` / `.results` / `.lobby`,
- * `this.viewerPlayerIndex`) and draw through `this._blit`.
+ * `this.viewerPlayerIndex`) and draw through `this.framebuffer.blit`.
  *
  * Layout strategy: backdrops fill the framebuffer end-to-end so the
  * screen never letterboxes. Everything painted on top — labels, digit
@@ -83,7 +83,7 @@ export const screenMethods = {
         let x = xR;
         if (pct && pct.width > 1) {
             x -= WIPCNT_W;
-            this._blit(pct, 0, 0, WIPCNT_W, WIPCNT_H, x, yTop, WIPCNT_W, WIPCNT_H);
+            this.framebuffer.blit(pct, 0, 0, WIPCNT_W, WIPCNT_H, x, yTop, WIPCNT_W, WIPCNT_H);
         }
         this._drawInterDigits(String(Math.max(0, value | 0)), x, yTop);
     },
@@ -100,7 +100,7 @@ export const screenMethods = {
         const colon = getIntermissionTexture('WICOLON');
         if (colon && colon.width > 1) {
             x -= WICOLON_W;
-            this._blit(colon, 0, 0, WICOLON_W, WICOLON_H,
+            this.framebuffer.blit(colon, 0, 0, WICOLON_W, WICOLON_H,
                 x, yTop + (WINUM_H - WICOLON_H), WICOLON_W, WICOLON_H);
         }
         this._drawInterDigits(String(mm), x, yTop);
@@ -116,7 +116,7 @@ export const screenMethods = {
             const tex = getIntermissionTexture(`WINUM${d}`);
             if (!tex || tex.width <= 1) continue;
             x -= WINUM_W;
-            this._blit(tex, 0, 0, WINUM_W, WINUM_H, x, yTop, WINUM_W, WINUM_H);
+            this.framebuffer.blit(tex, 0, 0, WINUM_W, WINUM_H, x, yTop, WINUM_W, WINUM_H);
         }
         return x;
     },
@@ -174,7 +174,7 @@ export const screenMethods = {
         }
         const totalLabel = getIntermissionTexture('WIMSTT');
         if (totalLabel && totalLabel.width > 1) {
-            this._blit(totalLabel, 0, 0, totalLabel.width, totalLabel.height,
+            this.framebuffer.blit(totalLabel, 0, 0, totalLabel.width, totalLabel.height,
                 dx(totalColX + (totalW - totalLabel.width) / 2 | 0),
                 dy(headTop + (faceH - totalLabel.height) / 2 | 0),
                 totalLabel.width, totalLabel.height);
@@ -301,7 +301,7 @@ export const screenMethods = {
         // pinned over it. DOM matches via `filter: brightness(0.3)` on
         // the pane itself — same arithmetic per pixel here.
         if (claimState === 'waiting' || claimState === 'prompting') {
-            const fb = this.fb, n = fb.length;
+            const fb = this.framebuffer.fb, n = fb.length;
             for (let i = 0; i < n; i++) {
                 const px = fb[i];
                 const r = px & 0xff;
@@ -319,7 +319,7 @@ export const screenMethods = {
         const text = claimState === 'ready'
             ? 'READY!'
             : 'PRESS BUTTON TO\nCONNECT CONTROLLER';
-        const { W, H } = this;
+        const { W, H } = this.framebuffer;
         const lines = text.split('\n');
         const lineH = 10;
         let y = (H - lines.length * lineH) / 2 | 0;
@@ -334,8 +334,8 @@ export const screenMethods = {
     /** Centre of the 320×200 native composition inside the framebuffer. */
     _screenOrigin() {
         return {
-            ox: Math.round((this.W - INTERMISSION_W) / 2),
-            oy: Math.round((this.H - INTERMISSION_H) / 2),
+            ox: Math.round((this.framebuffer.W - INTERMISSION_W) / 2),
+            oy: Math.round((this.framebuffer.H - INTERMISSION_H) / 2),
         };
     },
 
@@ -344,9 +344,9 @@ export const screenMethods = {
     _beginScreen(bgName) {
         const bg = getIntermissionTexture(bgName);
         if (bg && bg.width > 1) {
-            this._blit(bg, 0, 0, bg.width, bg.height, 0, 0, this.W, this.H);
+            this.framebuffer.blit(bg, 0, 0, bg.width, bg.height, 0, 0, this.framebuffer.W, this.framebuffer.H);
         } else {
-            this.fb.fill(0xFF000000);
+            this.framebuffer.fb.fill(0xFF000000);
         }
         return this._screenOrigin();
     },
@@ -354,7 +354,7 @@ export const screenMethods = {
     /** Blit a sprite at its native source size, no-op if not yet loaded. */
     _blitSprite(tex, x, y) {
         if (!tex || tex.width <= 1) return;
-        this._blit(tex, 0, 0, tex.width, tex.height, x, y, tex.width, tex.height);
+        this.framebuffer.blit(tex, 0, 0, tex.width, tex.height, x, y, tex.width, tex.height);
     },
 
     /** STFB[…] swatch + STFST00 face overlay — same composition the DOM
@@ -362,7 +362,7 @@ export const screenMethods = {
     _drawFaceSwatch(playerIdx, x, y, w, h) {
         const swatch = getHudTexture(PLAYER_SWATCH[playerIdx] ?? 'STFB0');
         if (swatch && swatch.width > 1) {
-            this._blit(swatch, 0, 0, swatch.width, swatch.height, x, y, w, h);
+            this.framebuffer.blit(swatch, 0, 0, swatch.width, swatch.height, x, y, w, h);
         }
         const face = getHudTexture('STFST00');
         if (face && face.width > 1) {
@@ -370,7 +370,7 @@ export const screenMethods = {
             // the face, matching the DOM .scoreboard-swatch padding.
             const fw = Math.max(1, w - 4);
             const fh = Math.max(1, h - 4);
-            this._blit(face, 0, 0, face.width, face.height,
+            this.framebuffer.blit(face, 0, 0, face.width, face.height,
                 x + (w - fw) / 2 | 0, y + (h - fh) / 2 | 0, fw, fh);
         }
     },
@@ -388,7 +388,7 @@ export const screenMethods = {
             const minus = getIntermissionTexture('WIMINUS');
             if (minus && minus.width > 1) {
                 x -= WIMINUS_W + 1;
-                this._blit(minus, 0, 0, WIMINUS_W, WIMINUS_H,
+                this.framebuffer.blit(minus, 0, 0, WIMINUS_W, WIMINUS_H,
                     x, yTop + (WINUM_H - WIMINUS_H) / 2 | 0,
                     WIMINUS_W, WIMINUS_H);
             }
@@ -426,7 +426,7 @@ export const screenMethods = {
             if (c === 32) { cx += 4 * scale; continue; }
             const g = getFontTexture(c);
             if (!g || g.width <= 1) { cx += 5 * scale; continue; }
-            this._blit(g, 0, 0, g.width, g.height,
+            this.framebuffer.blit(g, 0, 0, g.width, g.height,
                 cx, y, g.width * scale, g.height * scale);
             cx += (g.width + 1) * scale;
         }

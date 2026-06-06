@@ -38,6 +38,7 @@ import { THING_SPRITES } from '../dom/scene/constants.js';
 import {
     FOV, LIGHT_EFFECT, ANIM_FRAME_MS, ENEMY_ANIM, lightMul,
 } from './tables.js';
+import { Framebuffer } from './framebuffer.js';
 import { commandMethods } from './commands.js';
 import { sectorMethods } from './sectors.js';
 import { skyMethods } from './passes/sky.js';
@@ -49,11 +50,10 @@ import { screenMethods } from './screens.js';
 
 export class SoftwareRenderer {
     constructor() {
-        this.W = 0;
-        this.H = 0;
-        this.fb = null;           // Uint32Array framebuffer (ABGR)
-        this.zb = null;           // Float32Array depth buffer (forward distance)
-        this.imageData = null;    // ImageData backing fb
+        // Pixel + depth buffers and the overlay blit primitive. The world
+        // passes destructure `this.framebuffer` for their hot loops; the
+        // display canvas reads `imageData` (exposed below) to blit out.
+        this.framebuffer = new Framebuffer();
         this.walls = [];
         this.sectorPolygons = [];
 
@@ -110,13 +110,12 @@ export class SoftwareRenderer {
         this._colAngle = null;    // per-column view-angle offset, rebuilt on resize
     }
 
+    /** ImageData the display canvas blits from — owned by the framebuffer. */
+    get imageData() { return this.framebuffer.imageData; }
+
     /** Allocate buffers for an internal resolution of W×H. */
     resize(W, H, ctx) {
-        this.W = W;
-        this.H = H;
-        this.imageData = ctx.createImageData(W, H);
-        this.fb = new Uint32Array(this.imageData.data.buffer);
-        this.zb = new Float32Array(W * H);
+        this.framebuffer.resize(W, H, ctx);
         const halfW = W * 0.5;
         const sxScale = halfW / Math.tan(FOV / 2);
         this._colAngle = new Float32Array(W);
@@ -292,11 +291,9 @@ export class SoftwareRenderer {
     // ── Per-frame entry point ────────────────────────────────────────────
 
     render(camera) {
-        const { W, H, fb, zb } = this;
-        if (!fb) return;
-
-        fb.fill(0xFF000000);
-        zb.fill(Infinity);
+        const fbuf = this.framebuffer;
+        if (!fbuf.fb) return;
+        fbuf.clear();
 
         const now = performance.now();
 
@@ -326,6 +323,7 @@ export class SoftwareRenderer {
         // units/sec. Kept bounded so it stays power-of-two aligned.
         this._scrollOffset = (now * 0.035) % 4096;
 
+        const { W, H } = fbuf;
         const aspect = W / H;
         const fovScale = Math.tan(FOV / 2);
         const halfW = W * 0.5;
@@ -355,32 +353,6 @@ export class SoftwareRenderer {
         // per-pane prompt overlay on top, matching the DOM lobby's
         // CSS-driven `data-claim-state` panel.
         if (this.lobby?.variant === 'local') this._overlayLocalLobby(now);
-    }
-
-    /**
-     * Blit a source rectangle of `tex` into the framebuffer, nearest-
-     * neighbour scaled to the destination rectangle, alpha-tested. The
-     * shared overlay primitive: used by the HUD passes (passes/hud.js)
-     * and the full-screen screens (screens.js). No depth test — overlays
-     * sit on top of the world.
-     */
-    _blit(tex, sx, sy, sw, sh, dx, dy, dw, dh) {
-        const { W, H, fb } = this;
-        const data = tex.data, texW = tex.width;
-        const x0 = Math.max(0, dx | 0), x1 = Math.min(W, (dx + dw) | 0);
-        const y0 = Math.max(0, dy | 0), y1 = Math.min(H, (dy + dh) | 0);
-        const ix = sw / dw, iy = sh / dh;
-        for (let y = y0; y < y1; y++) {
-            const srcY = sy + ((y - dy) * iy | 0);
-            const srcRow = srcY * texW;
-            const dstRow = y * W;
-            for (let x = x0; x < x1; x++) {
-                const srcX = sx + ((x - dx) * ix | 0);
-                const texel = data[srcRow + srcX];
-                if ((texel >>> 24) < 128) continue;
-                fb[dstRow + x] = texel | 0xff000000;
-            }
-        }
     }
 }
 

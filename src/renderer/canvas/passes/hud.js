@@ -2,8 +2,8 @@
  * Screen-space HUD passes for the SoftwareRenderer (mixed onto the
  * prototype): the status bar, the held weapon sprite, and the damage /
  * pickup screen flash. All drawn into the framebuffer after the world,
- * with no depth test — they sit on top. They share the renderer's `_blit`
- * primitive (kept in software.js) and `uiScale`.
+ * with no depth test — they sit on top. They draw through the shared
+ * `this.framebuffer.blit` overlay primitive and read `this.uiScale`.
  */
 
 import { getHudTexture, getWeaponTexture } from '../textures.js';
@@ -20,7 +20,7 @@ export const hudMethods = {
         const stbar = getHudTexture('STBAR');
         if (!stbar || stbar.width <= 1) return;
 
-        const { W, H } = this;
+        const { W, H } = this.framebuffer;
         // Draw the bar at its native 320×32 resolution times uiScale,
         // bottom-centred. Narrower framebuffers clip the sides rather
         // than downscaling the bar; at higher resolutions the bar grows
@@ -35,7 +35,7 @@ export const hudMethods = {
         const dy = ny => barY + ny * scale;
 
         // Bar background.
-        this._blit(stbar, 0, 0, 320, 32, barX, barY, barW, barH);
+        this.framebuffer.blit(stbar, 0, 0, 320, 32, barX, barY, barW, barH);
 
         const digits = getHudTexture('DIGITS_SHEET');
 
@@ -47,7 +47,7 @@ export const hudMethods = {
                 const g = glyphIndex(str[i]);
                 if (g < 0) continue;
                 x -= BIG_GLYPH_W;
-                this._blit(digits, g * BIG_GLYPH_W, 0, BIG_GLYPH_W, BIG_GLYPH_H,
+                this.framebuffer.blit(digits, g * BIG_GLYPH_W, 0, BIG_GLYPH_W, BIG_GLYPH_H,
                     dx(x), dy(yT), BIG_GLYPH_W * scale, BIG_GLYPH_H * scale);
             }
         };
@@ -70,7 +70,7 @@ export const hudMethods = {
                     const g = glyphIndex(str[i]);
                     if (g < 0 || g > 9) continue;
                     x -= SMALL_GLYPH_W;
-                    this._blit(small, g * SMALL_GLYPH_W, 0, SMALL_GLYPH_W, SMALL_GLYPH_H,
+                    this.framebuffer.blit(small, g * SMALL_GLYPH_W, 0, SMALL_GLYPH_W, SMALL_GLYPH_H,
                         dx(x), dy(yT), SMALL_GLYPH_W * scale, SMALL_GLYPH_H * scale);
                 }
             };
@@ -86,12 +86,12 @@ export const hudMethods = {
         // slot number — yellow STYSNUM if owned, grey STGNUM otherwise.
         const arms = getHudTexture('STARMS');
         if (arms && arms.width > 1) {
-            this._blit(arms, 0, 0, 40, 32, dx(104), dy(0), 40 * scale, 32 * scale);
+            this.framebuffer.blit(arms, 0, 0, 40, 32, dx(104), dy(0), 40 * scale, 32 * scale);
             for (const s of ARMS_SLOTS) {
                 const owned = hud.ownedWeapons.has(s.slot);
                 const glyph = getHudTexture(`${owned ? 'STYSNUM' : 'STGNUM'}${s.slot}`);
                 if (!glyph || glyph.width <= 1) continue;
-                this._blit(glyph, 0, 0, 4, 6, dx(s.x), dy(s.y), 4 * scale, 6 * scale);
+                this.framebuffer.blit(glyph, 0, 0, 4, 6, dx(s.x), dy(s.y), 4 * scale, 6 * scale);
             }
         }
 
@@ -101,7 +101,7 @@ export const hudMethods = {
             const h = hud.health;
             const row = h >= 80 ? 0 : h >= 60 ? 1 : h >= 40 ? 2 : h >= 20 ? 3 : 4;
             const col = h <= 0 ? 0 : ((now / 500) | 0) % 3;
-            this._blit(face, col * FACE_W, row * FACE_H, FACE_W, FACE_H,
+            this.framebuffer.blit(face, col * FACE_W, row * FACE_H, FACE_W, FACE_H,
                 dx(143 + (36 - FACE_W) / 2), dy(1), FACE_W * scale, FACE_H * scale);
         }
 
@@ -111,7 +111,7 @@ export const hudMethods = {
             if (!hud.keys.has(HUD_KEYS[i].color)) continue;
             const icon = getHudTexture(HUD_KEYS[i].icon);
             if (!icon || icon.width <= 1) continue;
-            this._blit(icon, 0, 0, 7, 5,
+            this.framebuffer.blit(icon, 0, 0, 7, 5,
                 dx(239), dy(4 + i * 9), 7 * scale, 5 * scale);
         }
     },
@@ -144,12 +144,12 @@ export const hudMethods = {
         this._bobX += ((Math.cos(phase) * 5 * targetMag) - this._bobX) * Math.min(1, ease);
         this._bobY += ((Math.abs(Math.sin(phase)) * 4 * targetMag) - this._bobY) * Math.min(1, ease);
 
-        const { W, H } = this;
+        const { W, H } = this.framebuffer;
         const ui = this.uiScale;
         const destW = fw * ui, destH = fh * ui;
         const destX = Math.round((W - destW) / 2 + this._bobX * ui);
         const destY = Math.round(H - destH + this._bobY * ui);
-        this._blit(tex, frame * fw, 0, fw, fh, destX, destY, destW, destH);
+        this.framebuffer.blit(tex, frame * fw, 0, fw, fh, destX, destY, destW, destH);
     },
 
     _renderFlash(now) {
@@ -159,7 +159,7 @@ export const hudMethods = {
         const a = 0.35 * (1 - e / FLASH_MS);
         const ia = 1 - a;
         const fr = this.flash.r * a, fg = this.flash.g * a, fb_ = this.flash.b * a;
-        const { fb } = this;
+        const { fb } = this.framebuffer;
         for (let i = 0, n = fb.length; i < n; i++) {
             const px = fb[i];
             const r = ((px & 0xff) * ia + fr) | 0;

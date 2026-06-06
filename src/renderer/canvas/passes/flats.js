@@ -35,7 +35,7 @@ export const flatMethods = {
     },
 
     _drawPlane(cam, boundaries, planeZ, tex, lightLevel) {
-        const { W, H, fb, zb } = this;
+        const { W, H, fb, zb } = this.framebuffer;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
         const cz = planeZ - ez;
         if (Math.abs(cz) < 0.01) return;   // plane at eye level — no coverage
