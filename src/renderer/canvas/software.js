@@ -178,6 +178,15 @@ const ENEMY_ANIM = {
 const PLAYER_ANIM = { spr: 'PLAY', walk: ['A', 'B'], attack: 'E', death: null };
 const PLAYER_CORPSE_VARIANT = ['', '-red', '-indigo', '-brown'];
 
+// Idle-animated pickups / decorations, keyed by 4-letter sprite prefix →
+// frame count. These cycle their rotation-0 frames (A, B, …) on a loop
+// (the bonuses spin, the soulsphere pulses, the barrel idles, torches
+// flicker). Frame count from public/assets/sprite-info.json.
+const ITEM_ANIM = {
+    SOUL: 4, BON1: 4, BON2: 4, PINS: 4, ARM1: 2, ARM2: 2, TRED: 4, BAR1: 2,
+};
+const ITEM_FRAME_MS = 250;
+
 // Transient effect frame sequences (single-view).
 const PUFF_FRAMES = ['PUFFA0', 'PUFFB0', 'PUFFC0', 'PUFFD0'];
 // Enemy fireball impact — the imp/baron ball's own burst frames.
@@ -193,6 +202,16 @@ const TFOG_FRAMES = ['TFOGA0', 'TFOGB0', 'TFOGC0', 'TFOGD0', 'TFOGE0',
  * flipped, matching the WAD lump naming (e.g. TROOA2A8 serves rotation
  * 2 and, flipped, rotation 8).
  */
+// Current frame name for an idle-animated pickup/decoration sprite (or
+// the name unchanged if it isn't animated). `name` is the THING_SPRITES
+// front frame, e.g. 'BON1A0' → cycles BON1A0..BON1D0.
+function itemFrameName(name, now) {
+    const n = ITEM_ANIM[name.slice(0, 4)];
+    if (!n) return name;
+    const i = ((now / ITEM_FRAME_MS) | 0) % n;
+    return name.slice(0, 4) + String.fromCharCode(65 + i) + '0';
+}
+
 function buildRotName(spr, frame, rot) {
     switch (rot) {
         case 5:  return { name: `${spr}${frame}5`, mirror: false };
@@ -1249,9 +1268,9 @@ export class SoftwareRenderer {
     _renderEntities(cam) {
         const now = performance.now();
 
-        // Static decorations + corpses.
+        // Static decorations + corpses (some decorations idle-animate).
         for (const s of this.statics) {
-            const tex = getSpriteTexture(s.name);
+            const tex = getSpriteTexture(itemFrameName(s.name, now));
             if (tex && tex.width > 1) {
                 this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false);
             }
@@ -1297,7 +1316,7 @@ export class SoftwareRenderer {
 
     /** Current sprite frame + mirror flag for a thing entry. */
     _thingSprite(e, now) {
-        if (!e.isEnemy) return { name: e.fixedName, mirror: false };
+        if (!e.isEnemy) return { name: itemFrameName(e.fixedName, now), mirror: false };
         const anim = e.anim;
 
         if (e.state === 'dead' && anim.death) {
