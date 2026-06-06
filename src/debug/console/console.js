@@ -20,7 +20,6 @@ import * as layersModule from '../features/layers.js';
 import * as flags from '../features/flags.js';
 import * as freeze from '../features/freeze.js';
 import { position as positionCmds, world as worldCmds } from '../features/world.js';
-import { registerCustom } from '../custom/custom.js';
 import { openDebugMenu } from '../ui/panel.js';
 import { switchRenderer } from '../features/renderer.js';
 import { setSpectator } from '../features/spectator.js';
@@ -75,9 +74,14 @@ camera.offset = cameraModule.offset;
 camera.reset = cameraModule.reset;
 
 // ── debug.custom — hand-authored talk set pieces (see custom/custom.js) ──
-// Scripts that string the debug.* commands together on a timeline. Authored
-// separately so the building-block commands above stay clean.
-registerCustom(debug);
+// Scripts that string the debug.* commands together on a timeline. DEV-only:
+// dynamically imported behind import.meta.env.DEV so the talk scratchpad — and
+// the large recordings.js data it pulls — is dead-code-eliminated from the
+// production build entirely. Registration is async (a microtask later); the
+// commands are only ever invoked by hand, so that's fine.
+if (import.meta.env.DEV) {
+    import('../custom/custom.js').then(({ registerCustom }) => registerCustom(debug));
+}
 
 // ── debug.path — record / replay the player's path (position + angle) ──────
 // Segment-based recording with a top-centre transport panel; replay moves the
