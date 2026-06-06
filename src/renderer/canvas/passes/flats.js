@@ -14,20 +14,21 @@ import { animName, NEAR, MAX_DIST, lightFor, shade } from '../tables.js';
 
 export const flatMethods = {
     _renderFlats(cam) {
-        for (const sector of this.sectorPolygons) {
+        const scene = this.scene;
+        for (const sector of scene.sectorPolygons) {
             // Doors animate their ceiling height; lifts animate their floor.
-            const ceilingHeight = this._ceilOverride.get(sector) ?? sector.ceilingHeight;
-            const floorHeight = this._floorOverride.get(sector) ?? sector.floorHeight;
+            const ceilingHeight = scene._ceilOverride.get(sector) ?? sector.ceilingHeight;
+            const floorHeight = scene._floorOverride.get(sector) ?? sector.floorHeight;
             if (ceilingHeight <= floorHeight) continue;
 
-            const light = sector.lightLevel * (this._sectorLightMul[sector.sectorIndex] ?? 1);
-            const floorTex = getFlatTexture(animName(sector.floorTexture, this._animFrame));
+            const light = sector.lightLevel * (scene._sectorLightMul[sector.sectorIndex] ?? 1);
+            const floorTex = getFlatTexture(animName(sector.floorTexture, scene._animFrame));
             if (floorTex) {
                 this._drawPlane(cam, sector.boundaries, floorHeight, floorTex, light);
             }
             // Sky ceilings are painted by the backdrop pass, not here.
             if (sector.ceilingTexture === 'F_SKY1') continue;
-            const ceilTex = getFlatTexture(animName(sector.ceilingTexture, this._animFrame));
+            const ceilTex = getFlatTexture(animName(sector.ceilingTexture, scene._animFrame));
             if (ceilTex) {
                 this._drawPlane(cam, sector.boundaries, ceilingHeight, ceilTex, light);
             }

@@ -15,9 +15,10 @@ import {
 export const entityMethods = {
     _renderEntities(cam) {
         const now = performance.now();
+        const scene = this.scene;
 
         // Static decorations + corpses (some decorations idle-animate).
-        for (const s of this.statics) {
+        for (const s of scene.statics) {
             const tex = getSpriteTexture(itemFrameName(s.name, now));
             if (tex && tex.width > 1) {
                 this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false);
@@ -25,7 +26,7 @@ export const entityMethods = {
         }
 
         // Game-driven things (enemies, pickups, barrels, players).
-        for (const e of this.things.values()) {
+        for (const e of scene.things.values()) {
             if (e.collected) continue;
             // Don't draw this viewer's own player billboard.
             if (e.playerIndex !== undefined && e.playerIndex === this.viewerPlayerIndex) continue;
@@ -37,9 +38,9 @@ export const entityMethods = {
         }
 
         // Projectiles — linear interpolation start → end over duration.
-        for (const [id, p] of this.projectiles) {
+        for (const [id, p] of scene.projectiles) {
             const t = (now - p.start) / (p.duration * 1000);
-            if (t >= 1) { this.projectiles.delete(id); continue; }
+            if (t >= 1) { scene.projectiles.delete(id); continue; }
             const tex = getSpriteTexture(p.sprite);
             if (tex && tex.width > 1) {
                 this._drawBillboard(cam,
@@ -51,10 +52,10 @@ export const entityMethods = {
         }
 
         // Transient effects — advance frames, drop when finished.
-        for (let i = this.effects.length - 1; i >= 0; i--) {
-            const fx = this.effects[i];
+        for (let i = scene.effects.length - 1; i >= 0; i--) {
+            const fx = scene.effects[i];
             const frame = ((now - fx.start) / fx.frameMs) | 0;
-            if (frame >= fx.frames.length) { this.effects.splice(i, 1); continue; }
+            if (frame >= fx.frames.length) { scene.effects.splice(i, 1); continue; }
             const tex = getSpriteTexture(fx.frames[frame]);
             if (tex && tex.width > 1) {
                 this._drawBillboard(cam, fx.x, fx.y, fx.z, tex, 250, false, fx.centered);

@@ -1,141 +1,19 @@
 /**
- * Dispatch command surface for the SoftwareRenderer (mixed onto the
- * prototype). This is the renderer's whole inbound contract with the game
- * loop: every world / per-player envelope the CanvasRenderer forwards ends
- * up here (the entity-state mutators, the HUD overlay setters, and the
- * full-screen-screen show/hide toggles). They only mutate renderer state;
- * the render passes read it.
+ * View-side dispatch commands for the SoftwareRenderer (mixed onto the
+ * prototype). These mutate *presentation* state that lives on the
+ * renderer, not on the Scene: the held weapon, the damage / pickup screen
+ * flash, the HUD readout, and the full-screen intermission / results /
+ * lobby screens. They're per-pane — two panes viewing the same world show
+ * different weapons and HUDs — which is exactly why they don't belong on
+ * the shared world model.
  *
- * Door / lift commands live in sectors.js (next to their simulation), and
- * the screen *rendering* lives in screens.js — only the show/hide state
- * setters are here.
+ * World commands (move / kill / collect a thing, open a door, …) live on
+ * the Scene (scene.js); the renderer forwards those to `this.scene`.
  */
 
-import {
-    TAU, WEAPON_INFO, FLASH_COLOR, PLAYER_ANIM, PLAYER_CORPSE_VARIANT,
-    BARREL_FRAMES, PUFF_FRAMES, EXPLOSION_FRAMES, TFOG_FRAMES,
-} from './tables.js';
+import { WEAPON_INFO, FLASH_COLOR } from './tables.js';
 
 export const commandMethods = {
-    // ── Entity state (game loop → things / projectiles / effects) ────────
-
-    updateThingPosition(i, x, y, floorZ) {
-        const e = this.things.get(i);
-        if (e) { e.x = x; e.y = y; e.floorZ = floorZ; }
-    },
-
-    reparentThingToSector(i, sectorIndex) {
-        const e = this.things.get(i);
-        const l = this._sectorLight[sectorIndex];
-        if (e && l != null) e.light = l;
-    },
-
-    collectItem(i) { const e = this.things.get(i); if (e) e.collected = true; },
-    uncollectItem(i) { const e = this.things.get(i); if (e) { e.collected = false; e.state = 'idle'; e.deathStart = 0; } },
-
-    setEnemyState(i, _type, newState) {
-        const e = this.things.get(i);
-        if (!e || e.state === 'dead') return;
-        e.state = newState === 'attacking' ? 'attack'
-                : newState === 'idle' ? 'idle'
-                : 'walk';
-    },
-
-    setThingMoving(i, moving) {
-        const e = this.things.get(i);
-        if (e && e.state !== 'dead') e.state = moving ? 'walk' : 'idle';
-    },
-
-    playPlayerAttack(i) {
-        const e = this.things.get(i);
-        if (e && e.state !== 'dead') e.state = 'attack';
-    },
-
-    killEnemy(i, _type, instant /* , gib */) {
-        const e = this.things.get(i);
-        if (!e) return;
-        if (e.category === 'barrel') {
-            // Barrels don't fall over — they detonate and vanish.
-            this._spawnEffect(e.x, e.y, e.floorZ + 24, BARREL_FRAMES, 60, true);
-            e.collected = true;
-            return;
-        }
-        e.state = 'dead';
-        e.deathStart = instant ? -1 : performance.now();
-    },
-
-    resetEnemy(i, _type, x, y, floorZ) {
-        const e = this.things.get(i);
-        if (!e) return;
-        e.state = 'idle';
-        e.deathStart = 0;
-        e.collected = false;
-        if (x !== undefined) { e.x = x; e.y = y; e.floorZ = floorZ; }
-    },
-
-    updateEnemyRotation(i, enemy, viewers) {
-        const e = this.things.get(i);
-        if (!e || !e.isEnemy) return;
-        e.x = enemy.x; e.y = enemy.y; e.facing = enemy.facing;
-        const v = viewers[this.viewerPlayerIndex] ?? viewers[0];
-        if (!v) return;
-        const toViewer = Math.atan2(v.y - enemy.y, v.x - enemy.x);
-        let rel = toViewer - enemy.facing;
-        rel = ((rel % TAU) + TAU) % TAU;
-        e.rotation = (Math.floor((rel + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
-    },
-
-    createProjectile(id, spec) {
-        this.projectiles.set(id, {
-            sprite: spec.sprite,
-            sx: spec.startX, sy: spec.startY, sz: spec.startZ,
-            ex: spec.endX, ey: spec.endY, ez: spec.endZ,
-            duration: spec.duration || 1,
-            start: performance.now(),
-        });
-    },
-
-    removeProjectile(id) { this.projectiles.delete(id); },
-
-    // Note the argument orders: puff / teleport-fog are (x, z, y); the
-    // explosion is (x, y, z) — matching the game's dispatch sites.
-    createPuff(x, z, y) { this._spawnEffect(x, y, z, PUFF_FRAMES, 50, true); },
-    createExplosion(x, y, z) { this._spawnEffect(x, y, z, EXPLOSION_FRAMES, 60, true); },
-    createTeleportFog(x, z, y) { this._spawnEffect(x, y, z, TFOG_FRAMES, 45, false); },
-
-    _spawnEffect(x, y, z, frames, frameMs, centered) {
-        this.effects.push({ x, y, z, frames, frameMs, centered, start: performance.now() });
-    },
-
-    createCorpse(x, y, floorZ, sectorIndex, playerIndex, gib) {
-        const variant = PLAYER_CORPSE_VARIANT[playerIndex] ?? '';
-        this.statics.push({
-            x, y, floorZ,
-            light: this._sectorLight[sectorIndex] ?? 200,
-            name: (gib ? 'PLAYW0' : 'PLAYN0') + variant,
-        });
-    },
-
-    createPlayerSprite(thingIndex, playerIndex, x, y, floorZ /* , sectorIndex */) {
-        if (this.things.has(thingIndex)) return;   // idempotent
-        this.things.set(thingIndex, {
-            type: -1,
-            category: 'player',
-            x, y, floorZ,
-            light: 220,
-            isEnemy: true,
-            anim: PLAYER_ANIM,
-            fixedName: 'PLAYA1',
-            rotation: 1,
-            facing: 0,
-            state: 'idle',
-            collected: false,
-            deathStart: 0,
-            walkPhase: Math.random() * 1000,
-            playerIndex,
-        });
-    },
-
     // ── HUD overlay state (weapon, screen flash, status-bar readout) ─────
 
     switchWeapon(name, fireRate) {

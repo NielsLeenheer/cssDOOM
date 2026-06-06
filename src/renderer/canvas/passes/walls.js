@@ -13,32 +13,61 @@ import { animName, NEAR, lightFor, shade, skyCol, skyRow } from '../tables.js';
 
 export const wallMethods = {
     _renderWalls(cam) {
-        for (const wall of this.walls) {
+        const scene = this.scene;
+        for (const wall of scene.walls) {
             // Lift boundary walls are drawn by _renderLiftWalls at the
             // animated platform height; skip them here so the static and
             // moving copies don't z-fight (matches the DOM's buildWalls).
             if (wall.isLiftWall) continue;
-            const tex = getWallTexture(animName(wall.texture, this._animFrame));
+            const tex = getWallTexture(animName(wall.texture, scene._animFrame));
             if (!tex) continue;
 
             // Door panels raise their bottom edge as the door opens;
             // track jambs override their (zero) top to the travel span.
-            const bottomOffset = this._wallBottomOffset.get(wall) || 0;
+            const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
             const wallBottom = wall.bottomHeight + bottomOffset;
-            const wallTop = this._wallTopOverride.get(wall) ?? wall.topHeight;
+            const wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
             // Adding the door's rise to the vertical texture offset pins
             // the panel texture to its moving bottom edge, so the door
             // texture slides up with the panel instead of squashing.
             const yOff = (wall.yOffset || 0) + bottomOffset;
-            const light = wall.lightLevel * (this._sectorLightMul[wall.sectorIndex] ?? 1);
+            const light = wall.lightLevel * (scene._sectorLightMul[wall.sectorIndex] ?? 1);
 
             // If this wall reaches its sector's sky ceiling, the area above
             // its top edge is that sector's sky — paint it at the wall's
             // depth so it occludes whatever lies beyond the opening.
-            const skyCeil = this._skyCeil.get(wall.sectorIndex);
+            const skyCeil = scene._skyCeil.get(wall.sectorIndex);
             const skyAbove = skyCeil !== undefined && Math.abs(wallTop - skyCeil) < 1;
 
             this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light, false, skyAbove);
+        }
+    },
+
+    /**
+     * Draw lift shaft walls. The platform-face walls span from the
+     * platform's current height to the floor they face (so they grow as
+     * the lift drops); the static shaft sides span the full travel so the
+     * shaft isn't see-through once the platform has moved away.
+     */
+    _renderLiftWalls(cam) {
+        for (const lift of this.scene.lifts.values()) {
+            for (const wall of lift.shaftWalls) {
+                const tex = getWallTexture(wall.texture);
+                if (!tex || tex.width <= 1) continue;
+                let bottom, top;
+                if (wall.isPlatformFace) {
+                    const nf = wall.neighborFloor ?? lift.lower;
+                    bottom = Math.min(lift.current, nf);
+                    top = Math.max(lift.current, nf);
+                } else {
+                    bottom = wall.neighborFloor !== undefined
+                        ? Math.min(wall.neighborFloor, lift.lower) : lift.lower;
+                    top = lift.upper;
+                }
+                if (top - bottom < 0.5) continue;
+                const light = wall.lightLevel ?? lift.light;
+                this._drawWall(cam, wall, tex, bottom, top, wall.yOffset || 0, light, true);
+            }
         }
     },
 
@@ -72,7 +101,7 @@ export const wallMethods = {
         let c2x = (bx - ex) * ca + (by - ey) * sa;
         let c2y = ca * (by - ey) - sa * (bx - ex);
 
-        let u1 = (wall.xOffset || 0) + (wall.isScrolling ? this._scrollOffset : 0);
+        let u1 = (wall.xOffset || 0) + (wall.isScrolling ? this.scene._scrollOffset : 0);
         let u2 = u1 + Math.hypot(dx, dy);
 
         if (c1y < NEAR && c2y < NEAR) return;
