@@ -95,6 +95,7 @@ export const HUD_KEYS = [
 export const WINUM_W = 11, WINUM_H = 12;     // big yellow digits 0-9
 export const WIPCNT_W = 13, WIPCNT_H = 12;   // percent sign
 export const WICOLON_W = 5, WICOLON_H = 10;  // m:ss colon
+export const WIMINUS_W = 6, WIMINUS_H = 3;   // negative-score sign
 export const INTERMISSION_W = 320, INTERMISSION_H = 200;
 export const INTER_COUNT_UP_MS = 1200;       // per-row duration, matches DOM
 export const INTER_STEP_DELAY_MS = 250;      // gap between rows

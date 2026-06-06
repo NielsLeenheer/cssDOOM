@@ -5,6 +5,15 @@
    image smoothing disabled for the chunky DOOM look. */
 .pane.pane-canvas {
     background: #000;
+    /* Override the flex-item default `min-width: auto`. The inner
+       <canvas>'s intrinsic size (its `width`/`height` HTML attributes —
+       set in `_resize` to the pane size × DPR) would otherwise act as
+       the flex item's min-content, so two panes sharing #game in DM
+       split-screen can't shrink below their canvas size and the second
+       pane gets squashed to ~0. With min-width:0/min-height:0 the flex
+       `1 1 50%` rule wins and DM split-screen behaves normally. */
+    min-width: 0;
+    min-height: 0;
 }
 
 .canvas-render {

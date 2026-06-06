@@ -110,10 +110,6 @@ export class SoftwareRenderer {
         // below the render factor so the bar/weapon get relatively smaller
         // as the world resolution rises (1x→1, 2x→1, 3x→2, 4x→3).
         this.uiScale = 1;
-        // Pixel scale for *full-screen* UI elements (intermission, future
-        // results / lobby screens). Scales 1:1 with the render factor so
-        // those screens always fill the framebuffer.
-        this.screenScale = 1;
         this._animFrame = 0;          // current animated-texture frame
         this._scrollOffset = 0;       // current scrolling-wall texture offset
         this._bobX = 0;
