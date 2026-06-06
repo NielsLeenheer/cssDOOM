@@ -60,6 +60,7 @@ const TAU = Math.PI * 2;
 const WALK_FRAME_MS = 180;    // enemy walk-cycle frame duration
 const DEATH_FRAME_MS = 120;   // enemy death-animation frame duration
 const DOOR_SPEED = 100;       // door travel speed, world units per second
+const LIFT_SPEED = 140;       // lift platform speed, world units per second
 
 // Sector light specials, keyed by DOOM sector specialType. Each maps to
 // a time-varying multiplier on the sector's base light level. `sync`
@@ -232,9 +233,11 @@ export class SoftwareRenderer {
         // bottom edge as it opens; `_ceilOverride` raises the door
         // sector's ceiling so its floor/ceiling become visible.
         this.doors = new Map();          // sectorIndex → door record
+        this.lifts = new Map();          // sectorIndex → lift record
         this._wallBottomOffset = new Map(); // wall ref → bottom-height delta
         this._wallTopOverride = new Map();  // wall ref → absolute top height (door tracks)
         this._ceilOverride = new Map();     // sectorPolygon ref → ceiling height
+        this._floorOverride = new Map();    // sectorPolygon ref → floor height (lifts)
         this._lastFrameTime = 0;
 
         // Sector light specials (flicker / blink / glow / fire).
@@ -306,9 +309,11 @@ export class SoftwareRenderer {
         this.projectiles.clear();
         this.effects = [];
         this.doors.clear();
+        this.lifts.clear();
         this._wallBottomOffset.clear();
         this._wallTopOverride.clear();
         this._ceilOverride.clear();
+        this._floorOverride.clear();
 
         // Build door records. A door is a sector whose ceiling rises from
         // closedHeight (the stored, squished state) to openHeight; its
@@ -338,18 +343,44 @@ export class SoftwareRenderer {
             }
         }
 
+        // Build lift records. A lift is a sector whose floor rides between
+        // upperHeight (its stored, raised state) and lowerHeight; its
+        // shaft walls are kept on the record and drawn each frame at the
+        // animated height. Start raised.
+        for (const lift of (data.lifts || [])) {
+            const sectorPoly = polyOf.get(lift.sectorIndex) || null;
+            const raised = sectorPoly ? sectorPoly.floorHeight : lift.upperHeight;
+            this.lifts.set(lift.sectorIndex, {
+                upper: lift.upperHeight,
+                lower: lift.lowerHeight,
+                current: raised,
+                target: raised,
+                sectorPoly,
+                light: this._sectorLight[lift.sectorIndex] ?? 200,
+                shaftWalls: lift.shaftWalls || [],
+            });
+            if (sectorPoly) this._floorOverride.set(sectorPoly, raised);
+        }
+
         for (const t of (data.things || [])) {
             if (t.category === undefined) continue;   // filtered out by skill / MP
             const name = THING_SPRITES[t.type];
             if (!name) continue;
             const light = sectors[t.sectorIndex]?.lightLevel ?? 180;
+            // Anchor to the static floor of the thing's sector rather than
+            // the enriched `t.floorHeight`: that value is computed inside
+            // maps.load against the global lift state, which on a level
+            // transition still holds the *previous* level's lifts, sinking
+            // things into the new floor. The sector's own floorHeight is
+            // immune; moving things get live heights via updateThingPosition.
+            const floorZ = polyOf.get(t.sectorIndex)?.floorHeight ?? t.floorHeight ?? 0;
 
             // Things the game simulates carry a gameId — the key the
             // dispatch commands address them by. Register those in the
             // things map so they can move / be collected / die. Passive
             // decorations (no gameId) become static billboards.
             if (t.gameId === undefined) {
-                this.statics.push({ x: t.x, y: t.y, floorZ: t.floorHeight ?? 0, light, name });
+                this.statics.push({ x: t.x, y: t.y, floorZ, light, name });
                 continue;
             }
 
@@ -359,7 +390,7 @@ export class SoftwareRenderer {
                 category: t.category,
                 x: t.x,
                 y: t.y,
-                floorZ: t.floorHeight ?? 0,
+                floorZ,
                 light,
                 isEnemy: anim !== null,
                 anim,
@@ -383,9 +414,11 @@ export class SoftwareRenderer {
         this.projectiles.clear();
         this.effects = [];
         this.doors.clear();
+        this.lifts.clear();
         this._wallBottomOffset.clear();
         this._wallTopOverride.clear();
         this._ceilOverride.clear();
+        this._floorOverride.clear();
         this._lightSectors = [];
         this._sectorLightMul = [];
     }
@@ -546,6 +579,54 @@ export class SoftwareRenderer {
         }
     }
 
+    setLiftState(sectorIndex, liftState) {
+        const lift = this.lifts.get(sectorIndex);
+        if (lift) lift.target = liftState === 'lowered' ? lift.lower : lift.upper;
+    }
+
+    /** Advance lift animations: move the platform floor toward its target
+     *  and refresh the floor-height override that drives the visplane. */
+    _updateLifts(dt) {
+        for (const lift of this.lifts.values()) {
+            if (lift.current === lift.target) continue;
+            const dir = Math.sign(lift.target - lift.current);
+            lift.current += dir * LIFT_SPEED * dt;
+            if ((dir > 0 && lift.current > lift.target)
+                || (dir < 0 && lift.current < lift.target)) {
+                lift.current = lift.target;
+            }
+            if (lift.sectorPoly) this._floorOverride.set(lift.sectorPoly, lift.current);
+        }
+    }
+
+    /**
+     * Draw lift shaft walls. The platform-face walls span from the
+     * platform's current height to the floor they face (so they grow as
+     * the lift drops); the static shaft sides span the full travel so the
+     * shaft isn't see-through once the platform has moved away.
+     */
+    _renderLiftWalls(cam) {
+        for (const lift of this.lifts.values()) {
+            for (const wall of lift.shaftWalls) {
+                const tex = getWallTexture(wall.texture);
+                if (!tex || tex.width <= 1) continue;
+                let bottom, top;
+                if (wall.isPlatformFace) {
+                    const nf = wall.neighborFloor ?? lift.lower;
+                    bottom = Math.min(lift.current, nf);
+                    top = Math.max(lift.current, nf);
+                } else {
+                    bottom = wall.neighborFloor !== undefined
+                        ? Math.min(wall.neighborFloor, lift.lower) : lift.lower;
+                    top = lift.upper;
+                }
+                if (top - bottom < 0.5) continue;
+                const light = wall.lightLevel ?? lift.light;
+                this._drawWall(cam, wall, tex, bottom, top, wall.yOffset || 0, light, true);
+            }
+        }
+    }
+
     createPlayerSprite(thingIndex, playerIndex, x, y, floorZ /* , sectorIndex */) {
         if (this.things.has(thingIndex)) return;   // idempotent
         this.things.set(thingIndex, {
@@ -579,6 +660,7 @@ export class SoftwareRenderer {
         const dt = this._lastFrameTime ? Math.min(0.1, (now - this._lastFrameTime) / 1000) : 0;
         this._lastFrameTime = now;
         this._updateDoors(dt);
+        this._updateLifts(dt);
         const tSec = now / 1000;
         for (const e of this._lightSectors) {
             this._sectorLightMul[e.sectorIndex] = lightMul(e, tSec);
@@ -604,6 +686,7 @@ export class SoftwareRenderer {
 
         this._renderSky(cam);
         this._renderWalls(cam);
+        this._renderLiftWalls(cam);
         this._renderFlats(cam);
         this._renderEntities(cam);
         this._renderWeapon(cam, now, dt);
@@ -843,131 +926,136 @@ export class SoftwareRenderer {
     // ── Walls ────────────────────────────────────────────────────────────
 
     _renderWalls(cam) {
-        const { W, H, fb, zb } = this;
-        const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
-
         for (const wall of this.walls) {
             const tex = getWallTexture(animName(wall.texture, this._animFrame));
             if (!tex) continue;
-
-            const ax = wall.start.x, ay = wall.start.y;
-            const bx = wall.end.x, by = wall.end.y;
-            const dx = bx - ax, dy = by - ay;
-
-            // Back-face cull. Each exported quad is one visible surface
-            // whose textured face looks into its sector; given the
-            // exporter's winding that front normal is (dy, -dx). Skip
-            // walls whose front faces away from the camera. This stops a
-            // two-sided surface (door panel, sky upper wall, masked
-            // mid-texture) from painting its hidden back face over the
-            // visible one, and lets the sky show through upper openings
-            // instead of a dark wall.
-            const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5;
-            if ((ex - mx) * dy - (ey - my) * dx <= 0) continue;
-
-            // Camera-space endpoints.
-            let c1x = (ax - ex) * ca + (ay - ey) * sa;
-            let c1y = ca * (ay - ey) - sa * (ax - ex);
-            let c2x = (bx - ex) * ca + (by - ey) * sa;
-            let c2y = ca * (by - ey) - sa * (bx - ex);
-
-            let u1 = wall.xOffset || 0;
-            let u2 = u1 + Math.hypot(dx, dy);
-
-            // Near-plane clip (carry the U coordinate along).
-            if (c1y < NEAR && c2y < NEAR) continue;
-            if (c1y < NEAR) {
-                const t = (NEAR - c1y) / (c2y - c1y);
-                c1x += (c2x - c1x) * t;
-                u1 += (u2 - u1) * t;
-                c1y = NEAR;
-            } else if (c2y < NEAR) {
-                const t = (NEAR - c2y) / (c1y - c2y);
-                c2x += (c1x - c2x) * t;
-                u2 += (u1 - u2) * t;
-                c2y = NEAR;
-            }
 
             // Door panels raise their bottom edge as the door opens;
             // track jambs override their (zero) top to the travel span.
             const bottomOffset = this._wallBottomOffset.get(wall) || 0;
             const wallBottom = wall.bottomHeight + bottomOffset;
             const wallTop = this._wallTopOverride.get(wall) ?? wall.topHeight;
-            const topZ = wallTop - ez;
-            const botZ = wallBottom - ez;
-
-            let p1 = halfW + (c1x / c1y) * sxScale;
-            let p2 = halfW + (c2x / c2y) * sxScale;
-            let yt1 = halfH - (topZ / c1y) * syScale;
-            let yb1 = halfH - (botZ / c1y) * syScale;
-            let yt2 = halfH - (topZ / c2y) * syScale;
-            let yb2 = halfH - (botZ / c2y) * syScale;
-            let inv1 = 1 / c1y, inv2 = 1 / c2y;
-            let uo1 = u1 * inv1, uo2 = u2 * inv2;
-
-            if (p1 > p2) {
-                let s;
-                s = p1; p1 = p2; p2 = s;
-                s = yt1; yt1 = yt2; yt2 = s;
-                s = yb1; yb1 = yb2; yb2 = s;
-                s = inv1; inv1 = inv2; inv2 = s;
-                s = uo1; uo1 = uo2; uo2 = s;
-            }
-
-            const xs = Math.max(0, Math.ceil(p1 - 0.5));
-            const xe = Math.min(W - 1, Math.floor(p2 - 0.5));
-            if (xs > xe) continue;
-
-            const span = p2 - p1 || 1e-6;
-            const texW = tex.width, texH = tex.height, tdata = tex.data;
-            const wallH = wallTop - wallBottom;
             // Adding the door's rise to the vertical texture offset pins
             // the panel texture to its moving bottom edge, so the door
             // texture slides up with the panel instead of squashing.
             const yOff = (wall.yOffset || 0) + bottomOffset;
+            const light = wall.lightLevel * (this._sectorLightMul[wall.sectorIndex] ?? 1);
 
-            // Fake contrast: E/W walls darker, N/S walls brighter.
-            let baseLight = wall.lightLevel * (this._sectorLightMul[wall.sectorIndex] ?? 1);
-            baseLight += Math.abs(dx) > Math.abs(dy) ? -16 : 16;
+            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light);
+        }
+    }
 
-            for (let x = xs; x <= xe; x++) {
-                const t = (x + 0.5 - p1) / span;
-                const inv = inv1 + (inv2 - inv1) * t;
-                const cy = 1 / inv;
-                const u = (uo1 + (uo2 - uo1) * t) / inv;
+    /**
+     * Rasterise one textured wall quad: back-face cull, transform to
+     * camera space, near-plane clip, project, then fill each screen
+     * column with a perspective-correct textured strip, depth-tested.
+     */
+    _drawWall(cam, wall, tex, wallBottom, wallTop, yOff, baseLight, noCull = false) {
+        const { W, H, fb, zb } = this;
+        const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
-                let texX = u % texW;
-                if (texX < 0) texX += texW;
-                texX |= 0;
-                if (texX >= texW) texX = texW - 1;
+        const ax = wall.start.x, ay = wall.start.y;
+        const bx = wall.end.x, by = wall.end.y;
+        const dx = bx - ax, dy = by - ay;
 
-                const ytop = yt1 + (yt2 - yt1) * t;
-                const ybot = yb1 + (yb2 - yb1) * t;
-                const colH = ybot - ytop;
-                if (colH <= 0) continue;
+        // Back-face cull against the front normal (dy, -dx). Lift shaft
+        // walls opt out (noCull): their winding isn't guaranteed to face
+        // the viewer and the depth buffer resolves any overdraw.
+        if (!noCull) {
+            const mx = (ax + bx) * 0.5, my = (ay + by) * 0.5;
+            if ((ex - mx) * dy - (ey - my) * dx <= 0) return;
+        }
 
-                const y0 = Math.max(0, Math.ceil(ytop - 0.5));
-                const y1 = Math.min(H - 1, Math.floor(ybot - 0.5));
-                if (y0 > y1) continue;
+        let c1x = (ax - ex) * ca + (ay - ey) * sa;
+        let c1y = ca * (ay - ey) - sa * (ax - ex);
+        let c2x = (bx - ex) * ca + (by - ey) * sa;
+        let c2y = ca * (by - ey) - sa * (bx - ex);
 
-                const lf = lightFor(baseLight, cy);
-                const col = texX;
-                const invColH = 1 / colH;
+        let u1 = wall.xOffset || 0;
+        let u2 = u1 + Math.hypot(dx, dy);
 
-                for (let y = y0; y <= y1; y++) {
-                    const idx = y * W + x;
-                    if (cy >= zb[idx]) continue;
-                    const frac = (y + 0.5 - ytop) * invColH;
-                    let v = frac * wallH + yOff;
-                    v %= texH;
-                    if (v < 0) v += texH;
-                    let texY = v | 0;
-                    if (texY >= texH) texY = texH - 1;
-                    const texel = tdata[texY * texW + col];
-                    if ((texel >>> 24) < 128) continue;
-                    fb[idx] = shade(texel, lf);
-                    zb[idx] = cy;
-                }
+        if (c1y < NEAR && c2y < NEAR) return;
+        if (c1y < NEAR) {
+            const t = (NEAR - c1y) / (c2y - c1y);
+            c1x += (c2x - c1x) * t;
+            u1 += (u2 - u1) * t;
+            c1y = NEAR;
+        } else if (c2y < NEAR) {
+            const t = (NEAR - c2y) / (c1y - c2y);
+            c2x += (c1x - c2x) * t;
+            u2 += (u1 - u2) * t;
+            c2y = NEAR;
+        }
+
+        const topZ = wallTop - ez;
+        const botZ = wallBottom - ez;
+
+        let p1 = halfW + (c1x / c1y) * sxScale;
+        let p2 = halfW + (c2x / c2y) * sxScale;
+        let yt1 = halfH - (topZ / c1y) * syScale;
+        let yb1 = halfH - (botZ / c1y) * syScale;
+        let yt2 = halfH - (topZ / c2y) * syScale;
+        let yb2 = halfH - (botZ / c2y) * syScale;
+        let inv1 = 1 / c1y, inv2 = 1 / c2y;
+        let uo1 = u1 * inv1, uo2 = u2 * inv2;
+
+        if (p1 > p2) {
+            let s;
+            s = p1; p1 = p2; p2 = s;
+            s = yt1; yt1 = yt2; yt2 = s;
+            s = yb1; yb1 = yb2; yb2 = s;
+            s = inv1; inv1 = inv2; inv2 = s;
+            s = uo1; uo1 = uo2; uo2 = s;
+        }
+
+        const xs = Math.max(0, Math.ceil(p1 - 0.5));
+        const xe = Math.min(W - 1, Math.floor(p2 - 0.5));
+        if (xs > xe) return;
+
+        const span = p2 - p1 || 1e-6;
+        const texW = tex.width, texH = tex.height, tdata = tex.data;
+        const wallH = wallTop - wallBottom;
+
+        // Fake contrast: E/W walls darker, N/S walls brighter.
+        const light = baseLight + (Math.abs(dx) > Math.abs(dy) ? -16 : 16);
+
+        for (let x = xs; x <= xe; x++) {
+            const t = (x + 0.5 - p1) / span;
+            const inv = inv1 + (inv2 - inv1) * t;
+            const cy = 1 / inv;
+            const u = (uo1 + (uo2 - uo1) * t) / inv;
+
+            let texX = u % texW;
+            if (texX < 0) texX += texW;
+            texX |= 0;
+            if (texX >= texW) texX = texW - 1;
+
+            const ytop = yt1 + (yt2 - yt1) * t;
+            const ybot = yb1 + (yb2 - yb1) * t;
+            const colH = ybot - ytop;
+            if (colH <= 0) continue;
+
+            const y0 = Math.max(0, Math.ceil(ytop - 0.5));
+            const y1 = Math.min(H - 1, Math.floor(ybot - 0.5));
+            if (y0 > y1) continue;
+
+            const lf = lightFor(light, cy);
+            const col = texX;
+            const invColH = 1 / colH;
+
+            for (let y = y0; y <= y1; y++) {
+                const idx = y * W + x;
+                if (cy >= zb[idx]) continue;
+                const frac = (y + 0.5 - ytop) * invColH;
+                let v = frac * wallH + yOff;
+                v %= texH;
+                if (v < 0) v += texH;
+                let texY = v | 0;
+                if (texY >= texH) texY = texH - 1;
+                const texel = tdata[texY * texW + col];
+                if ((texel >>> 24) < 128) continue;
+                fb[idx] = shade(texel, lf);
+                zb[idx] = cy;
             }
         }
     }
@@ -976,14 +1064,15 @@ export class SoftwareRenderer {
 
     _renderFlats(cam) {
         for (const sector of this.sectorPolygons) {
-            // Door sectors animate their ceiling height as they open.
+            // Doors animate their ceiling height; lifts animate their floor.
             const ceilingHeight = this._ceilOverride.get(sector) ?? sector.ceilingHeight;
-            if (ceilingHeight <= sector.floorHeight) continue;
+            const floorHeight = this._floorOverride.get(sector) ?? sector.floorHeight;
+            if (ceilingHeight <= floorHeight) continue;
 
             const light = sector.lightLevel * (this._sectorLightMul[sector.sectorIndex] ?? 1);
             const floorTex = getFlatTexture(animName(sector.floorTexture, this._animFrame));
             if (floorTex) {
-                this._drawPlane(cam, sector.boundaries, sector.floorHeight, floorTex, light);
+                this._drawPlane(cam, sector.boundaries, floorHeight, floorTex, light);
             }
             // Sky ceilings are painted by the backdrop pass, not here.
             if (sector.ceilingTexture === 'F_SKY1') continue;

@@ -188,6 +188,7 @@ const ENTITY_COMMANDS = [
     'createCorpse',
     'createPlayerSprite',
     'setDoorState',
+    'setLiftState',
     'switchWeapon',
     'startFiring',
     'stopFiring',
