@@ -13,7 +13,14 @@
  * debug.sectors.explode(...), debug.layers.fadeOut(...) directly.
  */
 
-import { one, two, three, four, downthestairs, spectator, spectatorStart, spectatorEnd, door } from './recordings.js';
+// The talk path recordings (recordings.js) are a large data blob — the player's
+// recorded walks for the CSS Day talk, not part of the regular debug toolkit.
+// Load them on demand the first time a set piece needs one, so they form their
+// own chunk and never weigh down the debug bootstrap. Memoised: the dynamic
+// import is cached after the first call. A set piece grabs what it needs with
+// `const { spectator } = await recordings();` at the top.
+let _recordings = null;
+const recordings = () => (_recordings ??= import('./recordings.js'));
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -22,6 +29,7 @@ export function registerCustom(debug) {
 
     
     custom.one = async () => {
+        const { one } = await recordings();
         document.body.classList.add('hide-chrome');
         
         debug.game.noDamage(true);
@@ -37,6 +45,7 @@ export function registerCustom(debug) {
     };
     
     custom.two = async () => {
+        const { two, three, four } = await recordings();
         document.body.classList.add('hide-chrome');
 
         debug.game.noDamage(false);
@@ -124,6 +133,7 @@ export function registerCustom(debug) {
 
 
     custom.three = async () => {
+        const { three } = await recordings();
         debug.renderer('flat')
 
         document.body.classList.add('hide-chrome');
@@ -274,6 +284,7 @@ export function registerCustom(debug) {
 
 
     custom.six = async () => {
+        const { downthestairs } = await recordings();
         debug.renderer('cat')
 
         document.body.classList.add('hide-chrome');
@@ -298,6 +309,7 @@ export function registerCustom(debug) {
 
 
     custom.seven = async () => {
+        const { spectator } = await recordings();
         debug.renderer('dom')
         debug.culling.all(false)
 
@@ -335,6 +347,7 @@ export function registerCustom(debug) {
     };
 
     custom.sevenAltStart = async () => {
+        const { spectatorStart } = await recordings();
         debug.renderer('dom')
         debug.culling.all(false)
 
@@ -452,6 +465,7 @@ export function registerCustom(debug) {
     };
 
     custom.sevenAltEnd = async () => {
+        const { spectatorEnd } = await recordings();
         debug.renderer('dom')
         debug.culling.all(false)
 
@@ -489,6 +503,7 @@ export function registerCustom(debug) {
 
 
     custom.eight = async () => {
+        const { door } = await recordings();
         debug.renderer('dom')
         debug.culling.all(false)
 
