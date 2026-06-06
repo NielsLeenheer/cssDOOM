@@ -26,10 +26,10 @@ export const position = {
         if (angleDegrees !== undefined) player.angle = angleDegrees * Math.PI / 180;
         player.floorHeight = getFloorHeightAt(player.x, player.y);
         player.z = player.floorHeight + EYE_HEIGHT;
-        orchestrator.updateCamera(player.viewportIndex, {
+        orchestrator.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'updateCamera', args: [{
             x: player.x, y: player.y, z: player.z, angle: player.angle,
             floorHeight: player.floorHeight ?? 0, isFiring: player.isFiring,
-        });
+        }] });
     },
 
     /** Teleport to a thing by type name (e.g. teleportTo('spectre')). */
@@ -63,10 +63,10 @@ export const position = {
         player.angle = data.angle;
         player.floorHeight = getFloorHeightAt(player.x, player.y);
         player.z = player.floorHeight + EYE_HEIGHT;
-        orchestrator.updateCamera(player.viewportIndex, {
+        orchestrator.dispatch({ type: 'player', slot: player.viewportIndex, cmd: 'updateCamera', args: [{
             x: player.x, y: player.y, z: player.z, angle: player.angle,
             floorHeight: player.floorHeight ?? 0, isFiring: player.isFiring,
-        });
+        }] });
         console.log(`Loaded slot ${slot}: ${data.map} (${Math.round(data.x)}, ${Math.round(data.y)})`);
     },
 };
