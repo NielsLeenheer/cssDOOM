@@ -2,7 +2,7 @@
  * Console — the `window.debug` command surface.
  *
  * `window.debug` is a callable object: calling it opens the debug menu; every
- * command hangs off it in grouped sub-objects (debug.position.*, debug.sectors.*,
+ * command hangs off it in grouped sub-objects (debug.player.*, debug.sectors.*,
  * debug.path.*, …). This module is a thin PRESENTER — it imports each capability
  * from ../features/* and wires it onto a debug.* group; the menu (../ui) presents
  * the same features as checkboxes/buttons. Loaded for its side effects at boot
@@ -32,10 +32,8 @@ window.debug = debug;
 /** Get (or lazily create) a command group on the debug namespace. */
 function group(name) { return (debug[name] ??= {}); }
 
-// ── debug.position / debug.world — placement + level inspection (see
-// features/world.js). Teleport / save-load the player, dump player + nearby
-// geometry / triggers / lifts.
-Object.assign(group('position'), positionCmds);
+// ── debug.world — level inspection (see features/world.js). Dump the player +
+// nearby geometry / triggers / lifts. (Player placement is debug.player.position.)
 Object.assign(group('world'), worldCmds);
 
 // ── debug.sectors — dissect the level for the talk's "anatomy of a sector"
@@ -165,12 +163,13 @@ view.record = async () => {
 };
 view.save = (slot) => recorder.save(slot);
 
-// ── debug.player — set the slot-0 player's vitals for talk shots (see
-// features/loadout.js). Mutates the live player + flags the HUD dirty.
-//   debug.player.health(100)      ·  debug.player.armor(200)
-//   debug.player.armor(100, 1)    — green (1/3 absorb) instead of blue
-//   debug.player.ammo('shells', 50)  ·  ammo(50) all pools  ·  ammo() fill to max
+// ── debug.player — the slot-0 player: placement (position.*) + vitals (see
+// features/world.js + loadout.js). Vitals mutate the live player + flag the HUD.
+//   debug.player.position.teleport(x, y, angle°)  ·  position.teleportTo(name)
+//   debug.player.position.save(slot) / position.load(slot)  — placement in localStorage
+//   debug.player.health(100)  ·  armor(200)  ·  armor(100, 1) green  ·  ammo('shells', 50)
 const player = group('player');
+Object.assign((player.position ??= {}), positionCmds);
 player.health = loadout.setHealth;
 player.armor = loadout.setArmor;
 player.ammo = loadout.setAmmo;

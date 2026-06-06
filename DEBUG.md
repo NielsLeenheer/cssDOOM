@@ -5,7 +5,7 @@ plus an on-screen debug menu. None of it is part of the game proper — it lives
 entirely under [`src/debug/`](src/debug/) and is wired up once at boot.
 
 - **Console** — open your browser devtools and type `debug.<group>.<command>(…)`.
-  Everything is grouped: `debug.position.*`, `debug.world.*`, `debug.sectors.*`, etc.
+  Everything is grouped: `debug.player.*`, `debug.world.*`, `debug.sectors.*`, etc.
 - **Menu** — call `debug()` (or click the cssDOOM logo) to open the debug menu, a
   panel of checkboxes/buttons in the top-left. The menu is declarative; its toggles
   live in [`src/debug/ui/registry.js`](src/debug/ui/registry.js).
@@ -21,14 +21,20 @@ The debug layer is organised as **features + two presenters**:
 
 ---
 
-## `debug.position` — player placement
+## `debug.player` — the slot-0 player
+
+Placement lives under `position.*`; vitals (`health` / `armor` / `ammo`) mutate the
+live player and refresh the HUD.
 
 | Command | Description |
 | --- | --- |
-| `teleport(x, y, angle?)` | Jump to exact coords; `angle` in **degrees** (optional). |
-| `teleportTo(name)` | Jump to the first thing of a type, e.g. `teleportTo('spectre')`. |
-| `save(slot = 0)` | Save the current map + pose to `localStorage`. |
-| `load(slot = 0)` | Restore a saved pose (swaps level first if needed). |
+| `position.teleport(x, y, angle?)` | Jump to exact coords; `angle` in **degrees** (optional). |
+| `position.teleportTo(name)` | Jump to the first thing of a type, e.g. `teleportTo('spectre')`. |
+| `position.save(slot = 0)` | Save the current map + pose to `localStorage`. |
+| `position.load(slot = 0)` | Restore a saved pose (swaps level first if needed). |
+| `health(n)` | Set health (clamped ≥ 0; not capped, so soul/megasphere values work). |
+| `armor(n, type?)` | Set armor; `type` 1 = green (⅓ absorb), 2 = blue (½). Defaults to blue when there was none; 0 clears it. |
+| `ammo(typeOrN?, n?)` | `ammo('shells', 50)` one pool · `ammo(50)` every pool · `ammo()` fill to max (clamped per pool). |
 
 ## `debug.world` — inspect the level
 

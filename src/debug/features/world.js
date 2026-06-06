@@ -1,9 +1,9 @@
 /**
  * World / position — dev inspection + teleport commands over the live game
- * state: move the player around (debug.position.*), and dump the player /
+ * state: move the player around (debug.player.position.*), and dump the player /
  * nearby walls-doors-lifts-things / triggers / lifts (debug.world.*). A shared
- * feature exposing two command groups; console wires them onto debug.position
- * and debug.world.
+ * feature exposing two command groups; console wires them onto
+ * debug.player.position and debug.world.
  */
 
 import { state } from '../../game/state.js';
@@ -16,7 +16,7 @@ import { swapLevel } from '../../game/level.js';
 import { forEachWallInAABB } from '../../game/spatial-grid.js';
 import { activateLift, getLiftEntries } from '../../game/mechanics/lifts.js';
 
-// ── debug.position — player placement & position save/load ──────────────────
+// ── debug.player.position — player placement & position save/load ───────────
 export const position = {
     /** Teleport to exact coords (+ optional angle in degrees). */
     teleport: (x, y, angleDegrees) => {
