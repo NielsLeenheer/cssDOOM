@@ -767,14 +767,18 @@ export class SoftwareRenderer {
         if (!stbar || stbar.width <= 1) return;
 
         const { W, H } = this;
-        const scale = W / 320;                 // bar fills the frame width
-        const barH = Math.round(32 * scale);
+        // Draw the bar at its native 320×32 resolution, bottom-centred.
+        // Narrower framebuffers clip the sides rather than downscaling the
+        // bar (which softened the digits/face on non-widescreen panes).
+        const scale = 1;
+        const barH = 32;
         const barY = H - barH;
-        const dx = nx => nx * scale;
+        const barX = Math.round((W - 320) / 2);   // negative → sides clip
+        const dx = nx => barX + nx * scale;
         const dy = ny => barY + ny * scale;
 
         // Bar background.
-        this._blit(stbar, 0, 0, 320, 32, 0, barY, W, barH);
+        this._blit(stbar, 0, 0, 320, 32, barX, barY, 320, 32);
 
         const digits = getHudTexture('DIGITS_SHEET');
 
