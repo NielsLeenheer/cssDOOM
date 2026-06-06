@@ -10,7 +10,7 @@
  *
  * Wired by console.js via registerCustom(debug): it hands in the live `debug`
  * namespace, so a script just calls debug.path.play(...),
- * debug.sectors.explode(...), debug.layers.fadeOut(...) directly.
+ * debug.sectors.explode(...), debug.layers.walls.hide() directly.
  */
 
 // The talk path recordings (recordings.js) are a large data blob — the player's
@@ -30,7 +30,7 @@ export function registerCustom(debug) {
     
     custom.one = async () => {
         const { one } = await recordings();
-        document.body.classList.add('hide-chrome');
+        debug.layers.chrome.hide();
         
         debug.game.noDamage(true);
         debug.game.noAttack(true);
@@ -46,7 +46,7 @@ export function registerCustom(debug) {
     
     custom.two = async () => {
         const { two, three, four } = await recordings();
-        document.body.classList.add('hide-chrome');
+        debug.layers.chrome.hide();
 
         debug.game.noDamage(false);
         debug.game.noAttack(false);
@@ -63,9 +63,9 @@ export function registerCustom(debug) {
         });
 
         /* Hide everthing except the door */
-        debug.layers.fadeOut('sky');
-        document.body.classList.add('hide-hud');
-        document.body.classList.add('hide-enemies');
+        debug.layers.sky.hide();
+        debug.layers.hud.hide();
+        debug.layers.enemies.hide();
         await delay(1000);
 
         debug.sectors.only(40);
@@ -82,7 +82,7 @@ export function registerCustom(debug) {
         debug.sectors.show();
         await delay(1000);
 
-        debug.layers.fadeIn('sky');
+        debug.layers.sky.show();
 
         /* Move up the stairs */
         let segment2 = debug.path.play(three, { 
@@ -92,15 +92,15 @@ export function registerCustom(debug) {
         });        
         
         await delay(5000);
-        debug.layers.fadeOut('ceilings');
+        debug.layers.ceilings.hide();
         debug.camera.offset(0, 60, -100, 2, 100);
 
         await segment2;
 
         /* Fade out falls and ceilings and hide other sectors */
-        debug.layers.fadeOut('walls');
-        debug.layers.fadeOut('sky')
-        debug.layers.fadeOut('things')
+        debug.layers.walls.hide();
+        debug.layers.sky.hide()
+        debug.layers.things.hide()
         debug.sectors.only(29, 32);
         await delay(1000);
 
@@ -114,8 +114,8 @@ export function registerCustom(debug) {
         debug.camera.offset(0, 0, 0, 2, 100);
 
         /* Show enemies, things and hide the floor grid again. */
-        document.body.classList.remove('hide-enemies');
-        debug.layers.fadeIn('things')
+        debug.layers.enemies.show();
+        debug.layers.things.show()
         debug.sectors.hideFloorGrid(29);
         debug.sectors.hideFloorGrid(32);
         debug.sectors.show();
@@ -136,12 +136,12 @@ export function registerCustom(debug) {
         const { three } = await recordings();
         debug.renderer('flat')
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        debug.layers.enemies.hide();
 
-        debug.layers.fadeOut('sky');
-        debug.layers.fadeOut('things')
+        debug.layers.sky.hide();
+        debug.layers.things.hide()
 
 
 
@@ -165,7 +165,7 @@ export function registerCustom(debug) {
         debug.sectors.show();
         await delay(1000);
 
-        // debug.layers.fadeIn('sky');
+        // debug.layers.sky.show();
 
         /* Move up the stairs */
         let segment2 = debug.path.play(three, { 
@@ -174,18 +174,18 @@ export function registerCustom(debug) {
             end: { x: -17, y: -3128, angle: 121 } 
         });        
         
-        debug.layers.fadeIn('things')
+        debug.layers.things.show()
 
         await delay(5000);
-        debug.layers.fadeOut('ceilings');
+        debug.layers.ceilings.hide();
         debug.camera.offset(0, 60, -100, 2, 100);
 
         await segment2;
 
         /* Fade out falls and ceilings and hide other sectors */
-        debug.layers.fadeOut('walls');
-        debug.layers.fadeOut('sky')
-        debug.layers.fadeOut('things')
+        debug.layers.walls.hide();
+        debug.layers.sky.hide()
+        debug.layers.things.hide()
         debug.sectors.only(29, 32);
         await delay(1000);
     };
@@ -193,12 +193,12 @@ export function registerCustom(debug) {
     custom.four = async () => {
         debug.renderer('lighting')
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        debug.layers.enemies.hide();
 
-        debug.layers.fadeOut('sky');
-        debug.layers.fadeOut('things')
+        debug.layers.sky.hide();
+        debug.layers.things.hide()
 
 
 
@@ -228,12 +228,12 @@ export function registerCustom(debug) {
     custom.five = async () => {
         debug.renderer('lighting')
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        debug.layers.enemies.hide();
 
-        debug.layers.fadeOut('sky');
-        debug.layers.fadeOut('things')
+        debug.layers.sky.hide();
+        debug.layers.things.hide()
 
         await debug.path.move({
             x: 39, y: -3113, angle: 246
@@ -287,12 +287,12 @@ export function registerCustom(debug) {
         const { downthestairs } = await recordings();
         debug.renderer('cat')
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        debug.layers.enemies.hide();
 
-        debug.layers.fadeOut('sky');
-        debug.layers.fadeOut('things')
+        debug.layers.sky.hide();
+        debug.layers.things.hide()
 
         await debug.path.move({
             x: 39, y: -3113, angle: 246
@@ -313,12 +313,12 @@ export function registerCustom(debug) {
         debug.renderer('dom')
         debug.culling.all(false)
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        // document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        // debug.layers.enemies.hide();
 
-        // debug.layers.fadeOut('sky');
-        // debug.layers.fadeOut('things')
+        // debug.layers.sky.hide();
+        // debug.layers.things.hide()
 
         await debug.path.move({
             x: 997, y: -3276, angle: 308
@@ -351,12 +351,12 @@ export function registerCustom(debug) {
         debug.renderer('dom')
         debug.culling.all(false)
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        // document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        // debug.layers.enemies.hide();
 
-        // debug.layers.fadeOut('sky');
-        // debug.layers.fadeOut('things')
+        // debug.layers.sky.hide();
+        // debug.layers.things.hide()
 
         await debug.path.move({
             x: 997, y: -3276, angle: 308
@@ -402,12 +402,12 @@ export function registerCustom(debug) {
         debug.renderer('dom')
         debug.culling.all(false)
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        // document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        // debug.layers.enemies.hide();
 
-        // debug.layers.fadeOut('sky');
-        // debug.layers.fadeOut('things')
+        // debug.layers.sky.hide();
+        // debug.layers.things.hide()
 
         await debug.path.move({
             x: 1212, y: -3265, angle: 276
@@ -469,12 +469,12 @@ export function registerCustom(debug) {
         debug.renderer('dom')
         debug.culling.all(false)
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
-        // document.body.classList.add('hide-enemies');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
+        // debug.layers.enemies.hide();
 
-        // debug.layers.fadeOut('sky');
-        // debug.layers.fadeOut('things')
+        // debug.layers.sky.hide();
+        // debug.layers.things.hide()
 
         await debug.path.move({
             x: 1212, y: -3265, angle: 276
@@ -507,8 +507,8 @@ export function registerCustom(debug) {
         debug.renderer('dom')
         debug.culling.all(false)
 
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
 
         await debug.path.move({
             x: 1520, y: -2496, angle: 246
@@ -529,8 +529,8 @@ export function registerCustom(debug) {
         debug.culling.all(false)
 
         debug.spectator(true);
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
 
         await debug.path.move({
             x: 1520, y: -2496, angle: 246
@@ -553,7 +553,7 @@ export function registerCustom(debug) {
         
         await delay(1000);
         
-        document.body.classList.remove('hide-hud');
+        debug.layers.hud.show();
 
         await delay(28000);
 
@@ -573,7 +573,7 @@ export function registerCustom(debug) {
 
         await delay(8000);
 
-        debug.layers.fadeOut('sky');
+        debug.layers.sky.hide();
 
         let fight4 = debug.path.play('fight4', { 
             trim: true,
@@ -581,18 +581,18 @@ export function registerCustom(debug) {
 
         await delay(1500);
 
-        document.body.classList.add('hide-hud');
+        debug.layers.hud.hide();
 
         await delay(2000);
 
 
-        debug.layers.fadeOut('walls');
-        debug.layers.fadeOut('enemies');
-        debug.layers.fadeOut('corpses');
+        debug.layers.walls.hide();
+        debug.layers.enemies.hide();
+        debug.layers.corpses.hide();
 
         await delay(1000);
 
-        debug.layers.fadeOut('ceilings');
+        debug.layers.ceilings.hide();
 
         await fight4;
         
@@ -605,8 +605,8 @@ export function registerCustom(debug) {
         debug.culling.all(false)
 
         debug.spectator(true);
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
 
         await debug.path.move({
             x: 1520, y: -2496, angle: 246
@@ -630,8 +630,8 @@ export function registerCustom(debug) {
         
         await delay(1000);
         
-        // debug.layers.fadeOut('sky');
-        document.body.classList.remove('hide-hud');
+        // debug.layers.sky.hide();
+        debug.layers.hud.show();
 
         await fight;
 
@@ -639,12 +639,12 @@ export function registerCustom(debug) {
 
         await delay(1000);
 
-        document.body.classList.add('hide-hud');
+        debug.layers.hud.hide();
 
-        // debug.layers.fadeOut('walls');
-        // debug.layers.fadeOut('ceilings');
-        // debug.layers.fadeOut('floors');
-        // debug.layers.fadeOut('enemies');
+        // debug.layers.walls.hide();
+        // debug.layers.ceilings.hide();
+        // debug.layers.floors.hide();
+        // debug.layers.enemies.hide();
 
         await delay(2000);
     };
@@ -654,8 +654,8 @@ export function registerCustom(debug) {
         debug.culling.all(false)
 
         debug.spectator(true);
-        document.body.classList.add('hide-chrome');
-        document.body.classList.add('hide-hud');
+        debug.layers.chrome.hide();
+        debug.layers.hud.hide();
 
         await debug.path.move({
             x: 1520, y: -2496, angle: 246
@@ -679,22 +679,22 @@ export function registerCustom(debug) {
         
         await delay(1000);
         
-        // debug.layers.fadeOut('sky');
-        document.body.classList.remove('hide-hud');
+        // debug.layers.sky.hide();
+        debug.layers.hud.show();
 
         await fight;
 
         debug.game.peaceful(true);
-        document.body.classList.add('hide-hud');
+        debug.layers.hud.hide();
 
         await delay(1000);
 
-        // document.body.classList.add('hide-hud');
+        // debug.layers.hud.hide();
 
-        // debug.layers.fadeOut('walls');
-        // debug.layers.fadeOut('ceilings');
-        // debug.layers.fadeOut('floors');
-        // debug.layers.fadeOut('enemies');
+        // debug.layers.walls.hide();
+        // debug.layers.ceilings.hide();
+        // debug.layers.floors.hide();
+        // debug.layers.enemies.hide();
 
         await delay(2000);
     };
@@ -754,17 +754,17 @@ export function registerCustom(debug) {
             x: 2192, y: -2380, angle: 293
         });
 
-        debug.layers.fadeIn('walls');
-        debug.layers.fadeIn('ceilings');
-        debug.layers.fadeIn('floors');
-        debug.layers.fadeIn('enemies');
+        debug.layers.walls.show();
+        debug.layers.ceilings.show();
+        debug.layers.floors.show();
+        debug.layers.enemies.show();
 
-        document.body.classList.remove('hide-hud');
+        debug.layers.hud.show();
         debug.sprites.hideSheet()
 
         await delay(1000);
 
-        debug.layers.fadeIn('sky');
+        debug.layers.sky.show();
 
         debug.game.peaceful(false);
         debug.game.noDamage(true);
@@ -781,17 +781,17 @@ export function registerCustom(debug) {
             x: 2172, y: -2388, angle: 293
         });
 
-        // debug.layers.fadeIn('walls');
-        // debug.layers.fadeIn('ceilings');
-        // debug.layers.fadeIn('floors');
-        // debug.layers.fadeIn('enemies');
+        // debug.layers.walls.show();
+        // debug.layers.ceilings.show();
+        // debug.layers.floors.show();
+        // debug.layers.enemies.show();
 
-        document.body.classList.remove('hide-hud');
+        debug.layers.hud.show();
         debug.sprites.hideSheet()
 
         await delay(1000);
 
-        debug.layers.fadeIn('sky');
+        debug.layers.sky.show();
 
         debug.game.peaceful(false);
         debug.game.noDamage(true);
@@ -817,7 +817,7 @@ export function registerCustom(debug) {
 
         await delay(3000);
 
-        debug.layers.fadeOut('enemies');
+        debug.layers.enemies.hide();
         debug.game.peaceful(true);
     };
 
@@ -830,7 +830,7 @@ export function registerCustom(debug) {
             end:    { x: 2996, y: -3752, angle: 188 },
         });
 
-        debug.layers.fadeIn('enemies');
+        debug.layers.enemies.show();
         debug.game.peaceful(false);
     };
 }

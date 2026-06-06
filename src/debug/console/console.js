@@ -23,7 +23,6 @@ import { position as positionCmds, world as worldCmds } from '../features/world.
 import { openDebugMenu } from '../ui/panel.js';
 import { switchRenderer } from '../features/renderer.js';
 import { setSpectator } from '../features/spectator.js';
-import { isolateHud } from '../features/isolate.js';
 import * as loadout from '../features/loadout.js';
 
 // ── Callable namespace ────────────────────────────────────────────────────
@@ -54,10 +53,13 @@ const sprites = group('sprites');
 sprites.showSheet = spritesModule.showSheet;
 sprites.hideSheet = spritesModule.hideSheet;
 
-// ── debug.layers — animated scene-layer fades (see features/layers.js + .css).
-// Opacity fade of every wall / floor / ceiling / thing / enemy plus the sky, vs
-// the menu's instant hide-* toggles. fadeOut(layer) / fadeIn(layer), or omit for all.
-Object.assign(group('layers'), layersModule);
+// ── debug.layers — per-layer visibility, one object per layer (see
+// features/layers.js + .css). Scene layers cross-fade; hud / chrome hide
+// instantly; hud also isolates (fade the scene to grey, keep the HUD).
+//   debug.layers.walls.hide()  ·  debug.layers.walls.show()
+//   debug.layers.hud.hide()    ·  debug.layers.hud.isolate(true)
+//   debug.layers.chrome.hide() — menu buttons / spectator overlay
+Object.assign(group('layers'), layersModule.layers);
 
 // ── debug.camera — view-relative orbit for talk shots (see camera.css) ──────
 // Offset the eye AND re-aim to keep the target framed: x = right, y = up,
@@ -164,11 +166,6 @@ debug.renderer = (kind) => {
 // ── debug.spectator — toggle spectator mode (see features/spectator.js). SP
 // only (refused in DM); no arg toggles, a boolean sets it on/off.
 debug.spectator = setSpectator;
-
-// ── debug.isolateHud — fade the scene out to a flat grey field, leaving just
-// the HUD (status bar + weapon) for the talk's HUD-anatomy shot (see
-// features/isolate.js + .css). No arg toggles; a boolean sets it on/off.
-debug.isolateHud = isolateHud;
 
 // ── debug.player — set the slot-0 player's vitals for talk shots (see
 // features/loadout.js). Mutates the live player + flags the HUD dirty.

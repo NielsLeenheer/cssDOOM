@@ -80,21 +80,28 @@ Synced via the Web Animations API and follows state changes (walk → attack →
 While active, the ghosted sprite is exempt from culling so it doesn't pop at screen
 edges.
 
-## `debug.layers` — cross-fade scene layers
+## `debug.layers` — per-layer visibility
 
-Animated fades of a whole layer (vs the menu's instant hide toggles). Pass
-`'walls'`, `'floors'`, `'ceilings'`, `'things'` (pickups / decorations / barrels),
-`'enemies'`, or `'sky'`, or omit to act on all of them. `'corpses'` is an extra
-sub-layer — just the map's dead-body / gore decorations (a subset of `'things'`,
-not in the "all" set; pass it explicitly). Surfaces, things and enemies fade via
-opacity;
-`'sky'` fades a black layer in over the sky background (which can't transition) but
-behind the scene. ([`features/layers.css`](src/debug/features/layers.css).)
+One object per layer, each with `.show()` / `.hide()` (`.hide()` makes the layer
+disappear, `.show()` brings it back).
+
+Scene layers — `walls`, `floors`, `ceilings`, `sky`, `things` (pickups /
+decorations / barrels), `enemies`, `corpses` (a subset of `things`: just the
+map's dead-body / gore decorations) — **cross-fade** via opacity. `sky` fades a
+black layer in over the sky background (which can't transition) but behind the
+scene. ([`features/layers.css`](src/debug/features/layers.css).)
+
+`hud` and `chrome` hide **instantly** via the same `hide-*` body class the menu
+drives. `hud` also has `.isolate(on?)` — fade the scene to a flat grey field and
+leave just the HUD (status bar + weapon) for the HUD-anatomy shot
+([`features/isolate.js`](src/debug/features/isolate.js)).
 
 | Command | Description |
 | --- | --- |
-| `fadeOut(layer?)` | Fade a layer (or all) out — surfaces/things to transparent, sky to black. |
-| `fadeIn(layer?)` | Fade it back in. |
+| `walls.hide()` · `walls.show()` | Cross-fade a scene layer out / back in (same for `floors`, `ceilings`, `sky`, `things`, `enemies`, `corpses`). |
+| `hud.hide()` · `hud.show()` | Instantly hide / show the HUD. |
+| `hud.isolate(on?)` | Fade the scene to grey, leaving just the HUD. No arg toggles; a boolean sets it. |
+| `chrome.hide()` · `chrome.show()` | Instantly hide / show the menu buttons + spectator overlay. |
 
 ## `debug.camera` — view-relative orbit (talk shots)
 

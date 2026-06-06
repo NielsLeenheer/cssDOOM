@@ -1,23 +1,37 @@
 /**
- * Layers — animated opacity fades of a whole scene layer (walls / floors /
- * ceilings / things / enemies) plus the sky, the counterpart to the menu's
- * instant hide-* toggles. Toggles a body.fade-{layer} class; the actual fade
- * lives in CSS (features/layers.css). 'sky' fades a black overlay in behind the
- * scene (the sky is a background-image, which can't transition).
+ * Layers — per-layer visibility controls for the debug console (debug.layers.*).
  *
- * 'corpses' is an extra sub-layer (a subset of 'things') that fades just the
- * map-placed dead-body / gore decorations — handy when you want to keep things
- * but drop the corpses. It's not part of the "fade all" set (no arg) since
- * 'things' already covers it; pass it explicitly.
+ * Each layer is an object with .show() / .hide():
+ *   - Scene layers — walls / floors / ceilings / sky / things / enemies /
+ *     corpses — cross-fade via a body.fade-{layer} class (animated opacity in
+ *     features/layers.css). 'sky' fades a black overlay in behind the scene
+ *     (the sky is a background-image, which can't transition). 'corpses' is a
+ *     subset of 'things' — just the map-placed dead-body / gore decorations.
+ *   - hud / chrome hide INSTANTLY via the body.hide-{layer} class the menu also
+ *     drives. hud additionally has .isolate(on?) — fade the scene to a flat grey
+ *     field and leave just the HUD (status bar + weapon); see features/isolate.js.
  *
- * A shared feature: console exposes these as debug.layers.*.
+ * hide() makes the layer disappear (fade out / hide), show() brings it back;
+ * `shown` reports the current state. A shared feature with two presenters over
+ * the SAME objects — the console exposes the whole thing as debug.layers, and
+ * the menu's Renderer grid checkboxes drive the same per-layer show()/hide()
+ * (registry.js kind:'layer'), so panel and console are one codepath, not two.
  */
 
-const LAYER_NAMES = ['walls', 'floors', 'ceilings', 'sky', 'things', 'enemies'];
-const eachLayer = (layer) => layer ? [layer] : LAYER_NAMES;
+import { isolateHud } from './isolate.js';
 
-/** Fade a scene layer ('walls' | 'floors' | 'ceilings' | 'things' | 'enemies' |
- *  'sky', or all) out — or 'corpses' for just the map's dead-body decorations. */
-export const fadeOut = (layer) => eachLayer(layer).forEach(l => document.body.classList.add(`fade-${l}`));
-/** Fade a scene layer (or all) back in. */
-export const fadeIn = (layer) => eachLayer(layer).forEach(l => document.body.classList.remove(`fade-${l}`));
+/** A layer toggled by a single body class: hide() adds it, show() removes it,
+ *  `shown` is true while the class is absent (used by the menu checkbox). */
+const classLayer = (cls) => ({
+    hide: () => document.body.classList.add(cls),
+    show: () => document.body.classList.remove(cls),
+    get shown() { return !document.body.classList.contains(cls); },
+});
+
+// Scene layers cross-fade (body.fade-*); hud/chrome hide instantly (body.hide-*).
+const FADE_LAYERS = ['walls', 'floors', 'ceilings', 'sky', 'things', 'enemies', 'corpses'];
+
+export const layers = {};
+for (const name of FADE_LAYERS) layers[name] = classLayer(`fade-${name}`);
+layers.hud = { ...classLayer('hide-hud'), isolate: isolateHud };
+layers.chrome = classLayer('hide-chrome');
