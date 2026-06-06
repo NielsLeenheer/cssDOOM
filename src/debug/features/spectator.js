@@ -1,8 +1,8 @@
 /**
  * Spectator — set/toggle spectator mode, the SP-only follow/top camera the
  * binoculars button drives (refused in deathmatch). A shared feature: the
- * console exposes it as debug.spectator(); the menu's binoculars button calls
- * the same underlying spectate() in src/ui/spectator.js.
+ * console exposes it as debug.view.spectator(); the menu's binoculars button
+ * calls the same underlying spectate() in src/ui/spectator.js.
  */
 
 import { spectate, spectatorActive } from '../../ui/spectator.js';

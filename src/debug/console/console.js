@@ -9,7 +9,7 @@
  * from master.js.
  */
 
-import { currentMap } from '../../shared/maps/index.js';     // for debug.game.record()
+import { currentMap } from '../../shared/maps/index.js';     // for debug.view.record()
 import { swapLevel } from '../../game/level.js';
 import * as recorder from '../features/recorder.js';
 import * as pathModule from '../features/path.js';
@@ -117,22 +117,13 @@ path.play = pathModule.play;
 path.transition = pathModule.transition;
 path.move = pathModule.move;
 
-// ── debug.game — render-command recording ─────────────────────────────────
-// Capture every envelope through orchestrator.dispatch from a clean level
-// state, save to storage, replay via ?play=slot.
-//   debug.game.record()    — restart current level, start capturing
-//   debug.game.save('slot') — write buffer to storage
+// ── debug.game — freeze-frame + cheat flags (see features/freeze.js + flags.js).
+// pause() stops the world tick + all CSS animations (freeze a fireball mid-air);
+// play() resumes both. noDamage / noAttack / noMove toggle cheats; peaceful()
+// flips all three at once. (Render-command recording lives in debug.view.)
 const game = group('game');
-game.record = async () => {
-    recorder.start();
-    await swapLevel(currentMap);
-};
-game.save = (slot) => recorder.save(slot);
-// Freeze-frame: pause() stops the world tick + all CSS animations (freeze a
-// fireball mid-air); play() resumes both. See features/freeze.js.
 game.pause = freeze.pause;
 game.play = freeze.resume;
-// Game-flag toggles (see features/flags.js). peaceful() flips all three at once.
 game.noDamage = flags.noDamage;
 game.noAttack = flags.noAttack;
 game.noMove = flags.noMove;
@@ -148,13 +139,18 @@ cull.frustum = flags.cullFrustum;
 cull.sky = flags.cullSky;
 cull.all = flags.cullAll;
 
-// ── debug.renderer — swap the single-player renderer at runtime ─────────────
-// Same swap as the menu's Renderer picker: tears down the SP pane, rebuilds it
-// with the chosen renderer, reloads the map + catches up world state. SP only.
-// No arg logs the current renderer and the options.
-//   debug.renderer('flat')   ·   debug.renderer()  — show current + choices
+// ── debug.view — renderer + camera/view controls (see features/renderer.js,
+// spectator.js, recorder.js).
+//   renderer('flat')  — swap the SP renderer; tears down the pane, rebuilds with
+//     the chosen renderer, reloads the map + catches up world state. SP only.
+//     No arg logs the current renderer and the options.
+//   spectator(true)   — toggle spectator mode (SP only, refused in DM; no arg toggles).
+//   record() / save('slot')  — capture the renderer-command envelope stream from
+//     a clean level (record() restarts the current level) and write it to storage;
+//     replay via ?play=slot. Records the RENDERER's commands, not game state.
+const view = group('view');
 const RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat'];
-debug.renderer = (kind) => {
+view.renderer = (kind) => {
     if (kind == null) {
         console.log(`renderer: ${document.body.dataset.renderer || RENDERERS[0]} — options: ${RENDERERS.join(', ')}`);
         return;
@@ -162,10 +158,12 @@ debug.renderer = (kind) => {
     if (!RENDERERS.includes(kind)) { console.warn(`[debug] unknown renderer "${kind}" — try: ${RENDERERS.join(', ')}`); return; }
     return switchRenderer(kind);
 };
-
-// ── debug.spectator — toggle spectator mode (see features/spectator.js). SP
-// only (refused in DM); no arg toggles, a boolean sets it on/off.
-debug.spectator = setSpectator;
+view.spectator = setSpectator;
+view.record = async () => {
+    recorder.start();
+    await swapLevel(currentMap);
+};
+view.save = (slot) => recorder.save(slot);
 
 // ── debug.player — set the slot-0 player's vitals for talk shots (see
 // features/loadout.js). Mutates the live player + flags the HUD dirty.

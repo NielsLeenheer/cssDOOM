@@ -9,7 +9,7 @@
  * client window).
  *
  * Used by both presenters: the menu's Renderer picker (ui/panel.js) and
- * debug.renderer() (console/console.js) — neither owns it.
+ * debug.view.renderer() (console/console.js) — neither owns it.
  */
 
 import { orchestrator } from '../../orchestrator.js';

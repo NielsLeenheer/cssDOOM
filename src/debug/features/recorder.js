@@ -18,7 +18,7 @@
  * 5 MB localStorage quota in seconds; IDB's quota typically scales
  * with available disk, so multi-minute recordings fit.
  *
- * Public surface is exposed on `debug.game.record / save` in
+ * Public surface is exposed on `debug.view.record / save` in
  * debug/console.js — this module only holds state + helpers.
  */
 

@@ -172,26 +172,19 @@ await debug.path.transition({ duration: 2, direction: 'clockwise',
   start: { x: -17, y: -3128, angle: 121 }, end: { x: 39, y: -3113, angle: 246 } });
 ```
 
-## `debug.game` — render-command recording + cheat flags
+## `debug.game` — freeze-frame + cheat flags
 
-Capture every render envelope through the orchestrator from a clean level, save it,
-and replay it deterministically; plus console toggles for the Game cheat flags
-(same flags as the menu).
+Freeze the world for a freeze-frame, plus console toggles for the Game cheat flags
+(same flags as the menu). (Render-command recording lives in `debug.view`.)
 
 | Command | Description |
 | --- | --- |
-| `record()` | Restart the current level and start capturing. |
-| `save(slot)` | Write the captured buffer to storage. |
 | `pause()` | Freeze-frame — stop the world tick **and** all CSS animations (holds a fireball mid-air). |
 | `play()` | Resume both; in-flight motion continues from where it stopped. |
 | `noDamage(on?)` | Player takes no damage. No arg toggles; pass a boolean to set. |
 | `noAttack(on?)` | Enemies don't attack. |
 | `noMove(on?)` | Enemies don't move. |
 | `peaceful(on?)` | All three at once — no damage + no attack + no move. |
-
-Replay a captured slot by loading the page with **`?play=slot`**. Add
-**`?export=mp4`** or **`?export=webm`** to capture the replay to a downloaded video
-(uses screen capture, so it needs a click to start).
 
 ## `debug.culling` — toggle the renderer's culling passes
 
@@ -203,29 +196,31 @@ pass a boolean to set.
 | `distance(on?)` · `backface(on?)` · `frustum(on?)` · `sky(on?)` | Toggle one pass. |
 | `all(on = true)` | Set every pass at once — `all(false)` disables culling (handy so nothing pops at the screen edge during a shot). |
 
-## `debug.renderer(kind?)` — swap the SP renderer
+## `debug.view` — renderer, spectator & render-command recording
 
-Same swap as the menu's Renderer picker: tears down the SP pane, rebuilds it with
-the chosen renderer, reloads the map + catches up world state. **SP only.** No arg
-logs the current renderer and the options.
+Renderer-side controls: swap the SP renderer, toggle spectator mode, and capture
+the renderer's command stream for deterministic replay (it records the
+**renderer's** commands, not game state).
+
+| Command | Description |
+| --- | --- |
+| `renderer(kind?)` | Swap the SP renderer — tears down the pane, rebuilds with the chosen renderer, reloads the map + catches up. **SP only.** No arg logs the current renderer + options. |
+| `spectator(on?)` | Spectator mode — same as the binoculars button (which the Chrome toggle hides). **SP only** (refused in DM). No arg toggles. |
+| `record()` | Restart the current level and start capturing the render-command envelope stream. |
+| `save(slot)` | Write the captured buffer to storage. |
 
 ```js
-debug.renderer('lighting')   // dom · flat · shade · lighting · line · cat
-debug.renderer()             // show current + choices
+debug.view.renderer('lighting')   // dom · flat · shade · lighting · line · cat
+debug.view.renderer()             // show current + choices
+debug.view.spectator(true)        // force spectator on (no arg toggles)
 ```
 
 The **lighting** renderer is shade with opaque white surfaces and no colour — a
 pure black-and-white view of the per-sector lighting (dynamic light FX play).
 
-## `debug.spectator(on?)` — spectator mode
-
-Same as the binoculars button (which the Chrome toggle hides). **SP only** (refused
-in deathmatch). No arg toggles; pass a boolean to set.
-
-```js
-debug.spectator()        // toggle
-debug.spectator(true)    // force on
-```
+Replay a captured recording by loading the page with **`?play=slot`**. Add
+**`?export=mp4`** or **`?export=webm`** to capture the replay to a downloaded video
+(uses screen capture, so it needs a click to start).
 
 ## `debug.custom` — hand-authored talk set pieces
 
