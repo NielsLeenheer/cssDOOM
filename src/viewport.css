@@ -246,6 +246,33 @@ body[data-layout="kiosk"] #loading-overlay {
     background-position-x: calc(25vw - 82px * 4 * var(--screen-scale, 1) / 2);
 }
 
+/* Kiosk controls screen — a third monitor bolted onto the wall shows the
+   controls (#controls-screen, see index.html). It maps to the bottom-LEFT
+   quadrant of the 3840×2160 capture (otherwise empty in kiosk — only the top
+   two panes are wired). Hidden in every other layout. The DOOM intermission
+   map (WIMAP0, the Phobos surface) is the COVER background so it fills the
+   quadrant edge-to-edge; the transparent controls overlay is CONTAINed on top
+   so the whole diagram stays visible. Both scaled nearest-neighbour. */
+#controls-screen {
+    display: none;
+}
+body[data-layout="kiosk"] #controls-screen {
+    display: block;
+    position: fixed;
+    top: 50vh;
+    left: 0;
+    width: 50vw;
+    height: 50vh;
+    background: #000 url('/assets/intermission/WIMAP0.png') center / cover no-repeat;
+    image-rendering: pixelated;
+}
+body[data-layout="kiosk"] #controls-screen img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    image-rendering: pixelated;
+}
+
 /* Hidden chrome — DOOM logo (#menu-button), top-right action buttons
    (#ui-buttons), the debug toggle (#debug-menu), and the spectator controls
    (#spectator) render at opacity:0, either in the ?visualize four-pane talk

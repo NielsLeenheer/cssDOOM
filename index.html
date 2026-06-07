@@ -68,6 +68,16 @@
          `#pane-template`) when it's constructed. -->
     <div id="game"></div>
 
+    <!-- Kiosk controls screen — the installation bolts a third monitor onto the
+         video wall showing the controls. It maps to the bottom-left quadrant of
+         the 3840×2160 capture, otherwise empty in kiosk (only the top two panes
+         are wired). The DOOM intermission map (WIMAP0) is the cover background;
+         the transparent controls overlay sits on top, contained. Hidden outside
+         kiosk; positioned + revealed in viewport.css. -->
+    <div id="controls-screen">
+        <img src="images/controls.png" alt="Controls">
+    </div>
+
     <!-- Pane template — cloned into each .pane at DomRenderer load. Owns the
          full per-pane subtree: viewport (which carries CSS perspective),
          scene (the 3D world container), HUD overlay, and color overlays. -->
