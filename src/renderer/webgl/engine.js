@@ -33,7 +33,7 @@
 
 import { Program, StaticBuffer, DynamicBuffer } from './glutil.js';
 import {
-    WORLD_VS, WORLD_FS, FLAT_VS, FLAT_FS, SKY_VS, SKY_FS,
+    WORLD_VS, WORLD_FS, FLAT_VS, FLAT_FS, SKY_VS, SKY_FS, SKYWALL_VS,
     BLIT_VS, BLIT_FS, SOLID_VS, SOLID_FS,
 } from './shaders.js';
 import { getWallTexture, getFlatTexture, clearTextureCache } from './textures.js';
@@ -95,6 +95,9 @@ export class GLEngine {
         this.worldProgram = new Program(gl, WORLD_VS, WORLD_FS);
         this.flatProgram = new Program(gl, FLAT_VS, FLAT_FS);
         this.skyProgram = new Program(gl, SKY_VS, SKY_FS);
+        // Sky-wall occluders reuse the sky fragment sampling with a
+        // world-projected vertex shader (so they write real depth).
+        this.skyWallProgram = new Program(gl, SKYWALL_VS, SKY_FS);
         this.blitProgram = new Program(gl, BLIT_VS, BLIT_FS);
         this.solidProgram = new Program(gl, SOLID_VS, SOLID_FS);
 
@@ -192,7 +195,8 @@ export class GLEngine {
         this._overlayBuffer.dispose();
         if (this._wallBuffer) this._wallBuffer.dispose();
         if (this._flats) for (const f of this._flats) { f.fan.dispose(); f.quad.dispose(); }
-        for (const p of [this.worldProgram, this.flatProgram, this.skyProgram, this.blitProgram, this.solidProgram]) {
+        if (this._skyWallBuf) this._skyWallBuf.dispose();
+        for (const p of [this.worldProgram, this.flatProgram, this.skyProgram, this.skyWallProgram, this.blitProgram, this.solidProgram]) {
             gl.deleteProgram(p.program);
         }
         clearTextureCache(gl);
@@ -288,6 +292,7 @@ export class GLEngine {
         gl.depthFunc(gl.LESS);
 
         this._renderSky(this._cam);
+        this._renderSkyWalls(this._cam);
         this._renderFlats();
         this._renderWalls(this._cam);
         this._renderEntities(this._cam);

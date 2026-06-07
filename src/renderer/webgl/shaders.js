@@ -145,6 +145,31 @@ void main() {
     outColor = vec4(c, 1.0);
 }`;
 
+// ── Sky-wall program ─────────────────────────────────────────────────
+// Tall occluder quads standing on the top edge of every sky-perimeter
+// wall, reaching far overhead. They reuse the SKY_FS sampling (so they're
+// visually identical to the backdrop) but, unlike the backdrop, they're
+// real projected geometry that WRITES DEPTH — so any level geometry beyond
+// a sky opening is depth-rejected instead of showing through the sky.
+// (This is DOOM's "sky is an opaque backdrop above the segs"; the DOM
+// renderer does it with occluder planes + culling, the canvas renderer by
+// painting sky above wall tops at the wall's depth.)
+export const SKYWALL_VS = /* glsl */`#version 300 es
+precision highp float;
+layout(location=0) in vec3 a_pos;
+uniform vec3 u_eye;
+uniform vec2 u_rot;
+uniform float u_aspect;
+uniform float u_A, u_B;
+void main() {
+    float dx = a_pos.x - u_eye.x;
+    float dy = a_pos.y - u_eye.y;
+    float vx =  dx * u_rot.x + dy * u_rot.y;
+    float vz = -dx * u_rot.y + dy * u_rot.x;
+    float vy =  a_pos.z - u_eye.z;
+    gl_Position = vec4(vx, vy * u_aspect, u_A * vz + u_B, vz);
+}`;
+
 // ── Overlay blit program: HUD, weapon, screens ───────────────────────
 // 2D textured quads in a virtual pixel space (origin top-left). Alpha-
 // tested so the chunky DOOM graphics composite opaquely, exactly like
