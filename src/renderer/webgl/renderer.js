@@ -45,6 +45,8 @@ function parseResolution() {
 }
 
 export class WebGLRenderer extends RendererBase {
+    static type = 'canvas';   // draws on a <canvas> via WebGL2, not the CSS/DOM scene
+
     /**
      * @param {object} options
      * @param {number} options.playerIndex   the player this renderer is for
