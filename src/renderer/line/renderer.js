@@ -15,9 +15,17 @@
  * rendered (matches the "before CSS" purity of the talk demo).
  */
 
-import { renderScene3D, setRendererSettings, deduplicateLines } from './scene.js';
+import { renderScene3D, setRendererSettings, deduplicateLines, mergeCollinearLines } from './scene.js';
 import { RendererBase } from '../base.js';
 import { canvasStats } from '../canvas/renderer.js';
+
+// Which line-reduction pass feeds the paint, shared across all LineRenderer
+// instances. Toggled from the debug panel's Renderer → "Merge lines" checkbox
+// (and settable by hand: `lineReduction.merge = false`). merge = collinear
+// merge (collapses stacked corners + joins split wall runs); off falls back to
+// plain exact-endpoint dedup so the two can be compared live. The stats overlay
+// reports both counts regardless of which one is painted.
+export const lineReduction = { merge: true };
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
@@ -86,12 +94,13 @@ export class LineRenderer extends RendererBase {
         // Stats for the overlay (gated by the shared canvasStats toggle —
         // the same Renderer → "Stats" checkbox the CanvasRenderer uses).
         // Frame times roll through a 60-frame window for a stable ms/fps
-        // readout; line counts are the latest frame's raw → deduplicated
-        // segment totals so we can see how much the dedup pass collapses.
+        // readout; line counts are the latest frame's raw total plus the
+        // result of each reduction pass so the two can be compared live.
         this._frameTimes = new Float32Array(60);
         this._frameTimeIdx = 0;
         this._rawLineCount = 0;
-        this._lineCount = 0;
+        this._mergeCount = 0;
+        this._dedupCount = 0;
 
         // Resize observer keeps the canvas backing store aligned with
         // the displayed size. DomRenderer uses ResizeObserver for its
@@ -202,26 +211,33 @@ export class LineRenderer extends RendererBase {
         };
         const t0 = performance.now();
         const rawLines = renderScene3D(this._walls, camera, this._sectorPolygons);
-        // Collapse exact/near-coincident segments. The scene emits one quad
-        // per wall, so shared corners stack several identical edges on the
-        // same screen line — dedup removes those redundant strokes (cheaper
-        // for a real oscilloscope to draw). threshold = NDC rounding factor;
-        // 1000 ≈ 0.001 NDC tolerance.
-        const lines = deduplicateLines(rawLines, 1000);
+        // Reduce redundant strokes before painting (cheaper for a real
+        // oscilloscope to draw). Two passes, switchable for live A/B:
+        //   merge — collinear merge: collapses the 3-4 vertical edges that
+        //           stack where walls share a corner, and joins long walls
+        //           split into linedefs back into single strokes.
+        //   dedup — plain exact-endpoint dedup (the earlier baseline); only
+        //           catches truly identical segments.
+        // We compute both each frame (cheap at these counts) so the overlay
+        // can show the comparison no matter which one is painted.
+        const merged = mergeCollinearLines(rawLines);
+        const deduped = deduplicateLines(rawLines, 1000);
+        const lines = lineReduction.merge ? merged : deduped;
         this._paint(lines);
         const t1 = performance.now();
 
         this._frameTimes[this._frameTimeIdx] = t1 - t0;
         this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
         this._rawLineCount = rawLines.length;
-        this._lineCount = lines.length;
+        this._mergeCount = merged.length;
+        this._dedupCount = deduped.length;
         if (canvasStats.enabled) this._drawStats();
     };
 
-    /** Top-left overlay: frame time, fps, and raw → deduplicated line
-     *  counts. Drawn on the display canvas after the wireframe so the text
-     *  stays crisp. Mirrors CanvasRenderer._drawStats; gated by the same
-     *  shared canvasStats flag. */
+    /** Top-left overlay: frame time, fps, and line counts for both reduction
+     *  passes (the active one bracketed). Drawn on the display canvas after the
+     *  wireframe so the text stays crisp. Mirrors CanvasRenderer._drawStats;
+     *  gated by the same shared canvasStats flag. */
     _drawStats() {
         let sum = 0, n = 0;
         for (let i = 0; i < this._frameTimes.length; i++) {
@@ -233,9 +249,12 @@ export class LineRenderer extends RendererBase {
         const dpr = window.devicePixelRatio || 1;
         const ctx = this.ctx;
         const raw = this._rawLineCount;
-        const kept = this._lineCount;
+        const active = lineReduction.merge;
+        const mergeLbl = active ? `[merge ${this._mergeCount}]` : `merge ${this._mergeCount}`;
+        const dedupLbl = active ? `dedup ${this._dedupCount}` : `[dedup ${this._dedupCount}]`;
+        const kept = active ? this._mergeCount : this._dedupCount;
         const pct = raw > 0 ? Math.round((1 - kept / raw) * 100) : 0;
-        const text = `${kept}/${raw} lines (-${pct}%)  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
+        const text = `${mergeLbl} ${dedupLbl}  raw ${raw} (-${pct}%)  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.font = `${12 * dpr}px monospace`;

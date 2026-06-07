@@ -1231,3 +1231,128 @@ export function optimizeLineOrder(lines) {
 
     return result;
 }
+
+/**
+ * Merge collinear / overlapping line segments (screen-space, NDC).
+ *
+ * The scene emits one quad per wall, so the same screen line is drawn many
+ * times: vertical edges stack 3-4 deep where walls share a corner (same
+ * column, different heights), and a long wall split into linedefs becomes a
+ * run of short collinear segments. Exact-endpoint dedup misses all of these
+ * because the endpoints differ. This pass instead groups segments that lie on
+ * the same *infinite line* (within an angle + perpendicular-distance
+ * tolerance) and merges those whose 1D projections overlap or sit within a
+ * small gap — collapsing the stacks and joining the runs into single strokes.
+ * Far-apart collinear segments separated by more than `gapTol` (e.g. a wall
+ * occluded by a pillar) stay split, so we don't bridge across occluders.
+ *
+ * Output segments reuse the real input endpoints (no quantisation drift), so
+ * merged lines stay anchored to actual geometry. Pure function on 2D line
+ * segments — directly portable to the WebAudioOscilloscope renderer.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {object} [options]
+ * @param {number} [options.angleTol=0.035]  Max orientation difference (radians) to treat as one line.
+ * @param {number} [options.offsetTol=0.012] Max perpendicular distance (NDC) to treat as the same line.
+ * @param {number} [options.gapTol=0.02]     Max along-line gap (NDC) still bridged when merging.
+ */
+export function mergeCollinearLines(lines, options = {}) {
+    const angleTol = options.angleTol ?? 0.035;
+    const offsetTol = options.offsetTol ?? 0.012;
+    const gapTol = options.gapTol ?? 0.02;
+
+    const count = lines.length;
+    if (count < 2) return lines.slice();
+
+    const sinTol = Math.sin(angleTol);
+    // Angle buckets across the undirected range [0, PI). Used only to prune
+    // candidates; the cross-product test below is the source of truth, so a
+    // missed bucket only risks leaving a duplicate, never a wrong merge.
+    const N = Math.max(1, Math.round(Math.PI / angleTol));
+    const dA = Math.PI / N;
+
+    // bucketIndex -> array of groups. A group is one infinite line with the
+    // intervals (projections) of every segment assigned to it.
+    const buckets = new Map();
+
+    for (let i = 0; i < count; i++) {
+        const ln = lines[i];
+        const sx = ln.start[0], sy = ln.start[1];
+        const ex = ln.end[0], ey = ln.end[1];
+        let dx = ex - sx, dy = ey - sy;
+        const len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1e-9) continue; // degenerate point — drop
+        dx /= len; dy /= len;
+
+        // Undirected orientation in [0, PI). atan2 ∈ (-PI, PI]; fold to [0, PI).
+        let a = Math.atan2(dy, dx);
+        if (a < 0) a += Math.PI;
+        if (a >= Math.PI) a -= Math.PI;
+        const ab = Math.round(a / dA) % N;
+
+        // Look for an existing collinear group in this and the two modular-
+        // adjacent buckets (covers the 0≡PI wrap for near-horizontal lines).
+        let target = null;
+        for (let k = -1; k <= 1 && !target; k++) {
+            const nb = ((ab + k) % N + N) % N;
+            const arr = buckets.get(nb);
+            if (!arr) continue;
+            for (let g = 0; g < arr.length; g++) {
+                const grp = arr[g];
+                // Parallel? cross of unit dirs ≈ sin(angle between); sign-
+                // agnostic so near-antiparallel (wrap) directions also pass.
+                const cross = grp.dx * dy - grp.dy * dx;
+                if (cross > sinTol || cross < -sinTol) continue;
+                // Same line? perpendicular distance of this start to the group
+                // line (through grp.px,py with normal (-grp.dy, grp.dx)).
+                const perp = (sx - grp.px) * -grp.dy + (sy - grp.py) * grp.dx;
+                if (perp > offsetTol || perp < -offsetTol) continue;
+                target = grp;
+                break;
+            }
+        }
+
+        if (!target) {
+            target = { dx, dy, px: sx, py: sy, parts: [] };
+            let arr = buckets.get(ab);
+            if (!arr) { arr = []; buckets.set(ab, arr); }
+            arr.push(target);
+        }
+
+        // Project both endpoints onto the group axis → 1D interval, tagged
+        // with the real endpoint at each end.
+        const t1 = sx * target.dx + sy * target.dy;
+        const t2 = ex * target.dx + ey * target.dy;
+        if (t1 <= t2) target.parts.push({ lo: t1, hi: t2, plo: ln.start, phi: ln.end });
+        else target.parts.push({ lo: t2, hi: t1, plo: ln.end, phi: ln.start });
+    }
+
+    // Merge overlapping/near intervals per group and emit one segment each.
+    const result = [];
+    for (const arr of buckets.values()) {
+        for (let g = 0; g < arr.length; g++) {
+            const parts = arr[g].parts;
+            if (parts.length === 1) {
+                result.push({ start: parts[0].plo, end: parts[0].phi });
+                continue;
+            }
+            parts.sort((p, q) => p.lo - q.lo);
+            let curHi = parts[0].hi;
+            let curPlo = parts[0].plo;
+            let curPhi = parts[0].phi;
+            for (let p = 1; p < parts.length; p++) {
+                const it = parts[p];
+                if (it.lo <= curHi + gapTol) {
+                    // Overlapping or within gap — extend the running interval.
+                    if (it.hi > curHi) { curHi = it.hi; curPhi = it.phi; }
+                } else {
+                    result.push({ start: curPlo, end: curPhi });
+                    curHi = it.hi; curPlo = it.plo; curPhi = it.phi;
+                }
+            }
+            result.push({ start: curPlo, end: curPhi });
+        }
+    }
+
+    return result;
+}

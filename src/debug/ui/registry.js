@@ -35,6 +35,7 @@ import { enterAttract } from '../../game/attract.js';
 import { app } from '../../app.js';
 import { layers } from '../features/layers.js';
 import { canvasStats } from '../../renderer/canvas/renderer.js';
+import { lineReduction } from '../../renderer/line/renderer.js';
 import { PICKABLE_RENDERERS } from '../../renderer/manager.js';
 
 export const SETTINGS = [
@@ -70,6 +71,9 @@ export const SETTINGS = [
     { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS },
     // Canvas frame-time / size overlay — only the canvas renderer draws it.
     { section: 'Renderer', kind: 'flag', target: canvasStats, key: 'enabled', label: 'Stats', rendererType: 'canvas' },
+    // Line renderer: collinear merge vs. plain dedup (off). Effect shows in the
+    // Stats overlay's line counts. Line renderer reports type 'canvas'.
+    { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'merge', label: 'Merge lines', rendererType: 'canvas' },
     // Layer visibility — the SAME features/layers.js objects the console drives
     // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
     // instantly. Checkbox checked = layer shown. The scene layers are CSS, so
