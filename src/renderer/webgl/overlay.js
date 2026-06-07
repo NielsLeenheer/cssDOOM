@@ -209,8 +209,16 @@ export const overlayMethods = {
         const W = this.overlayW, H = this.overlayH;
         const ui = this.uiScale;
         const destW = fw * ui, destH = fh * ui;
+        // Rest the weapon on top of the status bar, tucked ~30 CSS px into
+        // it, matching the DomRenderer (`bottom: anchor(top)` +
+        // `margin-bottom: -30px`). The bar is 32 overlay px × uiScale tall
+        // (see _renderHud); without this the sprite sat flush at the very
+        // bottom of the framebuffer — about a full bar-height too low.
+        const barTop = H - 32 * ui;
+        const dpr = window.devicePixelRatio || 1;
+        const overlap = this.H ? 30 * dpr * H / this.H : 0.4 * 32 * ui;
         const destX = Math.round((W - destW) / 2 + this._bobX * ui);
-        const destY = Math.round(H - destH + this._bobY * ui);
+        const destY = Math.round(barTop + overlap - destH + this._bobY * ui);
         this._blit(tex, frame * fw, 0, fw, fh, destX, destY, destW, destH);
     },
 
