@@ -12,7 +12,17 @@ let settings = {
     renderFloorsCeilings: true,
     drawBorder: true,
     debugDisableDepthTest: false,  // When true, shows all edges without visibility testing
-    debugDisableBackfaceCull: false  // When true, skips back-face culling
+    debugDisableBackfaceCull: false,  // When true, skips back-face culling
+
+    // Drop wall quads that sit at/below their own sector's floor or at/above its
+    // ceiling. Two-sided portals (steps, pillar risers, lifts) generate a quad
+    // for BOTH sidedefs; the higher sector's copy is an interior face buried in
+    // solid geometry — never a real visible surface. Back-face culling keeps
+    // whichever copy faces the camera, so on the *far* side of a riser it keeps
+    // the buried interior face, which then leaks short stubs through the depth
+    // buffer at shared corners. Culling these by sector height removes the leak
+    // at the source (and trims redundant geometry).
+    cullInteriorFaces: true
 };
 
 // Current depth buffer dimensions
@@ -318,6 +328,23 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
     return visibleLinesPool;
 }
 
+// sectorIndex -> sector polygon (for floor/ceiling heights), cached against the
+// sectorPolygons array identity so it's rebuilt only when the map changes.
+let _sectorHeights = null;
+let _sectorHeightsSrc = null;
+function getSectorHeights(sectorPolygons) {
+    if (_sectorHeightsSrc === sectorPolygons) return _sectorHeights;
+    const m = new Map();
+    if (sectorPolygons) {
+        for (let i = 0; i < sectorPolygons.length; i++) {
+            m.set(sectorPolygons[i].sectorIndex, sectorPolygons[i]);
+        }
+    }
+    _sectorHeights = m;
+    _sectorHeightsSrc = sectorPolygons;
+    return m;
+}
+
 /**
  * Collect polygons with distance culling (optimized)
  */
@@ -326,6 +353,7 @@ function collectPolygonsOptimized(walls, sectorPolygons, camera, output, doorWal
     const camY = camera.y;
     const useDistanceCulling = settings.maxRenderDistance > 0;
     const maxDistSq = settings.maxRenderDistance * settings.maxRenderDistance;
+    const sectorHeights = settings.cullInteriorFaces ? getSectorHeights(sectorPolygons) : null;
 
     // Process walls
     for (let i = 0, len = walls.length; i < len; i++) {
@@ -337,6 +365,15 @@ function collectPolygonsOptimized(walls, sectorPolygons, camera, output, doorWal
             const dx = midX - camX;
             const dy = midY - camY;
             if (dx * dx + dy * dy > maxDistSq) continue;
+        }
+
+        // Skip interior faces: a quad buried at/below its sector's floor or
+        // at/above its ceiling is never a real visible surface (see
+        // settings.cullInteriorFaces). Removing it stops the far side of a
+        // two-sided riser from leaking stubs through the depth buffer.
+        if (sectorHeights) {
+            const s = sectorHeights.get(wall.sectorIndex);
+            if (s && (s.floorHeight >= wall.topHeight || s.ceilingHeight <= wall.bottomHeight)) continue;
         }
 
         // Track door walls for chevron rendering
