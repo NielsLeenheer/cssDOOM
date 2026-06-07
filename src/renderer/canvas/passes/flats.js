@@ -41,6 +41,10 @@ export const flatMethods = {
         const cz = planeZ - ez;
         if (Math.abs(cz) < 0.01) return;   // plane at eye level — no coverage
 
+        // Flat per-sector brightness (no distance falloff) — matches the
+        // DomRenderer / WebGL light model; constant across the plane.
+        const lf = lightFor(lightLevel);
+
         // Clip every boundary loop to the near plane and project to
         // screen. Edges from all loops feed one even-odd scanline fill,
         // which makes holes (hasHoles sectors) just work.
@@ -124,7 +128,6 @@ export const flatMethods = {
             const denomY = halfH - yc;
             const rowDepth = (cz * syScale) / denomY;
             if (rowDepth < NEAR || rowDepth > MAX_DIST) continue;
-            const lf = lightFor(lightLevel, rowDepth);
             const base = y * W;
 
             for (let s = 0; s + 1 < count; s += 2) {

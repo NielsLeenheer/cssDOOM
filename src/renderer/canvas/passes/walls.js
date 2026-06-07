@@ -146,8 +146,9 @@ export const wallMethods = {
         const texW = tex.width, texH = tex.height, tdata = tex.data;
         const wallH = wallTop - wallBottom;
 
-        // Fake contrast: E/W walls darker, N/S walls brighter.
-        const light = baseLight + (Math.abs(dx) > Math.abs(dy) ? -16 : 16);
+        // Flat per-sector brightness — matches the DomRenderer / WebGL light
+        // model (doomLight); constant across the wall, so resolve it once.
+        const lf = lightFor(baseLight);
         const skyCtx = skyAbove ? this._skyCtx : null;
 
         for (let x = xs; x <= xe; x++) {
@@ -184,7 +185,6 @@ export const wallMethods = {
             const y1 = Math.min(H - 1, Math.floor(ybot - 0.5));
             if (y0 > y1) continue;
 
-            const lf = lightFor(light, cy);
             const col = texX;
             const invColH = 1 / colH;
 

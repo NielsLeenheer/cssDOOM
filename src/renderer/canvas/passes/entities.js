@@ -114,7 +114,7 @@ export const entityMethods = {
 
         const invW = sw / (pxR - pxL || 1e-6);
         const invH = sh / (pyBot - pyTop || 1e-6);
-        const lf = lightFor(level, cy);
+        const lf = lightFor(level);
 
         for (let y = y0; y <= y1; y++) {
             const ty = ((y + 0.5 - pyTop) * invH) | 0;

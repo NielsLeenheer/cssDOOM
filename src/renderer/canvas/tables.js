@@ -15,13 +15,21 @@ export const MAX_DIST = 4000;        // far cull for flats / sprites
 export const SKY_DEPTH = 1e7;        // pseudo-depth so sky loses to all real geometry
 export const TAU = Math.PI * 2;
 
-const INV_FADE = 1 / 2600;    // distance light falloff rate
-const LIGHT_FLOOR = 0.22;     // darkest a lit surface gets, as a fraction
-const LIGHT_BAND = 12;        // colormap-style quantisation step
-
-// val (0..255 brightness) → multiplier in 0..256 for `c * lf >> 8`.
+// Sector light → brightness, matching the DomRenderer (scene/sectors.js
+// doomLightToCSS) and the WebGL engine exactly: DOOM's R_InitLightTables
+// colormap selection, flat per sector — no distance falloff, no directional
+// contrast — so the canvas pane stays in step with the CSS reference instead
+// of reading washed-out / lighter than the other renderers. Precomputed as a
+// 0..256 multiplier for `shade()`'s `c * lf >> 8`.
+const LIGHT_DISTANCE_OFFSET = 4;        // medium-distance scalelight compensation
+const LIGHT_MINIMUM_BRIGHTNESS = 0.12;  // never fully black
 const LIGHT_LUT = new Uint16Array(256);
-for (let i = 0; i < 256; i++) LIGHT_LUT[i] = Math.min(256, ((i * 256 / 255) | 0));
+for (let level = 0; level < 256; level++) {
+    const startmap = (15 - level / 16) * 4 - LIGHT_DISTANCE_OFFSET;
+    const colormap = Math.max(0, Math.min(31, startmap));
+    const brightness = Math.max(LIGHT_MINIMUM_BRIGHTNESS, 1 - colormap / 32);
+    LIGHT_LUT[level] = Math.min(256, (brightness * 256) | 0);
+}
 
 export const WALK_FRAME_MS = 180;    // enemy walk-cycle frame duration
 export const DEATH_FRAME_MS = 120;   // enemy death-animation frame duration
@@ -218,12 +226,11 @@ export function shade(texel, lf) {
     return 0xff000000 | (b << 16) | (g << 8) | r;
 }
 
-// Sector light + distance falloff → 0..256 multiplier, banded.
-export function lightFor(level, dist) {
-    let m = 1 - dist * INV_FADE;
-    if (m < LIGHT_FLOOR) m = LIGHT_FLOOR;
-    let v = level * m;
-    v -= v % LIGHT_BAND;          // colormap-style quantisation
+// Sector light level → 0..256 brightness multiplier (flat per sector — see
+// LIGHT_LUT above; matches the DomRenderer / WebGL light model, no distance
+// falloff). Callers resolve it once per surface from the sector light level.
+export function lightFor(level) {
+    let v = level | 0;
     if (v < 0) v = 0; else if (v > 255) v = 255;
-    return LIGHT_LUT[v | 0];
+    return LIGHT_LUT[v];
 }
