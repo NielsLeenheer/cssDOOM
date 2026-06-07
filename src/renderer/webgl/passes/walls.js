@@ -73,26 +73,36 @@ export const wallPassMethods = {
         // Lift shaft walls — drawn at the live platform height. The
         // platform-face walls span platform↔facing floor (growing as the
         // lift drops); the static shaft sides span the full travel so the
-        // shaft isn't see-through once the platform moves away. Lift walls
-        // are always unpegged (the DOM mechanic builds them that way).
+        // shaft isn't see-through once the platform moves away.
         for (const lift of scene.lifts.values()) {
             for (const wall of lift.shaftWalls) {
                 const tex = this._getWall(wall.texture);
                 if (!tex || tex.width <= 1) continue;
-                let bottom, top;
+                let bottom, top, unpegged, yOff;
                 if (wall.isPlatformFace) {
                     const nf = wall.neighborFloor ?? lift.lower;
                     bottom = Math.min(lift.current, nf);
                     top = Math.max(lift.current, nf);
+                    // The face texture is pinned to the platform top so it
+                    // rides down with the lift (the DOM renders a full-height
+                    // panel pinned to the platform and translates it; that's
+                    // top-pegging, offset by the full panel height so the
+                    // texel at the platform matches). Without this the bottom
+                    // stayed put and the top was simply clipped.
+                    const fullH = lift.upper - Math.min(nf, lift.lower);
+                    unpegged = false;
+                    yOff = (wall.yOffset || 0) - fullH;
                 } else {
                     bottom = wall.neighborFloor !== undefined
                         ? Math.min(wall.neighborFloor, lift.lower) : lift.lower;
                     top = lift.upper;
+                    unpegged = true;                 // static shaft sides
+                    yOff = wall.yOffset || 0;
                 }
                 if (top - bottom < 0.5) continue;
                 const light = this._doomLight(wall.lightLevel ?? lift.light);
                 this._emitWall(groups, wall.texture, cam, wall, bottom, top,
-                    wall.yOffset || 0, light, wall.xOffset || 0, true, true);
+                    yOff, light, wall.xOffset || 0, true, unpegged);
             }
         }
 
