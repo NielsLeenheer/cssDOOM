@@ -203,6 +203,9 @@ export class CanvasRenderer extends RendererBase {
         this.internalCanvas.width = iw;
         this.internalCanvas.height = ih;
         this.software.resize(iw, ih, this.internalCtx);
+        // Display backing-store height in device px — the weapon pass uses it
+        // to tuck the sprite a fixed CSS distance into the status bar.
+        this.software.displayH = this.canvas.height;
 
         // Repaint at the new size right away. Setting canvas.width above
         // clears the display, and browsers commonly pause requestAnimation-

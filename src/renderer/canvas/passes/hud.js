@@ -133,12 +133,10 @@ export const hudMethods = {
         }
 
         // Weapon bob: a small figure-eight that builds while the view is
-        // moving and eases back to centre when it stops.
-        const moving = this._lastCamX !== null
-            && (Math.abs(cam.ex - this._lastCamX) > 0.5 || Math.abs(cam.ey - this._lastCamY) > 0.5);
-        this._lastCamX = cam.ex;
-        this._lastCamY = cam.ey;
-        const targetMag = moving ? 1 : 0;
+        // moving and eases back to centre when it stops. `this._moving` is
+        // detected once per frame in render() (it also drives the head bob),
+        // so the weapon sway stays in sync with the view.
+        const targetMag = this._moving ? 1 : 0;
         const phase = (now / 1000) * 6;
         const ease = 6 * dt;
         this._bobX += ((Math.cos(phase) * 5 * targetMag) - this._bobX) * Math.min(1, ease);
@@ -147,8 +145,17 @@ export const hudMethods = {
         const { W, H } = this.framebuffer;
         const ui = this.uiScale;
         const destW = fw * ui, destH = fh * ui;
+        // Rest the weapon on top of the status bar, tucked ~30 CSS px into
+        // it, matching the DomRenderer (`bottom: anchor(top)` +
+        // `margin-bottom: -30px`) and the WebGL renderer. The bar is 32
+        // framebuffer px × uiScale tall (see _renderHud); without this the
+        // sprite sat flush at the very bottom of the framebuffer — about a
+        // full bar-height too low.
+        const barTop = H - 32 * ui;
+        const dpr = window.devicePixelRatio || 1;
+        const overlap = this.displayH ? 30 * dpr * H / this.displayH : 0.4 * 32 * ui;
         const destX = Math.round((W - destW) / 2 + this._bobX * ui);
-        const destY = Math.round(H - destH + this._bobY * ui);
+        const destY = Math.round(barTop + overlap - destH + this._bobY * ui);
         this.framebuffer.blit(tex, frame * fw, 0, fw, fh, destX, destY, destW, destH);
     },
 

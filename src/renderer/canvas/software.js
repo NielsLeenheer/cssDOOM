@@ -49,6 +49,15 @@ import { entityMethods } from './passes/entities.js';
 import { hudMethods } from './passes/hud.js';
 import { screenMethods } from './screens.js';
 
+// Head bob — raise the eye 0→BOB_HEIGHT→0 while walking, matching the
+// DomRenderer's `--bob` keyframe (0..6 over a 400ms cycle) and the WebGL
+// engine. The amplitude eases in/out with movement so the view settles
+// smoothly when you stop. The game doesn't bob the camera itself, so
+// movement is derived from the camera sliding frame-to-frame (see render()).
+const BOB_HEIGHT = 6;                       // peak eye rise, world units
+const BOB_RATE = (2 * Math.PI) / 0.4;       // one 0→6→0 cycle per 400ms
+const BOB_EASE = 8;                         // amplitude ease rate (per second)
+
 export class SoftwareRenderer {
     constructor() {
         // Pixel + depth buffers and the overlay blit primitive. The world
@@ -84,6 +93,14 @@ export class SoftwareRenderer {
         this._bobY = 0;
         this._lastCamX = null;
         this._lastCamY = null;
+        // Head-bob state: eased amplitude (0..1) + free-running phase, plus
+        // the movement flag the weapon bob also reads (both set in render()).
+        this._moving = false;
+        this._bobAmp = 0;
+        this._bobPhase = 0;
+        // Display canvas height in device px, set by the CanvasRenderer on
+        // resize — lets the weapon tuck a fixed CSS distance into the bar.
+        this.displayH = 0;
         this._colAngle = null;        // per-column view-angle offset, rebuilt on resize
     }
 
@@ -135,6 +152,21 @@ export class SoftwareRenderer {
         this.scene.viewerPlayerIndex = this.viewerPlayerIndex;
         this.scene.update(dt, now);
 
+        // Movement detection (shared by head bob + weapon bob): the game
+        // doesn't bob the camera itself, so derive it from the camera
+        // sliding frame-to-frame, like the DomRenderer's `.moving` class.
+        // _renderWeapon reuses this._moving so the two bobs stay in sync.
+        this._moving = this._lastCamX !== null
+            && (Math.abs(camera.x - this._lastCamX) > 0.5 || Math.abs(camera.y - this._lastCamY) > 0.5);
+        this._lastCamX = camera.x; this._lastCamY = camera.y;
+
+        // Head bob: ease the amplitude toward 1 while moving / 0 while still
+        // and add a 0→BOB_HEIGHT→0 rise to the eye (raised cosine, so it sits
+        // at baseline when amplitude is 0 — no leftover offset when stopped).
+        this._bobAmp += ((this._moving ? 1 : 0) - this._bobAmp) * Math.min(1, BOB_EASE * dt);
+        this._bobPhase += dt * BOB_RATE;
+        const bobZ = this._bobAmp * (BOB_HEIGHT / 2) * (1 - Math.cos(this._bobPhase));
+
         const { W, H } = fbuf;
         const aspect = W / H;
         const fovScale = Math.tan(FOV / 2);
@@ -146,7 +178,7 @@ export class SoftwareRenderer {
         const cam = {
             ex: camera.x,
             ey: camera.y,
-            ez: camera.z,
+            ez: camera.z + bobZ,
             ca: Math.cos(camera.angle),
             sa: Math.sin(camera.angle),
             angle: camera.angle,
