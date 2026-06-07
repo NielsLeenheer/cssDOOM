@@ -15,8 +15,9 @@
  * rendered (matches the "before CSS" purity of the talk demo).
  */
 
-import { renderScene3D, setRendererSettings } from './scene.js';
+import { renderScene3D, setRendererSettings, deduplicateLines } from './scene.js';
 import { RendererBase } from '../base.js';
+import { canvasStats } from '../canvas/renderer.js';
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
@@ -81,6 +82,16 @@ export class LineRenderer extends RendererBase {
         // applied per-frame in render() so we don't mutate the
         // incoming object (it's shared with the audio listener etc.).
         this._camera = null;
+
+        // Stats for the overlay (gated by the shared canvasStats toggle —
+        // the same Renderer → "Stats" checkbox the CanvasRenderer uses).
+        // Frame times roll through a 60-frame window for a stable ms/fps
+        // readout; line counts are the latest frame's raw → deduplicated
+        // segment totals so we can see how much the dedup pass collapses.
+        this._frameTimes = new Float32Array(60);
+        this._frameTimeIdx = 0;
+        this._rawLineCount = 0;
+        this._lineCount = 0;
 
         // Resize observer keeps the canvas backing store aligned with
         // the displayed size. DomRenderer uses ResizeObserver for its
@@ -189,9 +200,53 @@ export class LineRenderer extends RendererBase {
             angle: this._camera.angle,
             ...CAMERA_DEFAULTS,
         };
-        const lines = renderScene3D(this._walls, camera, this._sectorPolygons);
+        const t0 = performance.now();
+        const rawLines = renderScene3D(this._walls, camera, this._sectorPolygons);
+        // Collapse exact/near-coincident segments. The scene emits one quad
+        // per wall, so shared corners stack several identical edges on the
+        // same screen line — dedup removes those redundant strokes (cheaper
+        // for a real oscilloscope to draw). threshold = NDC rounding factor;
+        // 1000 ≈ 0.001 NDC tolerance.
+        const lines = deduplicateLines(rawLines, 1000);
         this._paint(lines);
+        const t1 = performance.now();
+
+        this._frameTimes[this._frameTimeIdx] = t1 - t0;
+        this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
+        this._rawLineCount = rawLines.length;
+        this._lineCount = lines.length;
+        if (canvasStats.enabled) this._drawStats();
     };
+
+    /** Top-left overlay: frame time, fps, and raw → deduplicated line
+     *  counts. Drawn on the display canvas after the wireframe so the text
+     *  stays crisp. Mirrors CanvasRenderer._drawStats; gated by the same
+     *  shared canvasStats flag. */
+    _drawStats() {
+        let sum = 0, n = 0;
+        for (let i = 0; i < this._frameTimes.length; i++) {
+            const v = this._frameTimes[i];
+            if (v > 0) { sum += v; n++; }
+        }
+        const avg = n ? sum / n : 0;
+        const fps = avg > 0 ? Math.min(999, 1000 / avg) : 0;
+        const dpr = window.devicePixelRatio || 1;
+        const ctx = this.ctx;
+        const raw = this._rawLineCount;
+        const kept = this._lineCount;
+        const pct = raw > 0 ? Math.round((1 - kept / raw) * 100) : 0;
+        const text = `${kept}/${raw} lines (-${pct}%)  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.font = `${12 * dpr}px monospace`;
+        ctx.textBaseline = 'top';
+        const m = ctx.measureText(text);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.fillRect(0, 0, m.width + 12 * dpr, 18 * dpr);
+        ctx.fillStyle = '#ffdd55';
+        ctx.fillText(text, 6 * dpr, 3 * dpr);
+        ctx.restore();
+    }
 
     // CRT phosphor glow passes. Each entry is one stroke layer: width
     // in CSS px, RGBA color. Painted in order under
