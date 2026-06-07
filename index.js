@@ -22,7 +22,7 @@ const roomCode = joinParam || null;   // null for Local DM secondary
 // Stashed on body.dataset.layout so CSS + JS read a single token
 // instead of three independent body-class checks.
 const layout = params.get('layout') ?? (params.has('kiosk') ? 'kiosk' : null);
-// `?renderer=flat | shade | line` swaps which renderer the manager
+// `?renderer=canvas | webgl | flat | shade | line` swaps which renderer the manager
 // builds for each pane (default `dom`). Stashed on
 // body.dataset.renderer so the manager picks the constructor in
 // `create()` without re-parsing the URL. The alternative renderers
