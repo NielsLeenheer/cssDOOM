@@ -110,6 +110,31 @@ export class Level {
             await this.orchestrator.dispatch({ type: 'world', cmd: 'showLevelTransition', args: [] });
         }
 
+        // Tear down the previous map's per-level geometry state BEFORE
+        // maps.load runs enrichment. maps.load → initThings computes each
+        // thing's floorHeight via getFloorHeightAt, which reads two pieces
+        // of engine state:
+        //   - the spatial grid (forEachSectorAt uses it when built, else
+        //     falls back to mapData.sectorPolygons), and
+        //   - state.liftState (a lift sector reports its animated height).
+        // If either still holds the OUTGOING level here, the new map's
+        // things get floor heights from the previous level's geometry:
+        // a stale grid drops everything to floor 0, and a stale lift whose
+        // sector index happens to coincide with a new sector overrides
+        // that sector's floor. Clearing both forces initThings onto the
+        // freshly-set mapData with no lifts — exactly the state a fresh
+        // initial load runs in (no grid, empty liftState) — so barrels and
+        // decorations sit at the correct height after a transition. The
+        // new map's lifts are rebuilt by initLiftsState below; a thing
+        // resting on a lift sits at its upper height, which equals the
+        // sector's static floor, so omitting lifts here is correct.
+        // (Renderer-side teardown — DOM clear + iOS GPU-release yield — is
+        // owned by scene.loadMap and runs there per-renderer.)
+        if (!isInitialLoad) {
+            clearSpatialGrid();
+            state.liftState = new Map();
+        }
+
         // Fetch + enrich mapData. Mutates `maps.mapData` and
         // `maps.currentMap`. State.* is NOT touched here — that's
         // the initThingsState / initDoorsState / etc. calls below.
@@ -125,11 +150,6 @@ export class Level {
         } else {
             transitionToLevel();
         }
-
-        // Game-side teardown — renderer-side teardown (DOM clear +
-        // iOS GPU-release yield) is owned by scene.loadMap and runs
-        // there per-renderer.
-        if (!isInitialLoad) clearSpatialGrid();
 
         // Game-side state init: populates state.things, state.doorState,
         // state.liftState, state.crusherState from the enriched mapData.
