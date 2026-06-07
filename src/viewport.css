@@ -95,7 +95,15 @@ body[data-grid="tiled"] { --screen-scale: 1; }
 body[data-grid="tiled"] .pane {
     position: absolute;
     width: 100vw;
-    height: 100vh;
+    /* NOT 100vh — deliberate. At exactly 100vh the browser treats the scaled
+       pane as precisely viewport-height and, in document fullscreen, composites
+       it onto a GPU layer that stops honouring the .viewport `overflow: hidden`
+       clip — so the 3D scene leaks out of the renderer into the other quadrants.
+       (Windowed it clips fine; nothing in the computed style differs between the
+       two — it's purely a compositor edge case.) Nudging the height off the exact
+       viewport boundary forces re-rasterisation and the clip holds. The extra
+       0.1vh is ~0.05vh after the scale(0.5) — sub-pixel, invisible. */
+    height: 100.1vh;
     flex: none;
     transform-origin: top left;
     transform: scale(0.5);
