@@ -143,27 +143,38 @@ const LAYOUT_SPECS = {
         ],
         players: { singleplayer: { standalone: [0, 0, 0, 0] } },
     },
-    // ?layout=compare SP: DomRenderer (left) beside CanvasRenderer
-    // (right), both mirroring player 0, for side-by-side renderer
-    // comparison. Flex 50/50, full height.
-    compare: {
-        slots: [
-            { kind: 'dom' },
-            { kind: 'canvas' },
-        ],
-        players: { singleplayer: { standalone: [0, 0] } },
-    },
-    // ?layout=compare-gl SP: DomRenderer (left) beside WebGLRenderer
-    // (right), both mirroring player 0, for side-by-side comparison of
-    // the CSS renderer against the WebGL one. Flex 50/50, full height.
-    'compare-gl': {
-        slots: [
-            { kind: 'dom' },
-            { kind: 'webgl' },
-        ],
-        players: { singleplayer: { standalone: [0, 0] } },
-    },
 };
+
+// `?renderer=dom,canvas[,…]` requests an ad-hoc side-by-side renderer
+// comparison: one pane per kind, all mirroring player 0 (SP only). This
+// replaces the old fixed `compare` / `compare-gl` layouts — any combination
+// of renderers works now. 2 kinds → flex 50/50 full height; 3–4 kinds →
+// tiled 2×2 (kinds fill quadrants in order; a 3rd leaves the last quadrant
+// empty). More than 4 don't fit the grid and are dropped. A single kind is
+// the normal whole-screen routing handled by create() and never reaches here.
+function comparisonKinds() {
+    const raw = (document.body.dataset.renderer ?? '')
+        .split(',').map(s => s.trim()).filter(Boolean);
+    const valid = raw.filter(k => k in RENDERERS);
+    const unknown = raw.filter(k => !(k in RENDERERS));
+    if (unknown.length) {
+        console.warn(`[renderer] unknown ?renderer kind(s): ${unknown.join(', ')} — known: ${Object.keys(RENDERERS).join(', ')}`);
+    }
+    if (valid.length > 4) {
+        console.warn(`[renderer] ?renderer lists ${valid.length} renderers; only 4 fit the comparison grid — dropped: ${valid.slice(4).join(', ')}`);
+    }
+    return valid.slice(0, 4);
+}
+
+/** Synthesise a comparison layout (one pane per renderer kind) for an ad-hoc
+ *  `?renderer=a,b[,…]` request. SP only — falls back to `default` in DM. */
+function comparisonLayout(kinds) {
+    return {
+        grid: kinds.length > 2 ? 'tiled' : undefined,   // 2 → flex 50/50; 3–4 → tiled 2×2
+        slots: kinds.map(kind => ({ kind })),
+        players: { singleplayer: { standalone: kinds.map(() => 0) } },
+    };
+}
 
 class RendererManager {
     constructor() {
@@ -195,12 +206,18 @@ class RendererManager {
      * `orchestrator.addTarget`.
      *
      * Renderer kind is selected by `?renderer=…` (stashed on
-     * `body.dataset.renderer` at boot). Defaults to DomRenderer.
-     * Visualize mode bypasses this routing — it builds its own fixed
-     * line / shade / flat / dom layout via `_reshapeVisualize`.
+     * `body.dataset.renderer` at boot). Defaults to DomRenderer. Pinned
+     * layouts (visualize / cad) and the ad-hoc comparison layout pass an
+     * explicit `kind` per slot, so the URL routing below only applies to
+     * the URL-routable layouts (default / kiosk) and joiner panes; for a
+     * comma-listed `?renderer` it picks the first kind.
      */
     create(kind, playerIndex, extras = {}) {
-        const RendererClass = RENDERERS[kind ?? document.body.dataset.renderer] ?? DomRenderer;
+        // When routing via the URL (kind == null), `?renderer` may be a comma
+        // list for the comparison layout — take the first kind for any
+        // single-pane fallback (a joiner, or DM where comparison doesn't apply).
+        const routed = kind ?? document.body.dataset.renderer?.split(',')[0].trim();
+        const RendererClass = RENDERERS[routed] ?? DomRenderer;
         const renderer = new RendererClass({
             playerIndex,
             gameContainer: this._gameContainer,
@@ -234,8 +251,14 @@ class RendererManager {
      * destroy directly without reshape.
      */
     reshape(gameMode, networkMode) {
-        const layoutName = document.body.dataset.layout ?? 'default';
-        let layout = LAYOUT_SPECS[layoutName] ?? LAYOUT_SPECS.default;
+        // An ad-hoc `?renderer=a,b[,…]` comparison (multiple kinds, no explicit
+        // ?layout) synthesises its own layout; otherwise pick the named layout
+        // (default when unset / unknown).
+        const kinds = comparisonKinds();
+        const explicitLayout = document.body.dataset.layout;
+        let layout = (!explicitLayout && kinds.length > 1)
+            ? comparisonLayout(kinds)
+            : (LAYOUT_SPECS[explicitLayout ?? 'default'] ?? LAYOUT_SPECS.default);
         if (!layout.players[gameMode]?.[networkMode]) {
             layout = LAYOUT_SPECS.default;
         }
