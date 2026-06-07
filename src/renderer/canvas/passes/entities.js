@@ -21,7 +21,7 @@ export const entityMethods = {
         for (const s of scene.statics) {
             const tex = getSpriteTexture(itemFrameName(s.name, now));
             if (tex && tex.width > 1) {
-                this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false);
+                this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false, s.sectorIndex);
             }
         }
 
@@ -34,7 +34,7 @@ export const entityMethods = {
             if (!spr) continue;
             const tex = getSpriteTexture(spr.name);
             if (!tex || tex.width <= 1) continue;
-            this._drawBillboard(cam, e.x, e.y, e.floorZ, tex, e.light, spr.mirror, false);
+            this._drawBillboard(cam, e.x, e.y, e.floorZ, tex, e.light, spr.mirror, false, e.sectorIndex);
         }
 
         // Projectiles — linear interpolation start → end over duration.
@@ -88,7 +88,7 @@ export const entityMethods = {
      * (things, corpses, fog). `mirror` flips it horizontally for the
      * reused rotation art.
      */
-    _drawBillboard(cam, wx, wy, z, tex, level, mirror, centered) {
+    _drawBillboard(cam, wx, wy, z, tex, level, mirror, centered, sectorIndex = -1) {
         const { W, H, fb, zb } = this.framebuffer;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
@@ -114,7 +114,12 @@ export const entityMethods = {
 
         const invW = sw / (pxR - pxL || 1e-6);
         const invH = sh / (pyBot - pyTop || 1e-6);
-        const lf = lightFor(level);
+        // Apply the live light-special multiplier for the billboard's sector
+        // (1 for sectors without a special / projectiles), so decorations on a
+        // pulsing platform dim in step with the surfaces — matches the walls
+        // pass (`wall.lightLevel * _sectorLightMul`).
+        const mul = sectorIndex >= 0 ? (this.scene._sectorLightMul[sectorIndex] ?? 1) : 1;
+        const lf = lightFor(level * mul);
 
         for (let y = y0; y <= y1; y++) {
             const ty = ((y + 0.5 - pyTop) * invH) | 0;

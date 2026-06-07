@@ -41,7 +41,7 @@ export const entityPassMethods = {
         // Static decorations + corpses (some decorations idle-animate).
         for (const s of scene.statics) {
             const tex = getSpriteTexture(gl, itemFrameName(s.name, now));
-            if (tex && tex.width > 1) this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false);
+            if (tex && tex.width > 1) this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false, s.sectorIndex);
         }
 
         // Game-driven things (enemies, pickups, barrels, players).
@@ -52,7 +52,7 @@ export const entityPassMethods = {
             if (!spr) continue;
             const tex = getSpriteTexture(gl, spr.name);
             if (!tex || tex.width <= 1) continue;
-            this._drawBillboard(cam, e.x, e.y, e.floorZ, tex, e.light, spr.mirror, false);
+            this._drawBillboard(cam, e.x, e.y, e.floorZ, tex, e.light, spr.mirror, false, e.sectorIndex);
         }
 
         // Projectiles — linear interpolation start → end over duration.
@@ -97,7 +97,7 @@ export const entityPassMethods = {
         return buildRotName(anim.spr, frame, e.rotation);
     },
 
-    _drawBillboard(cam, wx, wy, z, tex, level, mirror, centered) {
+    _drawBillboard(cam, wx, wy, z, tex, level, mirror, centered, sectorIndex = -1) {
         // Cull behind the near plane / past the far cull, matching canvas.
         const cy = cam.ca * (wy - cam.ey) - cam.sa * (wx - cam.ex);
         if (cy < NEAR || cy > MAX_DIST) return;
@@ -113,9 +113,15 @@ export const entityPassMethods = {
         const topZ = centered ? z + sh * 0.5 : z + sh;
         const botZ = centered ? z - sh * 0.5 : z;
 
-        // Dim the billboard by its sector's colormap brightness, like the
-        // DOM `.sprite { filter: brightness(--light) }`.
-        const lf = this._doomLight(level);
+        // Dim the billboard by its sector's brightness, like the DOM
+        // `.sprite { filter: brightness(--light) }`. Use the full sector
+        // brightness (incl. the live pulsing value for light-special
+        // sectors) so a decoration on a blinking platform dims with the
+        // surfaces; projectiles / effects (sectorIndex -1) use the plain
+        // colormap brightness for their fixed level.
+        const lf = sectorIndex >= 0
+            ? this._sectorBrightness(sectorIndex, level)
+            : this._doomLight(level);
         const u0 = mirror ? 1 : 0, u1 = mirror ? 0 : 1;
         const data = this._spriteScratch || (this._spriteScratch = new Float32Array(36));
         // x,y,z,u,v,light per vertex; ABC, ACD with A=topL B=topR C=botR D=botL.

@@ -206,7 +206,12 @@ export class Scene {
             // things map so they can move / be collected / die. Passive
             // decorations (no gameId) become static billboards.
             if (t.gameId === undefined) {
-                this.statics.push({ x: t.x, y: t.y, floorZ, light, name });
+                // sectorIndex lets the entity passes pick up the live
+                // per-frame light multiplier (pulsing light specials), the
+                // same way walls/flats do — without it a decoration on a
+                // blinking platform stays at a fixed brightness while the
+                // surfaces around it pulse.
+                this.statics.push({ x: t.x, y: t.y, floorZ, light, name, sectorIndex: t.sectorIndex });
                 continue;
             }
 
@@ -218,6 +223,7 @@ export class Scene {
                 y: t.y,
                 floorZ,
                 light,
+                sectorIndex: t.sectorIndex,   // live light-special lookup (see statics above)
                 isEnemy: anim !== null,
                 anim,
                 fixedName: name,                       // used for pickups / barrels
