@@ -61,6 +61,13 @@ const HUD_MAX_SCALE = 3;
 const HUD_RAMP_MIN_W = 1280;   // CSS px: at/below → MIN scale
 const HUD_RAMP_MAX_W = 1920;   // CSS px: at/above → MAX scale
 
+// Head bob — raise the eye 0→BOB_HEIGHT→0 while walking, matching the
+// DomRenderer's `--bob` keyframe (0..6 over a 400ms cycle). The amplitude
+// eases in/out with movement so the view settles smoothly when you stop.
+const BOB_HEIGHT = 6;                       // peak eye rise, world units
+const BOB_RATE = (2 * Math.PI) / 0.4;       // one 0→6→0 cycle per 400ms
+const BOB_EASE = 8;                         // amplitude ease rate (per second)
+
 // DomRenderer light model (scene/sectors.js::doomLightToCSS +
 // constants.js): a DOOM sector light level (0..255) maps through the
 // R_InitLightTables colormap selection to a flat 0..1 brightness, with a
@@ -123,6 +130,11 @@ export class GLEngine {
         this._lastFrameTime = 0;
         this._bobX = 0; this._bobY = 0;
         this._lastCamX = null; this._lastCamY = null;
+        // Head-bob state: eased amplitude (0..1) + free-running phase, plus
+        // the movement flag the weapon bob also reads.
+        this._moving = false;
+        this._bobAmp = 0;
+        this._bobPhase = 0;
     }
 
     /** Size the drawing buffer (W×H device pixels) and recompute the
@@ -248,8 +260,22 @@ export class GLEngine {
         this.scene.viewerPlayerIndex = this.viewerPlayerIndex;
         this.scene.update(dt, now);
 
+        // Movement detection (shared by head bob + weapon bob): the game
+        // doesn't bob the camera itself, so we derive it from the camera
+        // sliding frame-to-frame, like the DomRenderer's `.moving` class.
+        this._moving = this._lastCamX !== null
+            && (Math.abs(camera.x - this._lastCamX) > 0.5 || Math.abs(camera.y - this._lastCamY) > 0.5);
+        this._lastCamX = camera.x; this._lastCamY = camera.y;
+
+        // Head bob: ease the amplitude toward 1 while moving / 0 while still,
+        // and add a 0→BOB_HEIGHT→0 rise to the eye height (raised cosine, so
+        // it sits at baseline when amplitude is 0 — no leftover offset).
+        this._bobAmp += ((this._moving ? 1 : 0) - this._bobAmp) * Math.min(1, BOB_EASE * dt);
+        this._bobPhase += dt * BOB_RATE;
+        const bobZ = this._bobAmp * (BOB_HEIGHT / 2) * (1 - Math.cos(this._bobPhase));
+
         this._cam = {
-            ex: camera.x, ey: camera.y, ez: camera.z,
+            ex: camera.x, ey: camera.y, ez: camera.z + bobZ,
             ca: Math.cos(camera.angle), sa: Math.sin(camera.angle),
             angle: camera.angle,
         };

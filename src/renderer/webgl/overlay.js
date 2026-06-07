@@ -199,11 +199,9 @@ export const overlayMethods = {
             }
         }
 
-        const moving = this._lastCamX !== null
-            && (Math.abs(cam.ex - this._lastCamX) > 0.5 || Math.abs(cam.ey - this._lastCamY) > 0.5);
-        this._lastCamX = cam.ex;
-        this._lastCamY = cam.ey;
-        const targetMag = moving ? 1 : 0;
+        // Movement is detected once per frame in the engine's render() (it
+        // also drives the head bob); reuse it here.
+        const targetMag = this._moving ? 1 : 0;
         const phase = (now / 1000) * 6;
         const ease = Math.min(1, 6 * dt);
         this._bobX += ((Math.cos(phase) * 5 * targetMag) - this._bobX) * ease;
