@@ -11,8 +11,8 @@
  * Vertices are grouped by texture so each distinct wall texture is one
  * draw call. Per vertex: world position (x,y,z), texel coordinate in
  * world units (u along the wall, v down it — the FS divides by the
- * texture size and REPEAT-wraps), and the baked sector light including
- * the N/S-brighter / E/W-darker fake contrast.
+ * texture size and REPEAT-wraps), and the surface's flat 0..1 brightness
+ * (computed CPU-side via the DomRenderer's colormap mapping).
  */
 
 import { DynamicBuffer } from '../glutil.js';
@@ -64,7 +64,7 @@ export const wallPassMethods = {
             const wallBottom = wall.bottomHeight + bottomOffset;
             const wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
             const yOff = wall.yOffset || 0;
-            const light = wall.lightLevel * (scene._sectorLightMul[wall.sectorIndex] ?? 1);
+            const light = this._sectorBrightness(wall.sectorIndex, wall.lightLevel);
             const u1 = (wall.xOffset || 0) + (wall.isScrolling ? scene._scrollOffset : 0);
             this._emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, light, u1,
                 false, this._unpegged.has(wall));
@@ -90,7 +90,7 @@ export const wallPassMethods = {
                     top = lift.upper;
                 }
                 if (top - bottom < 0.5) continue;
-                const light = wall.lightLevel ?? lift.light;
+                const light = this._doomLight(wall.lightLevel ?? lift.light);
                 this._emitWall(groups, wall.texture, cam, wall, bottom, top,
                     wall.yOffset || 0, light, wall.xOffset || 0, true, true);
             }
@@ -135,7 +135,7 @@ export const wallPassMethods = {
      * at the top (mod the texture height, which the REPEAT wrap handles).
      * This matches the DomRenderer's `background-position-y: 100%` rule.
      */
-    _emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, baseLight, u1, noCull, unpegged) {
+    _emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, light, u1, noCull, unpegged) {
         const wallH = wallTop - wallBottom;
         if (wallH <= 0) return;
 
@@ -148,8 +148,9 @@ export const wallPassMethods = {
             if ((cam.ex - mx) * dy - (cam.ey - my) * dx < 0) return;
         }
 
-        // Fake contrast: E/W walls darker, N/S walls brighter.
-        const light = baseLight + (Math.abs(dx) > Math.abs(dy) ? -16 : 16);
+        // `light` is the final 0..1 brightness (computed CPU-side to match
+        // the DomRenderer). The DOM applies no orientation-based fake
+        // contrast, so neither do we.
         const u2 = u1 + Math.hypot(dx, dy);
         const vTop = unpegged ? yOff - wallH : yOff;
         const vBot = unpegged ? yOff : yOff + wallH;

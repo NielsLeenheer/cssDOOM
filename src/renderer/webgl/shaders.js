@@ -18,23 +18,18 @@
  * sits cleanly in front of the floor it stands on (the canvas renderer's
  * "+2 lenience" in the depth test).
  *
- * Lighting matches tables.js::lightFor + shade: sector light scaled by a
- * distance falloff, quantised into colormap-style bands, multiplied into
- * the texel. Doing it per fragment means the bands sweep smoothly with
- * the high-res geometry while the texels stay chunky — the "high res,
- * low-res feel" the project is after.
+ * Lighting is a single 0..1 brightness multiplier on the texel, computed
+ * per surface on the CPU to match the DomRenderer exactly: a flat
+ * per-sector value from its `doomLightToCSS` colormap mapping, with no
+ * distance falloff and no per-pixel banding (the DOM applies `filter:
+ * brightness()` per element). Animated light specials override that with
+ * an absolute brightness, same as the DOM keyframes. The "high res,
+ * low-res feel" comes from the chunky NEAREST texels, not from shading.
  */
 
-// Shared lighting snippet: forward distance + base light → lit rgb.
-// Mirrors lightFor() (INV_FADE 1/2600, floor 0.22, 12-step banding).
-const LIGHT_GLSL = /* glsl */`
-float litFactor(float light, float dist) {
-    float m = clamp(1.0 - dist / 2600.0, 0.22, 1.0);
-    float v = light * m;
-    v = floor(v / 12.0) * 12.0;
-    return clamp(v, 0.0, 255.0) / 255.0;
-}
-`;
+// World vertex shader carries the per-vertex brightness (a_light, already
+// 0..1) straight through to the fragment shader; the flat shader takes its
+// brightness as a per-sector uniform. No lighting maths lives in GLSL.
 
 // ── World program: walls + sprite billboards ─────────────────────────
 // a_uv is in world texel units for walls (u_uvWorld=1 → divided by the
@@ -51,7 +46,6 @@ uniform float u_A, u_B; // depth remap
 uniform float u_zbias;
 out vec2 v_uv;
 out float v_light;
-out float v_dist;
 void main() {
     float dx = a_pos.x - u_eye.x;
     float dy = a_pos.y - u_eye.y;
@@ -60,7 +54,6 @@ void main() {
     float vy =  a_pos.z - u_eye.z;
     v_uv = a_uv;
     v_light = a_light;
-    v_dist = vz;
     // Sprites pass u_zbias>0 to pull their depth a couple of world units
     // toward the camera (so a billboard sits in front of the floor it
     // stands on). Walls/flats pass 0 so they project exactly — biasing
@@ -72,17 +65,15 @@ export const WORLD_FS = /* glsl */`#version 300 es
 precision highp float;
 in vec2 v_uv;
 in float v_light;
-in float v_dist;
 uniform sampler2D u_tex;
 uniform vec2 u_texSize;  // texels; used when u_uvWorld == 1
 uniform float u_uvWorld; // 1 = uv in world units (÷texSize), 0 = uv already 0..1
 out vec4 outColor;
-${LIGHT_GLSL}
 void main() {
     vec2 uv = u_uvWorld > 0.5 ? v_uv / u_texSize : v_uv;
     vec4 t = texture(u_tex, uv);
     if (t.a < 0.5) discard;
-    outColor = vec4(t.rgb * litFactor(v_light, v_dist), 1.0);
+    outColor = vec4(t.rgb * v_light, 1.0);
 }`;
 
 // ── Flat program: floors + ceilings ──────────────────────────────────
@@ -99,7 +90,6 @@ uniform float u_aspect;
 uniform float u_A, u_B;
 uniform float u_planeZ;
 out vec2 v_world;
-out float v_dist;
 void main() {
     float dx = a_xy.x - u_eye.x;
     float dy = a_xy.y - u_eye.y;
@@ -107,21 +97,18 @@ void main() {
     float vz = -dx * u_rot.y + dy * u_rot.x;
     float vy =  u_planeZ - u_eye.z;
     v_world = a_xy;
-    v_dist = vz;
     gl_Position = vec4(vx, vy * u_aspect, u_A * vz + u_B, vz);
 }`;
 
 export const FLAT_FS = /* glsl */`#version 300 es
 precision highp float;
 in vec2 v_world;
-in float v_dist;
 uniform sampler2D u_tex;
-uniform float u_light;
+uniform float u_light;   // 0..1 brightness, computed CPU-side
 out vec4 outColor;
-${LIGHT_GLSL}
 void main() {
     vec4 t = texture(u_tex, v_world / 64.0);
-    outColor = vec4(t.rgb * litFactor(u_light, v_dist), 1.0);
+    outColor = vec4(t.rgb * u_light, 1.0);
 }`;
 
 // ── Sky program ──────────────────────────────────────────────────────

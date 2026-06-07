@@ -50,6 +50,20 @@ import { overlayMethods } from './overlay.js';
 
 const FAR = 20000;   // depth far plane — generously past any map extent
 
+// DomRenderer light model (scene/sectors.js::doomLightToCSS +
+// constants.js): a DOOM sector light level (0..255) maps through the
+// R_InitLightTables colormap selection to a flat 0..1 brightness, with a
+// medium-distance scalelight compensation and a never-fully-black floor.
+// Matching this exactly is what keeps the WebGL pane's brightness in step
+// with the CSS reference — no distance falloff, no per-pixel banding.
+const LIGHT_DISTANCE_OFFSET = 4;
+const LIGHT_MINIMUM_BRIGHTNESS = 0.12;
+function doomLight(lightLevel) {
+    const startmap = (15 - lightLevel / 16) * 4 - LIGHT_DISTANCE_OFFSET;
+    const colormap = Math.max(0, Math.min(31, startmap));
+    return Math.max(LIGHT_MINIMUM_BRIGHTNESS, 1 - colormap / 32);
+}
+
 export class GLEngine {
     constructor(gl, resolution) {
         this.gl = gl;
@@ -121,6 +135,11 @@ export class GLEngine {
         this.scene.setMap(data);
         this._buildFlatGeometry();
         this._buildWallPegging();
+        // Sectors with an animated light special: their brightness is driven
+        // by the special's absolute value (scene._sectorLightMul), matching
+        // the DOM keyframes that override --light, rather than the static
+        // colormap brightness.
+        this._specialSectors = new Set(this.scene._lightSectors.map(e => e.sectorIndex));
     }
 
     clear() {
@@ -165,6 +184,21 @@ export class GLEngine {
 
     _getWall(name) { return getWallTexture(this.gl, name); }
     _getFlat(name) { return getFlatTexture(this.gl, name); }
+
+    /** Flat per-surface brightness (0..1), matching the DomRenderer. A
+     *  sector with an animated light special uses the special's absolute
+     *  value (the DOM keyframes override --light); everything else uses the
+     *  static colormap brightness for its light level. */
+    _sectorBrightness(sectorIndex, lightLevel) {
+        if (this._specialSectors && this._specialSectors.has(sectorIndex)) {
+            return this.scene._sectorLightMul[sectorIndex] ?? 1;
+        }
+        return doomLight(lightLevel);
+    }
+
+    /** Colormap brightness for a raw light level (no special handling) —
+     *  used for sprites, which the DOM dims by their sector's light. */
+    _doomLight(lightLevel) { return doomLight(lightLevel); }
 
     // ── Per-frame entry point ────────────────────────────────────────
 

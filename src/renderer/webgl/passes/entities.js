@@ -107,12 +107,15 @@ export const entityPassMethods = {
         const topZ = centered ? z + sh * 0.5 : z + sh;
         const botZ = centered ? z - sh * 0.5 : z;
 
+        // Dim the billboard by its sector's colormap brightness, like the
+        // DOM `.sprite { filter: brightness(--light) }`.
+        const lf = this._doomLight(level);
         const u0 = mirror ? 1 : 0, u1 = mirror ? 0 : 1;
         const data = this._spriteScratch || (this._spriteScratch = new Float32Array(36));
         // x,y,z,u,v,light per vertex; ABC, ACD with A=topL B=topR C=botR D=botL.
         let i = 0;
         const push = (x, y, zz, u, v) => {
-            data[i++] = x; data[i++] = y; data[i++] = zz; data[i++] = u; data[i++] = v; data[i++] = level;
+            data[i++] = x; data[i++] = y; data[i++] = zz; data[i++] = u; data[i++] = v; data[i++] = lf;
         };
         push(lx, ly, topZ, u0, 0);
         push(Rx, Ry, topZ, u1, 0);

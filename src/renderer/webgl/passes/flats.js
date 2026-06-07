@@ -94,7 +94,7 @@ export const flatPassMethods = {
             const ceilingHeight = scene._ceilOverride.get(sector) ?? sector.ceilingHeight;
             const floorHeight = scene._floorOverride.get(sector) ?? sector.floorHeight;
             if (ceilingHeight <= floorHeight) continue;
-            const light = sector.lightLevel * (scene._sectorLightMul[sector.sectorIndex] ?? 1);
+            const light = this._sectorBrightness(sector.sectorIndex, sector.lightLevel);
 
             const floorTex = this._getFlat(animName(sector.floorTexture, scene._animFrame));
             if (floorTex) this._drawFlat(f, floorHeight, floorTex, light, loc);
