@@ -56,6 +56,14 @@ export function rendererType(kind) {
     return RENDERERS[kind]?.type ?? 'dom';
 }
 
+// The renderer kinds offered in the debug picker (console
+// `debug.view.renderer` + the panel dropdown), in display order. A curated
+// subset of RENDERERS: `axis` is omitted because it needs an `extras.axis`
+// and is pinned per-slot by the visualize/cad layouts, not selectable as a
+// whole-screen renderer. Single source of truth for both pickers so they
+// can't drift (they each used to hardcode their own copy).
+export const PICKABLE_RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat', 'canvas', 'webgl'];
+
 // Per-layout pane composition, all static. Each layout has:
 //
 //   grid     — pane positioning model, written to `body.dataset.grid`.

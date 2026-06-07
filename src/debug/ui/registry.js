@@ -35,6 +35,7 @@ import { enterAttract } from '../../game/attract.js';
 import { app } from '../../app.js';
 import { layers } from '../features/layers.js';
 import { canvasStats } from '../../renderer/canvas/renderer.js';
+import { PICKABLE_RENDERERS } from '../../renderer/manager.js';
 
 export const SETTINGS = [
     // ── Game ── JS flags read by physics / AI each tick ───────────────────
@@ -66,7 +67,7 @@ export const SETTINGS = [
     { section: 'Effects', kind: 'css', class: 'all-enemies-shadow', label: 'All enemies shadow', default: false, rendererType: 'dom' },
 
     // ── Renderer ── select swaps the SP renderer; the rest gate by type ────
-    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: ['dom', 'flat', 'shade', 'lighting', 'line', 'cat', 'canvas'] },
+    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS },
     // Canvas frame-time / size overlay — only the canvas renderer draws it.
     { section: 'Renderer', kind: 'flag', target: canvasStats, key: 'enabled', label: 'Stats', rendererType: 'canvas' },
     // Layer visibility — the SAME features/layers.js objects the console drives

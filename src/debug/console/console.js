@@ -22,6 +22,7 @@ import { freeze, unfreeze } from '../features/freeze.js';
 import { position as positionCmds, world as worldCmds } from '../features/world.js';
 import { openDebugMenu } from '../ui/panel.js';
 import { switchRenderer } from '../features/renderer.js';
+import { PICKABLE_RENDERERS as RENDERERS } from '../../renderer/manager.js';
 import { setSpectator } from '../features/spectator.js';
 import * as loadout from '../features/loadout.js';
 
@@ -143,7 +144,6 @@ cull.all = flags.cullAll;
 //     show the stepped animation (see features/spritesheet.js). camera.* is the
 //     view-relative orbit, wired above.
 const view = group('view');
-const RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat', 'canvas'];
 view.renderer = (kind) => {
     if (kind == null) {
         console.log(`renderer: ${document.body.dataset.renderer || RENDERERS[0]} — options: ${RENDERERS.join(', ')}`);
