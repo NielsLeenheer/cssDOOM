@@ -29,6 +29,7 @@ import {
     PLAYER_ANIM, PLAYER_CORPSE_VARIANT,
     BARREL_FRAMES, PUFF_FRAMES, EXPLOSION_FRAMES, TFOG_FRAMES,
 } from './tables.js';
+import { glowParams } from '../../shared/maps/index.js';
 
 // Command method names the renderer forwards to the Scene. Listed here
 // (next to the implementations) so software.js can install the forwarders
@@ -109,12 +110,24 @@ export class Scene {
         for (const sp of this.sectorPolygons) {
             const eff = LIGHT_EFFECT[sp.specialType];
             if (!eff) continue;
-            this._lightSectors.push({
+            const entry = {
                 sectorIndex: sp.sectorIndex,
                 type: eff.type,
                 phase: eff.sync ? 0 : Math.random() * 10,
                 seed: (sp.sectorIndex * 2654435761) >>> 0,
-            });
+            };
+            if (eff.type === 'glow') {
+                // DOOM T_Glow: oscillate the LIGHT LEVEL between maxlight and
+                // the darkest neighbour at GLOWSPEED — a per-sector range +
+                // speed. minMul is min/max so `lightLevel * mul` reproduces
+                // the level; phase 0 because DOOM spawns every glow at max in
+                // lock-step (so adjacent glow sectors pulse together).
+                const gp = glowParams(sp.sectorIndex);
+                entry.minMul = gp && gp.max > 0 ? gp.min / gp.max : 1;
+                entry.period = gp ? gp.period : 0;
+                entry.phase = 0;
+            }
+            this._lightSectors.push(entry);
         }
 
         this.statics = [];

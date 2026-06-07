@@ -187,6 +187,11 @@ export class GLEngine {
         // the DOM keyframes that override --light, rather than the static
         // colormap brightness.
         this._specialSectors = new Set(this.scene._lightSectors.map(e => e.sectorIndex));
+        // Glow is the exception: it oscillates the light LEVEL (DOOM T_Glow),
+        // so the colormap is applied to the effective level (dims to
+        // doomLight(min)) rather than using the multiplier as the brightness.
+        this._glowSectors = new Set(
+            this.scene._lightSectors.filter(e => e.type === 'glow').map(e => e.sectorIndex));
     }
 
     clear() {
@@ -239,7 +244,10 @@ export class GLEngine {
      *  static colormap brightness for its light level. */
     _sectorBrightness(sectorIndex, lightLevel) {
         if (this._specialSectors && this._specialSectors.has(sectorIndex)) {
-            return this.scene._sectorLightMul[sectorIndex] ?? 1;
+            const mul = this.scene._sectorLightMul[sectorIndex] ?? 1;
+            // Glow modulates the light level → apply the colormap to it; the
+            // other specials drive --light directly (absolute brightness).
+            return this._glowSectors.has(sectorIndex) ? doomLight(lightLevel * mul) : mul;
         }
         return doomLight(lightLevel);
     }

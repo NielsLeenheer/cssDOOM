@@ -127,7 +127,16 @@ export function hashRnd(a, b) {
 export function lightMul(e, t) {
     const p = t + e.phase;
     switch (e.type) {
-        case 'glow':      return 0.75 + 0.25 * (0.5 - 0.5 * Math.cos(p * Math.PI)); // ~2s
+        case 'glow': {
+            // DOOM T_Glow: a linear triangle on the light LEVEL between
+            // maxlight (mul 1) and the darkest neighbour (mul = minMul),
+            // GLOWSPEED units/tic — period precomputed per sector. The
+            // renderer applies the colormap to `lightLevel * mul`, so this
+            // dims to doomLight(min). period 0 = no darker neighbour → static.
+            if (!e.period) return 1;
+            const s = Math.abs(1 - 2 * ((p / e.period) % 1)); // 1 at ends, 0 at mid
+            return e.minMul + (1 - e.minMul) * s;
+        }
         case 'blink':     return (p % 1) < 0.5 ? 1 : 0.5;                            // 1s
         case 'blinkfast': return (p % 0.5) < 0.25 ? 1 : 0.5;                         // 0.5s
         case 'flicker':   return hashRnd(e.seed, (t * 10) | 0) < 0.5 ? 1 : 0.5;

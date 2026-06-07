@@ -106,3 +106,44 @@ export function sectorCenter(sectorIndex) {
     }
     return n ? { x: cx / n, y: cy / n } : null;
 }
+
+// ── Glowing-light sectors (DOOM special 8) ────────────────────────
+
+// DOOM's T_Glow oscillates a sector's light level between its own value
+// (maxlight) and the lowest light among the sectors it shares a linedef
+// with (minlight), moving GLOWSPEED (8) units per tic at 35 tics/sec — a
+// linear triangle wave. So the darkness and speed are map-driven, not a
+// fixed fraction. We surface the parameters so every renderer animates the
+// same per-sector glow (canvas/webgl drive a level multiplier, the DOM sets
+// per-container CSS custom properties). Based on: linuxdoom-1.10/p_lights.c
+// (P_SpawnGlowingLight, T_Glow, P_FindMinSurroundingLight).
+const GLOW_UNITS_PER_SEC = 8 * 35;   // GLOWSPEED × TICRATE
+
+/**
+ * Glow parameters for a sector: `{ min, max, period }` where `period` is the
+ * full max→min→max cycle in seconds. `period` is 0 when the sector has no
+ * darker neighbour (max === min — no visible glow). Returns null if the
+ * sector or map geometry is missing.
+ */
+export function glowParams(sectorIndex) {
+    const sectors = mapData?.sectors;
+    const sector = sectors?.[sectorIndex];
+    if (!sector) return null;
+    const max = sector.lightLevel;
+    let min = max;
+    const linedefs = mapData.linedefs || [];
+    const sidedefs = mapData.sidedefs || [];
+    for (const line of linedefs) {
+        const front = line.frontSidedef >= 0 ? sidedefs[line.frontSidedef]?.sectorIndex : -1;
+        const back = line.backSidedef >= 0 ? sidedefs[line.backSidedef]?.sectorIndex : -1;
+        let other = -1;
+        if (front === sectorIndex && back >= 0) other = back;
+        else if (back === sectorIndex && front >= 0) other = front;
+        if (other < 0) continue;
+        const lvl = sectors[other]?.lightLevel;
+        if (lvl != null && lvl < min) min = lvl;
+    }
+    // period is the FULL max→min→max cycle: GLOWSPEED traverses the range
+    // once each way, so 2×range / units-per-sec.
+    return { min, max, period: 2 * (max - min) / GLOW_UNITS_PER_SEC };
+}
