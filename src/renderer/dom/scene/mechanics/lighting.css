@@ -1,8 +1,13 @@
 /* Sector Light Effects */
 
+/* DOOM T_Glow is a linear triangle (constant GLOWSPEED) between the
+   sector's light and its darkest neighbour. A single keyframe can't carry
+   each sector's own range/speed, so this is a fixed approximation tuned to
+   the common case (e.g. E1M1 44/45: 255↔128 ⇒ brightness 1↔0.25 over
+   ~0.9s); the canvas/webgl renderers do it per-sector. */
 @keyframes light-glow {
-    0%, 100% { --light: 0.75; }
-    50%      { --light: 1; }
+    0%, 100% { --light: 1; }
+    50%      { --light: 0.25; }
 }
 
 @keyframes light-blink {
@@ -41,7 +46,7 @@
 
 /* Sector light effects are on by default; the debug menu disables them by
    adding body.no-sector-lights (see debug/ui/registry.js). */
-.light-glow { animation: light-glow 1s ease-in-out infinite; }
+.light-glow { animation: light-glow 0.9s linear infinite; }
 .light-blink { animation: light-blink 1s steps(1) infinite; }
 .light-blink-fast { animation: light-blink-fast 0.5s steps(1) infinite; }
 .light-flicker { animation: light-flicker 2s steps(1) infinite; }
