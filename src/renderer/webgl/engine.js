@@ -40,7 +40,6 @@ import { getWallTexture, getFlatTexture, clearTextureCache } from './textures.js
 
 import { Scene, SCENE_COMMANDS } from '../canvas/scene.js';
 import { commandMethods } from '../canvas/commands.js';
-import { NEAR } from '../canvas/tables.js';
 
 import { skyPassMethods } from './passes/sky.js';
 import { wallPassMethods } from './passes/walls.js';
@@ -49,6 +48,13 @@ import { entityPassMethods } from './passes/entities.js';
 import { overlayMethods } from './overlay.js';
 
 const FAR = 20000;   // depth far plane — generously past any map extent
+// Near plane, in world units. Kept small so a wall doesn't blink out when
+// the camera is pressed right up against it (the GPU clips any geometry
+// nearer than this; at the old value of 4 a wall you stood flush against —
+// e.g. a lift's back wall, where collision lets you reach it — fell wholly
+// inside the near plane and vanished). 1 unit still leaves ample depth
+// precision against FAR for a DOOM-scale map.
+const NEAR_PLANE = 1;
 
 // HUD scale (source-pixels → CSS-pixels), like the DomRenderer's `--scale`.
 // The DOM steps 2→3 at a 1280px-wide pane; we use the same min/max but ramp
@@ -128,8 +134,8 @@ export class GLEngine {
         // Per-frame transients.
         this._cam = null;
         this._aspect = 1;
-        this._A = (FAR + NEAR) / (FAR - NEAR);
-        this._B = -2 * FAR * NEAR / (FAR - NEAR);
+        this._A = (FAR + NEAR_PLANE) / (FAR - NEAR_PLANE);
+        this._B = -2 * FAR * NEAR_PLANE / (FAR - NEAR_PLANE);
         this._lastFrameTime = 0;
         this._bobX = 0; this._bobY = 0;
         this._lastCamX = null; this._lastCamY = null;
