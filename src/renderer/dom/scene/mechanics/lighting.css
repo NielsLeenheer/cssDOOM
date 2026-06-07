@@ -44,9 +44,12 @@
     74%, 100%{ --light: 1; }
 }
 
-/* Sector light effects are on by default; the debug menu disables them by
-   adding body.no-sector-lights (see debug/ui/registry.js). */
-.light-glow { animation: light-glow 0.9s linear infinite; }
+/* Light glow is applied to the wall, floor and ceiling, due to a rendering 
+   problem in Firefox where animating the light level on a parent sector container doesn't
+  update the brightness of child elements with their own light level animation. */
+
+.light-glow :is(.wall, .floor, .ceiling, .decoration) { animation: light-glow 0.9s linear infinite; }
+
 .light-blink { animation: light-blink 1s steps(1) infinite; }
 .light-blink-fast { animation: light-blink-fast 0.5s steps(1) infinite; }
 .light-flicker { animation: light-flicker 2s steps(1) infinite; }
