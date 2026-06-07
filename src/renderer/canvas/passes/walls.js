@@ -14,6 +14,7 @@ import { animName, NEAR, lightFor, shade, skyCol, skyRow } from '../tables.js';
 export const wallMethods = {
     _renderWalls(cam) {
         const scene = this.scene;
+        if (!this._unpegged) this._buildWallPegging();
         for (const wall of scene.walls) {
             // Lift boundary walls are drawn by _renderLiftWalls at the
             // animated platform height; skip them here so the static and
@@ -22,15 +23,15 @@ export const wallMethods = {
             const tex = getWallTexture(animName(wall.texture, scene._animFrame));
             if (!tex) continue;
 
-            // Door panels raise their bottom edge as the door opens;
-            // track jambs override their (zero) top to the travel span.
+            // Door panels raise their visible bottom edge as the door opens
+            // (bottomOffset); track jambs override their (zero) top. Door
+            // panels are unpegged, so pinning the texture to the rising
+            // bottom (see _drawWall) slides it up on its own — the yOffset
+            // stays the wall's own, no bottomOffset folded in. Matches WebGL/DOM.
             const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
             const wallBottom = wall.bottomHeight + bottomOffset;
             const wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
-            // Adding the door's rise to the vertical texture offset pins
-            // the panel texture to its moving bottom edge, so the door
-            // texture slides up with the panel instead of squashing.
-            const yOff = (wall.yOffset || 0) + bottomOffset;
+            const yOff = wall.yOffset || 0;
             const light = wall.lightLevel * (scene._sectorLightMul[wall.sectorIndex] ?? 1);
 
             // If this wall reaches its sector's sky ceiling, the area above
@@ -39,8 +40,23 @@ export const wallMethods = {
             const skyCeil = scene._skyCeil.get(wall.sectorIndex);
             const skyAbove = skyCeil !== undefined && Math.abs(wallTop - skyCeil) < 1;
 
-            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light, false, skyAbove);
+            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light, false, skyAbove, this._unpegged.has(wall));
         }
+    },
+
+    /**
+     * Mark walls whose texture pins to the wall bottom (lower-unpegged),
+     * mirroring the WebGL/DOM renderers: ML_DONTPEGBOTTOM walls
+     * (`wall.isUnpegged`), every door face, and every door track jamb (the
+     * walls carrying a top override). Lift shaft walls pass the flag directly
+     * from `_renderLiftWalls`. Rebuilt per scene (invalidated on setMap/clear).
+     */
+    _buildWallPegging() {
+        const scene = this.scene;
+        const set = this._unpegged = new Set();
+        for (const w of scene.walls) if (w.isUnpegged) set.add(w);
+        for (const door of scene.doors.values()) for (const w of door.faceWalls) set.add(w);
+        for (const w of scene._wallTopOverride.keys()) set.add(w);
     },
 
     /**
@@ -54,19 +70,28 @@ export const wallMethods = {
             for (const wall of lift.shaftWalls) {
                 const tex = getWallTexture(wall.texture);
                 if (!tex || tex.width <= 1) continue;
-                let bottom, top;
+                let bottom, top, unpegged, yOff;
                 if (wall.isPlatformFace) {
                     const nf = wall.neighborFloor ?? lift.lower;
                     bottom = Math.min(lift.current, nf);
                     top = Math.max(lift.current, nf);
+                    // Pin the face texture to the platform top so it rides down
+                    // with the lift (the DOM translates a full-height panel
+                    // pinned to the platform — top-pegging offset by the full
+                    // panel height so the texel at the platform matches). Matches WebGL.
+                    const fullH = lift.upper - Math.min(nf, lift.lower);
+                    unpegged = false;
+                    yOff = (wall.yOffset || 0) - fullH;
                 } else {
                     bottom = wall.neighborFloor !== undefined
                         ? Math.min(wall.neighborFloor, lift.lower) : lift.lower;
                     top = lift.upper;
+                    unpegged = true;                 // static shaft sides
+                    yOff = wall.yOffset || 0;
                 }
                 if (top - bottom < 0.5) continue;
                 const light = wall.lightLevel ?? lift.light;
-                this._drawWall(cam, wall, tex, bottom, top, wall.yOffset || 0, light, true);
+                this._drawWall(cam, wall, tex, bottom, top, yOff, light, true, false, unpegged);
             }
         }
     },
@@ -76,7 +101,7 @@ export const wallMethods = {
      * camera space, near-plane clip, project, then fill each screen
      * column with a perspective-correct textured strip, depth-tested.
      */
-    _drawWall(cam, wall, tex, wallBottom, wallTop, yOff, baseLight, noCull = false, skyAbove = false) {
+    _drawWall(cam, wall, tex, wallBottom, wallTop, yOff, baseLight, noCull = false, skyAbove = false, unpegged = false) {
         const { W, H, fb, zb } = this.framebuffer;
         const { ex, ey, ez, ca, sa, halfW, halfH, sxScale, syScale } = cam;
 
@@ -145,6 +170,12 @@ export const wallMethods = {
         const span = p2 - p1 || 1e-6;
         const texW = tex.width, texH = tex.height, tdata = tex.data;
         const wallH = wallTop - wallBottom;
+        // Vertical texel reference. Top-pegged (default): yOff at the top
+        // running to yOff+wallH at the bottom. Lower-unpegged (door faces,
+        // door tracks, ML_DONTPEGBOTTOM, lift sides): pin the texture's
+        // bottom to the wall bottom instead — yOff−wallH at the top, yOff at
+        // the bottom (REPEAT-wrapped). Matches the WebGL/DOM renderers.
+        const vBase = unpegged ? yOff - wallH : yOff;
 
         // Flat per-sector brightness — matches the DomRenderer / WebGL light
         // model (doomLight); constant across the wall, so resolve it once.
@@ -192,7 +223,7 @@ export const wallMethods = {
                 const idx = y * W + x;
                 if (cy >= zb[idx]) continue;
                 const frac = (y + 0.5 - ytop) * invColH;
-                let v = frac * wallH + yOff;
+                let v = frac * wallH + vBase;
                 v %= texH;
                 if (v < 0) v += texH;
                 let texY = v | 0;

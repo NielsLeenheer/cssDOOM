@@ -119,10 +119,10 @@ export class SoftwareRenderer {
     }
 
     /** Ingest the shared, already-enriched map data into the scene. */
-    setMap(data) { this.scene.setMap(data); }
+    setMap(data) { this.scene.setMap(data); this._unpegged = null; }
 
     /** Drop the scene — used when the pane is torn down / between levels. */
-    clear() { this.scene.clear(); }
+    clear() { this.scene.clear(); this._unpegged = null; }
 
     // ── Per-frame entry point ────────────────────────────────────────────
 
