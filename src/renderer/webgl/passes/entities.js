@@ -7,9 +7,9 @@
  * A billboard is a vertical quad whose width runs along the camera's
  * world-space right vector (cos, sin of the view yaw) and whose height
  * runs up the world Z axis — so it always faces the viewer but stays
- * upright. Sprites are pulled a couple of world units toward the camera
- * (the shared shader's `u_zbias`) so they sit cleanly in front of the
- * floor they stand on instead of z-fighting it.
+ * upright. A small glPolygonOffset nudges sprites toward the camera in
+ * depth-buffer space so they sit cleanly in front of the floor they stand
+ * on without bleeding through nearby walls.
  */
 
 import { getSpriteTexture } from '../textures.js';
@@ -26,13 +26,17 @@ export const entityPassMethods = {
         const prog = this.worldProgram;
         prog.use();
         this._setCameraUniforms(prog);
-        gl.uniform1f(prog.u('u_zbias'), 2);
         gl.uniform1f(prog.u('u_uvWorld'), 0);
         gl.uniform2f(prog.u('u_texSize'), 1, 1);
         gl.uniform1i(prog.u('u_tex'), 0);
         gl.activeTexture(gl.TEXTURE0);
         gl.enable(gl.DEPTH_TEST);
         gl.disable(gl.STENCIL_TEST);
+        // A tiny depth-space nudge toward the camera so a billboard wins the
+        // z-fight against the floor it stands on, without the world-space
+        // bias that would let it bleed through nearby walls.
+        gl.enable(gl.POLYGON_OFFSET_FILL);
+        gl.polygonOffset(-1, -2);
 
         // Static decorations + corpses (some decorations idle-animate).
         for (const s of scene.statics) {
@@ -71,6 +75,8 @@ export const entityPassMethods = {
             const tex = getSpriteTexture(gl, fx.frames[frame]);
             if (tex && tex.width > 1) this._drawBillboard(cam, fx.x, fx.y, fx.z, tex, 250, false, fx.centered);
         }
+
+        gl.disable(gl.POLYGON_OFFSET_FILL);
     },
 
     /** Current sprite frame + mirror flag for a thing entry (identical

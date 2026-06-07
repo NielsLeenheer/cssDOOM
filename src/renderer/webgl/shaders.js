@@ -11,12 +11,11 @@
  *     vx =  (p - eye)·(cos, sin)          // screen-right
  *     vz = -(p - eye)·(sin,-cos)          // forward (becomes clip w)
  *     vy =  p.z - eye.z                   // up
- *     clip = vec4(vx, vy*aspect, A*(vz - zbias) + B, vz)
+ *     clip = vec4(vx, vy*aspect, A*vz + B, vz)
  *
- * with aspect = W/H and A,B the usual near/far depth remap. `zbias`
- * pulls billboards a couple of world units toward the camera so a sprite
- * sits cleanly in front of the floor it stands on (the canvas renderer's
- * "+2 lenience" in the depth test).
+ * with aspect = W/H and A,B the usual near/far depth remap. (Sprites are
+ * kept just in front of the floor with a glPolygonOffset in the entity
+ * pass, not a world-space depth bias — see passes/entities.js.)
  *
  * Lighting is a single 0..1 brightness multiplier on the texel, computed
  * per surface on the CPU to match the DomRenderer exactly: a flat
@@ -43,7 +42,6 @@ uniform vec3 u_eye;
 uniform vec2 u_rot;     // cos(angle), sin(angle)
 uniform float u_aspect; // W/H
 uniform float u_A, u_B; // depth remap
-uniform float u_zbias;
 out vec2 v_uv;
 out float v_light;
 void main() {
@@ -54,11 +52,11 @@ void main() {
     float vy =  a_pos.z - u_eye.z;
     v_uv = a_uv;
     v_light = a_light;
-    // Sprites pass u_zbias>0 to pull their depth a couple of world units
-    // toward the camera (so a billboard sits in front of the floor it
-    // stands on). Walls/flats pass 0 so they project exactly — biasing
-    // them would shift where they cross the near plane.
-    gl_Position = vec4(vx, vy * u_aspect, u_A * (vz - u_zbias) + u_B, vz);
+    // Project exactly. (Sprites get a tiny depth nudge toward the camera
+    // via glPolygonOffset in the entity pass, not a world-space z bias:
+    // because the far plane is huge, a world-unit bias here would act as a
+    // ~20% depth lenience and punch sprites through nearby walls.)
+    gl_Position = vec4(vx, vy * u_aspect, u_A * vz + u_B, vz);
 }`;
 
 export const WORLD_FS = /* glsl */`#version 300 es

@@ -101,7 +101,6 @@ export const wallPassMethods = {
         const prog = this.worldProgram;
         prog.use();
         this._setCameraUniforms(prog);
-        gl.uniform1f(prog.u('u_zbias'), 0);
         gl.uniform1f(prog.u('u_uvWorld'), 1);
         gl.uniform1i(prog.u('u_tex'), 0);
         gl.activeTexture(gl.TEXTURE0);
