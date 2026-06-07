@@ -50,6 +50,17 @@ import { overlayMethods } from './overlay.js';
 
 const FAR = 20000;   // depth far plane — generously past any map extent
 
+// HUD scale, in source-pixels → CSS-pixels, derived from the pane WIDTH so
+// the status bar / weapon grow and shrink with the viewport (the
+// DomRenderer keys its `--scale` off pane width too). Unlike the DOM we
+// never wrap the bar into extra rows — it scales continuously instead. The
+// 320-wide bar lands at ~half the pane width (matching the DOM's --scale at
+// its 1280px→2 / 1920px→3 breakpoints), clamped so it neither overflows a
+// narrow pane nor balloons on an ultra-wide one.
+const HUD_WIDTH_DIVISOR = 640;
+const HUD_MIN_SCALE = 1;
+const HUD_MAX_SCALE = 4;
+
 // DomRenderer light model (scene/sectors.js::doomLightToCSS +
 // constants.js): a DOOM sector light level (0..255) maps through the
 // R_InitLightTables colormap selection to a flat 0..1 brightness, with a
@@ -100,10 +111,9 @@ export class GLEngine {
         // Drawing-buffer + overlay dimensions, set by resize().
         this.W = 0; this.H = 0;
         this.overlayW = 0; this.overlayH = 0;
-        // The overlay (HUD/weapon) scales below the world resolution so the
-        // bar/weapon stay relatively smaller as the world sharpens — same
-        // 1x→1, 2x→1, 3x→2, 4x→3 mapping the canvas renderer uses.
-        this.uiScale = Math.max(1, resolution - 1);
+        // HUD/weapon scale, recomputed from the pane width on every resize
+        // (see resize()). 1 until the first resize lands.
+        this.uiScale = 1;
 
         // Per-frame transients.
         this._cam = null;
@@ -129,6 +139,16 @@ export class GLEngine {
         if (maxIH * aspect <= maxIW) { ih = maxIH; iw = Math.max(1, Math.round(ih * aspect)); }
         else { iw = maxIW; ih = Math.max(1, Math.round(iw / aspect)); }
         this.overlayW = iw; this.overlayH = ih;
+
+        // HUD scale follows the pane width. `scaleCss` is the source→CSS-px
+        // factor (what the DOM's `--scale` is); convert it into overlay
+        // virtual units so the bar's on-screen size is `320 * scaleCss` CSS
+        // px regardless of the overlay resolution or device pixel ratio.
+        const dpr = window.devicePixelRatio || 1;
+        const paneWidthCss = W / dpr;
+        const scaleCss = Math.max(HUD_MIN_SCALE,
+            Math.min(HUD_MAX_SCALE, paneWidthCss / HUD_WIDTH_DIVISOR));
+        this.uiScale = scaleCss * this.overlayW / paneWidthCss;
     }
 
     setMap(data) {

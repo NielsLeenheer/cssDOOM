@@ -10,12 +10,14 @@
  * (`_solidFill`). The layout maths is unchanged, so the HUD lands
  * pixel-for-pixel where the canvas pane puts it.
  *
- * Everything is laid out in a virtual pixel space (`overlayW × overlayH`)
- * sized exactly like the canvas framebuffer (height = 200 × resolution,
- * width following the pane aspect), so the chunky bar/weapon keep the same
- * on-screen proportions as the canvas renderer. The blit shader samples
- * the source graphics with NEAREST, so the overlay stays as crunchy as
- * the world's textures even though the GL canvas itself is high-res.
+ * Everything is laid out in a virtual pixel space (`overlayW × overlayH`,
+ * height = 200 × resolution, width following the pane aspect); the
+ * full-screen screens draw at native 320×200 centred in it. The status bar
+ * and weapon scale with `this.uiScale`, which the engine recomputes from
+ * the pane WIDTH each resize so the HUD grows/shrinks with the viewport
+ * (continuously, never wrapping into rows like the DOM). The blit shader
+ * samples the source graphics with NEAREST, so the overlay stays as crunchy
+ * as the world's textures even though the GL canvas itself is high-res.
  */
 
 import {
