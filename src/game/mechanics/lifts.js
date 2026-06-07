@@ -23,6 +23,7 @@ import { USE_RANGE, LIFT_RAISE_DELAY, LIFT_USE_SPECIAL } from '../../shared/cons
 
 import { state } from '../state.js';
 import { mapData, sectorCenter } from '../../shared/maps/index.js';
+import { pointInPolygon } from '../geometry.js';
 import { orchestrator } from '../../orchestrator.js';
 import { isMatchLobby } from '../match.js';
 
@@ -46,14 +47,40 @@ export function initLiftsState() {
         // this, a player stepping off a raised lift would be trapped
         // within PLAYER_RADIUS of the edge: blocked forward by the
         // circle/edge overlap, blocked backward by the step-up height.
-        const centroid = sectorCenter(lift.sectorIndex);
+        //
+        // The interior side is found PER EDGE by probing just off the
+        // edge midpoint and testing point-in-polygon against the lift
+        // sector's own polygon(s). A single sector centroid (the previous
+        // approach) cannot sit on the interior side of every edge of a
+        // concave / multi-edge lift — for those, some edges got an
+        // inverted sign and blocked the static foot area instead of the
+        // shaft, trapping the player. Each collision edge is a boundary of
+        // the lift sector, so one side is inside the polygon and the other
+        // is the neighbour; point-in-polygon resolves it correctly for any
+        // shape. (sectorPolygons is a list keyed by `.sectorIndex`, not
+        // positionally indexed — a sector can span several entries.)
+        const liftPolys = (mapData.sectorPolygons || [])
+            .filter(p => p.sectorIndex === lift.sectorIndex)
+            .map(p => p.boundaries?.[0])
+            .filter(Boolean);
         const annotatedEdges = (lift.collisionEdges || []).map(e => {
             const dx = e.end.x - e.start.x;
             const dy = e.end.y - e.start.y;
+            const len = Math.hypot(dx, dy) || 1;
+            const nx = -dy / len, ny = dx / len; // unit normal to the edge
+            const mx = (e.start.x + e.end.x) / 2, my = (e.start.y + e.end.y) / 2;
             let insideSign = 0;
-            if (centroid) {
-                const s = (centroid.x - e.start.x) * dy - (centroid.y - e.start.y) * dx;
+            // Escalate the probe distance so a midpoint that sits in a
+            // concave notch still resolves to one side in, one side out.
+            for (const eps of [1, 4, 8]) {
+                const aIn = liftPolys.some(poly => pointInPolygon(mx + nx * eps, my + ny * eps, poly));
+                const bIn = liftPolys.some(poly => pointInPolygon(mx - nx * eps, my - ny * eps, poly));
+                if (aIn === bIn) continue;
+                const ix = aIn ? mx + nx * eps : mx - nx * eps;
+                const iy = aIn ? my + ny * eps : my - ny * eps;
+                const s = (ix - e.start.x) * dy - (iy - e.start.y) * dx;
                 insideSign = s > 0 ? 1 : (s < 0 ? -1 : 0);
+                break;
             }
             return { ...e, insideSign };
         });

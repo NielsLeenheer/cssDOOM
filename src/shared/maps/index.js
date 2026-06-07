@@ -75,18 +75,34 @@ export function getSecretExitMap() {
 
 /**
  * Approximate centroid of a sector — average of its outer-boundary
- * vertices. Used by audio dispatch to give sector-bound sounds (door
- * open/close, lift start/stop) a world position so positional audio
- * works. Good enough for convex / mildly-concave sectors typical in
- * DOOM E1; truly pathological concave shapes might miss but those
- * don't matter for audio. Returns `{x, y}` or null if the sector
- * has no polygon.
+ * vertices across every polygon that belongs to the sector. Used by
+ * audio dispatch to give sector-bound sounds (door open/close, lift
+ * start/stop) a world position, and by lifts.js to decide which side
+ * of a shaft edge is the lift interior (insideSign).
+ *
+ * `sectorPolygons` is a LIST keyed by each entry's `.sectorIndex`
+ * property — NOT positionally indexed — and a single sector can span
+ * multiple polygon entries (see floors.js, spatial-grid.js, which both
+ * match on `.sectorIndex`). Indexing the array by sectorIndex returns
+ * an unrelated sector: for ~80% of sectors in E1M2 the array position
+ * doesn't equal the `.sectorIndex`. That mis-resolution put a lift's
+ * centroid on the wrong side of its shaft edge, inverting insideSign
+ * and trapping players standing at the foot of a raised lift.
+ *
+ * Good enough for convex / mildly-concave sectors typical in DOOM E1;
+ * truly pathological concave shapes might miss but those don't matter
+ * for the consumers here. Returns `{x, y}` or null if the sector has
+ * no polygon.
  */
 export function sectorCenter(sectorIndex) {
-    const poly = mapData?.sectorPolygons?.[sectorIndex];
-    if (!poly?.boundaries?.[0]) return null;
-    const pts = poly.boundaries[0];
-    let cx = 0, cy = 0;
-    for (const p of pts) { cx += p.x; cy += p.y; }
-    return { x: cx / pts.length, y: cy / pts.length };
+    const polygons = mapData?.sectorPolygons;
+    if (!polygons) return null;
+    let cx = 0, cy = 0, n = 0;
+    for (const poly of polygons) {
+        if (poly?.sectorIndex !== sectorIndex) continue;
+        const pts = poly.boundaries?.[0];
+        if (!pts) continue;
+        for (const p of pts) { cx += p.x; cy += p.y; n++; }
+    }
+    return n ? { x: cx / n, y: cy / n } : null;
 }
