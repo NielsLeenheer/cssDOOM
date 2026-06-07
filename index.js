@@ -49,6 +49,10 @@ const exportFormat = params.get('export');
 if (layout) document.body.dataset.layout = layout;
 if (rendererKind) document.body.dataset.renderer = rendererKind;
 if (resolution) document.body.dataset.resolution = resolution;
+// `body.dev` marks a dev-server run (statically dropped from prod builds) so
+// CSS can adjust dev-only chrome — e.g. fading the auto-opened debug menu out
+// of the kiosk display (see viewport.css).
+if (import.meta.env.DEV) document.body.classList.add('dev');
 // `body.recording` is added later (in the player, after the
 // click-to-start overlay is dismissed) so the debug menu stays
 // reachable while the user configures the recording.

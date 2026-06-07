@@ -264,6 +264,22 @@ body[data-layout="kiosk"] #loading-overlay {
     opacity: 1;
 }
 
+/* Dev server in kiosk — the debug menu auto-opens, but it shouldn't sit over the
+   kiosk display while developing. Fade just the debug toggle out (hover / [open]
+   reveal it, same as the chrome above); the user-facing chrome is handled
+   separately in kiosk. Dev-only (body.dev) — in production the menu only exists
+   if you summon it, and then you want it fully visible. */
+body.dev[data-layout="kiosk"] #debug-menu {
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+body.dev[data-layout="kiosk"] #debug-menu:hover {
+    opacity: 0.4;
+}
+body.dev[data-layout="kiosk"] #debug-menu[open] {
+    opacity: 1;
+}
+
 /* ?export chrome — the captured video should be just the rendered
    scene. Drop the DOOM logo, action buttons, and debug toggle
    entirely via display:none (no need to keep them click-able
