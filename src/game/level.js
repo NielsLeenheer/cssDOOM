@@ -110,6 +110,19 @@ export class Level {
             await this.orchestrator.dispatch({ type: 'world', cmd: 'showLevelTransition', args: [] });
         }
 
+        // Clear the spatial grid BEFORE loading + enriching the new map.
+        // maps.load runs initThings, which resolves each thing's sector and
+        // floor height through forEachSectorAt → the spatial grid. A stale
+        // grid from the previous level finds nothing for the new map's
+        // coordinates, so every thing ends up at sectorIndex=undefined /
+        // floorHeight=0 — sinking barrels, pickups and enemies into the
+        // floor-0 plane on a level transition. With the grid cleared,
+        // forEachSectorAt falls back to mapData.sectorPolygons (which
+        // maps.load points at the new map before initThings runs), so
+        // enrichment resolves correctly. The grid is rebuilt for the new
+        // geometry below, once lift shaft walls etc. are set up.
+        if (!isInitialLoad) clearSpatialGrid();
+
         // Fetch + enrich mapData. Mutates `maps.mapData` and
         // `maps.currentMap`. State.* is NOT touched here — that's
         // the initThingsState / initDoorsState / etc. calls below.
@@ -129,7 +142,6 @@ export class Level {
         // Game-side teardown — renderer-side teardown (DOM clear +
         // iOS GPU-release yield) is owned by scene.loadMap and runs
         // there per-renderer.
-        if (!isInitialLoad) clearSpatialGrid();
 
         // Game-side state init: populates state.things, state.doorState,
         // state.liftState, state.crusherState from the enriched mapData.
