@@ -150,10 +150,27 @@ export function canMoveTo(newX, newY, radius = PLAYER_RADIUS, currentFloorHeight
         }
     }
 
-    // Block if the floor step up is too high or the drop down is too far
+    // Block if the floor step up is too high or the drop down is too far.
     const newFloorHeight = getFloorHeightAt(newX, newY);
-    if (newFloorHeight - currentFloorHeight > MAX_STEP_HEIGHT) return false;
     if (currentFloorHeight - newFloorHeight > maxDropHeight) return false;
+
+    // Step-up is tested at the mover's leading edge (one radius ahead in the
+    // direction of travel), not just the centre. Otherwise the centre can be
+    // pushed flush against a too-high step face — e.g. a lift's back riser —
+    // with the body overlapping it, which embeds the camera in that wall (it
+    // then clips through the near plane and the wall appears see-through).
+    // DOOM tests the whole bounding box against the linedef opening; sampling
+    // the leading edge is the cheap equivalent that keeps the eye out of the
+    // riser. Drops (walking off a ledge) still use the centre, so ledge edges
+    // remain reachable.
+    let stepUp = newFloorHeight - currentFloorHeight;
+    const mvX = newX - fromX, mvY = newY - fromY;
+    const mvLen = Math.hypot(mvX, mvY);
+    if (mvLen > 0.001) {
+        const aheadFloor = getFloorHeightAt(newX + (mvX / mvLen) * radius, newY + (mvY / mvLen) * radius);
+        stepUp = Math.max(stepUp, aheadFloor - currentFloorHeight);
+    }
+    if (stepUp > MAX_STEP_HEIGHT) return false;
     return true;
 }
 
