@@ -734,8 +734,15 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
 
     for (let i = 0; i < vertCount; i++) {
         if (edgeMask && !edgeMask[i]) continue;
-        const v1 = verts[i];
-        const v2 = verts[(i + 1) % vertCount];
+        let v1 = verts[i];
+        let v2 = verts[(i + 1) % vertCount];
+
+        // Orient far-vertex-first. A vertex clipped to the near plane has tiny
+        // depth and projects to a huge off-screen coordinate; processing it
+        // first makes screen-clipping + the 1/depth interpolation degenerate
+        // (the whole on-screen span collapses to ~nearPlane depth). Starting
+        // from the stable far vertex keeps per-sample depth correct.
+        if (v1.depth < v2.depth) { const tmp = v1; v1 = v2; v2 = tmp; }
 
         // Clip edge to screen bounds first
         const clipped = clipLineToScreen(v1.screenX, v1.screenY, v2.screenX, v2.screenY);
@@ -758,18 +765,12 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
         const clipDepth1 = 1 / clipW1;
         const clipDepth2 = 1 / clipW2;
 
-        // Detect edges with near-plane clipped vertices
-        const minDepth = Math.min(clipDepth1, clipDepth2);
-        const maxDepth = Math.max(clipDepth1, clipDepth2);
-
         // Skip "clipping cap" edges - both vertices at near plane means this edge
         // is an artifact of near-plane clipping, not real geometry
         const bothAtNearPlane = clipDepth1 < 1.0 && clipDepth2 < 1.0;
         if (bothAtNearPlane) continue;
 
-        const hasNearPlaneVertex = minDepth < 1.0;
-
-        const isCloseEdge = minDepth < 100;
+        const isCloseEdge = Math.min(clipDepth1, clipDepth2) < 100;
         const shouldDebugLog = debugCaptureEnabled && isCloseEdge;
 
         if (length < 1) {
@@ -815,15 +816,9 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
             const w = clipW1 + t * dW;
             const depth = 1 / w;
 
-            let visible;
-            if (hasNearPlaneVertex) {
-                // Edge crosses the near plane: per-sample depth is degenerate
-                // (perspective interpolation collapses almost the whole edge to
-                // ~nearPlane), so fall back to the far-vertex heuristic.
-                visible = isPointVisibleNearPlane(x, y, maxDepth, depthBuffer);
-            } else {
-                visible = isPointVisibleFast(x, y, depth, depthBuffer);
-            }
+            // Per-sample perspective-correct depth (stable now that edges are
+            // oriented far-vertex-first), tested against the depth buffer.
+            const visible = isPointVisibleFast(x, y, depth, depthBuffer);
             visibilityBuffer[s] = visible ? 1 : 0;
 
             // Collect debug data
@@ -979,61 +974,6 @@ function isPointVisibleFast(x, y, depth, depthBuffer) {
 
     const epsilon = depth * settings.depthEpsilon + 1.0;
     return depth <= bufferDepth + epsilon;
-}
-
-/**
- * Visibility check for near-plane clipped edges
- * Uses the far vertex depth since interpolated depths near the clipped end are artifacts.
- *
- * The challenge: near the clipping boundary, walls and floors can overlap in screen space
- * at similar depths. But columns (walls) that are genuinely in front have much smaller depths.
- *
- * Strategy:
- * - Use farDepth for occluder threshold: columns at <50% of farDepth are definite occluders
- * - Use generous epsilon for visibility: floor/ceiling depths similar to farDepth should pass
- */
-function isPointVisibleNearPlane(x, y, farDepth, depthBuffer) {
-    if (x < 0 || x >= DEPTH_WIDTH || y < 0 || y >= DEPTH_HEIGHT) return false;
-
-    const ix = (x + 0.5) | 0;
-    const iy = (y + 0.5) | 0;
-    const clampedX = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
-    const clampedY = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
-
-    const baseIdx = clampedY * DEPTH_WIDTH;
-    const bufferDepth = depthBuffer[baseIdx + clampedX];
-
-    // Occluder threshold: if something is at less than 50% of farDepth, it's a column/wall in front
-    const occluderThreshold = farDepth * 0.5;
-
-    // Check for definite occluders (columns, walls clearly in front)
-    if (bufferDepth < occluderThreshold) {
-        return false;
-    }
-
-    // Also check nearby pixels for occluders (catch narrow columns)
-    const searchRadius = 2;
-    const xMin = Math.max(0, clampedX - searchRadius);
-    const xMax = Math.min(DEPTH_WIDTH - 1, clampedX + searchRadius);
-    for (let sx = xMin; sx <= xMax; sx++) {
-        if (depthBuffer[baseIdx + sx] < occluderThreshold) {
-            return false;
-        }
-    }
-
-    // Generous epsilon for floor/ceiling overlap at frustum boundary
-    // Floors at 50-80% of farDepth should not occlude the wall edge
-    const epsilon = farDepth * 0.4 + 2.0;
-
-    if (farDepth <= bufferDepth + epsilon) {
-        return true;
-    }
-
-    // Check immediate neighbors for polygon boundary seams
-    if (clampedX > 0 && farDepth <= depthBuffer[baseIdx + clampedX - 1] + epsilon) return true;
-    if (clampedX < DEPTH_WIDTH - 1 && farDepth <= depthBuffer[baseIdx + clampedX + 1] + epsilon) return true;
-
-    return false;
 }
 
 /**
