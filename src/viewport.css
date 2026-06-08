@@ -192,10 +192,14 @@ body[data-grid="tiled"] .pane[data-slot="3"] { top: 50vh; left: 50vw; }
 #loading-overlay {
     position: fixed;
     inset: 0;
+    /* Integer multiple of the 82×40 source so the pixelated logo scales
+       crisply. Drives background-size, the kiosk re-centre, and the status
+       offset below — change here only. */
+    --splash-logo-scale: 3;
     background: black url('/assets/menu/M_DOOM.png') no-repeat center;
     background-size:
-        calc(82px * 4 * var(--screen-scale, 1))
-        calc(40px * 4 * var(--screen-scale, 1));
+        calc(82px * var(--splash-logo-scale) * var(--screen-scale, 1))
+        calc(40px * var(--splash-logo-scale) * var(--screen-scale, 1));
     image-rendering: pixelated;
     z-index: 10000;
     pointer-events: none;
@@ -215,11 +219,11 @@ body[data-grid="tiled"] .pane[data-slot="3"] { top: 50vh; left: 50vw; }
    with the splash when the joiner finishes booting.
 
    Positioned at vertical center + the logo's half-height
-   (40 source px × 4 / 2 = 80 px at scale 1) + a small gap, so it
+   (40 source px × --splash-logo-scale / 2) + a 30px gap, so it
    sits just under the logo at every scale. */
 #loading-status {
     position: absolute;
-    top: calc(50% + 110px * var(--screen-scale, 1));
+    top: calc(50% + (20px * var(--splash-logo-scale) + 30px) * var(--screen-scale, 1));
     left: 0;
     right: 0;
     text-align: center;
@@ -243,7 +247,7 @@ body[data-grid="tiled"] .pane[data-slot="3"] { top: 50vh; left: 50vw; }
    the physical wall. */
 body[data-layout="kiosk"] #loading-overlay {
     bottom: 50vh;
-    background-position-x: calc(25vw - 82px * 4 * var(--screen-scale, 1) / 2);
+    background-position-x: calc(25vw - 82px * var(--splash-logo-scale) * var(--screen-scale, 1) / 2);
 }
 
 /* Kiosk controls screen — a third monitor bolted onto the wall shows the
