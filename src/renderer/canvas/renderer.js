@@ -254,12 +254,15 @@ export class CanvasRenderer extends RendererBase {
         ctx.save();
         ctx.font = `${12 * dpr}px monospace`;
         ctx.textBaseline = 'top';
+        ctx.textAlign = 'center';
         const text = `${this.resolution}x  ${this.internalCanvas.width}×${this.internalCanvas.height}  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
+        const cx = this.canvas.width / 2;
         const m = ctx.measureText(text);
+        const padX = 6 * dpr;
         ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-        ctx.fillRect(0, 0, m.width + 12 * dpr, 18 * dpr);
+        ctx.fillRect(cx - m.width / 2 - padX, 0, m.width + padX * 2, 18 * dpr);
         ctx.fillStyle = '#ffdd55';
-        ctx.fillText(text, 6 * dpr, 3 * dpr);
+        ctx.fillText(text, cx, 3 * dpr);
         ctx.restore();
     }
 
