@@ -27,6 +27,16 @@ import { canvasStats } from '../canvas/renderer.js';
 // reports both counts regardless of which one is painted.
 export const lineReduction = { merge: true };
 
+// Scene-geometry toggles, shared across LineRenderer instances and applied to
+// the scene each frame. Exposed in the debug panel (Renderer section) so the
+// hidden-line behaviour can be compared live:
+//   cullInteriorFaces       — drop wall quads buried below their sector floor /
+//                             above its ceiling (kills back-side leak stubs).
+//   drawFloorCeilingOutlines — draw sector floor/ceiling boundaries, so room and
+//                             platform outlines stay complete even where the
+//                             walls that would form them are back-face culled.
+export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: true };
+
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
 // treats `fov` as the horizontal field of view. cssDOOM's CSS
@@ -210,6 +220,9 @@ export class LineRenderer extends RendererBase {
             ...CAMERA_DEFAULTS,
         };
         const t0 = performance.now();
+        // Push the live scene-geometry toggles (cheap Object.assign; no depth
+        // realloc since dimensions are unchanged here — those come from _resize).
+        setRendererSettings(lineScene);
         const rawLines = renderScene3D(this._walls, camera, this._sectorPolygons);
         // Reduce redundant strokes before painting (cheaper for a real
         // oscilloscope to draw). Two passes, switchable for live A/B:

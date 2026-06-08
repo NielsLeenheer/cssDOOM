@@ -14,15 +14,25 @@ let settings = {
     debugDisableDepthTest: false,  // When true, shows all edges without visibility testing
     debugDisableBackfaceCull: false,  // When true, skips back-face culling
 
-    // Drop wall quads that sit at/below their own sector's floor or at/above its
-    // ceiling. Two-sided portals (steps, pillar risers, lifts) generate a quad
-    // for BOTH sidedefs; the higher sector's copy is an interior face buried in
-    // solid geometry — never a real visible surface. Back-face culling keeps
-    // whichever copy faces the camera, so on the *far* side of a riser it keeps
-    // the buried interior face, which then leaks short stubs through the depth
-    // buffer at shared corners. Culling these by sector height removes the leak
-    // at the source (and trims redundant geometry).
-    cullInteriorFaces: true
+    // Drop wall quads that sit at/below their own sector's floor or at/above
+    // its ceiling. Two-sided portals (steps, pillar risers, lifts) generate a
+    // quad for BOTH sidedefs; the higher sector's copy is an interior face
+    // buried in solid geometry — never a real visible surface. Back-face
+    // culling keeps whichever copy faces the camera, so on the *far* side of a
+    // riser it keeps the buried interior face, which then leaks short stubs
+    // through the depth buffer at shared corners. Culling these by sector
+    // height removes the leak at the source (and trims redundant geometry).
+    cullInteriorFaces: true,
+
+    // Extract edges from floor/ceiling polygons too (not just walls). The
+    // sector boundaries ARE the floor/ceiling outlines; drawing them gives the
+    // complete room/platform perimeter regardless of which walls are back-face
+    // culled (e.g. the full octagon top, far room edges). Pairs with
+    // cullInteriorFaces: the cull removes buried wall faces (and their leaks),
+    // the outlines restore every horizontal silhouette from the actual sector
+    // geometry. Floors/ceilings are already rasterized for depth, so occluded
+    // outline portions are hidden by the same visibility test as walls.
+    drawFloorCeilingOutlines: true
 };
 
 // Current depth buffer dimensions
@@ -282,9 +292,10 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
     }
     for (let p = 0; p < transformedPool.length; p++) {
         const poly = transformedPool[p];
-        // Skip edge extraction for floors/ceilings - they're only used for depth occlusion
-        // Their edges would incorrectly appear through floors above them due to depth-buffer limitations
-        if (poly.type === 'floor' || poly.type === 'ceiling') continue;
+        // Skip edge extraction for floors/ceilings unless explicitly enabled.
+        // They're always rasterized for depth occlusion; their edges are only
+        // drawn when drawFloorCeilingOutlines is set (see settings).
+        if ((poly.type === 'floor' || poly.type === 'ceiling') && !settings.drawFloorCeilingOutlines) continue;
         debugCurrentPolyType = poly.type || 'unknown';
         extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool);
     }
