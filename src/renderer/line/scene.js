@@ -14,6 +14,12 @@ let settings = {
     debugDisableDepthTest: false,  // When true, shows all edges without visibility testing
     debugDisableBackfaceCull: false,  // When true, skips back-face culling
 
+    // Depth-test tolerance: an edge sample is visible if its depth <=
+    // bufferDepth + depth*depthEpsilon + 1. Covers the small 1D-edge vs
+    // 2D-rasterised depth mismatch for coplanar surfaces. Lower = tighter
+    // (fewer leaked stubs, but risks clipping coplanar edges); higher = looser.
+    depthEpsilon: 0.04,
+
     // Drop wall quads that sit at/below their own sector's floor or at/above
     // its ceiling. Two-sided portals (steps, pillar risers, lifts) generate a
     // quad for BOTH sidedefs; the higher sector's copy is an interior face
@@ -811,9 +817,9 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
 
             let visible;
             if (hasNearPlaneVertex) {
-                // For edges with a near-plane clipped vertex, use the far vertex depth for visibility.
-                // The interpolated depth near the clipped end is an artifact (perspective-correct
-                // interpolation keeps it tiny), so we use maxDepth which represents the real geometry.
+                // Edge crosses the near plane: per-sample depth is degenerate
+                // (perspective interpolation collapses almost the whole edge to
+                // ~nearPlane), so fall back to the far-vertex heuristic.
                 visible = isPointVisibleNearPlane(x, y, maxDepth, depthBuffer);
             } else {
                 visible = isPointVisibleFast(x, y, depth, depthBuffer);
@@ -945,8 +951,15 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
 }
 
 /**
- * Fast point visibility check (inlined math)
- * Checks for nearby occluders (narrow pillars etc) that might be missed by point sampling
+ * Point visibility check against the depth buffer.
+ *
+ * Visible iff the edge sample is at or in front of the rasterised surface at its
+ * pixel. `epsilon` (settings.depthEpsilon) tolerates the small mismatch between
+ * an edge's 1D perspective-interpolated depth and the surface's 2D-rasterised
+ * depth for coplanar geometry (floor/wall junctions); a genuine occluder sits
+ * far closer, so it still culls. No neighbour/`searchRadius` probing — those
+ * over-culled edges next to occluders (clipping visible floor lines short) and
+ * leaked stubs across polygon seams.
  */
 function isPointVisibleFast(x, y, depth, depthBuffer) {
     if (x < 0 || x >= DEPTH_WIDTH || y < 0 || y >= DEPTH_HEIGHT) return false;
@@ -956,54 +969,16 @@ function isPointVisibleFast(x, y, depth, depthBuffer) {
     const clampedX = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
     const clampedY = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
 
-    const baseIdx = clampedY * DEPTH_WIDTH;
-    const bufferDepth = depthBuffer[baseIdx + clampedX];
+    const bufferDepth = depthBuffer[clampedY * DEPTH_WIDTH + clampedX];
 
-    // Epsilon for depth comparison - needs to handle:
-    // 1. Z-fighting at polygon boundaries
-    // 2. Interpolation mismatch between edge depth (1D) and buffer depth (2D rasterization)
-    // The 2D vs 1D interpolation can cause ~5-8% depth differences for the same surface
-    const epsilon = depth * 0.08 + 1.0;
-
-    // Near-plane clipping can create edges with interpolated depths very close to
-    // the near plane. Only reject samples extremely close to camera where artifacts occur.
-    // Threshold of 3.0 catches true near-plane clipping artifacts without rejecting
-    // legitimate close walls.
+    // Near-plane clipping artifact: an edge interpolated extremely close to the
+    // camera while the buffer is far behind — reject only right at the camera.
     if (depth < 3.0 && bufferDepth > depth * 5.0) {
-        return false; // Near-plane clipping artifact
-    }
-
-    // Threshold for detecting occluders - something significantly closer
-    const occluderThreshold = depth * 0.8;
-
-    // Check if there's an occluder at the exact pixel
-    if (bufferDepth < occluderThreshold) {
         return false;
     }
 
-    // Check a wider area for occluders (2 pixels each direction)
-    // This catches narrow pillars that point sampling might straddle
-    const searchRadius = 2;
-    const xMin = Math.max(0, clampedX - searchRadius);
-    const xMax = Math.min(DEPTH_WIDTH - 1, clampedX + searchRadius);
-
-    for (let sx = xMin; sx <= xMax; sx++) {
-        if (depthBuffer[baseIdx + sx] < occluderThreshold) {
-            return false; // Found an occluder nearby
-        }
-    }
-
-    // Check if point is in front of buffer (visible)
-    if (depth <= bufferDepth + epsilon) {
-        return true;
-    }
-
-    // If exact pixel fails, check immediate neighbors for polygon boundary seams
-    // (only if no occluder was found above)
-    if (clampedX > 0 && depth <= depthBuffer[baseIdx + clampedX - 1] + epsilon) return true;
-    if (clampedX < DEPTH_WIDTH - 1 && depth <= depthBuffer[baseIdx + clampedX + 1] + epsilon) return true;
-
-    return false;
+    const epsilon = depth * settings.depthEpsilon + 1.0;
+    return depth <= bufferDepth + epsilon;
 }
 
 /**
