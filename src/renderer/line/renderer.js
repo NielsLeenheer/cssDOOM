@@ -38,7 +38,7 @@ export const lineReduction = { snap: true, merge: true, gridSize: 0.005 };
 //   drawFloorCeilingOutlines — draw sector floor/ceiling boundaries, so room and
 //                             platform outlines stay complete even where the
 //                             walls that would form them are back-face culled.
-export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: false };
+export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: false, depthEpsilon: 0.025, minVisibleSamples: 3 };
 
 // Debug visualisation toggles (renderer-side, not scene settings). showDepthBuffer
 // draws the scene's depth buffer over the wireframe (nearest-neighbour, so its

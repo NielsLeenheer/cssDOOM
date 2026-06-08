@@ -16,9 +16,14 @@ let settings = {
 
     // Depth-test tolerance: an edge sample is visible if its depth <=
     // bufferDepth + depth*depthEpsilon + 1. Covers the small 1D-edge vs
-    // 2D-rasterised depth mismatch for coplanar surfaces. Lower = tighter
-    // (fewer leaked stubs, but risks clipping coplanar edges); higher = looser.
-    depthEpsilon: 0.04,
+    // 2D-rasterised depth mismatch for coplanar surfaces. Too high and edges
+    // overshoot a few px past a corner before the occluder gets far enough in
+    // front; too low and near-coplanar edges get clipped. ~0.025 balances both.
+    depthEpsilon: 0.025,
+
+    // Drop interior visible runs shorter than this many samples (leak blips at
+    // occluder silhouettes). Runs that reach an edge endpoint are always kept.
+    minVisibleSamples: 3,
 
     // Drop wall quads that sit at/below their own sector's floor or at/above
     // its ceiling. Two-sided portals (steps, pillar risers, lifts) generate a
@@ -916,6 +921,29 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
                 }
             } else {
                 s++;
+            }
+        }
+
+        // Symmetric hysteresis: drop short *interior* visible runs (flanked by
+        // occlusion on both sides). Those are isolated leak blips — a few samples
+        // that pass the depth test at an occluder's silhouette while the rest of
+        // the edge is hidden. Genuine partial edges run out to an endpoint, so a
+        // run touching sample 0 or numSamples-1 is kept. minVisibleSamples sets
+        // the threshold (0/1 disables; the single-sample case above still runs).
+        const minVis = settings.minVisibleSamples | 0;
+        if (minVis > 1) {
+            let v = 0;
+            while (v < numSamples) {
+                if (smoothedBuffer[v]) {
+                    const runStart = v;
+                    while (v < numSamples && smoothedBuffer[v]) v++;
+                    const interior = runStart > 0 && v < numSamples;
+                    if (interior && v - runStart < minVis) {
+                        for (let j = runStart; j < v; j++) smoothedBuffer[j] = 0;
+                    }
+                } else {
+                    v++;
+                }
             }
         }
 
