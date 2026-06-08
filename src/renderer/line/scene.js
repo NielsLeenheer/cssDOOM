@@ -1301,6 +1301,39 @@ export function optimizeLineOrder(lines) {
 }
 
 /**
+ * Snap line endpoints to a uniform grid, then drop degenerate and duplicate
+ * segments (screen-space, NDC). Unlike mergeCollinearLines this never moves a
+ * line onto another line's axis, so shared endpoints stay shared (junctions
+ * remain connected) and nothing shifts into/out of occlusion. Two effects:
+ *   - near-coincident segments (stacked corner edges, two-sided coincident
+ *     walls) snap identical and dedup to one;
+ *   - any segment shorter than a grid cell collapses to a point and is dropped,
+ *     which clears sub-grid leak stubs.
+ * Endpoints are quantised to integer grid cells so the dedup key is exact.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {number} gridSize  Grid cell size in NDC (e.g. 0.01 ≈ a 200×200 grid).
+ */
+export function snapLinesToGrid(lines, gridSize = 0.01) {
+    if (!(gridSize > 0)) return lines.slice();
+    const inv = 1 / gridSize;
+    const seen = new Set();
+    const result = [];
+    for (let i = 0, len = lines.length; i < len; i++) {
+        const ln = lines[i];
+        const ix1 = Math.round(ln.start[0] * inv), iy1 = Math.round(ln.start[1] * inv);
+        const ix2 = Math.round(ln.end[0] * inv), iy2 = Math.round(ln.end[1] * inv);
+        if (ix1 === ix2 && iy1 === iy2) continue; // collapsed to a point
+        const swap = ix1 > ix2 || (ix1 === ix2 && iy1 > iy2);
+        const key = swap ? `${ix2},${iy2},${ix1},${iy1}` : `${ix1},${iy1},${ix2},${iy2}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        result.push({ start: [ix1 * gridSize, iy1 * gridSize], end: [ix2 * gridSize, iy2 * gridSize] });
+    }
+    return result;
+}
+
+/**
  * Merge collinear / overlapping line segments (screen-space, NDC).
  *
  * The scene emits one quad per wall, so the same screen line is drawn many

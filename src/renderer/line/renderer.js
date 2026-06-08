@@ -15,17 +15,20 @@
  * rendered (matches the "before CSS" purity of the talk demo).
  */
 
-import { renderScene3D, setRendererSettings, deduplicateLines, mergeCollinearLines, getDepthBuffer } from './scene.js';
+import { renderScene3D, setRendererSettings, snapLinesToGrid, mergeCollinearLines, getDepthBuffer } from './scene.js';
 import { RendererBase } from '../base.js';
 import { canvasStats } from '../canvas/renderer.js';
 
-// Which line-reduction pass feeds the paint, shared across all LineRenderer
-// instances. Toggled from the debug panel's Renderer → "Merge lines" checkbox
-// (and settable by hand: `lineReduction.merge = false`). merge = collinear
-// merge (collapses stacked corners + joins split wall runs); off falls back to
-// plain exact-endpoint dedup so the two can be compared live. The stats overlay
-// reports both counts regardless of which one is painted.
-export const lineReduction = { merge: true };
+// Line-reduction pipeline, shared across LineRenderer instances and toggled
+// from the debug panel (Renderer section):
+//   snap  — snap endpoints to a uniform grid + dedup (default). Keeps junctions
+//           connected, drops sub-grid stubs, never repositions a line.
+//   merge — collinear merge on top of snap (default). With snap first, its
+//           tolerances are tied to the grid so it only joins segments already on
+//           the same grid line — no perpendicular repositioning, so junctions
+//           stay connected and nothing shifts into/out of occlusion.
+//   gridSize — snap grid cell in NDC (settable by hand: lineReduction.gridSize).
+export const lineReduction = { snap: true, merge: true, gridSize: 0.01 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
 // the scene each frame. Exposed in the debug panel (Renderer section) so the
@@ -122,8 +125,7 @@ export class LineRenderer extends RendererBase {
         this._frameTimes = new Float32Array(60);
         this._frameTimeIdx = 0;
         this._rawLineCount = 0;
-        this._mergeCount = 0;
-        this._dedupCount = 0;
+        this._lineCount = 0;
 
         // Resize observer keeps the canvas backing store aligned with
         // the displayed size. DomRenderer uses ResizeObserver for its
@@ -238,25 +240,24 @@ export class LineRenderer extends RendererBase {
         setRendererSettings(lineScene);
         const rawLines = renderScene3D(this._walls, camera, this._sectorPolygons);
         // Reduce redundant strokes before painting (cheaper for a real
-        // oscilloscope to draw). Two passes, switchable for live A/B:
-        //   merge — collinear merge: collapses the 3-4 vertical edges that
-        //           stack where walls share a corner, and joins long walls
-        //           split into linedefs back into single strokes.
-        //   dedup — plain exact-endpoint dedup (the earlier baseline); only
-        //           catches truly identical segments.
-        // We compute both each frame (cheap at these counts) so the overlay
-        // can show the comparison no matter which one is painted.
-        const merged = mergeCollinearLines(rawLines);
-        const deduped = deduplicateLines(rawLines, 1000);
-        const lines = lineReduction.merge ? merged : deduped;
+        // oscilloscope to draw): grid-snap + dedup, plus optional collinear merge.
+        let lines = rawLines;
+        const g = lineReduction.gridSize;
+        if (lineReduction.snap) lines = snapLinesToGrid(lines, g);
+        if (lineReduction.merge) {
+            // Tolerances tied to the grid: only join segments already on the same
+            // grid line (offsetTol < one cell), so the merge never moves a line
+            // perpendicular. gapTol bridges the ~1-cell sampling gaps between
+            // adjacent visible wall edges, not wide occlusion gaps.
+            lines = mergeCollinearLines(lines, { offsetTol: g * 0.5, angleTol: 0.04, gapTol: g * 1.5 });
+        }
         this._paint(lines);
         const t1 = performance.now();
 
         this._frameTimes[this._frameTimeIdx] = t1 - t0;
         this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
         this._rawLineCount = rawLines.length;
-        this._mergeCount = merged.length;
-        this._dedupCount = deduped.length;
+        this._lineCount = lines.length;
         if (canvasStats.enabled) this._drawStats();
     };
 
@@ -275,12 +276,10 @@ export class LineRenderer extends RendererBase {
         const dpr = window.devicePixelRatio || 1;
         const ctx = this.ctx;
         const raw = this._rawLineCount;
-        const active = lineReduction.merge;
-        const mergeLbl = active ? `[merge ${this._mergeCount}]` : `merge ${this._mergeCount}`;
-        const dedupLbl = active ? `dedup ${this._dedupCount}` : `[dedup ${this._dedupCount}]`;
-        const kept = active ? this._mergeCount : this._dedupCount;
+        const kept = this._lineCount;
         const pct = raw > 0 ? Math.round((1 - kept / raw) * 100) : 0;
-        const text = `${mergeLbl} ${dedupLbl}  raw ${raw} (-${pct}%)  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
+        const mode = (lineReduction.snap ? 'snap' : '') + (lineReduction.merge ? '+merge' : '') || 'raw';
+        const text = `${kept}/${raw} lines (-${pct}%) ${mode}  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.font = `${12 * dpr}px monospace`;

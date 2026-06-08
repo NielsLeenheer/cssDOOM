@@ -73,6 +73,7 @@ export const SETTINGS = [
     { section: 'Renderer', kind: 'flag', target: canvasStats, key: 'enabled', label: 'Stats', rendererType: 'canvas' },
     // Line renderer: collinear merge vs. plain dedup (off). Effect shows in the
     // Stats overlay's line counts. Line renderer reports type 'canvas'.
+    { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'snap', label: 'Snap to grid', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'merge', label: 'Merge lines', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineScene, key: 'cullInteriorFaces', label: 'Cull interior faces', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineScene, key: 'drawFloorCeilingOutlines', label: 'Floor/ceiling outlines', rendererType: 'canvas' },
