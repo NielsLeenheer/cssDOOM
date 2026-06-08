@@ -129,7 +129,9 @@ export class LineRenderer extends RendererBase {
         // readout; line counts are the latest frame's raw total plus the
         // result of each reduction pass so the two can be compared live.
         this._frameTimes = new Float32Array(60);
+        this._frameDeltas = new Float32Array(60);
         this._frameTimeIdx = 0;
+        this._lastTick = 0;
         this._rawLineCount = 0;
         this._lineCount = 0;
         this._baselineCount = 0;
@@ -233,6 +235,11 @@ export class LineRenderer extends RendererBase {
     _tick = () => {
         this._raf = requestAnimationFrame(this._tick);
         if (!this._walls || !this._camera) return;
+        // RAF interval for fps (render ms alone would show the theoretical max,
+        // not the vsync-capped rate); cpu render ms is captured separately below.
+        const now = performance.now();
+        if (this._lastTick) this._frameDeltas[this._frameTimeIdx] = now - this._lastTick;
+        this._lastTick = now;
         const camera = {
             x: this._camera.x,
             y: this._camera.y,
@@ -293,13 +300,14 @@ export class LineRenderer extends RendererBase {
      *  after the wireframe so the text stays crisp. Mirrors CanvasRenderer.
      *  _drawStats; gated by the same shared canvasStats flag. */
     _drawStats() {
-        let sum = 0, n = 0;
+        let sum = 0, n = 0, dsum = 0, dn = 0;
         for (let i = 0; i < this._frameTimes.length; i++) {
-            const v = this._frameTimes[i];
-            if (v > 0) { sum += v; n++; }
+            if (this._frameTimes[i] > 0) { sum += this._frameTimes[i]; n++; }
+            if (this._frameDeltas[i] > 0) { dsum += this._frameDeltas[i]; dn++; }
         }
         const avg = n ? sum / n : 0;
-        const fps = avg > 0 ? Math.min(999, 1000 / avg) : 0;
+        const avgDelta = dn ? dsum / dn : 0;
+        const fps = avgDelta > 0 ? Math.min(999, 1000 / avgDelta) : 0;
         const dpr = window.devicePixelRatio || 1;
         const ctx = this.ctx;
         // baseline (no cull) → raw (after cull) → final (after snap/merge/drop);
