@@ -977,22 +977,40 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
  * Point visibility check against the depth buffer.
  *
  * Visible iff the edge sample is at or in front of the rasterised surface at its
- * pixel. `epsilon` (settings.depthEpsilon) tolerates the small mismatch between
- * an edge's 1D perspective-interpolated depth and the surface's 2D-rasterised
- * depth for coplanar geometry (floor/wall junctions); a genuine occluder sits
- * far closer, so it still culls. No neighbour/`searchRadius` probing — those
- * over-culled edges next to occluders (clipping visible floor lines short) and
- * leaked stubs across polygon seams.
+ * position. The buffer is sampled *bilinearly*: at distance the depth gradient
+ * across a pixel is steep, so comparing an edge's exact sub-pixel position to a
+ * single rounded buffer cell made the 1D-edge vs 2D-rasterised depth mismatch
+ * oscillate around the threshold and break distant coplanar lines into dashes.
+ * Bilinear matches the surface depth at the exact position, so a tight epsilon
+ * holds without dashing. Cells with no geometry (Infinity) fall back to nearest.
+ * `epsilon` (settings.depthEpsilon) still covers residual coplanar mismatch; a
+ * genuine occluder sits far closer so it culls.
  */
 function isPointVisibleFast(x, y, depth, depthBuffer) {
     if (x < 0 || x >= DEPTH_WIDTH || y < 0 || y >= DEPTH_HEIGHT) return false;
 
-    const ix = (x + 0.5) | 0;
-    const iy = (y + 0.5) | 0;
-    const clampedX = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
-    const clampedY = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
+    // Bilinear sample of the buffer at the exact (x, y); pixel centres at integers.
+    let x0 = Math.floor(x), y0 = Math.floor(y);
+    const tx = x - x0, ty = y - y0;
+    if (x0 < 0) x0 = 0; else if (x0 > DEPTH_WIDTH - 2) x0 = DEPTH_WIDTH - 2;
+    if (y0 < 0) y0 = 0; else if (y0 > DEPTH_HEIGHT - 2) y0 = DEPTH_HEIGHT - 2;
+    const i00 = y0 * DEPTH_WIDTH + x0;
+    const d00 = depthBuffer[i00], d10 = depthBuffer[i00 + 1];
+    const d01 = depthBuffer[i00 + DEPTH_WIDTH], d11 = depthBuffer[i00 + DEPTH_WIDTH + 1];
 
-    const bufferDepth = depthBuffer[clampedY * DEPTH_WIDTH + clampedX];
+    let bufferDepth;
+    if (d00 === Infinity || d10 === Infinity || d01 === Infinity || d11 === Infinity) {
+        // Near a geometry silhouette — bilinear would blend in the empty cell.
+        // Fall back to the nearest cell.
+        const ix = (x + 0.5) | 0, iy = (y + 0.5) | 0;
+        const cx = ix < 0 ? 0 : (ix >= DEPTH_WIDTH ? DEPTH_WIDTH - 1 : ix);
+        const cy = iy < 0 ? 0 : (iy >= DEPTH_HEIGHT ? DEPTH_HEIGHT - 1 : iy);
+        bufferDepth = depthBuffer[cy * DEPTH_WIDTH + cx];
+    } else {
+        const a = d00 + (d10 - d00) * tx;
+        const b = d01 + (d11 - d01) * tx;
+        bufferDepth = a + (b - a) * ty;
+    }
 
     // Near-plane clipping artifact: an edge interpolated extremely close to the
     // camera while the buffer is far behind — reject only right at the camera.
