@@ -27,8 +27,12 @@ import { canvasStats } from '../canvas/renderer.js';
 //           tolerances are tied to the grid so it only joins segments already on
 //           the same grid line — no perpendicular repositioning, so junctions
 //           stay connected and nothing shifts into/out of occlusion.
-//   gridSize — snap grid cell in NDC (settable by hand: lineReduction.gridSize).
-export const lineReduction = { snap: true, merge: true, gridSize: 0.005 };
+//   gridSize — base (nearest) snap cell in NDC (settable: lineReduction.gridSize).
+//   gridNearDepth — depth below which the base grid is used; beyond it the cell
+//           doubles each depth-doubling (coarser far grid collapses distant
+//           near-parallel clutter). 0 disables distance scaling.
+//   gridMaxLevel — cap on the number of cell-size doublings with distance.
+export const lineReduction = { snap: true, merge: true, gridSize: 0.005, gridNearDepth: 200, gridMaxLevel: 3 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
 // the scene each frame. Exposed in the debug panel (Renderer section) so the
@@ -243,7 +247,7 @@ export class LineRenderer extends RendererBase {
         // oscilloscope to draw): grid-snap + dedup, plus optional collinear merge.
         let lines = rawLines;
         const g = lineReduction.gridSize;
-        if (lineReduction.snap) lines = snapLinesToGrid(lines, g);
+        if (lineReduction.snap) lines = snapLinesToGrid(lines, g, { nearDepth: lineReduction.gridNearDepth, maxLevel: lineReduction.gridMaxLevel });
         if (lineReduction.merge) {
             // Tolerances tied to the grid: only join segments already on the same
             // grid line (offsetTol < one cell), so the merge never moves a line
