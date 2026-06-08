@@ -1,5 +1,5 @@
 /**
- * AudioRenderer — an orchestrator render target alongside DomRenderer
+ * AudioRenderer — an orchestrator render target alongside CSSRenderer
  * and RenderSink. Each instance represents one local listener (one
  * local player's pane).
  *
@@ -35,7 +35,7 @@ export class AudioRenderer extends RendererBase {
     constructor({ slot, paneSide }) {
         super();
         // Orchestrator target identity. `kind` distinguishes audio
-        // targets from DomRenderer ('dom') and RenderSink ('sink') in
+        // targets from CSSRenderer ('dom') and RenderSink ('sink') in
         // dispatch sites that branch on the kind. `playerIndex` is
         // what per-player dispatch matches against.
         this.kind = 'audio';
@@ -43,7 +43,7 @@ export class AudioRenderer extends RendererBase {
 
         this.paneSide = paneSide;
         // Per-listener world view. Only x/y/angle are read in
-        // playSound; kept narrow rather than mirroring DomRenderer's
+        // playSound; kept narrow rather than mirroring CSSRenderer's
         // full 6 fields. updateCamera below writes these from
         // incoming per-player command dispatches.
         this.state = { camera: { x: 0, y: 0, angle: 0 } };

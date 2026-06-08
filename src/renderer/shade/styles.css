@@ -16,7 +16,7 @@
     /* Light-effect animations override --light via @keyframes — kill
        them on .pane-shade so each sector's static --light value reads
        through. The class names come from buildSectorContainers (see
-       src/renderer/dom/scene/mechanics/lighting.css). */
+       src/renderer/css/scene/mechanics/lighting.css). */
     .light-glow,
     .light-blink,
     .light-blink-fast,

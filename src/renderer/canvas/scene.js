@@ -22,7 +22,7 @@
  * world state. Those commands stay in commands.js.
  */
 
-import { THING_SPRITES } from '../dom/scene/constants.js';
+import { THING_SPRITES } from '../css/scene/constants.js';
 import {
     LIGHT_EFFECT, ENEMY_ANIM, ANIM_FRAME_MS, lightMul,
     DOOR_SPEED, LIFT_SPEED, TAU,

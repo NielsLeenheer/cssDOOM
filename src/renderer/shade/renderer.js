@@ -5,7 +5,7 @@
  * green and ceilings blue so the room planes read distinctly against
  * the white walls. Surface colours live in shade/styles.css.
  *
- * Implemented as a DomRenderer subclass for the same reason
+ * Implemented as a CSSRenderer subclass for the same reason
  * FlatRenderer is: we inherit the pane DOM construction,
  * ResizeObserver-driven perspective, camera state, spectator
  * delegates, and the per-player / world commands we keep (chief
@@ -16,14 +16,14 @@
  * 2×2 layout). See `manager.js`.
  */
 
-import { DomRenderer } from '../dom/renderer.js';
+import { CSSRenderer } from '../css/renderer.js';
 import { RendererBase } from '../base.js';
 import { buildShadeScene } from './scene.js';
 import * as maps from '../../shared/maps/index.js';
 
 const IOS_GPU_RELEASE_DELAY_MS = 100;
 
-export class ShadeRenderer extends DomRenderer {
+export class ShadeRenderer extends CSSRenderer {
     constructor(options) {
         super(options);
         // CSS hook for `.pane.pane-shade` rules in viewport.css —

@@ -2,7 +2,7 @@
    debug.camera.offset — a view-relative ORBIT for talk shots.
 
    DEBUG-ONLY. The renderer's own camera transform
-   (renderer/dom/scene/camera.css) stays pristine. When debug.camera.offset()
+   (renderer/css/scene/camera.css) stays pristine. When debug.camera.offset()
    runs it adds the `debug-camera` class to <body> and sets the --cam-offset-*
    custom properties; the rule below re-states the .scene camera transform with
    a view-relative dolly AND a compensating re-aim, so you move to a new vantage
@@ -20,7 +20,7 @@
    same --cam-offset-* props, so the transition animates them together over t
    (t = 0 ⇒ 0s ⇒ instant); "from the previous offset" is automatic.
 
-   Must be @imported AFTER renderer/dom/scene/camera.css (see index.css): it
+   Must be @imported AFTER renderer/css/scene/camera.css (see index.css): it
    deliberately overrides that file's `.scene` transform, winning on source
    order — which also supersedes head-bob's transform (talk shots don't bob).
    Mirrors the base transform; keep it in sync if that ever changes.

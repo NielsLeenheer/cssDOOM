@@ -1,12 +1,12 @@
 /**
- * WebGLRenderer — a WebGL2 renderer that lives next to a DomRenderer in
+ * WebGLRenderer — a WebGL2 renderer that lives next to a CSSRenderer in
  * the orchestrator's target list. It exposes the exact same external
- * interface as the DomRenderer and CanvasRenderer (kind, playerIndex,
+ * interface as the CSSRenderer and CanvasRenderer (kind, playerIndex,
  * paneEl, command methods) so the orchestrator's per-pane / world
  * dispatch fans to it with no special-casing — identical in shape to its
  * siblings, so the three are freely swappable.
  *
- * Where the DomRenderer builds the scene out of CSS-transformed DOM and
+ * Where the CSSRenderer builds the scene out of CSS-transformed DOM and
  * the CanvasRenderer runs a software rasteriser, this one draws the world
  * on the GPU: a real 3D scene (perspective walls, depth-buffered
  * floors/ceilings, sky, sprite billboards) rendered at full display
@@ -54,7 +54,7 @@ export class WebGLRenderer extends RendererBase {
      */
     constructor({ playerIndex, gameContainer }) {
         super();
-        // Same orchestrator marker as DomRenderer so callers that find a
+        // Same orchestrator marker as CSSRenderer so callers that find a
         // target by kind don't need to learn a new one (matches the
         // canvas + line renderers).
         this.kind = 'dom';
@@ -104,7 +104,7 @@ export class WebGLRenderer extends RendererBase {
     // ── Active commands ──────────────────────────────────────────────────
 
     /** World loadMap fans here too. Resolve through the shared `maps`
-     *  store (same enrichment the DomRenderer + CanvasRenderer use) so the
+     *  store (same enrichment the CSSRenderer + CanvasRenderer use) so the
      *  thing list is already skill / multiplayer filtered. */
     async loadMap(name) {
         if (this._dead) return;

@@ -1,10 +1,10 @@
 /**
  * LineRenderer — wireframe canvas target that lives next to a
- * DomRenderer in the orchestrator's target list. Same interface
+ * CSSRenderer in the orchestrator's target list. Same interface
  * shape (kind, playerIndex, paneEl, command methods) so the
  * orchestrator's per-pane / world dispatch fans to it without any
  * special-casing. Used by `?visualize` mode for the talk visual: a
- * DomRenderer in one pane and this in another, side by side.
+ * CSSRenderer in one pane and this in another, side by side.
  *
  * Scene rendering is delegated to the vendored line-scene.js
  * (verbatim copy of WebAudioOscilloscope's renderer3d.js — no
@@ -76,7 +76,7 @@ export class LineRenderer extends RendererBase {
      */
     constructor({ playerIndex, gameContainer }) {
         super();
-        // Same orchestrator marker as DomRenderer so callers that
+        // Same orchestrator marker as CSSRenderer so callers that
         // already know how to find a 'dom' target don't have to learn
         // a new kind for the lines pane. Findability-by-kind is mainly
         // used by master.js's onLeave → grace-rebuild path which
@@ -135,7 +135,7 @@ export class LineRenderer extends RendererBase {
         this._baselineCount = 0;
 
         // Resize observer keeps the canvas backing store aligned with
-        // the displayed size. DomRenderer uses ResizeObserver for its
+        // the displayed size. CSSRenderer uses ResizeObserver for its
         // perspective recompute; we reuse the pattern.
         this._resizeObserver = new ResizeObserver(() => this._resize());
         this._resizeObserver.observe(this.paneEl);
@@ -155,10 +155,10 @@ export class LineRenderer extends RendererBase {
 
     /**
      * World loadMap fans here too. Fetch the map JSON (same path
-     * DomRenderer uses) and stash the bits line-scene.js needs.
+     * CSSRenderer uses) and stash the bits line-scene.js needs.
      * Returns the fetch promise so `orchestrator.loadMap`'s
      * Promise.all sees us as a real participant in the load round
-     * (matches DomRenderer's async loadMap return).
+     * (matches CSSRenderer's async loadMap return).
      */
     async loadMap(name) {
         const response = await fetch(`maps/${name}.json`);
@@ -178,7 +178,7 @@ export class LineRenderer extends RendererBase {
 
     // ── Lifecycle ───────────────────────────────────────────────────────
 
-    /** Match DomRenderer's destroy contract — orchestrator + manager
+    /** Match CSSRenderer's destroy contract — orchestrator + manager
      *  call this when reshaping or shutting down. */
     destroy() {
         cancelAnimationFrame(this._raf);
@@ -186,7 +186,7 @@ export class LineRenderer extends RendererBase {
         this.paneEl.remove();
     }
 
-    /** No-op equivalent of DomRenderer.clear (which tears the pane's
+    /** No-op equivalent of CSSRenderer.clear (which tears the pane's
      *  scene DOM down). We have nothing to clear that the next
      *  loadMap won't overwrite. */
     clear() {

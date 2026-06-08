@@ -1,12 +1,12 @@
 /**
- * FlatRenderer — stripped-down DomRenderer for the talk's progression
+ * FlatRenderer — stripped-down CSSRenderer for the talk's progression
  * visual. Same cssDOOM scene transform / perspective / lighting,
  * walls / floors / ceilings painted in flat colors via
  * texture-override.css (keyed on [data-texture]), things rendered as
  * solid-color billboarded rectangles (see flat/styles.css). No HUD,
  * no weapon, no overlay screens.
  *
- * Implemented as a DomRenderer subclass so we inherit the pane DOM
+ * Implemented as a CSSRenderer subclass so we inherit the pane DOM
  * construction, ResizeObserver-driven perspective, camera state,
  * spectator delegates, and the per-player / world commands. HUD /
  * weapon / overlay commands are suppressed at dispatch below.
@@ -15,14 +15,14 @@
  * 2×2 layout). See `manager.js`.
  */
 
-import { DomRenderer } from '../dom/renderer.js';
+import { CSSRenderer } from '../css/renderer.js';
 import { RendererBase } from '../base.js';
 import { buildFlatScene } from './scene.js';
 import * as maps from '../../shared/maps/index.js';
 
 const IOS_GPU_RELEASE_DELAY_MS = 100;
 
-export class FlatRenderer extends DomRenderer {
+export class FlatRenderer extends CSSRenderer {
     constructor(options) {
         super(options);
         // CSS hook so anything we want to suppress purely visually
@@ -62,7 +62,7 @@ export class FlatRenderer extends DomRenderer {
         return buildFlatScene(mapData);
     }
 
-    // updateCulling inherited from DomRenderer. It walks
+    // updateCulling inherited from CSSRenderer. It walks
     // state.wallElements / sectorContainers / things; things is
     // empty here (no FlatRenderer entries created) and the wall /
     // floor / ceiling cull path is exactly what we need — without

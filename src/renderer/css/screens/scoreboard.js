@@ -44,9 +44,9 @@ const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showResults / hideResults through the orchestrator as
-// world envelopes; the impls below are bound onto DomRenderer at the
+// world envelopes; the impls below are bound onto CSSRenderer at the
 // bottom of renderer.js. The envelope fans to master's own
-// DomRenderer and to every connected client's RenderSink, carrying the
+// CSSRenderer and to every connected client's RenderSink, carrying the
 // full scoreboard payload over the wire.
 //
 // World dispatch fires once per render target; each call writes only
@@ -55,7 +55,7 @@ const PLAYER_COLOR_NAME = ['GREEN', 'RED', 'INDIGO', 'BROWN'];
 // against repeated invocations.
 
 /**
- * @param {object} renderer  DomRenderer for the pane this call addresses.
+ * @param {object} renderer  CSSRenderer for the pane this call addresses.
  * @param {{
  *   mapName: string,
  *   scores: number[],

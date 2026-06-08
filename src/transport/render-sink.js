@@ -1,7 +1,7 @@
 /**
  * RenderSink — a render target that forwards every command over a
  * `Transport` instead of painting DOM. Sinks live alongside
- * DomRenderers in the orchestrator's target list and represent
+ * CSSRenderers in the orchestrator's target list and represent
  * remote clients (Network DM joiners, Local DM secondary).
  *
  * The orchestrator dispatches a command envelope to each target;
@@ -23,7 +23,7 @@ export class RenderSink extends RendererBase {
     constructor(channel, paneIndex) {
         super();
         // Explicit type marker. Orchestrator uses `target.kind` to
-        // distinguish RenderSinks from local DomRenderers instead of
+        // distinguish RenderSinks from local CSSRenderers instead of
         // duck-typing on method existence.
         this.kind = 'sink';
 

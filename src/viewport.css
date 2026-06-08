@@ -62,7 +62,7 @@ body[data-grid="tiled"] { --screen-scale: 1; }
       orchestrator updates it on every addTarget / removeTarget.
 
    2. Pane visibility — `.pane[data-active]` per pane. "false" marks a
-      pane whose local DomRenderer was taken over by a remote client;
+      pane whose local CSSRenderer was taken over by a remote client;
       the paneEl stays in the DOM (reused on disconnect via Level.load)
       but shouldn't be visible.
 

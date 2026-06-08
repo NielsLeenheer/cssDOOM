@@ -12,7 +12,7 @@
  * draw call. Per vertex: world position (x,y,z), texel coordinate in
  * world units (u along the wall, v down it — the FS divides by the
  * texture size and REPEAT-wraps), and the surface's flat 0..1 brightness
- * (computed CPU-side via the DomRenderer's colormap mapping).
+ * (computed CPU-side via the CSSRenderer's colormap mapping).
  */
 
 import { DynamicBuffer } from '../glutil.js';
@@ -21,7 +21,7 @@ import { animName } from '../../canvas/tables.js';
 export const wallPassMethods = {
     /**
      * Precompute which walls are lower-unpegged (texture pinned to the
-     * wall bottom rather than the top), mirroring the DomRenderer:
+     * wall bottom rather than the top), mirroring the CSSRenderer:
      *
      *   - a regular wall with the ML_DONTPEGBOTTOM flag (`wall.isUnpegged`);
      *   - every door face wall (doors.js force-adds `unpegged`);
@@ -142,7 +142,7 @@ export const wallPassMethods = {
      * yOff+wallH at the bottom; lower-unpegged walls pin the texture's
      * bottom to the wall's bottom instead — yOff at the bottom, yOff−wallH
      * at the top (mod the texture height, which the REPEAT wrap handles).
-     * This matches the DomRenderer's `background-position-y: 100%` rule.
+     * This matches the CSSRenderer's `background-position-y: 100%` rule.
      */
     _emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, light, u1, noCull, unpegged) {
         const wallH = wallTop - wallBottom;
@@ -158,7 +158,7 @@ export const wallPassMethods = {
         }
 
         // `light` is the final 0..1 brightness (computed CPU-side to match
-        // the DomRenderer). The DOM applies no orientation-based fake
+        // the CSSRenderer). The DOM applies no orientation-based fake
         // contrast, so neither do we.
         const u2 = u1 + Math.hypot(dx, dy);
         const vTop = unpegged ? yOff - wallH : yOff;

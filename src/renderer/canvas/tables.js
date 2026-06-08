@@ -15,7 +15,7 @@ export const MAX_DIST = 4000;        // far cull for flats / sprites
 export const SKY_DEPTH = 1e7;        // pseudo-depth so sky loses to all real geometry
 export const TAU = Math.PI * 2;
 
-// Sector light → brightness, matching the DomRenderer (scene/sectors.js
+// Sector light → brightness, matching the CSSRenderer (scene/sectors.js
 // doomLightToCSS) and the WebGL engine exactly: DOOM's R_InitLightTables
 // colormap selection, flat per sector — no distance falloff, no directional
 // contrast — so the canvas pane stays in step with the CSS reference instead
@@ -236,7 +236,7 @@ export function shade(texel, lf) {
 }
 
 // Sector light level → 0..256 brightness multiplier (flat per sector — see
-// LIGHT_LUT above; matches the DomRenderer / WebGL light model, no distance
+// LIGHT_LUT above; matches the CSSRenderer / WebGL light model, no distance
 // falloff). Callers resolve it once per surface from the sector light level.
 export function lightFor(level) {
     let v = level | 0;

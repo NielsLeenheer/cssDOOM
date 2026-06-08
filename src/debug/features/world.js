@@ -8,7 +8,7 @@
 
 import { state } from '../../game/state.js';
 import { EYE_HEIGHT } from '../../shared/constants.js';
-import { THING_NAMES } from '../../renderer/dom/scene/constants.js';
+import { THING_NAMES } from '../../renderer/css/scene/constants.js';
 import { getFloorHeightAt, getSectorAt } from '../../game/physics.js';
 import { orchestrator } from '../../orchestrator.js';
 import { mapData, currentMap } from '../../shared/maps/index.js';

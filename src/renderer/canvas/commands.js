@@ -71,7 +71,7 @@ export const commandMethods = {
     // flip 'ready'→'active' — see Game.beginPlay. For this renderer that
     // late fire would otherwise latch the lobby panel back on top of the
     // running world, so treat inLobby:false as a hide, exactly like the
-    // DomRenderer's showLobby does.
+    // CSSRenderer's showLobby does.
     showLobby(payload) { this.lobby = payload && payload.inLobby ? payload : null; },
     hideLobby() { this.lobby = null; },
 };

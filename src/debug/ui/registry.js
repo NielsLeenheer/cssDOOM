@@ -18,9 +18,9 @@
  *   kind:'button'→ one-shot action. showClass gates DM-only / kiosk-only
  *                  visibility via CSS.
  *
- * rendererType (on any checkbox entry) → 'dom' | 'canvas'. The panel disables
+ * rendererType (on any checkbox entry) → 'css' | 'canvas'. The panel disables
  *   the checkbox when the active renderer's type (manager.rendererType) doesn't
- *   match — e.g. CSS toggles ('dom') are dead under a canvas renderer, and the
+ *   match — e.g. CSS toggles ('css') are dead under a canvas renderer, and the
  *   canvas Stats overlay ('canvas') is meaningless under a DOM renderer. Omit to
  *   leave it enabled for every renderer (Game cheats, Chrome, the picker).
  *
@@ -29,7 +29,7 @@
  */
 
 import { debugFlags } from '../../game/state.js';
-import { culling } from '../../renderer/dom/scene/culling.js';
+import { culling } from '../../renderer/css/scene/culling.js';
 import { endMatch } from '../../game/match.js';
 import { enterAttract } from '../../game/attract.js';
 import { app } from '../../app.js';
@@ -51,23 +51,23 @@ export const SETTINGS = [
     // instantly. Checkbox checked = layer shown. The scene layers are CSS, so
     // rendererType:'dom'; Chrome is app UI (menu buttons / spectator overlay,
     // not renderer-drawn) so it stays enabled for every renderer.
-    { section: 'Renderer', kind: 'layer', layer: layers.floors,   label: 'Floors',   grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.ceilings, label: 'Ceilings', grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.walls,    label: 'Walls',    grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.things,   label: 'Things',   grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.enemies,  label: 'Enemies',  grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.hud,      label: 'HUD',      grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.sky,      label: 'Sky',      grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.floors,   label: 'Floors',   grid: true, rendererType: 'css' },
+    { section: 'Renderer', kind: 'layer', layer: layers.ceilings, label: 'Ceilings', grid: true, rendererType: 'css' },
+    { section: 'Renderer', kind: 'layer', layer: layers.walls,    label: 'Walls',    grid: true, rendererType: 'css' },
+    { section: 'Renderer', kind: 'layer', layer: layers.things,   label: 'Things',   grid: true, rendererType: 'css' },
+    { section: 'Renderer', kind: 'layer', layer: layers.enemies,  label: 'Enemies',  grid: true, rendererType: 'css' },
+    { section: 'Renderer', kind: 'layer', layer: layers.hud,      label: 'HUD',      grid: true, rendererType: 'css' },
+    { section: 'Renderer', kind: 'layer', layer: layers.sky,      label: 'Sky',      grid: true, rendererType: 'css' },
     { section: 'Renderer', kind: 'layer', layer: layers.chrome,   label: 'Chrome',   grid: true },
 
     // ── Culling ── JS flags read by updateCulling(); order matches its passes.
     // rendererType:'dom' — these drive the DOM renderer's CSS/JS culling passes.
-    { section: 'Culling', kind: 'flag', target: culling, key: 'distance', label: 'Distance culling', stat: 'afterDistance', rendererType: 'dom' },
-    { section: 'Culling', kind: 'flag', target: culling, key: 'backface', label: 'Backface culling', stat: 'afterBackface', rendererType: 'dom' },
-    { section: 'Culling', kind: 'flag', target: culling, key: 'frustum',  label: 'Frustum culling',  stat: 'afterFrustum', rendererType: 'dom' },
-    { section: 'Culling', kind: 'flag', target: culling, key: 'sky',      label: 'Sky culling',      stat: 'afterSky', rendererType: 'dom' },
-    { section: 'Culling', kind: 'css', class: 'css-distance-culling', label: 'CSS distance culling', default: false, rendererType: 'dom' },
-    { section: 'Culling', kind: 'css', class: 'css-frustum-culling',  label: 'CSS frustum culling',  default: false, rendererType: 'dom' },
+    { section: 'Culling', kind: 'flag', target: culling, key: 'distance', label: 'Distance culling', stat: 'afterDistance', rendererType: 'css' },
+    { section: 'Culling', kind: 'flag', target: culling, key: 'backface', label: 'Backface culling', stat: 'afterBackface', rendererType: 'css' },
+    { section: 'Culling', kind: 'flag', target: culling, key: 'frustum',  label: 'Frustum culling',  stat: 'afterFrustum', rendererType: 'css' },
+    { section: 'Culling', kind: 'flag', target: culling, key: 'sky',      label: 'Sky culling',      stat: 'afterSky', rendererType: 'css' },
+    { section: 'Culling', kind: 'css', class: 'css-distance-culling', label: 'CSS distance culling', default: false, rendererType: 'css' },
+    { section: 'Culling', kind: 'css', class: 'css-frustum-culling',  label: 'CSS frustum culling',  default: false, rendererType: 'css' },
     // Line renderer's 2D-segment equivalents of the DOM culling passes
     // (rendererType:'canvas'). snap/merge/drop reduce the emitted line set;
     // cull-interior-faces drops buried wall quads. See renderer.js for details.
@@ -81,17 +81,17 @@ export const SETTINGS = [
     // disables each via a `no-*` body class (invert: checked = class absent =
     // effect on). The render default lives in CSS, not here — see
     // lighting/walls/floors/camera.css.
-    { section: 'Effects', kind: 'css', class: 'no-sector-lights',   label: 'Sector light effects', invert: true, rendererType: 'dom' },
-    { section: 'Effects', kind: 'css', class: 'light-falloff',      label: 'Light falloff',        default: false, rendererType: 'dom' },
-    { section: 'Effects', kind: 'css', class: 'no-scroll-textures', label: 'Scrolling textures',   invert: true, rendererType: 'dom' },
-    { section: 'Effects', kind: 'css', class: 'no-animated-flats',  label: 'Animated flats',       invert: true, rendererType: 'dom' },
-    { section: 'Effects', kind: 'css', class: 'no-head-bob',        label: 'Head bob',             invert: true, rendererType: 'dom' },
-    { section: 'Effects', kind: 'css', class: 'all-enemies-shadow', label: 'All enemies shadow', default: false, rendererType: 'dom' },
+    { section: 'Effects', kind: 'css', class: 'no-sector-lights',   label: 'Sector light effects', invert: true, rendererType: 'css' },
+    { section: 'Effects', kind: 'css', class: 'light-falloff',      label: 'Light falloff',        default: false, rendererType: 'css' },
+    { section: 'Effects', kind: 'css', class: 'no-scroll-textures', label: 'Scrolling textures',   invert: true, rendererType: 'css' },
+    { section: 'Effects', kind: 'css', class: 'no-animated-flats',  label: 'Animated flats',       invert: true, rendererType: 'css' },
+    { section: 'Effects', kind: 'css', class: 'no-head-bob',        label: 'Head bob',             invert: true, rendererType: 'css' },
+    { section: 'Effects', kind: 'css', class: 'all-enemies-shadow', label: 'All enemies shadow', default: false, rendererType: 'css' },
 
     // ── Debug ── development visualisations ────────────────────────────────
-    { section: 'Debug', kind: 'css', class: 'show-sky-walls',  label: 'Show sky walls',  default: false, rendererType: 'dom' },
-    { section: 'Debug', kind: 'css', class: 'show-wall-ids',   label: 'Show wall IDs',   default: false, rendererType: 'dom' },
-    { section: 'Debug', kind: 'css', class: 'show-sector-ids', label: 'Show sector IDs', default: false, rendererType: 'dom' },
+    { section: 'Debug', kind: 'css', class: 'show-sky-walls',  label: 'Show sky walls',  default: false, rendererType: 'css' },
+    { section: 'Debug', kind: 'css', class: 'show-wall-ids',   label: 'Show wall IDs',   default: false, rendererType: 'css' },
+    { section: 'Debug', kind: 'css', class: 'show-sector-ids', label: 'Show sector IDs', default: false, rendererType: 'css' },
     // Line renderer overlays (rendererType:'canvas'). Stats = frame-time / size /
     // line-count readout; the other two are wireframe debug visualisations.
     { section: 'Debug', kind: 'flag', target: canvasStats, key: 'enabled',         label: 'Stats',          rendererType: 'canvas' },

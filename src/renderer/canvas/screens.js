@@ -271,7 +271,7 @@ export const screenMethods = {
     },
 
     /** Local DM lobby overlay — draws on top of the live world. Mirrors
-     *  the DomRenderer's per-pane `data-claim-state` CSS:
+     *  the CSSRenderer's per-pane `data-claim-state` CSS:
      *
      *    prompting → world dimmed + "PRESS BUTTON TO CONNECT CONTROLLER"
      *    ready     → "READY!" over the live (un-dimmed) world

@@ -50,7 +50,7 @@ import { hudMethods } from './passes/hud.js';
 import { screenMethods } from './screens.js';
 
 // Head bob — raise the eye 0→BOB_HEIGHT→0 while walking, matching the
-// DomRenderer's `--bob` keyframe (0..6 over a 400ms cycle) and the WebGL
+// CSSRenderer's `--bob` keyframe (0..6 over a 400ms cycle) and the WebGL
 // engine. The amplitude eases in/out with movement so the view settles
 // smoothly when you stop. The game doesn't bob the camera itself, so
 // movement is derived from the camera sliding frame-to-frame (see render()).
@@ -137,7 +137,7 @@ export class SoftwareRenderer {
         // and own the whole pane. The Network DM lobby behaves the same
         // way — there's no level loaded behind it. The Local DM lobby
         // doesn't: the level pre-loads in standalone mode so the world
-        // is visible behind a per-pane prompt, mirroring what DomRenderer
+        // is visible behind a per-pane prompt, mirroring what CSSRenderer
         // shows. Locally we fall through to the world pass and overlay
         // the prompt at the end via `_overlayLocalLobby`.
         if (this.results) { this._renderResults(now); return; }
@@ -154,7 +154,7 @@ export class SoftwareRenderer {
 
         // Movement detection (shared by head bob + weapon bob): the game
         // doesn't bob the camera itself, so derive it from the camera
-        // sliding frame-to-frame, like the DomRenderer's `.moving` class.
+        // sliding frame-to-frame, like the CSSRenderer's `.moving` class.
         // _renderWeapon reuses this._moving so the two bobs stay in sync.
         this._moving = this._lastCamX !== null
             && (Math.abs(camera.x - this._lastCamX) > 0.5 || Math.abs(camera.y - this._lastCamY) > 0.5);

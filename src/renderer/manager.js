@@ -1,6 +1,6 @@
 /**
  * RendererManager — single owner of the renderer lifecycle in this
- * window. Manages DomRenderers by default, plus LineRenderer /
+ * window. Manages CSSRenderers by default, plus LineRenderer /
  * FlatRenderer instances when ?visualize mode is active.
  *
  * Each window (master or joiner) has exactly one Manager instance,
@@ -9,7 +9,7 @@
  * else can mutate. Everything that creates, destroys, or reshapes
  * renderers goes through the Manager.
  *
- * Boundary with Orchestrator: the Manager owns DomRenderer lifecycle
+ * Boundary with Orchestrator: the Manager owns CSSRenderer lifecycle
  * (which renderers exist, what their `playerIndex` is, when they die).
  * Orchestrator owns dispatch (which target receives a command). The
  * Manager installs a fresh renderer into Orchestrator via
@@ -22,7 +22,7 @@
  * differs; the management surface does not.
  */
 
-import { DomRenderer } from './dom/renderer.js';
+import { CSSRenderer } from './css/renderer.js';
 import { LineRenderer } from './line/renderer.js';
 import { CanvasRenderer } from './canvas/renderer.js';
 import { WebGLRenderer } from './webgl/renderer.js';
@@ -32,11 +32,11 @@ import { LightingRenderer } from './lighting/renderer.js';
 import { CatRenderer } from './cat/renderer.js';
 import { AxisRenderer } from './axis/renderer.js';
 import { orchestrator } from '../orchestrator.js';
-import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './dom/scene/culling.js';
+import { CULLING_INTERVAL, CULLING_INTERVAL_ATTRACT } from './css/scene/culling.js';
 
 // `?renderer=…` lookup table for the default-pane factory. Keys are
 // the URL values; values are the constructors. Missing entries (or
-// no `?renderer=`) fall back to DomRenderer.
+// no `?renderer=`) fall back to CSSRenderer.
 const RENDERERS = {
     line:     LineRenderer,
     canvas:   CanvasRenderer,
@@ -46,14 +46,14 @@ const RENDERERS = {
     lighting: LightingRenderer,
     cat:      CatRenderer,
     axis:     AxisRenderer,
-    dom:      DomRenderer,
+    css:      CSSRenderer,
 };
 
-/** The rendering technology of a renderer kind — 'dom' (CSS/DOM scene) or
+/** The rendering technology of a renderer kind — 'css' (CSS/DOM scene) or
  *  'canvas' (a <canvas> framebuffer). Read by the debug panel to disable
- *  CSS-only toggles when a canvas renderer is active. Unknown kinds → 'dom'. */
+ *  CSS-only toggles when a canvas renderer is active. Unknown kinds → 'css'. */
 export function rendererType(kind) {
-    return RENDERERS[kind]?.type ?? 'dom';
+    return RENDERERS[kind]?.type ?? 'css';
 }
 
 // The renderer kinds offered in the debug picker (console
@@ -65,7 +65,7 @@ export function rendererType(kind) {
 // Ordered: real renderers first (dom, line, canvas, webgl), then the
 // visualisation renderers (flat, shade, lighting, cat). The panel dropdown
 // draws a divider between the two groups (see `separatorAfter` in registry.js).
-export const PICKABLE_RENDERERS = ['dom', 'line', 'canvas', 'webgl', 'flat', 'shade', 'lighting', 'cat'];
+export const PICKABLE_RENDERERS = ['css', 'line', 'canvas', 'webgl', 'flat', 'shade', 'lighting', 'cat'];
 
 // Per-layout pane composition, all static. Each layout has:
 //
@@ -129,11 +129,11 @@ const LAYOUT_SPECS = {
             { kind: 'line' },
             { kind: 'shade' },
             { kind: 'flat' },
-            { kind: 'dom' },
+            { kind: 'css' },
         ],
         players: { singleplayer: { standalone: [0, 0, 0, 0] } },
     },
-    // ?layout=cad SP: three AxisRenderers + one default DomRenderer.
+    // ?layout=cad SP: three AxisRenderers + one default CSSRenderer.
     // AxisRenderer overrides updateCamera to place the camera
     // perpendicular to the player on its axis.
     cad: {
@@ -142,13 +142,13 @@ const LAYOUT_SPECS = {
             { kind: 'axis', extras: { axis: 'z' } },
             { kind: 'axis', extras: { axis: 'y' } },
             { kind: 'axis', extras: { axis: 'x' } },
-            { kind: 'dom' },
+            { kind: 'css' },
         ],
         players: { singleplayer: { standalone: [0, 0, 0, 0] } },
     },
 };
 
-// `?renderer=dom,canvas[,…]` requests an ad-hoc side-by-side renderer
+// `?renderer=css,canvas[,…]` requests an ad-hoc side-by-side renderer
 // comparison: one pane per kind, all mirroring player 0 (SP only). This
 // replaces the old fixed `compare` / `compare-gl` layouts — any combination
 // of renderers works now. 2 kinds → flex 50/50 full height; 3–4 kinds →
@@ -183,7 +183,7 @@ class RendererManager {
     constructor() {
         this._renderers = [];
         // Captured once at module load. Both elements live in index.html
-        // and never change; the Manager holds them so DomRenderer
+        // and never change; the Manager holds them so CSSRenderer
         // construction doesn't have to re-query the DOM each time.
         this._gameContainer = document.getElementById('game');
         this._paneTemplate = document.querySelector('#pane-template');
@@ -196,7 +196,7 @@ class RendererManager {
         this._cullingFrame = 0;
     }
 
-    /** Live `DomRenderer` instances, in registration order. Callers may
+    /** Live `CSSRenderer` instances, in registration order. Callers may
      *  iterate but must not mutate — use create/destroy/reshape. */
     get all() {
         return this._renderers;
@@ -209,7 +209,7 @@ class RendererManager {
      * `orchestrator.addTarget`.
      *
      * Renderer kind is selected by `?renderer=…` (stashed on
-     * `body.dataset.renderer` at boot). Defaults to DomRenderer. Pinned
+     * `body.dataset.renderer` at boot). Defaults to CSSRenderer. Pinned
      * layouts (visualize / cad) and the ad-hoc comparison layout pass an
      * explicit `kind` per slot, so the URL routing below only applies to
      * the URL-routable layouts (default / kiosk) and joiner panes; for a
@@ -220,7 +220,7 @@ class RendererManager {
         // list for the comparison layout — take the first kind for any
         // single-pane fallback (a joiner, or DM where comparison doesn't apply).
         const routed = kind ?? document.body.dataset.renderer?.split(',')[0].trim();
-        const RendererClass = RENDERERS[routed] ?? DomRenderer;
+        const RendererClass = RENDERERS[routed] ?? CSSRenderer;
         const renderer = new RendererClass({
             playerIndex,
             gameContainer: this._gameContainer,
@@ -325,7 +325,7 @@ class RendererManager {
             orchestrator.removeTarget(r);
             this.destroy(r);
         }
-        // Defensive: drop any non-DomRenderer targets too.
+        // Defensive: drop any non-CSSRenderer targets too.
         for (const t of [...orchestrator.targets]) {
             orchestrator.removeTarget(t);
         }

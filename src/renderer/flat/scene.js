@@ -1,11 +1,11 @@
 /**
  * Flat-shaded scene builder for FlatRenderer — the middle step in the
  * talk's progression visual (wireframe → flat → fully textured). Same
- * cssDOOM walls / floors / ceilings DOM as the full DomRenderer, but
+ * cssDOOM walls / floors / ceilings DOM as the full CSSRenderer, but
  * with every surface painted in the texture's average RGB instead of
  * the actual texture image. The colours live in texture-override.css
  * (generated; selected by the `[data-texture]` attribute every surface
- * carries) — this builder just emits the same DOM the DomRenderer does
+ * carries) — this builder just emits the same DOM the CSSRenderer does
  * and lets CSS recolour it. No things, no doors, no lifts, no crushers,
  * no player sprite — just the room shells.
  *
@@ -17,15 +17,15 @@
  * `.floor` / `.ceiling` classes.
  */
 
-import { makeSceneState } from '../dom/renderer.js';
-import { buildSectorContainers } from '../dom/scene/sectors.js';
-import { buildWalls } from '../dom/scene/surfaces/walls.js';
-import { buildFloors } from '../dom/scene/surfaces/floors.js';
-import { buildCeilings } from '../dom/scene/surfaces/ceilings.js';
-import { buildThing } from '../dom/scene/entities/things.js';
-import { buildDoor } from '../dom/scene/mechanics/doors.js';
-import { buildLift } from '../dom/scene/mechanics/lifts.js';
-import { buildCrusher } from '../dom/scene/mechanics/crushers.js';
+import { makeSceneState } from '../css/renderer.js';
+import { buildSectorContainers } from '../css/scene/sectors.js';
+import { buildWalls } from '../css/scene/surfaces/walls.js';
+import { buildFloors } from '../css/scene/surfaces/floors.js';
+import { buildCeilings } from '../css/scene/surfaces/ceilings.js';
+import { buildThing } from '../css/scene/entities/things.js';
+import { buildDoor } from '../css/scene/mechanics/doors.js';
+import { buildLift } from '../css/scene/mechanics/lifts.js';
+import { buildCrusher } from '../css/scene/mechanics/crushers.js';
 
 export function buildFlatScene(mapData) {
     const ctx = {

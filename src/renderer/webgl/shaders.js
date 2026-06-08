@@ -18,7 +18,7 @@
  * pass, not a world-space depth bias — see passes/entities.js.)
  *
  * Lighting is a single 0..1 brightness multiplier on the texel, computed
- * per surface on the CPU to match the DomRenderer exactly: a flat
+ * per surface on the CPU to match the CSSRenderer exactly: a flat
  * per-sector value from its `doomLightToCSS` colormap mapping, with no
  * distance falloff and no per-pixel banding (the DOM applies `filter:
  * brightness()` per element). Animated light specials override that with

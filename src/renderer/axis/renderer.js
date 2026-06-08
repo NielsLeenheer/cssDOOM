@@ -1,5 +1,5 @@
 /**
- * AxisRenderer — DomRenderer that places the camera perpendicular
+ * AxisRenderer — CSSRenderer that places the camera perpendicular
  * to the player on a fixed world axis instead of behind the player's
  * eyes. Used by ?cad to assemble a top + two side + 3D quad-view
  * CAD-style layout.
@@ -9,7 +9,7 @@
  *   z — camera at (player.x, player.y, player.z + OFFSET), looking
  *       DOWN. The horizontal pitch (rotateX(-90deg)) is applied via
  *       a per-pane CSS override (axis/styles.css) because the
- *       DomRenderer's scene transform doesn't carry pitch.
+ *       CSSRenderer's scene transform doesn't carry pitch.
  *
  *   x — camera at (player.x + OFFSET, player.y, player.z), looking
  *       WEST toward the player. Yaw alone handles this — no CSS
@@ -25,8 +25,8 @@
  * camera automatically.
  */
 
-import { DomRenderer } from '../dom/renderer.js';
-import { culling } from '../dom/scene/culling.js';
+import { CSSRenderer } from '../css/renderer.js';
+import { culling } from '../css/scene/culling.js';
 import { state } from '../../game/state.js';
 import { getSectorAt } from '../../game/physics.js';
 
@@ -49,7 +49,7 @@ const AXIS_VIEWS = {
     y: { dx: 0,        dy: OFFSET, dz: 0,          angle: Math.PI      }, // camera north, looking south
 };
 
-export class AxisRenderer extends DomRenderer {
+export class AxisRenderer extends CSSRenderer {
     constructor({ axis, ...options }) {
         super(options);
         this.axis = axis;
@@ -59,7 +59,7 @@ export class AxisRenderer extends DomRenderer {
     /**
      * Translate the player's reported camera state to a virtual
      * camera offset along this renderer's axis, then hand off to
-     * the inherited DomRenderer pipeline. Everything downstream
+     * the inherited CSSRenderer pipeline. Everything downstream
      * (culler, scene transform, marker arc) reads from the
      * virtual camera and stays oriented to the off-axis viewer.
      */

@@ -15,7 +15,7 @@
  * renderer's DOM (`renderer.viewportEl`, `renderer.sceneEl`). The UI
  * (`src/ui/spectator.js`) doesn't reach in here directly — it goes
  * through `Orchestrator` which forwards to `renderer.startSpectatorMode`,
- * etc. The DomRenderer methods at the bottom of this file are the thin
+ * etc. The CSSRenderer methods at the bottom of this file are the thin
  * delegates the Orchestrator hands off to.
  */
 

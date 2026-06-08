@@ -27,10 +27,10 @@
  *
  *   - master onReady → buildCatchup(slot) → sendCatchup over the
  *     wire to a freshly-attached joiner. Receiver applies against
- *     its local DomRenderer.
+ *     its local CSSRenderer.
  *   - master grace-rebuild (Local DM secondary detach) →
  *     buildCatchup(slot) → applyCatchupCmds directly to the rebuilt
- *     local DomRenderer. The rebuilt pane is a brand-new DomRenderer
+ *     local CSSRenderer. The rebuilt pane is a brand-new CSSRenderer
  *     with no state; it needs the same HUD / camera / weapon / overlay
  *     catch-up as a wire joiner. Locally-applied catch-up is free
  *     (no wire), so there's no cost reason to skip any section.
@@ -58,8 +58,8 @@ export function buildCatchup(slot) {
 }
 
 /**
- * Apply a catchup cmd list to a DomRenderer. World and per-player
- * impls both hang off DomRenderer.prototype, so the same target shape
+ * Apply a catchup cmd list to a CSSRenderer. World and per-player
+ * impls both hang off CSSRenderer.prototype, so the same target shape
  * covers every command in the envelope. Animations are CSS-suppressed
  * during the apply via the `snapshot-applying` class on the pane
  * element. Per-tuple try/catch isolates failure so one bad entry

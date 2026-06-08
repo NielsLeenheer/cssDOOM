@@ -15,7 +15,7 @@
  * --spectator-angle. CSS composes the transform.
  *
  * All renderer access goes through the orchestrator. This module
- * never touches DomRenderer or DomRendererManager directly.
+ * never touches CSSRenderer or CSSRendererManager directly.
  */
 
 import { state } from '../game/state.js';

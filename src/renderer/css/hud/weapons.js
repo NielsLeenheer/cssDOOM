@@ -66,7 +66,7 @@ export function stopFiring(renderer) {
 
 /**
  * Wire per-renderer weapon-element event listeners. Called once per
- * DomRenderer at construction (the only point the renderer's
+ * CSSRenderer at construction (the only point the renderer's
  * weaponEl exists and is final). The listener lives with the
  * element — when the pane is destroyed and the element is removed
  * from the DOM, the listener is GC'd with it.

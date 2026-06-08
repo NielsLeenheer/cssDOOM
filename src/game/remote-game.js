@@ -202,8 +202,8 @@ export class RemoteGame {
                 // No-op for now.
             },
             // Apply the catchup envelope against our local
-            // DomRenderer directly — world and per-player impls both
-            // hang off DomRenderer.prototype. Bypassing the
+            // CSSRenderer directly — world and per-player impls both
+            // hang off CSSRenderer.prototype. Bypassing the
             // orchestrator skips the per-player slot filter (catchup
             // is always for our own slot), and the AudioRenderer's
             // listener position lands on the next gameLoop frame's
@@ -234,7 +234,7 @@ export class RemoteGame {
 
     /**
      * Master ACK handler. Applies the snapshot fields (gameMode,
-     * level, gameState, slotIndex), rebuilds the local DomRenderer at
+     * level, gameState, slotIndex), rebuilds the local CSSRenderer at
      * the assigned slot, loads the map, and wires up the RenderClient
      * + input forwarder. Transitions CONNECTING → CONNECTED.
      *
@@ -272,7 +272,7 @@ export class RemoteGame {
         if (payload.level) {
             // Initial-bootstrap load — goes through the same per-window
             // pipeline as subsequent coordinated loads (orchestrator
-            // fans to the joiner's local DomRenderer → scene.loadMap).
+            // fans to the joiner's local CSSRenderer → scene.loadMap).
             // No READY_TO_PLAY here: ACK is not part of the coordinated
             // handshake. MSG.READY (sent from _wireUp below) is the
             // bootstrap-finished signal master gates the spawn / initial
@@ -299,7 +299,7 @@ export class RemoteGame {
      * up the two halves of the client pipeline:
      *   - RenderClient subscribes to the transport and dispatches
      *     inbound CMD_PANE / CMD_WORLD envelopes to the local
-     *     DomRenderer (per-pane) and orchestrator (world).
+     *     CSSRenderer (per-pane) and orchestrator (world).
      *   - Input forwarder (Network DM only) initializes the local
      *     input pipeline and ships every action / analog snapshot
      *     over the wire as MSG.ACTION / MSG.ANALOG.

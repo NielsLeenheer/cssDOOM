@@ -27,7 +27,7 @@
  * `body.dataset.networkMode`, sizes `state.players`, resets / clears the
  * match struct, picks the default input-slot routing, configures audio,
  * opens / closes the network signaling room, asks the renderer to
- * reshape its DomRenderer set. Called from boot (master.js / client.js)
+ * reshape its CSSRenderer set. Called from boot (master.js / client.js)
  * and from menu mode-switch handlers (ui/menu.js's switchMode).
  *
  * Nothing here is UI: the menu just exposes `switchMode(name)` via buttons.
@@ -173,9 +173,9 @@ export function applyMode(gameMode, networkMode = 'standalone') {
         setDefaultSlot(0);
     }
 
-    // Reshape the master's local DomRenderers + audio listeners for
+    // Reshape the master's local CSSRenderers + audio listeners for
     // this mode. Client windows skip both: they manage exactly one
-    // DomRenderer for their master-assigned slot (handled by
+    // CSSRenderer for their master-assigned slot (handled by
     // RemoteGame._onAck → rendererManager.resetToJoinerSlot), and
     // their audio listener also lives at that slot (set by _onAck
     // after the slot is known — applyMode runs BEFORE the join

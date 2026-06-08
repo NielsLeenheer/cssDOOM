@@ -10,7 +10,7 @@
  * (not just the center) to avoid incorrectly culling large surfaces that
  * partially overlap the view.
  *
- * Per-renderer: each DomRenderer owns its own sceneState and its own
+ * Per-renderer: each CSSRenderer owns its own sceneState and its own
  * camera (`renderer.camera` aliases its player on master, or its local
  * mirror on a client). The cullingLoop iterates every renderer so each
  * pane gets its own visibility pass each tick. cullingStats reflects the
@@ -248,7 +248,7 @@ function behindSkyWall(x, y, z, sectorIndex, playerX, playerY, skyPlanes, skyGro
 
 /**
  * Run culling checks on the given player's pane. Called from the per-renderer
- * `DomRenderer.updateCulling()` method, scheduled by the manager's culling
+ * `CSSRenderer.updateCulling()` method, scheduled by the manager's culling
  * loop. Elements are hidden/shown by toggling the `hidden` attribute which
  * maps to `display: none` and fully removes them from compositor work.
  *

@@ -7,7 +7,7 @@
  */
 
 import { debugFlags } from '../../game/state.js';
-import { culling } from '../../renderer/dom/scene/culling.js';
+import { culling } from '../../renderer/css/scene/culling.js';
 
 /** Make a toggle for `key` on `target`: no arg flips it, a boolean sets it; logs
  *  and returns the new state. (The menu checkbox won't redraw until reopened —

@@ -5,7 +5,7 @@
  * Subscribes to a Transport and delegates incoming envelopes through
  * the local Orchestrator: per-pane commands via the orchestrator's
  * per-pane prototype method (which fans to every target whose
- * playerIndex matches — the local DomRenderer + the local
+ * playerIndex matches — the local CSSRenderer + the local
  * AudioRenderer if `updateCamera` is the call), world commands via
  * the world prototype method. `playSound` is one of the world
  * commands — the client window's AudioRenderers handle the playback;
@@ -62,7 +62,7 @@ export class RenderClient {
                 // sending MSG.READY_TO_PLAY after its local scene
                 // rebuild resolves. orchestrator.dispatch returns the
                 // Promise.all of per-target results — on the joiner
-                // that's the single local DomRenderer, so awaiting it
+                // that's the single local CSSRenderer, so awaiting it
                 // is awaiting scene.loadMap's clear + maps.load + build
                 // + absorb + warmup chain. `.finally` so the signal
                 // still fires on failure (master proceeds; joiner's

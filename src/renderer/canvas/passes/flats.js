@@ -42,7 +42,7 @@ export const flatMethods = {
         if (Math.abs(cz) < 0.01) return;   // plane at eye level — no coverage
 
         // Flat per-sector brightness (no distance falloff) — matches the
-        // DomRenderer / WebGL light model; constant across the plane.
+        // CSSRenderer / WebGL light model; constant across the plane.
         const lf = lightFor(lightLevel);
 
         // Clip every boundary loop to the near plane and project to

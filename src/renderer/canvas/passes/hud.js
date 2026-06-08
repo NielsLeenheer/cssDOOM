@@ -146,7 +146,7 @@ export const hudMethods = {
         const ui = this.uiScale;
         const destW = fw * ui, destH = fh * ui;
         // Rest the weapon on top of the status bar, tucked ~30 CSS px into
-        // it, matching the DomRenderer (`bottom: anchor(top)` +
+        // it, matching the CSSRenderer (`bottom: anchor(top)` +
         // `margin-bottom: -30px`) and the WebGL renderer. The bar is 32
         // framebuffer px × uiScale tall (see _renderHud); without this the
         // sprite sat flush at the very bottom of the framebuffer — about a

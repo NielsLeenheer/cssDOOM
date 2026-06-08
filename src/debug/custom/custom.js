@@ -310,7 +310,7 @@ export function registerCustom(debug) {
 
     custom.seven = async () => {
         const { spectator } = await recordings();
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.layers.chrome.hide();
@@ -348,7 +348,7 @@ export function registerCustom(debug) {
 
     custom.sevenAltStart = async () => {
         const { spectatorStart } = await recordings();
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.layers.chrome.hide();
@@ -399,7 +399,7 @@ export function registerCustom(debug) {
     };
 
     custom.sevenAltWiggle = async () => {
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.layers.chrome.hide();
@@ -466,7 +466,7 @@ export function registerCustom(debug) {
 
     custom.sevenAltEnd = async () => {
         const { spectatorEnd } = await recordings();
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.layers.chrome.hide();
@@ -504,7 +504,7 @@ export function registerCustom(debug) {
 
     custom.eight = async () => {
         const { door } = await recordings();
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.layers.chrome.hide();
@@ -525,7 +525,7 @@ export function registerCustom(debug) {
     };
 
     custom.nine = async () => {
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.view.spectator(true);
@@ -601,7 +601,7 @@ export function registerCustom(debug) {
     
 
     custom.ten = async () => {
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.view.spectator(true);
@@ -650,7 +650,7 @@ export function registerCustom(debug) {
     };
 
     custom.tenAlt = async () => {
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         debug.view.spectator(true);
@@ -701,7 +701,7 @@ export function registerCustom(debug) {
 
 
     custom.tenAltEnd = async () => {
-        debug.view.renderer('dom')
+        debug.view.renderer('css')
         debug.culling.all(false)
 
         await debug.player.path.move({

@@ -8,7 +8,7 @@
  *
  * Every renderer builds its own scene independently — buildScene() is a
  * pure function of (mapData + state) and returns `{ fragment, sceneState }`
- * that the renderer absorbs via DomRenderer.loadMap(). No cloning between
+ * that the renderer absorbs via CSSRenderer.loadMap(). No cloning between
  * panes; each pane runs the build for itself. See RENDERER_REFACTOR.md
  * for the migration story.
  */
@@ -78,7 +78,7 @@ const IOS_GPU_RELEASE_DELAY_MS = 100;
  * paneWidth ≈ window.innerWidth so the natural per-pane perspective
  * applies (wide FOV, no special case).
  *
- * Called by the DomRenderer's own ResizeObserver — fires on initial
+ * Called by the CSSRenderer's own ResizeObserver — fires on initial
  * observe, window resize, and any CSS layout change that resizes the
  * viewport (e.g. a sibling pane appearing or disappearing when a
  * remote client joins or leaves). No external trigger needed.
@@ -180,7 +180,7 @@ export async function buildScene(mapData) {
  *   5. Prime culling once so visibility classifications are correct on
  *      the first composited frame.
  *
- * Each DomRenderer in the orchestrator's target list runs this
+ * Each CSSRenderer in the orchestrator's target list runs this
  * independently — no cross-pane coupling. The camera prime reads
  * `renderer.state.camera`, populated by the `updateCamera` impl on
  * every dispatch. Master's `Level.load` fires an explicit
@@ -190,14 +190,14 @@ export async function buildScene(mapData) {
  * fan-out forwards to joiners over each RenderSink, so the joiner's
  * scene.loadMap warmup primes against fresh data too.
  *
- * Wired onto DomRenderer.prototype as the `loadMap` impl at the
+ * Wired onto CSSRenderer.prototype as the `loadMap` impl at the
  * bottom of renderer.js. Returns a Promise so the orchestrator's
  * world dispatch can Promise.all every local renderer.
  */
 export async function loadMap(renderer, name) {
     // Teardown phase — only if this renderer has a prior scene to
     // tear down. Empty on first construction; non-empty after any
-    // prior load. Reuses DomRenderer.clear() — same operation the
+    // prior load. Reuses CSSRenderer.clear() — same operation the
     // orchestrator triggers when a remote takes over master's pane
     // (different lifecycle, same DOM/state reset).
     //
@@ -228,7 +228,7 @@ export async function loadMap(renderer, name) {
     // dispatches fired before loadMap). Calling through the
     // auto-generated per-pane prototype method keeps the prime
     // local to this renderer; we skip the orchestrator so other
-    // panes don't get double-primed when a sibling DomRenderer's
+    // panes don't get double-primed when a sibling CSSRenderer's
     // loadMap runs.
     if (renderer.state.camera) {
         renderer.updateCamera(renderer.state.camera);

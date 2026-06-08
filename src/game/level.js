@@ -164,7 +164,7 @@ export class Level {
         // per-renderer warmup reads it. applyPlayerStart just wrote
         // each player's new x/y/z/angle into state.players; this
         // updateCamera dispatch fans to every target at the matching
-        // slot — the local DomRenderer's impl writes its state.camera
+        // slot — the local CSSRenderer's impl writes its state.camera
         // and the local AudioRenderer writes its listener's. The
         // fan-out also forwards over each RenderSink to its joiner, so
         // the joiner's scene.loadMap warmup primes against fresh data
@@ -183,7 +183,7 @@ export class Level {
             }] });
         }
 
-        // Fan the load to every render target. Each local DomRenderer
+        // Fan the load to every render target. Each local CSSRenderer
         // runs scene.loadMap (clear-if-needed, yield-if-cleared, build,
         // prime camera + culling). Each RenderSink forwards a
         // `cmd-world loadMap` envelope to its remote. Promise.all of

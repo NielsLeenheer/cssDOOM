@@ -13,18 +13,18 @@
  * orchestrator owns three concerns that all key off slot index:
  *
  *   1. Render-target dispatch — `targets` is a flat list of every
- *      registered target (DomRenderer, RenderSink, AudioRenderer).
+ *      registered target (CSSRenderer, RenderSink, AudioRenderer).
  *      Game code constructs an envelope (`{ type, slot?, cmd, args }`)
  *      and calls `orchestrator.dispatch(env)`. Player envelopes fan to
  *      every target whose `playerIndex` matches the addressed slot;
  *      world envelopes fan to every target. Each target's
- *      `dispatch(env)` decides what it does (DomRenderer paints,
+ *      `dispatch(env)` decides what it does (CSSRenderer paints,
  *      RenderSink forwards over the wire, AudioRenderer updates its
  *      per-listener state).
  *
  *   2. Remote-slot lifecycle — `nextOrCurrentRemoteSlot`, `bindRemoteSlot`,
  *      `unbindRemoteSlot`. A joining client triggers bind: the local
- *      DomRenderer at that slot leaves the target list (its sceneEl
+ *      CSSRenderer at that slot leaves the target list (its sceneEl
  *      is cleared and the paneEl's `data-active` flips to "false" so
  *      CSS hides it), a RenderSink is added in its place, and (for
  *      Network DM remotes) the local AudioRenderer also leaves so
@@ -63,7 +63,7 @@ import { AudioRenderer } from './audio/renderer.js';
 const MAX_SLOTS = 4;
 
 // Deferred-unhide window. When a client disconnects, the target swap
-// (sink → DomRenderer) happens immediately so master's per-frame commands
+// (sink → CSSRenderer) happens immediately so master's per-frame commands
 // keep the local pane DOM current. The visual "show pane again" toggle is
 // deferred this long so a quickly-reloading client can reconnect
 // without the user seeing master's pane flash visible. Aligned with
@@ -114,11 +114,11 @@ class Orchestrator {
         // Flat list of render targets, in registration order. Each
         // target carries `kind` ('dom' | 'sink' | 'audio') and
         // `playerIndex` (the slot it services). Multiple targets can
-        // share one slot — e.g. a DomRenderer + an AudioRenderer both
+        // share one slot — e.g. a CSSRenderer + an AudioRenderer both
         // service slot 0 locally. Per-pane dispatch matches against
         // playerIndex; world dispatch fans to all. Lifecycle (who's
         // in the list when) is owned by the modules that create
-        // targets: DomRendererManager for 'dom', bindRemoteSlot /
+        // targets: CSSRendererManager for 'dom', bindRemoteSlot /
         // unbindRemoteSlot for 'sink', audio/renderer.js for 'audio'.
         this.targets = [];
 
@@ -186,7 +186,7 @@ class Orchestrator {
 
     /**
      * Find the first target at the given slot with the given kind, or
-     * null. Callers needing a specific role (the local DomRenderer for
+     * null. Callers needing a specific role (the local CSSRenderer for
      * overlay replay, the sink for a remote, the AudioRenderer for
      * mute) pick by kind — multiple targets can share one slot.
      */
@@ -200,7 +200,7 @@ class Orchestrator {
     /**
      * Register a target. Each target must expose `kind` and
      * `playerIndex`. Refreshes `#game[data-active-renderers]` because
-     * adding a local DomRenderer changes how CSS sizes the panes.
+     * adding a local CSSRenderer changes how CSS sizes the panes.
      */
     addTarget(target) {
         this.targets.push(target);
@@ -221,7 +221,7 @@ class Orchestrator {
     /** Recompute and write `#game[data-active-renderers]` based on the
      *  count of panes currently marked active (`data-active="true"`).
      *  Reads from the DOM rather than `this.targets` because during the
-     *  unbindRemoteSlot grace window a DomRenderer is back in targets
+     *  unbindRemoteSlot grace window a CSSRenderer is back in targets
      *  but its paneEl is still hidden (data-active="false") until
      *  loadMap rebuilds the scene; CSS sizing should treat it as 1
      *  pane visible, not 2. */
@@ -235,7 +235,7 @@ class Orchestrator {
     }
 
     // ── Spectator mode ───────────────────────────────────────────────────
-    // SP-only feature. All forwards target slot 0's local DomRenderer
+    // SP-only feature. All forwards target slot 0's local CSSRenderer
     // (always present in SP). UI calls these on the orchestrator and
     // never holds a renderer reference directly.
     setSpectatorCamera(camera)        { this.findTarget(0, 'dom')?.setSpectatorCamera?.(camera); }
@@ -351,7 +351,7 @@ class Orchestrator {
     // ── Audio listener lifecycle ────────────────────────────────────────
     //
     // The orchestrator owns the set of AudioRenderer targets the same
-    // way it owns DomRenderers and RenderSinks. `configureAudio` sets
+    // way it owns CSSRenderers and RenderSinks. `configureAudio` sets
     // the roster size; `setAudioEnabled` flips the master switch; bind /
     // unbind toggle per-slot suppression. Every change funnels through
     // `_rebuildAudioTargets`, which derives the live set from the
@@ -368,7 +368,7 @@ class Orchestrator {
      * Listener count drives the pan mode after suppression: 1 = bearing
      * pan, 2+ = locked L/R for split-screen. Called by `mode.js`'s
      * applyMode (master path), `master.js`'s onJoin handler, and the
-     * joiner's `_onAck` after `resetToJoinerSlot` puts its DomRenderer
+     * joiner's `_onAck` after `resetToJoinerSlot` puts its CSSRenderer
      * at the assigned slot.
      */
     configureAudio(slots) {
@@ -435,7 +435,7 @@ class Orchestrator {
 
     /**
      * Bind a connected peer to the given slot. Installs a RenderSink in
-     * place of the DomRenderer, tears down master's local DOM for that
+     * place of the CSSRenderer, tears down master's local DOM for that
      * pane (since the client now renders it), hides the pane via
      * `paneEl[data-active="false"]`, and refreshes perspectives because
      * the remaining pane just grew from 50% → 100% width. Cancels any
@@ -476,7 +476,7 @@ class Orchestrator {
 
         this._occupiedRemoteSlots.add(slot);
 
-        // Pull the local DomRenderer (if any) out of the active target
+        // Pull the local CSSRenderer (if any) out of the active target
         // list — the remote now drives this slot's visual. The renderer
         // instance survives in savedDom for restore on unbind.
         const localDom = savedDom ?? this.findTarget(slot, 'dom');
@@ -516,7 +516,7 @@ class Orchestrator {
     }
 
     /**
-     * Reverse of bindRemoteSlot for one peer. Restores the DomRenderer
+     * Reverse of bindRemoteSlot for one peer. Restores the CSSRenderer
      * immediately so master's per-frame commands keep the local pane DOM
      * in sync, but defers the visual unhide for RECONNECT_GRACE_MS so a
      * reloading client's reconnect doesn't flash the pane visible. After
@@ -530,7 +530,7 @@ class Orchestrator {
      * to re-fire per-player setup that the original level-load fan-out
      * landed only on renderers existing at the time (createPlayerSprite
      * for cross-pane billboards). No callback fires if the slot had no
-     * local DomRenderer (savedTarget was null) or if a reconnect
+     * local CSSRenderer (savedTarget was null) or if a reconnect
      * cancelled the grace timer.
      */
     unbindRemoteSlot(peerKey, { onGraceRebuilt, bindingGraceMs = RECONNECT_GRACE_MS } = {}) {
@@ -544,7 +544,7 @@ class Orchestrator {
         this.removeTarget(sink);
         this._occupiedRemoteSlots.delete(slot);
 
-        // Restore the local DomRenderer immediately so master's per-frame
+        // Restore the local CSSRenderer immediately so master's per-frame
         // commands keep its DOM in sync; visual unhide is deferred via
         // grace so a quick reconnect doesn't flash the pane visible.
         if (savedDom) this.addTarget(savedDom);
@@ -667,7 +667,7 @@ class Orchestrator {
  *
  *   { type: 'world', cmd, args } — every target is dispatched to.
  *      AudioRenderers without the named method silently no-op via
- *      their base dispatch; DomRenderer / RenderSink always
+ *      their base dispatch; CSSRenderer / RenderSink always
  *      participate. Returns Promise.all so async impls (loadMap's
  *      scene rebuild, level-transition's fade-complete promise) can
  *      be awaited.

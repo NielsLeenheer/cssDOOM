@@ -177,7 +177,7 @@ export const wallMethods = {
         // the bottom (REPEAT-wrapped). Matches the WebGL/DOM renderers.
         const vBase = unpegged ? yOff - wallH : yOff;
 
-        // Flat per-sector brightness — matches the DomRenderer / WebGL light
+        // Flat per-sector brightness — matches the CSSRenderer / WebGL light
         // model (doomLight); constant across the wall, so resolve it once.
         const lf = lightFor(baseLight);
         const skyCtx = skyAbove ? this._skyCtx : null;

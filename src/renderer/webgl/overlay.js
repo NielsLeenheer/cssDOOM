@@ -15,7 +15,7 @@
  * full-screen screens draw at native 320×200 centred in it. The status bar
  * and weapon scale with `this.uiScale`, which the engine recomputes each
  * resize: held at a min scale on small panes and a max on large ones,
- * ramping between two width breakpoints — the DomRenderer's 2↔3 range,
+ * ramping between two width breakpoints — the CSSRenderer's 2↔3 range,
  * smoothed and never wrapping into rows. The blit shader
  * samples the source graphics with NEAREST, so the overlay stays as crunchy
  * as the world's textures even though the GL canvas itself is high-res.
@@ -211,7 +211,7 @@ export const overlayMethods = {
         const ui = this.uiScale;
         const destW = fw * ui, destH = fh * ui;
         // Rest the weapon on top of the status bar, tucked ~30 CSS px into
-        // it, matching the DomRenderer (`bottom: anchor(top)` +
+        // it, matching the CSSRenderer (`bottom: anchor(top)` +
         // `margin-bottom: -30px`). The bar is 32 overlay px × uiScale tall
         // (see _renderHud); without this the sprite sat flush at the very
         // bottom of the framebuffer — about a full bar-height too low.

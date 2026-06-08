@@ -3,7 +3,7 @@
  *
  * Counterpart to [src/master.js](master.js). The joining window constructs
  * an App that holds a RemoteGame instead of a Game; RemoteGame owns the
- * transport, ACK handshake, DomRenderer setup, map load, and input
+ * transport, ACK handshake, CSSRenderer setup, map load, and input
  * forwarder.
  *
  *   - `?join` with no value → Local DM secondary. BroadcastChannel

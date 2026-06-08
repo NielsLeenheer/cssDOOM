@@ -56,7 +56,7 @@ const FAR = 20000;   // depth far plane — generously past any map extent
 // precision against FAR for a DOOM-scale map.
 const NEAR_PLANE = 1;
 
-// HUD scale (source-pixels → CSS-pixels), like the DomRenderer's `--scale`.
+// HUD scale (source-pixels → CSS-pixels), like the CSSRenderer's `--scale`.
 // The DOM steps 2→3 at a 1280px-wide pane; we use the same min/max but ramp
 // smoothly across a width band instead of stepping, and we never wrap the
 // bar into extra rows. Below MIN_W the scale holds at MIN, above MAX_W it
@@ -68,13 +68,13 @@ const HUD_RAMP_MIN_W = 1280;   // CSS px: at/below → MIN scale
 const HUD_RAMP_MAX_W = 1920;   // CSS px: at/above → MAX scale
 
 // Head bob — raise the eye 0→BOB_HEIGHT→0 while walking, matching the
-// DomRenderer's `--bob` keyframe (0..6 over a 400ms cycle). The amplitude
+// CSSRenderer's `--bob` keyframe (0..6 over a 400ms cycle). The amplitude
 // eases in/out with movement so the view settles smoothly when you stop.
 const BOB_HEIGHT = 6;                       // peak eye rise, world units
 const BOB_RATE = (2 * Math.PI) / 0.4;       // one 0→6→0 cycle per 400ms
 const BOB_EASE = 8;                         // amplitude ease rate (per second)
 
-// DomRenderer light model (scene/sectors.js::doomLightToCSS +
+// CSSRenderer light model (scene/sectors.js::doomLightToCSS +
 // constants.js): a DOOM sector light level (0..255) maps through the
 // R_InitLightTables colormap selection to a flat 0..1 brightness, with a
 // medium-distance scalelight compensation and a never-fully-black floor.
@@ -238,7 +238,7 @@ export class GLEngine {
     _getWall(name) { return getWallTexture(this.gl, name); }
     _getFlat(name) { return getFlatTexture(this.gl, name); }
 
-    /** Flat per-surface brightness (0..1), matching the DomRenderer. A
+    /** Flat per-surface brightness (0..1), matching the CSSRenderer. A
      *  sector with an animated light special uses the special's absolute
      *  value (the DOM keyframes override --light); everything else uses the
      *  static colormap brightness for its light level. */
@@ -280,7 +280,7 @@ export class GLEngine {
 
         // Movement detection (shared by head bob + weapon bob): the game
         // doesn't bob the camera itself, so we derive it from the camera
-        // sliding frame-to-frame, like the DomRenderer's `.moving` class.
+        // sliding frame-to-frame, like the CSSRenderer's `.moving` class.
         this._moving = this._lastCamX !== null
             && (Math.abs(camera.x - this._lastCamX) > 0.5 || Math.abs(camera.y - this._lastCamY) > 0.5);
         this._lastCamX = camera.x; this._lastCamY = camera.y;

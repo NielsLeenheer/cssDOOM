@@ -1,11 +1,11 @@
 /**
  * CanvasRenderer — an experimental DOOM-style renderer that lives next
- * to a DomRenderer in the orchestrator's target list. It exposes the
+ * to a CSSRenderer in the orchestrator's target list. It exposes the
  * exact same external interface (kind, playerIndex, paneEl, command
  * methods) so the orchestrator's per-pane / world dispatch fans to it
  * with no special-casing — identical in shape to the LineRenderer.
  *
- * Where the DomRenderer builds the scene out of CSS-transformed DOM and
+ * Where the CSSRenderer builds the scene out of CSS-transformed DOM and
  * the LineRenderer draws an oscilloscope wireframe, this renderer runs
  * a small software rasteriser (see software.js) that reproduces the
  * original game's look: textured walls, floors, ceilings, sky, light
@@ -69,7 +69,7 @@ export class CanvasRenderer extends RendererBase {
      */
     constructor({ playerIndex, gameContainer }) {
         super();
-        // Same orchestrator marker as DomRenderer so callers that find
+        // Same orchestrator marker as CSSRenderer so callers that find
         // a target by kind don't need to learn a new one — matches the
         // LineRenderer's reasoning.
         this.kind = 'dom';
@@ -126,7 +126,7 @@ export class CanvasRenderer extends RendererBase {
 
     /**
      * World loadMap fans here too. Resolve the map through the shared
-     * `maps` store — the same source the DomRenderer's scene builder
+     * `maps` store — the same source the CSSRenderer's scene builder
      * uses — rather than fetching a private copy. `maps.load` is
      * idempotent and runs the map-side enrichment (initThings), so
      * `maps.mapData.things` arrives already filtered by the selected

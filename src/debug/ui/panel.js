@@ -8,7 +8,7 @@
  * Companion stylesheet: panel.css.
  */
 
-import { culling, cullingStats } from '../../renderer/dom/scene/culling.js';
+import { culling, cullingStats } from '../../renderer/css/scene/culling.js';
 import { switchRenderer } from '../features/renderer.js';
 import { rendererType } from '../../renderer/manager.js';
 import { SETTINGS, HIDE_DISABLED_SECTIONS } from './registry.js';
@@ -25,7 +25,7 @@ const typedControls = [];
  *  renderer are greyed + disabled, or hidden outright in HIDE_DISABLED_SECTIONS
  *  so those sections show only the relevant set. */
 function applyRendererTypes() {
-    const active = rendererType(document.body.dataset.renderer || 'dom');
+    const active = rendererType(document.body.dataset.renderer || 'css');
     for (const c of typedControls) {
         const off = c.type !== active;
         if (c.hide) {

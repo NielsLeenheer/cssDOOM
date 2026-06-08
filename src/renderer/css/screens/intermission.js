@@ -31,13 +31,13 @@ const animationsByPane = new WeakMap();
 
 // ── Renderer-command entry points ──────────────────────────────────────
 // Game pushes showIntermission / hideIntermission through the
-// orchestrator as world envelopes; DomRenderer's bottom-of-file
+// orchestrator as world envelopes; CSSRenderer's bottom-of-file
 // binding wires these as the impls. Game also owns the
 // `body.dataset.gameState` transition that gates CSS visibility —
 // this module never touches it.
 
 /**
- * @param {object} renderer  DomRenderer for the pane this call addresses.
+ * @param {object} renderer  CSSRenderer for the pane this call addresses.
  * @param {object} payload
  * @param {string|null} payload.mapName  Name of the level just finished —
  *                                       drives the WILV title sprite.

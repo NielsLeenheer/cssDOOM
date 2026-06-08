@@ -1,7 +1,7 @@
 /**
- * DomRenderer — one rendering unit, one pane, one player's view.
+ * CSSRenderer — one rendering unit, one pane, one player's view.
  *
- * Each DomRenderer owns:
+ * Each CSSRenderer owns:
  *
  *   - Its DOM subtree: a `<div class="pane">` it created from
  *     `#pane-template`, plus the cached `rendererEl / sceneEl / viewportEl
@@ -12,7 +12,7 @@
  *   - Its camera state (the viewer's position, updated by updateCamera).
  *   - Its `playerIndex` — the player whose view it renders.
  *
- * No DomRenderer reaches into another DomRenderer's state. Cross-pane
+ * No CSSRenderer reaches into another CSSRenderer's state. Cross-pane
  * fan-out is the orchestrator's job (it iterates renderers).
  *
  * Per-player and world methods are bound onto the prototype at the
@@ -34,7 +34,7 @@ import { RendererBase } from '../base.js';
 // definition. The orchestrator calls `target.dispatch(env)`;
 // RendererBase routes that to the bound method here.
 
-export class DomRenderer extends RendererBase {
+export class CSSRenderer extends RendererBase {
     /**
      * @param {object} options
      * @param {number} options.playerIndex   the player this renderer is for
@@ -44,7 +44,7 @@ export class DomRenderer extends RendererBase {
     constructor({ playerIndex, gameContainer, paneTemplate }) {
         super();
         // Explicit type marker. Orchestrator uses `target.kind` to
-        // distinguish local DomRenderers from RenderSinks instead of
+        // distinguish local CSSRenderers from RenderSinks instead of
         // duck-typing on method existence — see
         // orchestrator.bindRemoteSlot / unbindRemoteSlot.
         this.kind = 'dom';
@@ -175,7 +175,7 @@ export class DomRenderer extends RendererBase {
      * Run one culling pass on this pane. Delegates to culling.js's
      * algorithm with `this` as the renderer arg. Skips when the pane
      * has no camera (e.g. an unbound slot) or no built geometry yet.
-     * Called by `DomRendererManager`'s culling loop, which schedules
+     * Called by `CSSRendererManager`'s culling loop, which schedules
      * each renderer's pass at a staggered cadence.
      */
     updateCulling(spectatorActive, collectStats) {
@@ -256,11 +256,11 @@ export function ensureThing(state, thingIndex) {
 }
 
 // ── Command impl bindings ────────────────────────────────────────────────
-// Each renderer command is bound here as a method on DomRenderer.prototype
+// Each renderer command is bound here as a method on CSSRenderer.prototype
 // that calls the impl with `this` baked in as the first arg. The
 // orchestrator calls `target.dispatch(env)`; RendererBase.dispatch
 // routes to the method bound below by `env.cmd`. Player vs world
-// routing is on `env.type` at the orchestrator — DomRenderer doesn't
+// routing is on `env.type` at the orchestrator — CSSRenderer doesn't
 // need to know the difference. Bound here so the cross-cutting
 // prototype mutation lives next to the class it mutates.
 
@@ -344,7 +344,7 @@ const IMPLS = {
 };
 
 for (const [name, impl] of Object.entries(IMPLS)) {
-    DomRenderer.prototype[name] = function (...args) {
+    CSSRenderer.prototype[name] = function (...args) {
         return impl(this, ...args);
     };
 }

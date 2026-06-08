@@ -59,11 +59,11 @@
     <!-- Game container — split-screen wrapper.
          Single pane visible when body[data-game-mode="singleplayer"]; both panes
          flex 50/50 when body[data-game-mode="deathmatch"]. Each pane is an empty
-         container at parse time; DomRenderer clones
+         container at parse time; CSSRenderer clones
          <template id="pane-template"> into every .pane at module
          load, so per-pane markup lives in one place. -->
-    <!-- Panes are created by src/renderer/dom-renderer.js's
-         DomRenderer instances. `#game` starts empty; each renderer
+    <!-- Panes are created by src/renderer/css/renderer.js's
+         CSSRenderer instances. `#game` starts empty; each renderer
          appends its own `.pane` subtree (cloned from
          `#pane-template`) when it's constructed. -->
     <div id="game"></div>
@@ -78,7 +78,7 @@
         <img src="images/controls.png" alt="Controls">
     </div>
 
-    <!-- Pane template — cloned into each .pane at DomRenderer load. Owns the
+    <!-- Pane template — cloned into each .pane at CSSRenderer load. Owns the
          full per-pane subtree: viewport (which carries CSS perspective),
          scene (the 3D world container), HUD overlay, and color overlays. -->
     <template id="pane-template">

@@ -53,7 +53,7 @@ import { config } from '../config.js';
 /**
  * Push each player's camera + HUD through the orchestrator. The
  * orchestrator's per-player dispatch fans the call to every render
- * target (DomRenderer or RenderSink) whose `playerIndex` matches —
+ * target (CSSRenderer or RenderSink) whose `playerIndex` matches —
  * mirror SP fans player 0 to both panes, DM splits, Network DM
  * forwards via the sink to the client.
  */
@@ -376,7 +376,7 @@ function setupMasterBroadcast() {
             // reclaiming it). No-op if the slot never received ANALOG.
             if (slot != null) clearRemoteSlot(slot);
             // After the unbind's grace expires, the slot's restored
-            // local DomRenderer is brand-new — every pickup
+            // local CSSRenderer is brand-new — every pickup
             // uncollected, every enemy alive, no player billboards,
             // no corpses, default HUD and weapon sprite. Apply the
             // current catchup directly to that one renderer so
@@ -518,7 +518,7 @@ export async function initMaster({ playSlot = null, exportFormat = null } = {}) 
     // applyMode owns the cross-cutting "enter a mode" work that Game
     // doesn't replicate: state.gameMode/networkMode, body data
     // attributes, player count, audio config, signaling room, and
-    // DomRenderer reshaping. Game reads from state.gameMode (via the
+    // CSSRenderer reshaping. Game reads from state.gameMode (via the
     // getter on Game) so once applyMode runs, Game sees the right mode.
     applyMode(isKiosk ? 'deathmatch' : loadSavedGameMode(), 'standalone');
 

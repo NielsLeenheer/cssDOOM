@@ -38,7 +38,7 @@
 
        1. `.sprite` elements (enemies, barrels, animated pickups, player
           billboards) already carry --w/--h sizing and the billboard
-          transform from src/renderer/dom/scene/entities/{sprites,things}.css.
+          transform from src/renderer/css/scene/entities/{sprites,things}.css.
           We just wipe the sprite-sheet background image + sprite-cycle
           animation and fill with a flat color.
 
