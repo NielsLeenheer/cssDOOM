@@ -44,7 +44,7 @@ export const lineReduction = { snap: true, merge: true, dropParallel: true, grid
 //                   resolves thin distant near-edge-on lines that would
 //                   otherwise dash, at ~scale² visibility-fill cost (applied on
 //                   the next resize).
-export const lineScene = { cullInteriorFaces: true, depthEpsilon: 0.025, minVisibleSamples: 3, depthResScale: 1 };
+export const lineScene = { cullInteriorFaces: true, depthEpsilon: 0.025, minVisibleSamples: 3, depthResScale: 3 };
 
 // Debug visualisation toggles (renderer-side, not scene settings). showDepthBuffer
 // draws the scene's depth buffer over the wireframe (nearest-neighbour, so its
