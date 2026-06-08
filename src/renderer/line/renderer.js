@@ -15,12 +15,14 @@
  * rendered (matches the "before CSS" purity of the talk demo).
  */
 
-import { renderScene3D, setRendererSettings, snapLinesToGrid, mergeCollinearLines, dropParallelDuplicates, getDepthBuffer } from './scene.js';
+import { renderScene3D, setRendererSettings, dropSmallLines, snapLinesToGrid, mergeCollinearLines, dropParallelDuplicates, getDepthBuffer } from './scene.js';
 import { RendererBase } from '../base.js';
 import { canvasStats } from '../canvas/renderer.js';
 
 // Line-reduction pipeline, shared across LineRenderer instances and toggled
 // from the debug panel (Renderer section):
+//   dropSmall — drop segments shorter than minLineLength (NDC), before snap, so
+//           tiny distant slivers / stubs never feed into snap/merge.
 //   snap  — snap endpoints to a uniform grid + dedup (default). Keeps junctions
 //           connected, drops sub-grid stubs, never repositions a line.
 //   merge — collinear merge on top of snap (default). With snap first, its
@@ -33,7 +35,7 @@ import { canvasStats } from '../canvas/renderer.js';
 //           dependent for free, since recessed-opening edges only converge on
 //           screen far away. A dropped line can pop back when you approach.
 //   gridSize — snap grid cell in NDC (settable by hand: lineReduction.gridSize).
-export const lineReduction = { snap: true, merge: true, dropParallel: true, gridSize: 0.005, dropPerpTol: 0.02 };
+export const lineReduction = { dropSmall: true, snap: true, merge: true, dropParallel: true, gridSize: 0.005, dropPerpTol: 0.02, minLineLength: 0.01 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
 // the scene each frame. cullInteriorFaces is exposed in the debug panel
@@ -273,6 +275,7 @@ export class LineRenderer extends RendererBase {
         // oscilloscope to draw): grid-snap + dedup, plus optional collinear merge.
         let lines = rawLines;
         const g = lineReduction.gridSize;
+        if (lineReduction.dropSmall) lines = dropSmallLines(lines, lineReduction.minLineLength);
         if (lineReduction.snap) lines = snapLinesToGrid(lines, g);
         if (lineReduction.merge) {
             // Tolerances tied to the grid: only join segments already on the same

@@ -71,6 +71,7 @@ export const SETTINGS = [
     // Line renderer's 2D-segment equivalents of the DOM culling passes
     // (rendererType:'canvas'). snap/merge/drop reduce the emitted line set;
     // cull-interior-faces drops buried wall quads. See renderer.js for details.
+    { section: 'Culling', kind: 'flag', target: lineReduction, key: 'dropSmall',    label: 'Drop small lines',    rendererType: 'canvas' },
     { section: 'Culling', kind: 'flag', target: lineReduction, key: 'snap',         label: 'Snap to grid',        rendererType: 'canvas' },
     { section: 'Culling', kind: 'flag', target: lineReduction, key: 'merge',        label: 'Merge lines',         rendererType: 'canvas' },
     { section: 'Culling', kind: 'flag', target: lineReduction, key: 'dropParallel', label: 'Drop parallel lines', rendererType: 'canvas' },

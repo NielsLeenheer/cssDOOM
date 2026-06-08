@@ -1280,6 +1280,26 @@ export function optimizeLineOrder(lines) {
 }
 
 /**
+ * Drop segments shorter than `minLength` (screen-space, NDC). Run before snap so
+ * tiny distant slivers / leftover stubs never feed into snap or merge (where
+ * they could anchor or extend a neighbour). Endpoint depth tags are preserved.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {number} minLength  Minimum segment length in NDC to keep.
+ */
+export function dropSmallLines(lines, minLength = 0.01) {
+    if (!(minLength > 0)) return lines.slice();
+    const min2 = minLength * minLength;
+    const result = [];
+    for (let i = 0, len = lines.length; i < len; i++) {
+        const l = lines[i];
+        const dx = l.end[0] - l.start[0], dy = l.end[1] - l.start[1];
+        if (dx * dx + dy * dy >= min2) result.push(l);
+    }
+    return result;
+}
+
+/**
  * Snap line endpoints to a uniform grid, then drop degenerate and duplicate
  * segments (screen-space, NDC). Unlike mergeCollinearLines this never moves a
  * line onto another line's axis, so shared endpoints stay shared (junctions
