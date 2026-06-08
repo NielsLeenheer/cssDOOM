@@ -35,7 +35,7 @@ import { canvasStats } from '../canvas/renderer.js';
 //           dependent for free, since recessed-opening edges only converge on
 //           screen far away. A dropped line can pop back when you approach.
 //   gridSize — snap grid cell in NDC (settable by hand: lineReduction.gridSize).
-export const lineReduction = { dropSmall: true, snap: true, merge: true, dropParallel: true, gridSize: 0.005, dropPerpTol: 0.02, minLineLength: 0.01 };
+export const lineReduction = { dropSmall: true, snap: true, merge: true, dropParallel: true, gridSize: 0.005, dropPerpTol: 0.02, minLineLength: 0.03 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
 // the scene each frame. cullInteriorFaces is exposed in the debug panel
