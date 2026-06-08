@@ -93,6 +93,17 @@ export class GLEngine {
         this.gl = gl;
         this.resolution = resolution;
 
+        // Per-frame GPU draw stats for the debug overlay. drawArrays is the
+        // only draw entry point used by every pass, so wrap it once to count
+        // calls + triangles centrally; render() zeroes these each frame.
+        this._stats = { drawCalls: 0, tris: 0 };
+        const realDrawArrays = gl.drawArrays.bind(gl);
+        gl.drawArrays = (mode, first, count) => {
+            this._stats.drawCalls++;
+            if (mode === gl.TRIANGLES) this._stats.tris += count / 3;
+            realDrawArrays(mode, first, count);
+        };
+
         // World model + per-frame simulation (shared with the canvas
         // renderer). The engine forwards every world command here.
         this.scene = new Scene();
@@ -261,6 +272,8 @@ export class GLEngine {
     render(camera) {
         const gl = this.gl;
         if (!this.W) return;
+        this._stats.drawCalls = 0;
+        this._stats.tris = 0;
         gl.viewport(0, 0, this.W, this.H);
         const now = performance.now();
 

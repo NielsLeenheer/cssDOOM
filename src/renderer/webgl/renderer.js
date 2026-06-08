@@ -28,6 +28,7 @@
 
 import { RendererBase } from '../base.js';
 import { GLEngine } from './engine.js';
+import { canvasStats } from '../canvas/renderer.js';
 import * as maps from '../../shared/maps/index.js';
 
 const MAX_RESOLUTION = 4;
@@ -89,6 +90,27 @@ export class WebGLRenderer extends RendererBase {
         this.engine = new GLEngine(this.gl, this.resolution);
         this._camera = null;
         this._hasScene = false;
+
+        // Stats overlay (gated by the shared canvasStats toggle — WebGL is a
+        // 'canvas'-type renderer, so the debug panel's "Stats" applies). Can't
+        // draw 2D text on the GL canvas, so use a top-centred DOM div. CPU
+        // submit time and RAF frame interval are tracked in rolling windows;
+        // fps comes from the frame interval (CPU submit time would inflate it,
+        // since the GPU works asynchronously after the draw calls return).
+        this._cpuTimes = new Float32Array(60);
+        this._frameDeltas = new Float32Array(60);
+        this._statIdx = 0;
+        this._lastTick = 0;
+        this._statsEl = document.createElement('div');
+        this._statsEl.className = 'webgl-stats';
+        Object.assign(this._statsEl.style, {
+            position: 'absolute', top: '0', left: '50%', transform: 'translateX(-50%)',
+            font: '12px monospace', color: '#ffdd55', background: 'rgba(0, 0, 0, 0.55)',
+            padding: '3px 6px', whiteSpace: 'nowrap', pointerEvents: 'none',
+            zIndex: '10', display: 'none',
+        });
+        if (!this.paneEl.style.position) this.paneEl.style.position = 'relative';
+        this.paneEl.appendChild(this._statsEl);
 
         this._resizeObserver = new ResizeObserver(() => this._resize());
         this._resizeObserver.observe(this.paneEl);
@@ -156,12 +178,39 @@ export class WebGLRenderer extends RendererBase {
     _paint() {
         if (this._dead || !this._hasScene || !this._camera) return;
         this.engine.viewerPlayerIndex = this.playerIndex;
+        const t0 = performance.now();
         this.engine.render(this._camera);
+        this._cpuTimes[this._statIdx] = performance.now() - t0;
+        if (canvasStats.enabled) this._drawStats();
+        else if (this._statsEl.style.display !== 'none') this._statsEl.style.display = 'none';
+    }
+
+    /** Top-centred DOM overlay: resolution, GL backing size, per-frame draw
+     *  calls + triangles, CPU submit time, and frame-interval fps. */
+    _drawStats() {
+        let cpu = 0, cn = 0, delta = 0, dn = 0;
+        for (let i = 0; i < this._cpuTimes.length; i++) {
+            if (this._cpuTimes[i] > 0) { cpu += this._cpuTimes[i]; cn++; }
+            if (this._frameDeltas[i] > 0) { delta += this._frameDeltas[i]; dn++; }
+        }
+        const ms = cn ? cpu / cn : 0;
+        const avgDelta = dn ? delta / dn : 0;
+        const fps = avgDelta > 0 ? Math.min(999, 1000 / avgDelta) : 0;
+        const s = this.engine._stats;
+        this._statsEl.textContent =
+            `${this.resolution}x  ${this.canvas.width}×${this.canvas.height}  ` +
+            `${s.drawCalls} draws  ${(s.tris / 1000).toFixed(1)}k tris  ` +
+            `${ms.toFixed(1)} ms cpu  ${fps.toFixed(0)} fps`;
+        this._statsEl.style.display = '';
     }
 
     _tick = () => {
         this._raf = requestAnimationFrame(this._tick);
+        const now = performance.now();
+        if (this._lastTick) this._frameDeltas[this._statIdx] = now - this._lastTick;
+        this._lastTick = now;
         this._paint();
+        this._statIdx = (this._statIdx + 1) % this._cpuTimes.length;
     };
 }
 
