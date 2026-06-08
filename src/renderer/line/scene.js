@@ -24,15 +24,12 @@ let settings = {
     // height removes the leak at the source (and trims redundant geometry).
     cullInteriorFaces: true,
 
-    // Extract edges from floor/ceiling polygons too (not just walls). The
-    // sector boundaries ARE the floor/ceiling outlines; drawing them gives the
-    // complete room/platform perimeter regardless of which walls are back-face
-    // culled (e.g. the full octagon top, far room edges). Pairs with
-    // cullInteriorFaces: the cull removes buried wall faces (and their leaks),
-    // the outlines restore every horizontal silhouette from the actual sector
-    // geometry. Floors/ceilings are already rasterized for depth, so occluded
-    // outline portions are hidden by the same visibility test as walls.
-    drawFloorCeilingOutlines: true
+    // Extract edges from floor/ceiling polygons too (not just walls). Off by
+    // default: their coplanar edges leak through floors above them, the same way
+    // wall stubs did. Completeness of outlines is instead handled by extracting
+    // the silhouette edges of back-facing walls via the eye-height rule (see the
+    // back-face handling in renderScene3D). Kept as a toggle for comparison.
+    drawFloorCeilingOutlines: false
 };
 
 // Current depth buffer dimensions
@@ -61,6 +58,9 @@ const edgeX = new Float32Array(MAX_EDGES);
 const edgeDx = new Float32Array(MAX_EDGES);
 const edgeDepth = new Float32Array(MAX_EDGES);
 const edgeDDepth = new Float32Array(MAX_EDGES);
+
+// Reusable edge mask for back-facing wall silhouette extraction (4 quad edges)
+const backEdgeMask = [false, false, false, false];
 
 // Reusable result arrays (cleared each frame)
 let polygonPool = [];
@@ -185,6 +185,7 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
         // (unreliable normal/center when vertices are on both sides)
         const crossesNearPlane = !allInFront && !allBehind;
 
+        poly._backFacing = false;
         if (!crossesNearPlane && !settings.debugDisableBackfaceCull) {
             centerX /= vertCount;
             centerY /= vertCount;
@@ -208,7 +209,16 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
             }
 
             const dot = nx * (-centerX) + ny * (-centerY) + nz * (-centerZ);
-            if (dot <= 0) continue; // Back-facing
+            if (dot <= 0) {
+                // Back-facing. Floors/ceilings: cull outright (their hidden side
+                // is never a useful outline). Walls: keep, but only their
+                // silhouette horizontal edges are extracted later (eye-height
+                // rule) — a back wall's top is a visible outline when it's below
+                // eye level (you look down onto it) and its bottom when above.
+                // We don't rasterize it (it can't occlude anything in front).
+                if (poly.type !== 'wall') continue;
+                poly._backFacing = true;
+            }
         }
 
         // Clip to near plane and project
@@ -278,8 +288,12 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
 
         if (maxX < 0 || minX >= DEPTH_WIDTH || maxY < 0 || minY >= DEPTH_HEIGHT) continue;
 
-        // Rasterize to depth buffer
-        rasterizePolygonOptimized(screenVerts, screenCount, depthBuffer);
+        // Rasterize to depth buffer (back-facing walls are kept for silhouette
+        // edge extraction only — they must not write depth or they'd occlude the
+        // very front geometry that should hide them, and re-leak their own edges).
+        if (!poly._backFacing) {
+            rasterizePolygonOptimized(screenVerts, screenCount, depthBuffer);
+        }
 
         // Store for edge extraction
         poly._screenCount = screenCount;
@@ -297,7 +311,24 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
         // drawn when drawFloorCeilingOutlines is set (see settings).
         if ((poly.type === 'floor' || poly.type === 'ceiling') && !settings.drawFloorCeilingOutlines) continue;
         debugCurrentPolyType = poly.type || 'unknown';
-        extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool);
+
+        if (poly._backFacing) {
+            // Back-facing wall: only its silhouette horizontal edges are real
+            // outlines, decided by eye height. A back wall never crosses the near
+            // plane (back-face test is skipped for those), so screenVerts are the
+            // 4 quad corners in order: 0-1 bottom, 1-2 / 3-0 vertical, 2-3 top.
+            if (poly._screenCount !== 4) continue;
+            const bottomZ = poly.vertices[0].z;
+            const topZ = poly.vertices[2].z;
+            backEdgeMask[0] = bottomZ >= camera.z;   // bottom edge: visible when above eye
+            backEdgeMask[1] = false;                 // vertical: interior to silhouette
+            backEdgeMask[2] = topZ <= camera.z;      // top edge: visible when below eye
+            backEdgeMask[3] = false;
+            if (!backEdgeMask[0] && !backEdgeMask[2]) continue;
+            extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool, backEdgeMask);
+        } else {
+            extractVisibleEdgesOptimized(poly._screenVerts, poly._screenCount, depthBuffer, visibleLinesPool, null);
+        }
     }
 
     // Add door chevron indicators
@@ -649,8 +680,11 @@ function clipLineToScreen(x1, y1, x2, y2) {
 
 /**
  * Extract visible edges (optimized)
+ * @param {Array} [edgeMask] optional per-edge boolean array; when present, edge i
+ *   (verts[i]->verts[i+1]) is only processed if edgeMask[i] is truthy. Used to
+ *   extract just the silhouette horizontal edges of back-facing walls.
  */
-function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
+function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edgeMask) {
     const invWidth = 2 / DEPTH_WIDTH;
     const invHeight = 2 / DEPTH_HEIGHT;
 
@@ -660,6 +694,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
         const MAX_DEBUG_EDGES = 2000;
         for (let i = 0; i < vertCount; i++) {
             if (output.length >= MAX_DEBUG_EDGES) return;
+            if (edgeMask && !edgeMask[i]) continue;
 
             const v1 = verts[i];
             const v2 = verts[(i + 1) % vertCount];
@@ -683,6 +718,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output) {
     }
 
     for (let i = 0; i < vertCount; i++) {
+        if (edgeMask && !edgeMask[i]) continue;
         const v1 = verts[i];
         const v2 = verts[(i + 1) % vertCount];
 

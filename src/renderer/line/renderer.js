@@ -35,7 +35,7 @@ export const lineReduction = { merge: true };
 //   drawFloorCeilingOutlines — draw sector floor/ceiling boundaries, so room and
 //                             platform outlines stay complete even where the
 //                             walls that would form them are back-face culled.
-export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: true };
+export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: false };
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
