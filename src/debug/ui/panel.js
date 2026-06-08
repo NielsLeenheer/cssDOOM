@@ -118,8 +118,21 @@ function buildEntry(s, parent) {
                     select.appendChild(sep);
                 }
             }
-            select.value = document.body.dataset.renderer || s.options[0];
-            select.addEventListener('change', () => switchRenderer(select.value));
+            const current = document.body.dataset.renderer || '';
+            const kinds = current.split(',').map(k => k.trim()).filter(Boolean);
+            if (kinds.length > 1) {
+                // Comparison layout (?renderer=a,b): several renderers at once,
+                // not switchable from here. Show "multiple" and disable the picker.
+                const opt = document.createElement('option');
+                opt.value = current;
+                opt.textContent = 'multiple';
+                select.appendChild(opt);
+                select.value = current;
+                select.disabled = true;
+            } else {
+                select.value = current || s.options[0];
+                select.addEventListener('change', () => switchRenderer(select.value));
+            }
             lbl.appendChild(select);
             parent.appendChild(lbl);
             break;
