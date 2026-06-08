@@ -107,9 +107,14 @@ export class CanvasRenderer extends RendererBase {
 
         // Rolling frame-time stats for the overlay (`_drawStats`), gated by the
         // shared `canvasStats.enabled` flag — off by default, toggled from the
-        // debug panel's Renderer → "Stats" checkbox.
+        // debug panel's Renderer → "Stats" checkbox. `_frameTimes` is the CPU
+        // render cost (ms); `_frameDeltas` is the RAF interval, used for fps
+        // (1000/render-ms would show the theoretical max, not the vsync-capped
+        // rate the loop actually runs at).
         this._frameTimes = new Float32Array(60);
+        this._frameDeltas = new Float32Array(60);
         this._frameTimeIdx = 0;
+        this._lastTick = 0;
 
         this._resizeObserver = new ResizeObserver(() => this._resize());
         this._resizeObserver.observe(this.paneEl);
@@ -232,9 +237,9 @@ export class CanvasRenderer extends RendererBase {
         ctx.drawImage(this.internalCanvas, 0, 0, this.canvas.width, this.canvas.height);
         const t1 = performance.now();
 
-        // Roll the elapsed ms into a 60-frame window for the readout.
+        // Roll the CPU render cost into the current window slot (the index is
+        // advanced once per frame in _tick, alongside the RAF delta).
         this._frameTimes[this._frameTimeIdx] = t1 - t0;
-        this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
         if (canvasStats.enabled) this._drawStats();
     }
 
@@ -242,13 +247,14 @@ export class CanvasRenderer extends RendererBase {
      *  framebuffer) so the text stays crisp instead of getting upscaled
      *  with the world. */
     _drawStats() {
-        let sum = 0, n = 0;
+        let sum = 0, n = 0, dsum = 0, dn = 0;
         for (let i = 0; i < this._frameTimes.length; i++) {
-            const v = this._frameTimes[i];
-            if (v > 0) { sum += v; n++; }
+            if (this._frameTimes[i] > 0) { sum += this._frameTimes[i]; n++; }
+            if (this._frameDeltas[i] > 0) { dsum += this._frameDeltas[i]; dn++; }
         }
         const avg = n ? sum / n : 0;
-        const fps = avg > 0 ? Math.min(999, 1000 / avg) : 0;
+        const avgDelta = dn ? dsum / dn : 0;
+        const fps = avgDelta > 0 ? Math.min(999, 1000 / avgDelta) : 0;
         const dpr = window.devicePixelRatio || 1;
         const ctx = this.ctx;
         ctx.save();
@@ -268,7 +274,11 @@ export class CanvasRenderer extends RendererBase {
 
     _tick = () => {
         this._raf = requestAnimationFrame(this._tick);
+        const now = performance.now();
+        if (this._lastTick) this._frameDeltas[this._frameTimeIdx] = now - this._lastTick;
+        this._lastTick = now;
         this._paint();
+        this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
     };
 }
 
