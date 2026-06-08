@@ -36,14 +36,11 @@ import { canvasStats } from '../canvas/renderer.js';
 export const lineReduction = { snap: true, merge: true, dropParallel: true, gridSize: 0.005, dropPerpTol: 0.02 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
-// the scene each frame. Exposed in the debug panel (Renderer section) so the
-// hidden-line behaviour can be compared live:
-//   cullInteriorFaces       — drop wall quads buried below their sector floor /
-//                             above its ceiling (kills back-side leak stubs).
-//   drawFloorCeilingOutlines — draw sector floor/ceiling boundaries, so room and
-//                             platform outlines stay complete even where the
-//                             walls that would form them are back-face culled.
-export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: false, depthEpsilon: 0.025, minVisibleSamples: 3 };
+// the scene each frame. cullInteriorFaces is exposed in the debug panel
+// (Culling section); depthEpsilon / minVisibleSamples are console-tunable.
+//   cullInteriorFaces — drop wall quads buried below their sector floor / above
+//                       its ceiling (kills back-side leak stubs).
+export const lineScene = { cullInteriorFaces: true, depthEpsilon: 0.025, minVisibleSamples: 3 };
 
 // Debug visualisation toggles (renderer-side, not scene settings). showDepthBuffer
 // draws the scene's depth buffer over the wireframe (nearest-neighbour, so its

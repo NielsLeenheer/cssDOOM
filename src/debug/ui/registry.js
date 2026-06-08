@@ -54,6 +54,13 @@ export const SETTINGS = [
     { section: 'Culling', kind: 'flag', target: culling, key: 'sky',      label: 'Sky culling',      stat: 'afterSky', rendererType: 'dom' },
     { section: 'Culling', kind: 'css', class: 'css-distance-culling', label: 'CSS distance culling', default: false, rendererType: 'dom' },
     { section: 'Culling', kind: 'css', class: 'css-frustum-culling',  label: 'CSS frustum culling',  default: false, rendererType: 'dom' },
+    // Line renderer's 2D-segment equivalents of the DOM culling passes
+    // (rendererType:'canvas'). snap/merge/drop reduce the emitted line set;
+    // cull-interior-faces drops buried wall quads. See renderer.js for details.
+    { section: 'Culling', kind: 'flag', target: lineReduction, key: 'snap',         label: 'Snap to grid',        rendererType: 'canvas' },
+    { section: 'Culling', kind: 'flag', target: lineReduction, key: 'merge',        label: 'Merge lines',         rendererType: 'canvas' },
+    { section: 'Culling', kind: 'flag', target: lineReduction, key: 'dropParallel', label: 'Drop parallel lines', rendererType: 'canvas' },
+    { section: 'Culling', kind: 'flag', target: lineScene,     key: 'cullInteriorFaces', label: 'Cull interior faces', rendererType: 'canvas' },
 
     // ── Effects ── CSS-only render toggles (rendererType:'dom' — pure CSS) ──
     // These four effects are ON by default in the renderer CSS; the menu
@@ -69,17 +76,6 @@ export const SETTINGS = [
 
     // ── Renderer ── select swaps the SP renderer; the rest gate by type ────
     { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS },
-    // Canvas frame-time / size overlay — only the canvas renderer draws it.
-    { section: 'Renderer', kind: 'flag', target: canvasStats, key: 'enabled', label: 'Stats', rendererType: 'canvas' },
-    // Line renderer: collinear merge vs. plain dedup (off). Effect shows in the
-    // Stats overlay's line counts. Line renderer reports type 'canvas'.
-    { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'snap', label: 'Snap to grid', rendererType: 'canvas' },
-    { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'merge', label: 'Merge lines', rendererType: 'canvas' },
-    { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'dropParallel', label: 'Drop parallel lines', rendererType: 'canvas' },
-    { section: 'Renderer', kind: 'flag', target: lineScene, key: 'cullInteriorFaces', label: 'Cull interior faces', rendererType: 'canvas' },
-    { section: 'Renderer', kind: 'flag', target: lineScene, key: 'drawFloorCeilingOutlines', label: 'Floor/ceiling outlines', rendererType: 'canvas' },
-    { section: 'Renderer', kind: 'flag', target: lineDebug, key: 'showDepthBuffer', label: 'Depth buffer', rendererType: 'canvas' },
-    { section: 'Renderer', kind: 'flag', target: lineDebug, key: 'showTriangles', label: 'Line triangles', rendererType: 'canvas' },
     // Layer visibility — the SAME features/layers.js objects the console drives
     // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
     // instantly. Checkbox checked = layer shown. The scene layers are CSS, so
@@ -93,11 +89,17 @@ export const SETTINGS = [
     { section: 'Renderer', kind: 'layer', layer: layers.hud,      label: 'HUD',      grid: true, rendererType: 'dom' },
     { section: 'Renderer', kind: 'layer', layer: layers.sky,      label: 'Sky',      grid: true, rendererType: 'dom' },
     { section: 'Renderer', kind: 'layer', layer: layers.chrome,   label: 'Chrome',   grid: true },
+    // Frame-time / size + line-count overlay — only canvas renderers draw it.
+    // Last in the section so it sits under all the renderer toggles.
+    { section: 'Renderer', kind: 'flag', target: canvasStats, key: 'enabled', label: 'Stats', rendererType: 'canvas' },
 
-    // ── Debug ── CSS-only development visualisations (rendererType:'dom') ──
+    // ── Debug ── development visualisations ────────────────────────────────
     { section: 'Debug', kind: 'css', class: 'show-sky-walls',  label: 'Show sky walls',  default: false, rendererType: 'dom' },
     { section: 'Debug', kind: 'css', class: 'show-wall-ids',   label: 'Show wall IDs',   default: false, rendererType: 'dom' },
     { section: 'Debug', kind: 'css', class: 'show-sector-ids', label: 'Show sector IDs', default: false, rendererType: 'dom' },
+    // Line renderer debug overlays (rendererType:'canvas').
+    { section: 'Debug', kind: 'flag', target: lineDebug, key: 'showDepthBuffer', label: 'Depth buffer',   rendererType: 'canvas' },
+    { section: 'Debug', kind: 'flag', target: lineDebug, key: 'showTriangles',   label: 'Line triangles', rendererType: 'canvas' },
 
     // ── State ── one-shot actions (End match = DM only, Attract = kiosk only)
     { section: 'State', kind: 'button', label: 'End level',     onClick: () => app.game?.endCurrentLevel() },

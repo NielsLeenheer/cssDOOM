@@ -33,14 +33,7 @@ let settings = {
     // riser it keeps the buried interior face, which then leaks short stubs
     // through the depth buffer at shared corners. Culling these by sector
     // height removes the leak at the source (and trims redundant geometry).
-    cullInteriorFaces: true,
-
-    // Extract edges from floor/ceiling polygons too (not just walls). Off by
-    // default: their coplanar edges leak through floors above them, the same way
-    // wall stubs did. Completeness of outlines is instead handled by extracting
-    // the silhouette edges of back-facing walls via the eye-height rule (see the
-    // back-face handling in renderScene3D). Kept as a toggle for comparison.
-    drawFloorCeilingOutlines: false
+    cullInteriorFaces: true
 };
 
 // Current depth buffer dimensions
@@ -317,10 +310,10 @@ export function renderScene3D(walls, camera, sectorPolygons = []) {
     }
     for (let p = 0; p < transformedPool.length; p++) {
         const poly = transformedPool[p];
-        // Skip edge extraction for floors/ceilings unless explicitly enabled.
-        // They're always rasterized for depth occlusion; their edges are only
-        // drawn when drawFloorCeilingOutlines is set (see settings).
-        if ((poly.type === 'floor' || poly.type === 'ceiling') && !settings.drawFloorCeilingOutlines) continue;
+        // Floors/ceilings are rasterized for depth occlusion only — their edges
+        // are never drawn (they'd leak through floors above; room/platform
+        // outlines come from the walls' silhouette edges instead).
+        if (poly.type === 'floor' || poly.type === 'ceiling') continue;
         debugCurrentPolyType = poly.type || 'unknown';
 
         if (poly._backFacing) {
