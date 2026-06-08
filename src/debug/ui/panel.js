@@ -11,23 +11,30 @@
 import { culling, cullingStats } from '../../renderer/dom/scene/culling.js';
 import { switchRenderer } from '../features/renderer.js';
 import { rendererType } from '../../renderer/manager.js';
-import { SETTINGS } from './registry.js';
+import { SETTINGS, HIDE_DISABLED_SECTIONS } from './registry.js';
 
 // Per-frame culling stat elements, keyed by the registry entry's `stat`.
 const statElements = {};
 
-// Checkboxes gated by renderer type ({ input, label, type }). Disabled +
-// greyed when the active renderer's type doesn't match (see applyRendererTypes).
+// Checkboxes gated by renderer type ({ input, label, type, hide, stat }).
+// When the active renderer's type doesn't match, the control is greyed +
+// disabled — or, if `hide`, removed from layout entirely (see applyRendererTypes).
 const typedControls = [];
 
-/** Disable the type-gated checkboxes that don't apply to the active renderer
- *  (CSS toggles under a canvas renderer, canvas Stats under a DOM renderer). */
+/** Apply renderer-type gating: controls whose type doesn't match the active
+ *  renderer are greyed + disabled, or hidden outright in HIDE_DISABLED_SECTIONS
+ *  so those sections show only the relevant set. */
 function applyRendererTypes() {
     const active = rendererType(document.body.dataset.renderer || 'dom');
     for (const c of typedControls) {
         const off = c.type !== active;
-        c.input.disabled = off;
-        c.label.classList.toggle('debug-disabled', off);
+        if (c.hide) {
+            c.label.style.display = off ? 'none' : '';
+            if (c.stat) c.stat.style.display = off ? 'none' : '';
+        } else {
+            c.input.disabled = off;
+            c.label.classList.toggle('debug-disabled', off);
+        }
     }
 }
 
@@ -47,11 +54,16 @@ function makeRow(checkbox, label) {
 }
 
 /** Append a checkbox row, registering it for renderer-type gating if the entry
- *  declares a `rendererType` (disabled when the active renderer doesn't match). */
+ *  declares a `rendererType` (disabled — or hidden, in HIDE_DISABLED_SECTIONS —
+ *  when the active renderer doesn't match). Returns the typedControls entry (or
+ *  null) so the caller can link extras like the stat element. */
 function addCheckboxRow(s, cb, parent) {
     const row = makeRow(cb, s.label);
     parent.appendChild(row);
-    if (s.rendererType) typedControls.push({ input: cb, label: row, type: s.rendererType });
+    if (!s.rendererType) return null;
+    const tc = { input: cb, label: row, type: s.rendererType, hide: HIDE_DISABLED_SECTIONS.has(s.section), stat: null };
+    typedControls.push(tc);
+    return tc;
 }
 
 /** Build one registry entry's DOM into `parent`. */
@@ -74,12 +86,13 @@ function buildEntry(s, parent) {
         }
         case 'flag': {
             const cb = makeCheckbox(!!s.target[s.key], (checked) => { s.target[s.key] = checked; });
-            addCheckboxRow(s, cb, parent);
+            const tc = addCheckboxRow(s, cb, parent);
             if (s.stat) {
                 const stat = document.createElement('div');
                 stat.className = 'debug-stat';
                 parent.appendChild(stat);
                 statElements[s.stat] = stat;
+                if (tc) tc.stat = stat; // hide the stat alongside its row when gated out
             }
             break;
         }

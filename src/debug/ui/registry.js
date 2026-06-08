@@ -38,16 +38,30 @@ import { canvasStats } from '../../renderer/canvas/renderer.js';
 import { lineReduction, lineScene, lineDebug } from '../../renderer/line/renderer.js';
 import { PICKABLE_RENDERERS } from '../../renderer/manager.js';
 
+// Entries whose `rendererType` doesn't match the active renderer are normally
+// disabled + greyed; in these sections they're hidden outright instead (see
+// applyRendererTypes in panel.js) so the section only shows the relevant set.
+export const HIDE_DISABLED_SECTIONS = new Set(['Culling', 'Debug']);
+
 export const SETTINGS = [
-    // ── Game ── JS flags read by physics / AI each tick ───────────────────
-    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noEnemyAttack', label: 'No enemy attack' },
-    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noEnemyMove',   label: 'No enemy movement' },
-    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noclip',        label: 'No collision (noclip)' },
-    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noDamage',      label: 'No damage' },
+    // ── Renderer ── select swaps the SP renderer; the rest gate by type ────
+    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS },
+    // Layer visibility — the SAME features/layers.js objects the console drives
+    // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
+    // instantly. Checkbox checked = layer shown. The scene layers are CSS, so
+    // rendererType:'dom'; Chrome is app UI (menu buttons / spectator overlay,
+    // not renderer-drawn) so it stays enabled for every renderer.
+    { section: 'Renderer', kind: 'layer', layer: layers.floors,   label: 'Floors',   grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.ceilings, label: 'Ceilings', grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.walls,    label: 'Walls',    grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.things,   label: 'Things',   grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.enemies,  label: 'Enemies',  grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.hud,      label: 'HUD',      grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.sky,      label: 'Sky',      grid: true, rendererType: 'dom' },
+    { section: 'Renderer', kind: 'layer', layer: layers.chrome,   label: 'Chrome',   grid: true },
 
     // ── Culling ── JS flags read by updateCulling(); order matches its passes.
-    // rendererType:'dom' — these drive the DOM renderer's CSS/JS culling passes;
-    // a canvas renderer does its own culling, so the panel disables them there.
+    // rendererType:'dom' — these drive the DOM renderer's CSS/JS culling passes.
     { section: 'Culling', kind: 'flag', target: culling, key: 'distance', label: 'Distance culling', stat: 'afterDistance', rendererType: 'dom' },
     { section: 'Culling', kind: 'flag', target: culling, key: 'backface', label: 'Backface culling', stat: 'afterBackface', rendererType: 'dom' },
     { section: 'Culling', kind: 'flag', target: culling, key: 'frustum',  label: 'Frustum culling',  stat: 'afterFrustum', rendererType: 'dom' },
@@ -74,32 +88,21 @@ export const SETTINGS = [
     { section: 'Effects', kind: 'css', class: 'no-head-bob',        label: 'Head bob',             invert: true, rendererType: 'dom' },
     { section: 'Effects', kind: 'css', class: 'all-enemies-shadow', label: 'All enemies shadow', default: false, rendererType: 'dom' },
 
-    // ── Renderer ── select swaps the SP renderer; the rest gate by type ────
-    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS },
-    // Layer visibility — the SAME features/layers.js objects the console drives
-    // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
-    // instantly. Checkbox checked = layer shown. The scene layers are CSS, so
-    // rendererType:'dom'; Chrome is app UI (menu buttons / spectator overlay,
-    // not renderer-drawn) so it stays enabled for every renderer.
-    { section: 'Renderer', kind: 'layer', layer: layers.floors,   label: 'Floors',   grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.ceilings, label: 'Ceilings', grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.walls,    label: 'Walls',    grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.things,   label: 'Things',   grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.enemies,  label: 'Enemies',  grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.hud,      label: 'HUD',      grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.sky,      label: 'Sky',      grid: true, rendererType: 'dom' },
-    { section: 'Renderer', kind: 'layer', layer: layers.chrome,   label: 'Chrome',   grid: true },
-    // Frame-time / size + line-count overlay — only canvas renderers draw it.
-    // Last in the section so it sits under all the renderer toggles.
-    { section: 'Renderer', kind: 'flag', target: canvasStats, key: 'enabled', label: 'Stats', rendererType: 'canvas' },
-
     // ── Debug ── development visualisations ────────────────────────────────
     { section: 'Debug', kind: 'css', class: 'show-sky-walls',  label: 'Show sky walls',  default: false, rendererType: 'dom' },
     { section: 'Debug', kind: 'css', class: 'show-wall-ids',   label: 'Show wall IDs',   default: false, rendererType: 'dom' },
     { section: 'Debug', kind: 'css', class: 'show-sector-ids', label: 'Show sector IDs', default: false, rendererType: 'dom' },
-    // Line renderer debug overlays (rendererType:'canvas').
-    { section: 'Debug', kind: 'flag', target: lineDebug, key: 'showDepthBuffer', label: 'Depth buffer',   rendererType: 'canvas' },
-    { section: 'Debug', kind: 'flag', target: lineDebug, key: 'showTriangles',   label: 'Line triangles', rendererType: 'canvas' },
+    // Line renderer overlays (rendererType:'canvas'). Stats = frame-time / size /
+    // line-count readout; the other two are wireframe debug visualisations.
+    { section: 'Debug', kind: 'flag', target: canvasStats, key: 'enabled',         label: 'Stats',          rendererType: 'canvas' },
+    { section: 'Debug', kind: 'flag', target: lineDebug,   key: 'showDepthBuffer', label: 'Depth buffer',   rendererType: 'canvas' },
+    { section: 'Debug', kind: 'flag', target: lineDebug,   key: 'showTriangles',   label: 'Line triangles', rendererType: 'canvas' },
+
+    // ── Game ── JS flags read by physics / AI each tick ───────────────────
+    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noEnemyAttack', label: 'No enemy attack' },
+    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noEnemyMove',   label: 'No enemy movement' },
+    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noclip',        label: 'No collision (noclip)' },
+    { section: 'Game', kind: 'flag', target: debugFlags, key: 'noDamage',      label: 'No damage' },
 
     // ── State ── one-shot actions (End match = DM only, Attract = kiosk only)
     { section: 'State', kind: 'button', label: 'End level',     onClick: () => app.game?.endCurrentLevel() },
