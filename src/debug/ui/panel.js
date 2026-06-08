@@ -21,13 +21,18 @@ const statElements = {};
 // disabled — or, if `hide`, removed from layout entirely (see applyRendererTypes).
 const typedControls = [];
 
-/** Apply renderer-type gating: controls whose type doesn't match the active
- *  renderer are greyed + disabled, or hidden outright in HIDE_DISABLED_SECTIONS
- *  so those sections show only the relevant set. */
+/** Apply renderer-type gating: a control is active if ANY currently-active
+ *  renderer matches its type. dataset.renderer may be a comma list (the
+ *  `?renderer=a,b` comparison layout), so we gate on the *set* of active types —
+ *  e.g. line,canvas → canvas controls only; css,canvas → both css and canvas.
+ *  Non-matching controls are greyed + disabled, or hidden outright in
+ *  HIDE_DISABLED_SECTIONS so those sections show only the relevant set. */
 function applyRendererTypes() {
-    const active = rendererType(document.body.dataset.renderer || 'css');
+    const kinds = (document.body.dataset.renderer || 'css').split(',').map(s => s.trim()).filter(Boolean);
+    const activeTypes = new Set(kinds.map(rendererType));
+    if (!activeTypes.size) activeTypes.add('css');
     for (const c of typedControls) {
-        const off = c.type !== active;
+        const off = !activeTypes.has(c.type);
         if (c.hide) {
             c.label.style.display = off ? 'none' : '';
             if (c.stat) c.stat.style.display = off ? 'none' : '';
