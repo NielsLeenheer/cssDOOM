@@ -40,7 +40,11 @@ export const lineReduction = { snap: true, merge: true, dropParallel: true, grid
 // (Culling section); depthEpsilon / minVisibleSamples are console-tunable.
 //   cullInteriorFaces — drop wall quads buried below their sector floor / above
 //                       its ceiling (kills back-side leak stubs).
-export const lineScene = { cullInteriorFaces: true, depthEpsilon: 0.025, minVisibleSamples: 3 };
+//   depthResScale — multiplier on the 400px depth-buffer baseline. Higher
+//                   resolves thin distant near-edge-on lines that would
+//                   otherwise dash, at ~scale² visibility-fill cost (applied on
+//                   the next resize).
+export const lineScene = { cullInteriorFaces: true, depthEpsilon: 0.025, minVisibleSamples: 3, depthResScale: 1 };
 
 // Debug visualisation toggles (renderer-side, not scene settings). showDepthBuffer
 // draws the scene's depth buffer over the wireframe (nearest-neighbour, so its
@@ -214,10 +218,14 @@ export class LineRenderer extends RendererBase {
         // depthBufferWidth / depthBufferHeight`; if that drifts from
         // the canvas aspect, the horizon ends up too high or low.
         // 400 px baseline keeps the visibility-test resolution
-        // comparable to the default 640×400.
+        // comparable to the default 640×400. lineScene.depthResScale
+        // multiplies it: higher = fewer dashed distant lines (thin
+        // near-edge-on silhouettes resolve), at ~scale² fill cost.
+        // Changing it takes effect on the next resize.
+        const dh = Math.max(1, Math.round(400 * (lineScene.depthResScale || 1)));
         setRendererSettings({
-            depthBufferWidth: Math.max(1, Math.round(400 * w / h)),
-            depthBufferHeight: 400,
+            depthBufferWidth: Math.max(1, Math.round(dh * w / h)),
+            depthBufferHeight: dh,
         });
     }
 
