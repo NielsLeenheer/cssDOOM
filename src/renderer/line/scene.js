@@ -1460,3 +1460,68 @@ export function mergeCollinearLines(lines, options = {}) {
 
     return result;
 }
+
+/**
+ * Drop near-parallel duplicate lines (screen-space, NDC). When a shorter line
+ * runs nearly parallel to a longer one, within `perpTol` perpendicular distance,
+ * and is mostly overlapped by it, the shorter is dropped — the longer is left
+ * exactly in place (no moving, so no jitter). The perpendicular test is in
+ * screen space, so it's naturally distance-dependent: the front/back edges of a
+ * recessed opening (window/door frame) sit far apart on screen up close (both
+ * kept) and collapse onto each other in the distance (one dropped), thinning
+ * far-away clutter without touching near detail.
+ *
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {object} [options]
+ * @param {number} [options.angleTol=0.06]    Max orientation difference (radians) to treat as parallel.
+ * @param {number} [options.perpTol=0.02]     Max perpendicular distance (NDC) to drop a duplicate.
+ * @param {number} [options.overlapFrac=0.5]  Min fraction of the shorter line overlapped by the longer.
+ */
+export function dropParallelDuplicates(lines, options = {}) {
+    const angleTol = options.angleTol ?? 0.06;
+    const perpTol = options.perpTol ?? 0.02;
+    const overlapFrac = options.overlapFrac ?? 0.5;
+    const n = lines.length;
+    if (n < 2) return lines.slice();
+
+    const sinTol = Math.sin(angleTol);
+    const dirX = new Float64Array(n), dirY = new Float64Array(n), len = new Float64Array(n);
+    for (let i = 0; i < n; i++) {
+        const ln = lines[i];
+        let dx = ln.end[0] - ln.start[0], dy = ln.end[1] - ln.start[1];
+        const l = Math.sqrt(dx * dx + dy * dy) || 1e-9;
+        dirX[i] = dx / l; dirY[i] = dy / l; len[i] = l;
+    }
+    // Process longest first so shorter near-parallel neighbours are dropped onto it.
+    const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => len[b] - len[a]);
+    const dropped = new Uint8Array(n);
+
+    for (let oi = 0; oi < n; oi++) {
+        const i = order[oi];
+        if (dropped[i]) continue;
+        const A = lines[i], ax = dirX[i], ay = dirY[i];
+        const aT1 = A.start[0] * ax + A.start[1] * ay, aT2 = A.end[0] * ax + A.end[1] * ay;
+        const aLo = Math.min(aT1, aT2), aHi = Math.max(aT1, aT2);
+        for (let oj = oi + 1; oj < n; oj++) {
+            const j = order[oj];
+            if (dropped[j]) continue;
+            // Parallel?
+            const cross = ax * dirY[j] - ay * dirX[j];
+            if (cross > sinTol || cross < -sinTol) continue;
+            // Perpendicular distance of j's midpoint to i's infinite line.
+            const B = lines[j];
+            const mx = (B.start[0] + B.end[0]) * 0.5, my = (B.start[1] + B.end[1]) * 0.5;
+            const perp = (mx - A.start[0]) * -ay + (my - A.start[1]) * ax;
+            if (perp > perpTol || perp < -perpTol) continue;
+            // Mostly overlapped (projected onto i's direction)?
+            const bT1 = B.start[0] * ax + B.start[1] * ay, bT2 = B.end[0] * ax + B.end[1] * ay;
+            const bLo = Math.min(bT1, bT2), bHi = Math.max(bT1, bT2);
+            const ov = Math.min(aHi, bHi) - Math.max(aLo, bLo);
+            if (ov > 0 && ov >= overlapFrac * (bHi - bLo)) dropped[j] = 1;
+        }
+    }
+
+    const result = [];
+    for (let i = 0; i < n; i++) if (!dropped[i]) result.push(lines[i]);
+    return result;
+}

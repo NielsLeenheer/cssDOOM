@@ -15,7 +15,7 @@
  * rendered (matches the "before CSS" purity of the talk demo).
  */
 
-import { renderScene3D, setRendererSettings, snapLinesToGrid, mergeCollinearLines, getDepthBuffer } from './scene.js';
+import { renderScene3D, setRendererSettings, snapLinesToGrid, mergeCollinearLines, dropParallelDuplicates, getDepthBuffer } from './scene.js';
 import { RendererBase } from '../base.js';
 import { canvasStats } from '../canvas/renderer.js';
 
@@ -27,8 +27,13 @@ import { canvasStats } from '../canvas/renderer.js';
 //           tolerances are tied to the grid so it only joins segments already on
 //           the same grid line — no perpendicular repositioning, so junctions
 //           stay connected and nothing shifts into/out of occlusion.
+//   dropParallel — drop a shorter near-parallel line when it sits within
+//           dropPerpTol (NDC, screen space) of a longer one and is mostly
+//           overlapped by it. The kept line doesn't move (no jitter); distance-
+//           dependent for free, since recessed-opening edges only converge on
+//           screen far away. A dropped line can pop back when you approach.
 //   gridSize — snap grid cell in NDC (settable by hand: lineReduction.gridSize).
-export const lineReduction = { snap: true, merge: true, gridSize: 0.005 };
+export const lineReduction = { snap: true, merge: true, dropParallel: true, gridSize: 0.005, dropPerpTol: 0.02 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
 // the scene each frame. Exposed in the debug panel (Renderer section) so the
@@ -250,6 +255,9 @@ export class LineRenderer extends RendererBase {
             // perpendicular. gapTol bridges the ~1-cell sampling gaps between
             // adjacent visible wall edges, not wide occlusion gaps.
             lines = mergeCollinearLines(lines, { offsetTol: g * 0.5, angleTol: 0.04, gapTol: g * 1.5 });
+        }
+        if (lineReduction.dropParallel) {
+            lines = dropParallelDuplicates(lines, { perpTol: lineReduction.dropPerpTol });
         }
         this._paint(lines);
         const t1 = performance.now();
