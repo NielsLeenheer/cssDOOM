@@ -62,7 +62,10 @@ export function rendererType(kind) {
 // and is pinned per-slot by the visualize/cad layouts, not selectable as a
 // whole-screen renderer. Single source of truth for both pickers so they
 // can't drift (they each used to hardcode their own copy).
-export const PICKABLE_RENDERERS = ['dom', 'flat', 'shade', 'lighting', 'line', 'cat', 'canvas', 'webgl'];
+// Ordered: real renderers first (dom, line, canvas, webgl), then the
+// visualisation renderers (flat, shade, lighting, cat). The panel dropdown
+// draws a divider between the two groups (see `separatorAfter` in registry.js).
+export const PICKABLE_RENDERERS = ['dom', 'line', 'canvas', 'webgl', 'flat', 'shade', 'lighting', 'cat'];
 
 // Per-layout pane composition, all static. Each layout has:
 //

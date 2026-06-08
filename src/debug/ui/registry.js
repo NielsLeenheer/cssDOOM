@@ -45,7 +45,7 @@ export const HIDE_DISABLED_SECTIONS = new Set(['Culling', 'Debug']);
 
 export const SETTINGS = [
     // ── Renderer ── select swaps the SP renderer; the rest gate by type ────
-    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS },
+    { section: 'Renderer', kind: 'select', key: 'renderer', label: 'Renderer', options: PICKABLE_RENDERERS, separatorAfter: 'webgl' },
     // Layer visibility — the SAME features/layers.js objects the console drives
     // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
     // instantly. Checkbox checked = layer shown. The scene layers are CSS, so

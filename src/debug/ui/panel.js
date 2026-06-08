@@ -106,6 +106,12 @@ function buildEntry(s, parent) {
                 opt.value = kind;
                 opt.textContent = kind;
                 select.appendChild(opt);
+                if (kind === s.separatorAfter) {
+                    const sep = document.createElement('option');
+                    sep.disabled = true;
+                    sep.textContent = '──────────';
+                    select.appendChild(sep);
+                }
             }
             select.value = document.body.dataset.renderer || s.options[0];
             select.addEventListener('change', () => switchRenderer(select.value));
