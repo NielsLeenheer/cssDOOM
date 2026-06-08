@@ -35,7 +35,7 @@ import { enterAttract } from '../../game/attract.js';
 import { app } from '../../app.js';
 import { layers } from '../features/layers.js';
 import { canvasStats } from '../../renderer/canvas/renderer.js';
-import { lineReduction, lineScene } from '../../renderer/line/renderer.js';
+import { lineReduction, lineScene, lineDebug } from '../../renderer/line/renderer.js';
 import { PICKABLE_RENDERERS } from '../../renderer/manager.js';
 
 export const SETTINGS = [
@@ -76,6 +76,7 @@ export const SETTINGS = [
     { section: 'Renderer', kind: 'flag', target: lineReduction, key: 'merge', label: 'Merge lines', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineScene, key: 'cullInteriorFaces', label: 'Cull interior faces', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineScene, key: 'drawFloorCeilingOutlines', label: 'Floor/ceiling outlines', rendererType: 'canvas' },
+    { section: 'Renderer', kind: 'flag', target: lineDebug, key: 'showDepthBuffer', label: 'Depth buffer', rendererType: 'canvas' },
     // Layer visibility — the SAME features/layers.js objects the console drives
     // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
     // instantly. Checkbox checked = layer shown. The scene layers are CSS, so

@@ -15,7 +15,7 @@
  * rendered (matches the "before CSS" purity of the talk demo).
  */
 
-import { renderScene3D, setRendererSettings, deduplicateLines, mergeCollinearLines } from './scene.js';
+import { renderScene3D, setRendererSettings, deduplicateLines, mergeCollinearLines, getDepthBuffer } from './scene.js';
 import { RendererBase } from '../base.js';
 import { canvasStats } from '../canvas/renderer.js';
 
@@ -36,6 +36,13 @@ export const lineReduction = { merge: true };
 //                             platform outlines stay complete even where the
 //                             walls that would form them are back-face culled.
 export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: false };
+
+// Debug visualisation toggles (renderer-side, not scene settings). showDepthBuffer
+// draws the scene's depth buffer over the wireframe (nearest-neighbour, so its
+// grid resolution is visible) with the line segments overlaid in red — to see
+// where occlusion stubs leak relative to the depth grid. Exposed in the debug
+// panel (Renderer → "Depth buffer").
+export const lineDebug = { showDepthBuffer: false };
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
@@ -91,6 +98,12 @@ export class LineRenderer extends RendererBase {
         // to keep the centre line crisp.
         this.glowCanvas = document.createElement('canvas');
         this.glowCtx = this.glowCanvas.getContext('2d');
+
+        // Offscreen canvas for the depth-buffer debug overlay (sized to the
+        // depth buffer; upscaled nearest-neighbour so the grid shows).
+        this._depthCanvas = document.createElement('canvas');
+        this._depthCtx = this._depthCanvas.getContext('2d');
+        this._depthImage = null;
 
         // Scene data, populated by loadMap.
         this._walls = null;
@@ -296,6 +309,7 @@ export class LineRenderer extends RendererBase {
     ];
 
     _paint(lines) {
+        if (lineDebug.showDepthBuffer) { this._paintDepthDebug(lines); return; }
         const { ctx, glowCtx } = this;
         const w = this.canvas.width;
         const h = this.canvas.height;
@@ -371,6 +385,58 @@ export class LineRenderer extends RendererBase {
         ctx.strokeStyle = core.color;
         ctx.stroke();
         ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /** Debug view: the depth buffer as a grayscale image (near = bright, far =
+     *  dark, empty = dark blue), upscaled nearest-neighbour so the buffer's grid
+     *  resolution is visible, with the line segments overlaid in red. Lets us
+     *  see where occlusion stubs leak relative to the depth grid. */
+    _paintDepthDebug(lines) {
+        const { ctx } = this;
+        const w = this.canvas.width, h = this.canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        const { buffer, width, height } = getDepthBuffer();
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+
+        if (buffer) {
+            if (this._depthCanvas.width !== width || this._depthCanvas.height !== height) {
+                this._depthCanvas.width = width;
+                this._depthCanvas.height = height;
+                this._depthImage = this._depthCtx.createImageData(width, height);
+            }
+            // Normalise finite depths to [min,max] for contrast.
+            let min = Infinity, max = 0;
+            for (let i = 0; i < buffer.length; i++) {
+                const d = buffer[i];
+                if (d !== Infinity) { if (d < min) min = d; if (d > max) max = d; }
+            }
+            const range = max > min ? max - min : 1;
+            const data = this._depthImage.data;
+            for (let i = 0; i < buffer.length; i++) {
+                const d = buffer[i];
+                const j = i * 4;
+                if (d === Infinity) { data[j] = 0; data[j + 1] = 0; data[j + 2] = 48; data[j + 3] = 255; continue; }
+                const g = Math.round(255 * (1 - (d - min) / range)); // near = bright
+                data[j] = g; data[j + 1] = g; data[j + 2] = g; data[j + 3] = 255;
+            }
+            this._depthCtx.putImageData(this._depthImage, 0, 0);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(this._depthCanvas, 0, 0, w, h);
+        }
+
+        // Overlay the actual line segments in red so leaks are visible on the grid.
+        ctx.beginPath();
+        for (const seg of lines) {
+            ctx.moveTo((seg.start[0] * 0.5 + 0.5) * w, (1 - (seg.start[1] * 0.5 + 0.5)) * h);
+            ctx.lineTo((seg.end[0] * 0.5 + 0.5) * w, (1 - (seg.end[1] * 0.5 + 0.5)) * h);
+        }
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 1.5 * dpr;
+        ctx.strokeStyle = '#ff3030';
+        ctx.stroke();
     }
 }
 

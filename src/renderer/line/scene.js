@@ -603,6 +603,15 @@ let debugCurrentPolyType = '';
 let debugCameraInfo = null;
 
 /**
+ * Debug: the current frame's depth buffer (valid after renderScene3D). Returns
+ * the live Float32Array (depth = camera-space distance, Infinity where empty)
+ * plus its dimensions, for the overlay visualiser. Do not mutate.
+ */
+export function getDepthBuffer() {
+    return { buffer: depthBuffer, width: DEPTH_WIDTH, height: DEPTH_HEIGHT };
+}
+
+/**
  * Enable debug capture for next frame
  */
 export function triggerDebugCapture() {
@@ -1330,9 +1339,12 @@ export function optimizeLineOrder(lines) {
  * Far-apart collinear segments separated by more than `gapTol` (e.g. a wall
  * occluded by a pillar) stay split, so we don't bridge across occluders.
  *
- * Output segments reuse the real input endpoints (no quantisation drift), so
- * merged lines stay anchored to actual geometry. Pure function on 2D line
- * segments — directly portable to the WebAudioOscilloscope renderer.
+ * Output segments lie on the group's *reference* line — the longest member,
+ * whose direction is the most reliable (most pixels, least angular quantisation)
+ * and which usually sits nearest the camera. Shorter members only extend the
+ * run; they don't pull the angle, so merged strokes don't wiggle frame to frame
+ * the way chaining mismatched endpoints did. Pure function on 2D line segments —
+ * directly portable to the WebAudioOscilloscope renderer.
  *
  * @param {Array<{start:[number,number], end:[number,number]}>} lines
  * @param {object} [options]
@@ -1355,8 +1367,8 @@ export function mergeCollinearLines(lines, options = {}) {
     const N = Math.max(1, Math.round(Math.PI / angleTol));
     const dA = Math.PI / N;
 
-    // bucketIndex -> array of groups. A group is one infinite line with the
-    // intervals (projections) of every segment assigned to it.
+    // bucketIndex -> array of groups. A group is one infinite line plus the
+    // member segments assigned to it.
     const buckets = new Map();
 
     for (let i = 0; i < count; i++) {
@@ -1397,44 +1409,58 @@ export function mergeCollinearLines(lines, options = {}) {
         }
 
         if (!target) {
-            target = { dx, dy, px: sx, py: sy, parts: [] };
+            target = { dx, dy, px: sx, py: sy, segs: [] };
             let arr = buckets.get(ab);
             if (!arr) { arr = []; buckets.set(ab, arr); }
             arr.push(target);
         }
 
-        // Project both endpoints onto the group axis → 1D interval, tagged
-        // with the real endpoint at each end.
-        const t1 = sx * target.dx + sy * target.dy;
-        const t2 = ex * target.dx + ey * target.dy;
-        if (t1 <= t2) target.parts.push({ lo: t1, hi: t2, plo: ln.start, phi: ln.end });
-        else target.parts.push({ lo: t2, hi: t1, plo: ln.end, phi: ln.start });
+        target.segs.push({ sx, sy, ex, ey, len });
     }
 
-    // Merge overlapping/near intervals per group and emit one segment each.
+    // Emit one or more segments per group, all lying on the reference line.
     const result = [];
+    const parts = []; // scratch interval list, reused per group
     for (const arr of buckets.values()) {
         for (let g = 0; g < arr.length; g++) {
-            const parts = arr[g].parts;
-            if (parts.length === 1) {
-                result.push({ start: parts[0].plo, end: parts[0].phi });
+            const segs = arr[g].segs;
+            if (segs.length === 1) {
+                const s = segs[0];
+                result.push({ start: [s.sx, s.sy], end: [s.ex, s.ey] });
                 continue;
             }
-            parts.sort((p, q) => p.lo - q.lo);
-            let curHi = parts[0].hi;
-            let curPlo = parts[0].plo;
-            let curPhi = parts[0].phi;
-            for (let p = 1; p < parts.length; p++) {
-                const it = parts[p];
-                if (it.lo <= curHi + gapTol) {
-                    // Overlapping or within gap — extend the running interval.
-                    if (it.hi > curHi) { curHi = it.hi; curPhi = it.phi; }
+
+            // Reference = longest member; it sets the line's angle and position.
+            let ref = segs[0];
+            for (let s = 1; s < segs.length; s++) if (segs[s].len > ref.len) ref = segs[s];
+            const invLen = 1 / ref.len;
+            const rdx = (ref.ex - ref.sx) * invLen;
+            const rdy = (ref.ey - ref.sy) * invLen;
+            const rpx = ref.sx, rpy = ref.sy;
+
+            // Project every endpoint onto the reference line → 1D intervals.
+            parts.length = 0;
+            for (let s = 0; s < segs.length; s++) {
+                const seg = segs[s];
+                const t1 = (seg.sx - rpx) * rdx + (seg.sy - rpy) * rdy;
+                const t2 = (seg.ex - rpx) * rdx + (seg.ey - rpy) * rdy;
+                parts.push(t1 <= t2 ? t1 : t2, t1 <= t2 ? t2 : t1);
+            }
+            // Sort intervals by lo (pairs in parts: [lo,hi, lo,hi, ...]).
+            const pairs = [];
+            for (let p = 0; p < parts.length; p += 2) pairs.push([parts[p], parts[p + 1]]);
+            pairs.sort((p, q) => p[0] - q[0]);
+
+            let lo = pairs[0][0], hi = pairs[0][1];
+            for (let p = 1; p < pairs.length; p++) {
+                if (pairs[p][0] <= hi + gapTol) {
+                    if (pairs[p][1] > hi) hi = pairs[p][1];
                 } else {
-                    result.push({ start: curPlo, end: curPhi });
-                    curHi = it.hi; curPlo = it.plo; curPhi = it.phi;
+                    result.push({ start: [rpx + lo * rdx, rpy + lo * rdy], end: [rpx + hi * rdx, rpy + hi * rdy] });
+                    lo = pairs[p][0]; hi = pairs[p][1];
                 }
             }
-            result.push({ start: curPlo, end: curPhi });
+            result.push({ start: [rpx + lo * rdx, rpy + lo * rdy], end: [rpx + hi * rdx, rpy + hi * rdy] });
         }
     }
 
