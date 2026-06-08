@@ -28,7 +28,7 @@ import { canvasStats } from '../canvas/renderer.js';
 //           the same grid line — no perpendicular repositioning, so junctions
 //           stay connected and nothing shifts into/out of occlusion.
 //   gridSize — snap grid cell in NDC (settable by hand: lineReduction.gridSize).
-export const lineReduction = { snap: true, merge: true, gridSize: 0.01 };
+export const lineReduction = { snap: true, merge: true, gridSize: 0.005 };
 
 // Scene-geometry toggles, shared across LineRenderer instances and applied to
 // the scene each frame. Exposed in the debug panel (Renderer section) so the
@@ -45,7 +45,7 @@ export const lineScene = { cullInteriorFaces: true, drawFloorCeilingOutlines: fa
 // grid resolution is visible) with the line segments overlaid in red — to see
 // where occlusion stubs leak relative to the depth grid. Exposed in the debug
 // panel (Renderer → "Depth buffer").
-export const lineDebug = { showDepthBuffer: false };
+export const lineDebug = { showDepthBuffer: false, showTriangles: false };
 
 // Render config. fov + nearPlane fill in the camera fields cssDOOM
 // doesn't provide; line-scene.js reads them directly. line-scene
@@ -308,6 +308,7 @@ export class LineRenderer extends RendererBase {
     ];
 
     _paint(lines) {
+        if (lineDebug.showTriangles) { this._paintTriangles(lines); return; }
         if (lineDebug.showDepthBuffer) { this._paintDepthDebug(lines); return; }
         const { ctx, glowCtx } = this;
         const w = this.canvas.width;
@@ -383,6 +384,42 @@ export class LineRenderer extends RendererBase {
         ctx.lineWidth = core.width * dpr;
         ctx.strokeStyle = core.color;
         ctx.stroke();
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    /** Debug view: draw each segment as a triangle — pointy tip at the start,
+     *  wide base at the end — with additive blending. Direction is then obvious
+     *  (tip→base = start→end), and segments drawn on top of each other show up
+     *  as brighter overlaps, so collapsing / duplicate lines are visible. */
+    _paintTriangles(lines) {
+        const { ctx } = this;
+        const w = this.canvas.width, h = this.canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        const baseHalf = 5 * dpr; // half-width of the triangle base (at the end)
+
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#000';
+        ctx.fillRect(0, 0, w, h);
+        if (!lines.length) return;
+
+        ctx.globalCompositeOperation = 'lighter'; // overlaps accumulate brightness
+        ctx.fillStyle = 'rgba(40, 255, 80, 0.5)';
+        for (const seg of lines) {
+            const x1 = (seg.start[0] * 0.5 + 0.5) * w;          // tip = start
+            const y1 = (1 - (seg.start[1] * 0.5 + 0.5)) * h;
+            const x2 = (seg.end[0] * 0.5 + 0.5) * w;            // base centre = end
+            const y2 = (1 - (seg.end[1] * 0.5 + 0.5)) * h;
+            let dx = x2 - x1, dy = y2 - y1;
+            const len = Math.hypot(dx, dy) || 1;
+            dx /= len; dy /= len;
+            const px = -dy * baseHalf, py = dx * baseHalf; // perpendicular at the base
+            ctx.beginPath();
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2 + px, y2 + py);
+            ctx.lineTo(x2 - px, y2 - py);
+            ctx.closePath();
+            ctx.fill();
+        }
         ctx.globalCompositeOperation = 'source-over';
     }
 

@@ -78,6 +78,7 @@ export const SETTINGS = [
     { section: 'Renderer', kind: 'flag', target: lineScene, key: 'cullInteriorFaces', label: 'Cull interior faces', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineScene, key: 'drawFloorCeilingOutlines', label: 'Floor/ceiling outlines', rendererType: 'canvas' },
     { section: 'Renderer', kind: 'flag', target: lineDebug, key: 'showDepthBuffer', label: 'Depth buffer', rendererType: 'canvas' },
+    { section: 'Renderer', kind: 'flag', target: lineDebug, key: 'showTriangles', label: 'Line triangles', rendererType: 'canvas' },
     // Layer visibility — the SAME features/layers.js objects the console drives
     // as debug.layers.* (one codepath). Scene layers cross-fade; hud/chrome hide
     // instantly. Checkbox checked = layer shown. The scene layers are CSS, so
