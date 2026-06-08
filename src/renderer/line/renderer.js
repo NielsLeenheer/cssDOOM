@@ -132,6 +132,7 @@ export class LineRenderer extends RendererBase {
         this._frameTimeIdx = 0;
         this._rawLineCount = 0;
         this._lineCount = 0;
+        this._baselineCount = 0;
 
         // Resize observer keeps the canvas backing store aligned with
         // the displayed size. DomRenderer uses ResizeObserver for its
@@ -244,6 +245,18 @@ export class LineRenderer extends RendererBase {
             angle: this._camera.angle,
             ...CAMERA_DEFAULTS,
         };
+        // Cull-independent baseline for the stats overlay: a no-cull,
+        // no-reduction render so the savings % stays comparable when "Cull
+        // interior faces" is toggled (it otherwise shrinks the raw count
+        // itself). Debug-only and a full extra scene pass, so it runs only when
+        // stats are shown and cull is on, and before the real pass / outside the
+        // frame-time window below (the real pass leaves the depth buffer correct
+        // for the depth overlay).
+        let baseline = 0;
+        if (canvasStats.enabled && lineScene.cullInteriorFaces) {
+            setRendererSettings({ ...lineScene, cullInteriorFaces: false });
+            baseline = renderScene3D(this._walls, camera, this._sectorPolygons).length;
+        }
         const t0 = performance.now();
         // Push the live scene-geometry toggles (cheap Object.assign; no depth
         // realloc since dimensions are unchanged here — those come from _resize).
@@ -271,13 +284,14 @@ export class LineRenderer extends RendererBase {
         this._frameTimeIdx = (this._frameTimeIdx + 1) % this._frameTimes.length;
         this._rawLineCount = rawLines.length;
         this._lineCount = lines.length;
+        this._baselineCount = baseline || rawLines.length;
         if (canvasStats.enabled) this._drawStats();
     };
 
-    /** Top-left overlay: frame time, fps, and line counts for both reduction
-     *  passes (the active one bracketed). Drawn on the display canvas after the
-     *  wireframe so the text stays crisp. Mirrors CanvasRenderer._drawStats;
-     *  gated by the same shared canvasStats flag. */
+    /** Top-left overlay: frame time, fps, and the line-count pipeline
+     *  baseline→raw→final with the total saving %. Drawn on the display canvas
+     *  after the wireframe so the text stays crisp. Mirrors CanvasRenderer.
+     *  _drawStats; gated by the same shared canvasStats flag. */
     _drawStats() {
         let sum = 0, n = 0;
         for (let i = 0; i < this._frameTimes.length; i++) {
@@ -288,11 +302,13 @@ export class LineRenderer extends RendererBase {
         const fps = avg > 0 ? Math.min(999, 1000 / avg) : 0;
         const dpr = window.devicePixelRatio || 1;
         const ctx = this.ctx;
+        // baseline (no cull) → raw (after cull) → final (after snap/merge/drop);
+        // percentage is the total saving from the cull-independent baseline.
+        const baseline = this._baselineCount;
         const raw = this._rawLineCount;
-        const kept = this._lineCount;
-        const pct = raw > 0 ? Math.round((1 - kept / raw) * 100) : 0;
-        const mode = (lineReduction.snap ? 'snap' : '') + (lineReduction.merge ? '+merge' : '') || 'raw';
-        const text = `${kept}/${raw} lines (-${pct}%) ${mode}  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
+        const final = this._lineCount;
+        const pct = baseline > 0 ? Math.round((1 - final / baseline) * 100) : 0;
+        const text = `${baseline}→${raw}→${final} lines (-${pct}%)  ${avg.toFixed(1)} ms  ${fps.toFixed(0)} fps`;
         ctx.save();
         ctx.globalCompositeOperation = 'source-over';
         ctx.font = `${12 * dpr}px monospace`;
