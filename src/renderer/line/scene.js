@@ -787,8 +787,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
             if (isPointVisibleFast(mx, my, mDepth, depthBuffer)) {
                 output.push({
                     start: [clipX1 * invWidth - 1, -(clipY1 * invHeight - 1)],
-                    end: [clipX2 * invWidth - 1, -(clipY2 * invHeight - 1)],
-                    startDepth: clipDepth1, endDepth: clipDepth2
+                    end: [clipX2 * invWidth - 1, -(clipY2 * invHeight - 1)]
                 });
             }
             continue;
@@ -948,10 +947,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
             }
         }
 
-        // Extract segments. depthAt(t) = 1/(clipW1 + t*dW) gives the camera-space
-        // depth at a parametric position, attached so distance-based snapping can
-        // pick a coarser grid for far endpoints.
-        const depthAt = (t) => 1 / (clipW1 + t * dW);
+        // Extract segments
         let segStart = -1;
         for (let s = 0; s < numSamples; s++) {
             if (smoothedBuffer[s] && segStart === -1) {
@@ -961,8 +957,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
                 const t2 = (s - 1) * invSamples;
                 output.push({
                     start: [(clipX1 + t1 * dx) * invWidth - 1, -((clipY1 + t1 * dy) * invHeight - 1)],
-                    end: [(clipX1 + t2 * dx) * invWidth - 1, -((clipY1 + t2 * dy) * invHeight - 1)],
-                    startDepth: depthAt(t1), endDepth: depthAt(t2)
+                    end: [(clipX1 + t2 * dx) * invWidth - 1, -((clipY1 + t2 * dy) * invHeight - 1)]
                 });
                 segStart = -1;
             }
@@ -972,8 +967,7 @@ function extractVisibleEdgesOptimized(verts, vertCount, depthBuffer, output, edg
             const t1 = segStart * invSamples;
             output.push({
                 start: [(clipX1 + t1 * dx) * invWidth - 1, -((clipY1 + t1 * dy) * invHeight - 1)],
-                end: [clipX2 * invWidth - 1, -(clipY2 * invHeight - 1)],
-                startDepth: depthAt(t1), endDepth: clipDepth2
+                end: [clipX2 * invWidth - 1, -(clipY2 * invHeight - 1)]
             });
         }
     }
@@ -1120,8 +1114,7 @@ function addDoorChevrons(doorWalls, camera, depthBuffer, output) {
                 if (isPointVisibleFast(midX, midY, midDepth, depthBuffer)) {
                     output.push({
                         start: [line1.x1 * invWidth - 1, -(line1.y1 * invHeight - 1)],
-                        end: [line1.x2 * invWidth - 1, -(line1.y2 * invHeight - 1)],
-                        startDepth: line1.depth1, endDepth: line1.depth2
+                        end: [line1.x2 * invWidth - 1, -(line1.y2 * invHeight - 1)]
                     });
                 }
             }
@@ -1133,8 +1126,7 @@ function addDoorChevrons(doorWalls, camera, depthBuffer, output) {
                 if (isPointVisibleFast(midX, midY, midDepth, depthBuffer)) {
                     output.push({
                         start: [line2.x1 * invWidth - 1, -(line2.y1 * invHeight - 1)],
-                        end: [line2.x2 * invWidth - 1, -(line2.y2 * invHeight - 1)],
-                        startDepth: line2.depth1, endDepth: line2.depth2
+                        end: [line2.x2 * invWidth - 1, -(line2.y2 * invHeight - 1)]
                     });
                 }
             }
@@ -1295,66 +1287,34 @@ export function optimizeLineOrder(lines) {
 }
 
 /**
- * Cell size for a point at camera-space `depth`. With distance scaling on
- * (nearDepth > 0) the cell doubles each time depth doubles past nearDepth,
- * capped at maxLevel — a coarser grid in the distance collapses the swarm of
- * near-parallel far lines (window inner/outer frames, distant walls) while
- * keeping fine detail up close. Quantised to discrete levels so a point's cell
- * size is stable as it moves (no per-frame jitter from a continuously changing
- * grid). nearDepth <= 0 => uniform grid.
- */
-function cellSizeForDepth(base, depth, nearDepth, maxLevel) {
-    if (!(nearDepth > 0) || !(depth > nearDepth)) return base;
-    let level = Math.floor(Math.log2(depth / nearDepth)) + 1;
-    if (level > maxLevel) level = maxLevel;
-    return base * (1 << level);
-}
-
-/**
- * Snap line endpoints to a grid, then drop degenerate and duplicate segments
- * (screen-space, NDC). Unlike mergeCollinearLines this never moves a line onto
- * another line's axis, so shared endpoints stay shared (junctions remain
- * connected) and nothing shifts into/out of occlusion. Effects:
+ * Snap line endpoints to a uniform grid, then drop degenerate and duplicate
+ * segments (screen-space, NDC). Unlike mergeCollinearLines this never moves a
+ * line onto another line's axis, so shared endpoints stay shared (junctions
+ * remain connected) and nothing shifts into/out of occlusion. Two effects:
  *   - near-coincident segments (stacked corner edges, two-sided coincident
- *     walls, distant near-parallel lines) snap identical and dedup to one;
+ *     walls) snap identical and dedup to one;
  *   - any segment shorter than a grid cell collapses to a point and is dropped,
  *     which clears sub-grid leak stubs.
+ * Endpoints are quantised to integer grid cells so the dedup key is exact.
  *
- * Cell size can grow with each endpoint's depth (options.nearDepth) so distant
- * clutter collapses harder. Endpoint depth comes from `startDepth`/`endDepth`
- * tagged at extraction; a shared world vertex has the same depth from both
- * lines, so it snaps identically and stays connected.
- *
- * @param {Array<{start:[number,number], end:[number,number], startDepth?:number, endDepth?:number}>} lines
- * @param {number} gridSize  Base (nearest) cell size in NDC.
- * @param {object} [options]
- * @param {number} [options.nearDepth=0] Depth below which the base grid is used (0 = uniform).
- * @param {number} [options.maxLevel=3]  Max number of cell-size doublings with distance.
+ * @param {Array<{start:[number,number], end:[number,number]}>} lines
+ * @param {number} gridSize  Grid cell size in NDC (e.g. 0.01 ≈ a 200×200 grid).
  */
-export function snapLinesToGrid(lines, gridSize = 0.01, options = {}) {
+export function snapLinesToGrid(lines, gridSize = 0.01) {
     if (!(gridSize > 0)) return lines.slice();
-    const nearDepth = options.nearDepth ?? 0;
-    const maxLevel = options.maxLevel ?? 3;
     const inv = 1 / gridSize;
     const seen = new Set();
     const result = [];
     for (let i = 0, len = lines.length; i < len; i++) {
         const ln = lines[i];
-        const gs1 = cellSizeForDepth(gridSize, ln.startDepth, nearDepth, maxLevel);
-        const gs2 = cellSizeForDepth(gridSize, ln.endDepth, nearDepth, maxLevel);
-        const sx = Math.round(ln.start[0] / gs1) * gs1;
-        const sy = Math.round(ln.start[1] / gs1) * gs1;
-        const ex = Math.round(ln.end[0] / gs2) * gs2;
-        const ey = Math.round(ln.end[1] / gs2) * gs2;
-        // Dedup key on the common base grid (snapped coords are multiples of it).
-        const ix1 = Math.round(sx * inv), iy1 = Math.round(sy * inv);
-        const ix2 = Math.round(ex * inv), iy2 = Math.round(ey * inv);
+        const ix1 = Math.round(ln.start[0] * inv), iy1 = Math.round(ln.start[1] * inv);
+        const ix2 = Math.round(ln.end[0] * inv), iy2 = Math.round(ln.end[1] * inv);
         if (ix1 === ix2 && iy1 === iy2) continue; // collapsed to a point
         const swap = ix1 > ix2 || (ix1 === ix2 && iy1 > iy2);
         const key = swap ? `${ix2},${iy2},${ix1},${iy1}` : `${ix1},${iy1},${ix2},${iy2}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        result.push({ start: [sx, sy], end: [ex, ey] });
+        result.push({ start: [ix1 * gridSize, iy1 * gridSize], end: [ix2 * gridSize, iy2 * gridSize] });
     }
     return result;
 }
