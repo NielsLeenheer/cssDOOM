@@ -148,13 +148,17 @@ remaining JS-computed style CSS can now express.
 
 ### B8. `offset-path: ray()` for projectiles
 
-- [ ] Investigate
+- [-] Rejected
 
 Projectiles animate a `translate` keyframe pair between JS-computed start/end
 points. Motion paths (`offset-path: ray(...)` + animated `offset-distance`)
-would let JS set just origin + angle + range and lean on CSS for the flight —
-more in the spirit of the project. Current approach works; this is a
-"more CSS, less JS" option.
+would let JS set just origin + angle + range.
+
+**Rejected:** `offset-path` operates in the element's 2D containing-block
+plane, but projectiles move in 3D — the current keyframes interpolate height
+(`--start-z` → `--end-z`) too, e.g. a fireball aimed at a player on a ledge.
+Splitting into a 2D ray plus a separate vertical animation would be more
+complex than the current single keyframe pair.
 
 ### B9. Consistent style conventions
 
