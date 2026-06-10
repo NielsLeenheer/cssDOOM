@@ -346,9 +346,14 @@ function setupGamepad(gamepad) {
         press: () => emit({ kind: A.FIRE_DOWN, slot: slotForPad(), deviceId }),
         release: () => emit({ kind: A.FIRE_UP, slot: slotForPad(), deviceId }),
     };
-    // Start / Options (button9): Toggle menu
+    // Start / Options (button9): Toggle menu. Suppressed in kiosk mode so a
+    // stray Start press at the installation can't pull up the menu — the
+    // operator still reaches it via the keyboard (Escape).
     handlers[9] = {
-        press: () => emit({ kind: A.MENU_TOGGLE, slot: slotForPad(), deviceId }),
+        press: () => {
+            if (document.body.dataset.layout === 'kiosk') return;
+            emit({ kind: A.MENU_TOGGLE, slot: slotForPad(), deviceId });
+        },
     };
     // D-pad up (button12): Next weapon (mirrors R1)
     handlers[12] = {
