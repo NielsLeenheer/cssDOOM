@@ -11,7 +11,7 @@
  *
  * Lighting reuses cssDOOM's existing `--light` CSS custom property
  * (set per sector container by buildSectorContainers, applied via
- * `filter: brightness(...)` in walls.css / floors.css / ceilings.css)
+ * `filter: brightness(...)` in walls.css / horizontal.css)
  * — no extra work needed; the inherited CSS rules attach
  * automatically because the elements still carry their `.wall` /
  * `.floor` / `.ceiling` classes.

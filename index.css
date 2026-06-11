@@ -3,8 +3,7 @@
 @import url('src/renderer/css/scene/scene.css');
 @import url('src/renderer/css/scene/sky.css');
 @import url('src/renderer/css/scene/surfaces/walls.css');
-@import url('src/renderer/css/scene/surfaces/floors.css');
-@import url('src/renderer/css/scene/surfaces/ceilings.css');
+@import url('src/renderer/css/scene/surfaces/horizontal.css');
 @import url('src/renderer/css/scene/surfaces/textures.css');
 @import url('src/renderer/css/scene/mechanics/doors.css');
 @import url('src/renderer/css/scene/mechanics/lifts.css');

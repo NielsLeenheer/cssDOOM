@@ -272,7 +272,7 @@ function preloadTextures(sceneRoot) {
         if (!isRealTexture(name)) continue;
         urls.add(`/assets/flats/${name}.png`);
         // Animated NUKAGE flats cycle through all three frames via CSS
-        // keyframes (floors.css); preload the siblings so the animation
+        // keyframes (horizontal.css); preload the siblings so the animation
         // doesn't pop frames in during its first cycle.
         if (name.startsWith('NUKAGE')) {
             urls.add('/assets/flats/NUKAGE1.png');

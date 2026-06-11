@@ -69,7 +69,7 @@
         pointer-events: none;
     }
 
-    /* Sector IDs — mirror of `body.show-sector-ids` from floors.css,
+    /* Sector IDs — mirror of `body.show-sector-ids` from horizontal.css,
        scoped so the labels render in the shade pane only. */
     .floor::after {
         content: attr(data-sector);

@@ -3,8 +3,8 @@
    commands (see src/debug/console.js). Used to build the "anatomy of a
    sector" animation for the CSS Day talk, alongside hide()/show().
 
-   All the transform work lives HERE — walls.css / floors.css /
-   ceilings.css stay pristine. Each surface's base transform is restated
+   All the transform work lives HERE — walls.css / horizontal.css
+   stay pristine. Each surface's base transform is restated
    below as --explode-transform (mirroring the renderer's, plus the
    explode slide), and the scale + billboard extend that same property.
    Because --explode-dist / --explode-scale default to 0 / 1,
@@ -93,7 +93,7 @@
 }
 
 /* ── Base + explode transforms ──────────────────────────────────────────
-   Mirror of walls.css / floors.css / ceilings.css with the explode slide
+   Mirror of walls.css / horizontal.css with the explode slide
    appended: after the wall's rotateY its local +Z is the inward normal, so
    a negative Z slides it outward; after the floor/ceiling's rotateX(90deg)
    local +Z is world-up, so floor uses -Z (down) and ceiling +Z (up).
