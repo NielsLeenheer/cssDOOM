@@ -311,6 +311,15 @@ body.dev[data-layout="kiosk"] #debug-menu[open] {
     opacity: 1;
 }
 
+/* Kiosk — drop the operator-facing chrome that has no place at the
+   installation: the menu logo (#menu-button), the fullscreen toggle, and the
+   help button. No mouse at the kiosk, so remove them outright (display: none)
+   rather than the hover-reveal opacity used for the talk layouts above.
+   Detach + spectator stay for the operator. */
+body[data-layout="kiosk"] :is(#menu-button, #fullscreen-button, #help-button) {
+    display: none;
+}
+
 /* ?export chrome — the captured video should be just the rendered
    scene. Drop the DOOM logo, action buttons, and debug toggle
    entirely via display:none (no need to keep them click-able
