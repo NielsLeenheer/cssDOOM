@@ -364,6 +364,25 @@ function setupMasterBroadcast() {
                 spawnPlayer(player);
             }
         },
+        onLateReadyToPlay: (peerKey, cid) => {
+            // This peer's scene rebuild outlasted beginPlay's
+            // awaitAllReadyToPlay timeout, so the match-start fan-out
+            // (spawnPlayer's world commands + broadcastPlayerSprites)
+            // raced its loadMap. The joiner-side RenderClient queues
+            // mid-load envelopes and replays them, but re-sending the
+            // catchup here makes recovery independent of that replay
+            // (and of any state the queue can't reconstruct, like
+            // commands from before the peer's RenderClient existed).
+            // Catchup commands are idempotent at the receiver — worst
+            // case is a no-op re-apply.
+            const key = bindingKey(peerKey, cid);
+            const slot = orchestrator.currentRemoteSlot(key);
+            if (slot == null) return;
+            console.log('[broadcast] late READY_TO_PLAY from', key, '- re-sending catchup for slot', slot);
+            const cmds = buildCatchup(slot);
+            if (cmds.length) masterConnection.sendCatchup(peerKey, cmds);
+            if (state.players[slot]) state.players[slot]._hudDirty = false;
+        },
         onLeave: (peerKey, cid) => {
             const key = bindingKey(peerKey, cid);
             // Capture the slot before unbinding — the orchestrator

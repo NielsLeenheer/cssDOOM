@@ -115,14 +115,21 @@ class PeerConnectionBase {
  *   Fires when a specific peer goes silent or disconnects.
  * @param {(msg: object, peerKey: string|number) => void} [options.onRemoteInput]
  *   Forwarded ACTION / ANALOG envelopes, tagged with the originating peer.
+ * @param {(peerKey: string|number, cid: string|null) => void} [options.onLateReadyToPlay]
+ *   Fires when a peer's READY_TO_PLAY arrives AFTER awaitAllReadyToPlay
+ *   already timed out without it. Master proceeded with the match start
+ *   (spawn + billboard fan-out) while that peer was still rebuilding its
+ *   scene, so any state it should have received is suspect. Use this to
+ *   re-send the catchup envelope so the late peer converges anyway.
  */
 export class MasterConnection {
-    constructor({ snapshotProvider, onJoin, onReady, onLeave, onRemoteInput } = {}) {
+    constructor({ snapshotProvider, onJoin, onReady, onLeave, onRemoteInput, onLateReadyToPlay } = {}) {
         this.snapshotProvider = snapshotProvider;
         this.onJoin = onJoin;
         this.onReady = onReady;
         this.onLeave = onLeave;
         this.onRemoteInput = onRemoteInput;
+        this.onLateReadyToPlay = onLateReadyToPlay;
         // While paused, master ignores LOOKING from every peer. Used
         // during loadMap so a reconnecting client doesn't ACK against a
         // half-built scene and start receiving mid-rebuild deltas.
@@ -178,6 +185,11 @@ export class MasterConnection {
             // beginCoordinatedLoad so awaitAllReadyToPlay tracks the
             // latest load round.
             readyToPlay: false,
+            // Set when awaitAllReadyToPlay timed out while this session
+            // was still loading. The eventual READY_TO_PLAY then fires
+            // onLateReadyToPlay (recovery catchup) instead of passing
+            // silently. Cleared on each beginCoordinatedLoad.
+            missedLoad: false,
             lastFromPeer: 0,
             pingTimer: null,
             timeoutCheck: null,
@@ -314,6 +326,14 @@ export class MasterConnection {
             // Peer finished its loadMap; the awaitAllReadyToPlay
             // promise watches this flag.
             session.readyToPlay = true;
+            // This peer was still loading when awaitAllReadyToPlay gave
+            // up — master already ran the match-start fan-out without
+            // it. Hand it to the recovery hook so master can re-send
+            // the catchup envelope.
+            if (session.missedLoad) {
+                session.missedLoad = false;
+                this.onLateReadyToPlay?.(session.peerKey, session.cid);
+            }
         } else if (msg.type === MSG.ACTION || msg.type === MSG.ANALOG) {
             this.onRemoteInput?.(msg, session.peerKey);
         }
@@ -363,6 +383,10 @@ export class MasterConnection {
         for (const session of this._peers.values()) {
             if (!session.alive) continue;
             session.readyToPlay = false;
+            // A new load round supersedes any pending missed-load
+            // recovery — the upcoming loadMap + READY_TO_PLAY cycle
+            // (or its own timeout) re-establishes the peer's state.
+            session.missedLoad = false;
             this._loadInFlight.add(session.peerKey);
         }
     }
@@ -421,7 +445,13 @@ export class MasterConnection {
                     if (targets) {
                         for (const peerKey of targets) {
                             const s = this._peers.get(peerKey);
-                            if (s && s.alive && !s.readyToPlay) missing.push(peerKey);
+                            if (s && s.alive && !s.readyToPlay) {
+                                missing.push(peerKey);
+                                // Flag the session so its eventual
+                                // READY_TO_PLAY triggers the
+                                // onLateReadyToPlay recovery catchup.
+                                s.missedLoad = true;
+                            }
                         }
                     }
                     console.warn('[master] awaitAllReadyToPlay: timed out, proceeding without', missing);
