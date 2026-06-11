@@ -844,10 +844,10 @@ body:has(.pane-attract.active) #menu-button {
 
    Bar slides off by its own (possibly-wrapped) height via the
    `--status-rows` row count resolved upstream by `@container pane`
-   queries. The weapon needs an additional `110%` translate to clear
+   queries. The weapon needs an additional `110%` shift to clear
    the viewport because its anchor only drops it by the bar's height
-   — not enough on its own. `translate` (not `transform`) so the
-   weapon-bob keyframes keep writing transform without collision;
+   — not enough on its own. `transform` (not `translate`) so the
+   weapon-bob / weapon-switch keyframes keep writing translate without collision;
    `animation-play-state: paused` so resuming bob picks up at the
    frozen frame instead of snapping to keyframe 0. The `!important`
    beats the running rule
@@ -873,7 +873,7 @@ body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .weapon,
 body.spectator .weapon,
 body.hide-hud .weapon {
     animation-play-state: paused !important;
-    translate: 0 110%;
+    transform: translateY(110%);
 }
 
 
