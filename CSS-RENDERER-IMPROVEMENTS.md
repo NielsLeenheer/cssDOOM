@@ -128,14 +128,19 @@ could share one `.mover` rule.
 
 ### B6. View Transitions / `@starting-style` for screen choreography
 
-- [ ] Investigate
+- [-] Rejected
 
 `pane-transition`, lobby/intermission/scoreboard swaps, and the spectator
 ceiling fades are JS-orchestrated class toggles. Same-document
 `document.startViewTransition()` could replace a chunk of that choreography.
-`@starting-style` + `transition-behavior: allow-discrete` can replace
-"insert element, force reflow, add `.visible`" patterns for overlays entering
-from `display: none`.
+
+**Rejected:** view transitions capture the old and new states as flat
+rasterized snapshots — the `preserve-3d` scene gets flattened during the
+transition, and there's no way to capture a live before/after 3D view.
+Any transition that overlaps a visible scene would visibly collapse the
+perspective mid-fade. (`@starting-style` + `transition-behavior:
+allow-discrete` for 2D overlays entering from `display: none` remains
+viable on its own, but isn't worth a standalone item.)
 
 ### B7. CSS-computed perspective via container query units
 
