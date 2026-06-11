@@ -7,15 +7,15 @@
     margin-left: calc(var(--w) * var(--scale) * -0.5px);
     /* `bottom` transition lets the weapon ride down with the HUD bar
        when it slides off-screen — `bottom: anchor(top)` (set below
-       under @supports) re-resolves as .status moves. `translate` is
+       under @supports) re-resolves as .status moves. `transform` is
        used for hide states (overlay-active, spectator, death) so it
-       doesn't collide with the `transform`-driven weapon-bob /
-       weapon-switch keyframes — the bob can keep writing transform
-       while the hide writes translate. Both transitions use the same
+       doesn't collide with the `translate`-driven weapon-bob /
+       weapon-switch keyframes — the bob/switch keep writing translate
+       while the hide writes transform. Both transitions use the same
        0.4s ease-in-out so the bar and weapon slide together. */
     transition:
         bottom 0.4s ease-in-out,
-        translate 0.4s ease-in-out;
+        transform 0.4s ease-in-out;
     width: calc(var(--w) * var(--scale) * 1px);
     height: calc(var(--h) * var(--scale) * 1px);
     background-size: calc(var(--w) * var(--frames) * var(--scale) * 1px) calc(var(--h) * var(--scale) * 1px);
@@ -52,15 +52,15 @@
    ======================================================================== */
 
 @keyframes weapon-bob {
-    0%       { transform: translateX(40px)  translateY(-24px); }
-    12.5%    { transform: translateX(28px)  translateY(0); }
-    25%      { transform: translateX(0)     translateY(-24px); }
-    37.5%    { transform: translateX(-28px) translateY(0); }
-    50%      { transform: translateX(-40px) translateY(-24px); }
-    62.5%    { transform: translateX(-28px) translateY(0); }
-    75%      { transform: translateX(0)     translateY(-24px); }
-    87.5%    { transform: translateX(28px)  translateY(0); }
-    100%     { transform: translateX(40px)  translateY(-24px); }
+    0%       { translate: 40px -24px; }
+    12.5%    { translate: 28px 0px; }
+    25%      { translate: 0px -24px; }
+    37.5%    { translate: -28px 0px; }
+    50%      { translate: -40px -24px; }
+    62.5%    { translate: -28px 0px; }
+    75%      { translate: 0px -24px; }
+    87.5%    { translate: 28px 0px; }
+    100%     { translate: 40px -24px; }
 }
 
 /* Bob is always on the weapon (when not firing/switching) — paused by
@@ -69,7 +69,7 @@
    default position. Same pattern as the head-bob in camera.css.
    Bob stays applied in spectator (just never runs), so toggling
    spectator doesn't remove the animation and snap the weapon's
-   transform back to none mid-slide. */
+   translate back to none mid-slide. */
 .renderer .weapon:not(.firing):not(.switching) {
     animation: weapon-bob 1.4s linear infinite;
     animation-play-state: paused;
@@ -83,10 +83,10 @@ body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
    ======================================================================== */
 
 @keyframes weapon-switch {
-    0%   { transform: translateY(0); }
-    40%  { transform: translateY(110%); }
-    60%  { transform: translateY(110%); }
-    100% { transform: translateY(0); }
+    0%   { translate: 0 0; }
+    40%  { translate: 0 110%; }
+    60%  { translate: 0 110%; }
+    100% { translate: 0 0; }
 }
 
 .weapon.switching {
@@ -99,11 +99,11 @@ body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
    ======================================================================== */
 
 .renderer.dead .weapon {
-    /* `translate` (not `transform`) so the weapon-bob keyframes can
-       keep writing transform — animations override declared transform
-       values in the cascade, but `translate` is a separate property
-       and isn't touched by the bob keyframes. */
-    translate: 0 110%;
+    /* `transform` (not `translate`) so the weapon-bob / weapon-switch
+       keyframes can keep writing translate — animations override declared
+       values of the property they animate, but `transform` is a separate
+       property the bob/switch keyframes never touch, so the hide survives. */
+    transform: translateY(110%);
 }
 
 /* ========================================================================

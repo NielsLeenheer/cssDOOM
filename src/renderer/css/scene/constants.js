@@ -18,6 +18,12 @@ export const DOOM_LIGHT_MAX = 255;         // Upper bound of DOOM's sector light
 // brightening factor to approximate DOOM's scalelight close-range boost.
 export const LIGHT_DISTANCE_OFFSET = 4;   // Medium-distance scalelight compensation
 
+// Kiosk-mode brightness boost. The installation runs under bright ambient
+// venue lighting that washes out the scene, so every sector's computed --light
+// is scaled up by this factor when the kiosk layout is active. 1 = no change.
+// Tune on-site.
+export const KIOSK_LIGHT_BOOST = 1.5;
+
 // ============================================================================
 // Sky & Special Textures
 // ============================================================================

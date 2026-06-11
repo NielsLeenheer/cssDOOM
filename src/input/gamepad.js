@@ -298,6 +298,7 @@ function setupGamepad(gamepad) {
     const deviceId = gamepadDeviceId(gamepadIndex);
     const padState = {
         moveX: 0, moveY: 0, turn: 0, run: false,
+        fireButtons: 0,
         _wasConnected: false,
     };
     padStates.set(gamepadIndex, padState);
@@ -335,17 +336,32 @@ function setupGamepad(gamepad) {
     handlers[4] = {
         press: () => emit({ kind: A.WEAPON_PREV, slot: slotForPad(), deviceId }),
     };
-    // R1 / RB (button5): Next weapon
-    handlers[5] = {
-        press: () => emit({ kind: A.WEAPON_NEXT, slot: slotForPad(), deviceId }),
+
+    // Fire is on both shoulder triggers — R2 (button7) and R1 (button5) —
+    // since players at the installation reach for either. A single FIRE_DOWN
+    // must cover "any fire button held" and FIRE_UP only fire when the last
+    // one releases, otherwise letting go of one trigger while the other is
+    // still held would emit FIRE_UP and stop firing (fire.js tracks a single
+    // fireHeld bool). Reference-count the held triggers on padState so the
+    // bus still sees clean discrete down/up edges (the gates rely on them).
+    const fireDown = () => {
+        if (padState.fireButtons++ === 0) {
+            emit({ kind: A.FIRE_DOWN, slot: slotForPad(), deviceId });
+        }
     };
+    const fireUp = () => {
+        // Guard against an unpaired release (e.g. a press swallowed during a
+        // claim/reconnect) driving the count negative.
+        if (padState.fireButtons > 0 && --padState.fireButtons === 0) {
+            emit({ kind: A.FIRE_UP, slot: slotForPad(), deviceId });
+        }
+    };
+    // R1 / RB (button5): Fire. Weapon switching stays on L1 + the D-pad.
+    handlers[5] = { press: fireDown, release: fireUp };
     // R2 / RT (button7): Fire. Run-modifier is L2 (button6) — handled
     // separately via padState.run because it's a continuous state rather
     // than a discrete press/release.
-    handlers[7] = {
-        press: () => emit({ kind: A.FIRE_DOWN, slot: slotForPad(), deviceId }),
-        release: () => emit({ kind: A.FIRE_UP, slot: slotForPad(), deviceId }),
-    };
+    handlers[7] = { press: fireDown, release: fireUp };
     // Start / Options (button9): Toggle menu. Suppressed in kiosk mode so a
     // stray Start press at the installation can't pull up the menu — the
     // operator still reaches it via the keyboard (Escape).
@@ -355,7 +371,7 @@ function setupGamepad(gamepad) {
             emit({ kind: A.MENU_TOGGLE, slot: slotForPad(), deviceId });
         },
     };
-    // D-pad up (button12): Next weapon (mirrors R1)
+    // D-pad up (button12): Next weapon (mirrors L1's previous-weapon)
     handlers[12] = {
         press: () => emit({ kind: A.WEAPON_NEXT, slot: slotForPad(), deviceId }),
     };

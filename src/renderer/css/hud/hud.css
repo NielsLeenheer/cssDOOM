@@ -844,10 +844,10 @@ body:has(.pane-attract.active) #menu-button {
 
    Bar slides off by its own (possibly-wrapped) height via the
    `--status-rows` row count resolved upstream by `@container pane`
-   queries. The weapon needs an additional `110%` translate to clear
+   queries. The weapon needs an additional `110%` shift to clear
    the viewport because its anchor only drops it by the bar's height
-   — not enough on its own. `translate` (not `transform`) so the
-   weapon-bob keyframes keep writing transform without collision;
+   — not enough on its own. `transform` (not `translate`) so the
+   weapon-bob / weapon-switch keyframes keep writing translate without collision;
    `animation-play-state: paused` so resuming bob picks up at the
    frozen frame instead of snapping to keyframe 0. The `!important`
    beats the running rule
@@ -873,7 +873,7 @@ body[data-game-mode="deathmatch"] .pane[data-claim-state="waiting"] .weapon,
 body.spectator .weapon,
 body.hide-hud .weapon {
     animation-play-state: paused !important;
-    translate: 0 110%;
+    transform: translateY(110%);
 }
 
 
@@ -902,6 +902,37 @@ body[data-layout="kiosk"] .pane-intermission,
 body[data-layout="kiosk"] .pane-timer,
 body[data-layout="kiosk"] .pane-network-lobby {
     position: absolute;
+}
+
+/* Kiosk branding banner — a thin strip across the top of each pane (one per
+   monitor at the installation). Anchored to .renderer (position: absolute,
+   inset: 0) so it stays confined to this pane. Hidden in every other layout. */
+.pane-banner {
+    display: none;
+}
+body[data-layout="kiosk"] .pane-banner {
+    display: flex;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1250;
+    align-items: center;
+    justify-content: center;
+    padding: calc(16px * var(--screen-scale, 1)) calc(16px * var(--screen-scale, 1));
+    /* 36 px = 4× STCFN's 9-row em (multiple of 9 keeps the bitmap crisp). */
+    font-family: 'STCFN', monospace;
+    font-size: calc(36px * var(--screen-scale, 1));
+    /* STCFN is a COLR/CPAL color font — it renders the WAD's red palette by
+       default. font-palette swaps in the white ramp (color: only affects the
+       non-COLR fallback silhouette). */
+    font-palette: --stcfn-white;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.8);
+    text-align: center;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
 }
 
 body[data-game-mode="deathmatch"]:not(.client-window):not([data-layout="kiosk"]) .pane[data-player="1"] .pane-attract,
