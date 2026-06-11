@@ -12,17 +12,20 @@ Legend: `[ ]` open · `[x]` done · `[-]` rejected
 
 ### A1. Texture preloading broken since the `data-texture` refactor
 
-- [ ] Investigate / fix
+- [x] Fixed
 
-`preloadTextures()` in `src/renderer/css/scene/scene.js` collects wall/flat
+`preloadTextures()` in `src/renderer/css/scene/scene.js` collected wall/flat
 URLs by regexing `el.style.backgroundImage` — but walls and flats no longer
 get inline background images; they get a `data-texture` attribute and the URL
-comes from the generated `textures.css`. The first loop therefore collects
-nothing, and only sprite `<img>`s and SW2 switch textures are actually
+comes from the generated `textures.css`. The first loop therefore collected
+nothing, and only sprite `<img>`s and SW2 switch textures were actually
 preloaded.
 
-Fix: resolve URLs from `el.dataset.texture` instead (walls →
-`/assets/textures/`, floors/ceilings → `/assets/flats/`).
+**Fixed:** URLs now resolve from `el.dataset.texture` (walls →
+`/assets/textures/`, floors/ceilings → `/assets/flats/`), with a guard for
+DOOM's `-` no-texture marker and all three NUKAGE frames preloaded for the
+animated flats. Verified on E1M1: 33 wall textures + 23 flats collected,
+no 404s.
 
 ### A2. `transition: --floor-z` animates discretely (missing `@property`)
 

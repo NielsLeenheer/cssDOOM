@@ -14,6 +14,7 @@
  */
 
 import { makeSceneState } from '../renderer.js';
+import { NO_TEXTURE } from './constants.js';
 import * as maps from '../../../shared/maps/index.js';
 import { buildSectorContainers } from './sectors.js';
 import { buildWalls } from './surfaces/walls.js';
@@ -243,14 +244,41 @@ export async function loadMap(renderer, name) {
  * flats, and sprite images), and returns a promise that resolves once all
  * images are loaded. A timeout ensures the promise resolves even if some
  * textures fail to load.
+ *
+ * Surfaces don't carry inline background-image styles — they carry a
+ * `data-texture` attribute and the generated textures.css maps it to the
+ * image URL. Mirror that mapping here: walls draw from /assets/textures,
+ * floors + ceilings from /assets/flats, scoped per element since a name
+ * can exist in both namespaces.
  */
+/** True for texture names that map to a real image file. Filters the DOOM
+ *  "no texture" marker, which `createWallElement` writes to data-texture
+ *  unconditionally (door tracks / lift shafts built from raw wall data). */
+function isRealTexture(name) {
+    return !!name && name !== NO_TEXTURE;
+}
+
 function preloadTextures(sceneRoot) {
     const urls = new Set();
 
-    for (const el of sceneRoot.querySelectorAll('.wall, .floor, .ceiling')) {
-        const bg = el.style.backgroundImage;
-        const match = bg?.match(/url\(['"]?([^'")\s]+)['"]?\)/);
-        if (match) urls.add(match[1]);
+    for (const el of sceneRoot.querySelectorAll('.wall[data-texture]')) {
+        if (isRealTexture(el.dataset.texture)) {
+            urls.add(`/assets/textures/${el.dataset.texture}.png`);
+        }
+    }
+
+    for (const el of sceneRoot.querySelectorAll(':is(.floor, .ceiling)[data-texture]')) {
+        const name = el.dataset.texture;
+        if (!isRealTexture(name)) continue;
+        urls.add(`/assets/flats/${name}.png`);
+        // Animated NUKAGE flats cycle through all three frames via CSS
+        // keyframes (floors.css); preload the siblings so the animation
+        // doesn't pop frames in during its first cycle.
+        if (name.startsWith('NUKAGE')) {
+            urls.add('/assets/flats/NUKAGE1.png');
+            urls.add('/assets/flats/NUKAGE2.png');
+            urls.add('/assets/flats/NUKAGE3.png');
+        }
     }
 
     for (const el of sceneRoot.querySelectorAll('.switch[data-texture^="SW1"]')) {
