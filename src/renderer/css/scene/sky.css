@@ -3,7 +3,10 @@
 .viewport {
     background:
         url('/assets/textures/SKY1.png') repeat-x top left / auto 70%;
-    background-position-x: calc(var(--player-angle) * 163px), 0;
+    /* One full revolution (2π rad) scrolls the sky by 1024px — four
+       repeats of the 256px-wide SKY1 texture, matching DOOM's sky
+       mapping of 90° of yaw per 256px column. */
+    background-position-x: calc(var(--player-angle) / (2 * pi) * 1024px);
     image-rendering: pixelated;
 }
 
