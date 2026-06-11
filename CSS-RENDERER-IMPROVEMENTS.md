@@ -45,11 +45,15 @@ sector, this transition may move or disappear.
 
 ### A3. Duplicate keyframes: `light-blink` vs `light-blink-fast`
 
-- [ ] Investigate / fix
+- [x] Fixed upstream
 
-The two `@keyframes` blocks in `mechanics/lighting.css` are byte-identical;
-only the `animation-duration` at the usage site differs. One keyframes block
-suffices.
+The two `@keyframes` blocks in `mechanics/lighting.css` were byte-identical;
+only the `animation-duration` at the usage site differed.
+
+**Fixed on `multiplayer-doom`** (commit `8f9297e`, merged into this branch):
+the `light-blink-fast` keyframes are gone and `.light-blink-fast` reuses
+`light-blink` at 0.5s. The same commit also de-duplicated the redundant
+start/end percentages in the flicker keyframes.
 
 ### A4. Doc/code drift in `surfaces/horizontal.js`
 
@@ -178,6 +182,13 @@ Two mixed idioms worth standardizing:
   `.scene`, `.projectile`, and debug rules, while everything else uses long
   `transform:` strings. Fine where order matters (walls), but billboards /
   puffs / fog could move to individual properties.
+  **Note (from `multiplayer-doom` commit `e4a7e54`):** the mixing is
+  sometimes deliberate — weapons.css uses `translate` (bob/switch
+  keyframes) and `transform` (hide states) as two independent channels so
+  the animations don't clobber each other; camera.css does the same for
+  head-bob. The item is about *unintentional* mixing only — any
+  standardization pass must preserve the two-channel trick where it's
+  load-bearing.
 - CSS nesting is used in some files (sprites, lighting, lifts) but not others
   (walls, things).
 - `image-rendering: pixelated` is redundantly re-declared on
