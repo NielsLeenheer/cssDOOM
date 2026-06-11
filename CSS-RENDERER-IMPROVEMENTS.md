@@ -29,7 +29,9 @@ no 404s.
 
 ### A2. `transition: --floor-z` animates discretely (missing `@property`)
 
-- [ ] Investigate / fix
+- [x] Fixed — `--floor-z` registered as `<number>` in scene.css (commit
+  `3ba04d6`); audit found `--player-z` already registered and no other
+  transitioned/animated custom properties missing registration.
 
 `things.css` has `.enemy { transition: --floor-z 0.4s ease-out; }`, but
 `--floor-z` is never registered with `@property`. Unregistered custom
@@ -57,14 +59,17 @@ start/end percentages in the flicker keyframes.
 
 ### A4. Doc/code drift in `surfaces/horizontal.js`
 
-- [ ] Investigate / fix
+- [x] Fixed (commit `4351484`).
 
 The file header says sectors with holes use "`path()` with SVG evenodd fill
 rule"; the code uses `shape(evenodd …)`. Update the header comment.
 
 ### A5. `sky.css` oddities
 
-- [ ] Investigate / fix
+- [x] Fixed (commit `8869345`) — scroll factor now derived as
+  `calc(var(--player-angle) / (2 * pi) * 1024px)` (163px was 1024/2π in
+  disguise: four repeats of the 256px SKY1 texture per revolution), and the
+  stray second `background-position-x` layer value is gone.
 
 `background-position-x: calc(var(--player-angle) * 163px), 0;` declares two
 layer values for a single background layer (the trailing `0` is ignored), and
@@ -87,7 +92,9 @@ explicit and immune to import shuffling. Textbook use case.
 
 ### B2. `abs()` and `sign()` in the CSS culler
 
-- [ ] Investigate
+- [x] Done (commit `5aad71a`) — `abs()` replaces `max(x, -x)`,
+  `max(0, sign(expr))` replaces the `clamp(0, expr * 1000, 1)` boolean
+  trick. Verified identical cull counts before/after.
 
 `culling.css` hand-rolls absolute value
 (`max(var(--cull-lateral), calc(var(--cull-lateral) * -1))`) and booleans via
@@ -110,7 +117,9 @@ together and `calc()` can't do length × length. Angle-only change.
 
 ### B4. Merge `floors.css` and `ceilings.css`
 
-- [ ] Investigate
+- [x] Done (commit `99df6d9`) — merged into `surfaces/horizontal.css`
+  (named after its JS counterpart) with a `--surface-z` bridge per class.
+  Pure CSS change; verified pixel-identical render.
 
 The two files are the same ~26-line block except `--floor-z` vs
 `--ceiling-z`. A shared `:is(.floor, .ceiling)` rule keyed on one
