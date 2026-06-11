@@ -14,7 +14,7 @@
  * build, a renderer's `.sceneEl` afterward).
  */
 
-import { LIGHT_MINIMUM_BRIGHTNESS, DOOM_LIGHT_MAX, LIGHT_DISTANCE_OFFSET } from './constants.js';
+import { LIGHT_MINIMUM_BRIGHTNESS, DOOM_LIGHT_MAX, LIGHT_DISTANCE_OFFSET, KIOSK_LIGHT_BOOST } from './constants.js';
 import { mapData } from '../../../shared/maps/index.js';
 
 /**
@@ -42,11 +42,13 @@ function applyLightEffect(element, specialType) {
  * Based on DOOM's R_InitLightTables: lightnum = lightLevel/16 selects from
  * 32 colormaps. LIGHT_DISTANCE_OFFSET compensates for DOOM's scalelight
  * close-range brightening effect.
+ *
+ * `boost` scales the final value (kiosk-mode ambient compensation, default 1).
  */
-function doomLightToCSS(lightLevel) {
+function doomLightToCSS(lightLevel, boost = 1) {
     const startmap = (15 - lightLevel / 16) * 4 - LIGHT_DISTANCE_OFFSET;
     const colormap = Math.max(0, Math.min(31, startmap));
-    return Math.max(LIGHT_MINIMUM_BRIGHTNESS, 1 - colormap / 32);
+    return Math.max(LIGHT_MINIMUM_BRIGHTNESS, 1 - colormap / 32) * boost;
 }
 
 /**
@@ -58,6 +60,9 @@ export function buildSectorContainers(ctx) {
     const sectors = mapData.sectors;
     if (!sectors) return;
 
+    // Layout is fixed at boot, so read the kiosk flag once for the whole build.
+    const lightBoost = document.body.dataset.layout === 'kiosk' ? KIOSK_LIGHT_BOOST : 1;
+
     for (let i = 0; i < sectors.length; i++) {
         const sector = sectors[i];
         const container = document.createElement('div');
@@ -65,7 +70,7 @@ export function buildSectorContainers(ctx) {
         container.id = `s${i}`;
 
         container.style.setProperty('--light',
-            doomLightToCSS(sector.lightLevel));
+            doomLightToCSS(sector.lightLevel, lightBoost));
 
         if (sector.specialType) {
             applyLightEffect(container, sector.specialType);
