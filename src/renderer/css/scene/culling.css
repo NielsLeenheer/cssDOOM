@@ -58,8 +58,8 @@ body.css-distance-culling {
         --cull-y: calc(var(--y) - var(--player-y));
         --cull-dist-sq: calc(var(--cull-x) * var(--cull-x) + var(--cull-y) * var(--cull-y));
 
-        /* Resolves to 0 when within range, positive (clamped to 1) when beyond */
-        --cull-beyond: clamp(0, calc(var(--cull-dist-sq) - var(--max-render-dist-sq)), 1);
+        /* Boolean: 0 when within range, 1 when beyond */
+        --cull-beyond: max(0, sign(var(--cull-dist-sq) - var(--max-render-dist-sq)));
 
         /* Fallback: paused animation converts numeric 0/1 → visibility keyword */
         animation: cull-toggle 1s step-end paused;
@@ -162,21 +162,21 @@ body.css-frustum-culling {
         /* Project into view space */
         --cull-depth: calc(var(--cull-x) * var(--cam-fx) + var(--cull-y) * var(--cam-fy));
         --cull-lateral: calc(var(--cull-x) * var(--cam-rx) + var(--cull-y) * var(--cam-ry));
-        --cull-abs-lateral: max(var(--cull-lateral), calc(var(--cull-lateral) * -1));
+        --cull-abs-lateral: abs(var(--cull-lateral));
 
         /* Outside frustum: |lateral| > depth × tan(halfFov) + radius
            Radius accounts for large elements whose midpoint is outside the
            frustum but whose surface extends into view.
            Also catches behind-camera: negative depth makes the limit negative,
            so abs(lateral) always exceeds it → culled */
-        --cull-outside: clamp(0, calc((var(--cull-abs-lateral) - var(--cull-depth) * var(--fov-tangent) - var(--cull-radius)) * 1000), 1);
+        --cull-outside: max(0, sign(var(--cull-abs-lateral) - var(--cull-depth) * var(--fov-tangent) - var(--cull-radius)));
 
         /* Beyond max distance */
         --cull-dist-sq: calc(var(--cull-x) * var(--cull-x) + var(--cull-y) * var(--cull-y));
-        --cull-far: clamp(0, calc(var(--cull-dist-sq) - var(--max-render-dist-sq)), 1);
+        --cull-far: max(0, sign(var(--cull-dist-sq) - var(--max-render-dist-sq)));
 
         /* Combined: cull if outside frustum OR beyond distance */
-        --cull-any: clamp(0, calc((var(--cull-outside) + var(--cull-far)) * 1000), 1);
+        --cull-any: min(1, calc(var(--cull-outside) + var(--cull-far)));
 
         /* Fallback: paused animation converts numeric 0/1 → visibility keyword */
         animation: cull-toggle 1s step-end paused;
