@@ -29,7 +29,7 @@ function isRectangular(vertices, minX, maxX, minY, maxY) {
  *
  * The sector's polygon shape is applied via CSS clip-path:
  * - Simple sectors use polygon() with percentage-based vertex coordinates.
- * - Sectors with holes use path() with SVG evenodd fill rule.
+ * - Sectors with holes use shape() with the evenodd fill rule.
  * - Rectangular sectors need no clip-path.
  */
 export function buildHorizontalSurface(ctx, sector, height, textureName, surfaceType) {
