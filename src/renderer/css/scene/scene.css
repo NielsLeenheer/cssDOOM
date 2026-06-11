@@ -53,6 +53,17 @@
     initial-value: 0;
 }
 
+/* Registered so it interpolates — things.css transitions --floor-z on
+   .enemy (0.4s ease-out) to smooth floor-height changes (lift rides).
+   Unregistered custom properties animate discretely (flip at 50%).
+   `inherits: true` preserves the default inheritance behavior of
+   unregistered custom properties. */
+@property --floor-z {
+    syntax: "<number>";
+    inherits: true;
+    initial-value: 0;
+}
+
 @property --light {
     syntax: "<number>";
     inherits: true;
