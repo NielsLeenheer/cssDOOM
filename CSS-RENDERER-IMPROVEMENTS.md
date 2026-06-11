@@ -200,6 +200,31 @@ Several places violate it:
   attribute. Decide: booleans as classes, enums as data attributes (probably
   the least-churn rule), then normalize the outliers.
 
+### B11. Projectiles: convert inline background-image to `data-type` + CSS
+
+- [ ] Investigate
+
+Projectiles are the last scene elements styled with direct
+`style.backgroundImage` — `createProjectile`
+(`scene/entities/sprites.js`) sets `backgroundImage`, `backgroundSize`,
+`width`, and `height` inline from the wire spec. Every other scene sprite
+goes through a declarative mechanism (`data-texture` → generated
+textures.css, `data-type` → enemies.css/things.css, or class-based
+keyframes).
+
+Projectile types are a small fixed set (enemy fireball, player rocket), so
+this can become `data-type="fireball|rocket"` with the sprite URL, size,
+and `background-size` defined per type in `projectiles.css` — matching the
+sprite convention everywhere else. Only the genuinely per-shot values
+(`--start-*`, `--end-*`, `--duration`) stay inline.
+
+Side benefit: slims the wire envelope — master currently ships
+`width`/`height`/`sprite` over the network on every shot for what is
+static per-type data (check what RenderSink forwards in the
+createProjectile args and trim the spec at the game side).
+
+Related to B10 (classes vs data attributes convention).
+
 ---
 
 ## C. Structural refactors
