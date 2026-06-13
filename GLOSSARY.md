@@ -6,9 +6,10 @@ original DOOM behavior. Terms are locked one at a time; nothing here is a design
 proposal — it describes the agreed model the design must satisfy.
 
 Status:
-- **Sectors** — locked (this doc).
-- **Floors & ceilings** — in progress.
-- Coordinate system, walls, things, movers (doors/lifts/crushers) — TBD.
+- **Sectors** — locked.
+- **Floors & ceilings** — locked.
+- **Coordinate system** — in progress.
+- Walls, things, movers (doors/lifts/crushers) — TBD.
 
 ---
 
@@ -65,3 +66,57 @@ a scanline even-odd test). Under even-odd, the outline fills and each hole loop
 (nested, opposite winding) punches — so one surface with `[outline, …holes]`
 renders correctly. This is why a sector needs only one floor and one ceiling
 element regardless of hole count.
+
+---
+
+## Floors & ceilings
+
+A **flat** is a horizontal surface — a floor or a ceiling. Each sector produces
+one floor and (usually) one ceiling.
+
+> **A floor/ceiling is the sector's footprint — the bounding-box quad clipped to
+> (outline − holes) — placed at the sector's floor-z / ceiling-z, textured with a
+> world-aligned 64×64 flat, and lit by the sector. Floor and ceiling differ only
+> in height, facing, and sky handling.**
+
+### Terms
+
+| Term | Definition |
+|---|---|
+| **Flat** | A horizontal surface (floor or ceiling), textured with a 64×64 DOOM flat **tiled in world space**, clipped to (outline − holes), lit by the sector's brightness. |
+| **Floor surface** | The flat at the sector's `floor-z`, facing **up** (seen from above). |
+| **Ceiling surface** | The flat at the sector's `ceiling-z`, facing **down** (seen from below). A **sky** ceiling (`F_SKY1`) produces **no** surface — the sky backdrop shows through. |
+
+### How a flat is drawn (verified against current code)
+
+1. A `<div>` sized to the sector's **bounding box** (`width = max-x − min-x`,
+   `height = max-y − min-y`), laid flat by `rotateX(90deg)` and positioned at the
+   surface height.
+2. **Clipped** to the sector shape: rectangular → no clip; concave → `polygon()`;
+   holed → `shape(evenodd …)` with outline + holes as subpaths. Clip coordinates
+   are bbox-relative percentages with DOOM Y flipped (`(maxY − y)/H`), since
+   element-local Y points down.
+3. **Textured** world-aligned: `background-size: 64px`, `background-repeat`,
+   `background-position` in world coords (`−min-x`, `max-y`) so flats tile
+   seamlessly across adjacent sectors and the clip reveals this sector's slice.
+   (Matches vanilla DOOM, which cannot offset or rotate flats.)
+4. **Lit** by `filter: brightness(var(--light))` from the sector.
+
+### Floor vs ceiling — the only differences
+
+| | Floor | Ceiling |
+|---|---|---|
+| Height | `floor-z` | `ceiling-z` |
+| Facing | seen from above (`backface-visibility: hidden`; lift-platform floors are `visible`) | seen from below (`backface-visibility: visible`) |
+| Sky | sky floor → dark fallback colour | **sky ceiling: not built** — backdrop shows |
+| Extras | `data-sector` debug label; NUKAGE flat animation | — |
+
+### Known wrinkles (current code; addressed by the parked refactor)
+
+- The **bbox + clip-path are duplicated** — floor and ceiling each carry their
+  own identical copy inline, rather than inheriting from the sector.
+- **Two animation paths** exist: a permanent floor lower animates via an inline
+  `transition: transform` on the surface, separate from the registered
+  `@property --floor-z`. The refactor unifies these.
+- A **sky floor** renders a dark fallback colour instead of showing sky below
+  (rare; minor).
