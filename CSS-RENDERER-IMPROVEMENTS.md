@@ -311,10 +311,13 @@ The two flagship refactors have their own design docs:
   sector and the game loop's per-thing height fan-out goes away. Expands this
   item (C5) plus the lift/floor parts of B5.
 - **[`REFACTOR-door-sector-surfaces.md`](REFACTOR-door-sector-surfaces.md)**
-  — stop reparenting door ceilings/face-walls into a `.door > .panel`; keep
-  them in their sector and animate the door via the sector's `--ceiling`
-  channel. Makes grouped/tagged multi-sector doors trivial and retires one
-  arm of C1. Depends on the height doc.
+  — a door *is* a sector, so delete the duplicate `.door > .panel` and
+  animate the door's own `.sector` `--ceiling` in place. Unifies doors /
+  lifts / crushers as "a sector with one animating height channel," makes
+  grouped/tagged multi-sector doors trivial (per-sector dispatch = the group
+  model), and retires one arm of C1. The visible faces are the lone
+  cross-sector case (lit by the room, moved by the door). Depends on the
+  height doc.
 
 Original notes (now folded into the height doc):
 

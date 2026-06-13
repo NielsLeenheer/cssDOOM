@@ -1,25 +1,61 @@
-# Refactor: Per-sector door surfaces (stop reparenting into a `.door` panel)
+# Refactor: Doors are sectors — animate the sector, delete the `.door` panel
 
 Status: design proposal · Owner: TBD · Relates to: `CSS-RENDERER-IMPROVEMENTS.md`
-items **B5** (movers). **Depends on** `REFACTOR-sector-height-inheritance.md`
-(the `--ceiling` channel this doc drives is defined there).
+items **B5** (movers), **C1** (wall-creation dedup). **Depends on**
+`REFACTOR-sector-height-inheritance.md` (the `--ceiling` channel this doc
+drives is defined there).
 
 ---
 
 ## Summary
 
-Doors today are built by **pulling surfaces out of their sectors** into a
-separate animated `.door > .panel` container. That severs every inheritance
-relationship the sector provides — today just `--light` (which `buildDoor`
-laboriously copies back onto each moved element), and after the height-
-inheritance refactor it would also sever `--floor` / `--ceiling` /
-`--sector-path`.
+A DOOM door **is a sector** — a thin slab sector whose ceiling drops to the
+floor when closed and rises when open. The renderer already builds a
+`.sector` container for it (every sector index gets one). Yet `buildDoor`
+creates a *second* container, `.door > .panel`, and **moves the real
+sector's surfaces into it** — gutting the sector div it already had.
 
-This refactor keeps door ceilings and face walls **inside their `.sector`**
-and animates the door by transitioning the sector's inherited `--ceiling`.
-The trigger stays a single attribute flip — it just moves from the `.door`
-container onto the `.sector`, which also makes tagged doors that open several
-sectors at once fall out for free.
+This refactor deletes that duplication. The door's own `.sector` container
+becomes the door: flip one attribute on it and animate its inherited
+`--ceiling`; the ceiling flat and the door-face walls follow. This makes
+doors, lifts, and crushers the **same shape** — "a sector with one animating
+height channel" — and makes tagged multi-sector doors fall out for free.
+
+> **A door = a `.sector` whose `--ceiling` animates.**
+> **A lift = a `.sector` whose `--floor` animates.** (see sibling doc)
+> No bespoke mover container for either.
+
+---
+
+## Anatomy of a real door (E1M1 sector 4)
+
+Closed state: `floor = 0`, `ceiling = 0` (a zero-height slab). Open:
+ceiling rises to `68`. Four linedefs — two "end" lines (the faces), two
+"side" lines (the jambs):
+
+| Component | Map sectorIndex | Built by | Container today | Moves? |
+|---|---|---|---|---|
+| Ceiling flat (`FLAT20`) | 4 (door) | `buildCeilings` | `#s4` → **moved into `.panel`** | rises 0→68 |
+| Floor flat (`FLOOR4_8`) | 4 (door) | `buildFloors` | `#s4` (stays) | no |
+| Face `BIGDOOR2` → room 3 | **3** (room) | `buildWalls` | `#s3` → **moved into `.panel`** | bottom rises |
+| Face `BIGDOOR2` → room 0 | **0** (room) | `buildWalls` | `#s0` → **moved into `.panel`** | bottom rises |
+| Two `DOORTRAK` jambs | 4 (door) | `buildDoor` (synth) | `.door` group (static) | no |
+
+Two things the data makes clear:
+
+1. **The visible face is lit by the *room*, not the door.** `BIGDOOR2` has
+   `sectorIndex = 3` / `0` (front sidedef = the room), because DOOM lights an
+   upper texture from its own sidedef's sector. So the faces live in the
+   neighbour rooms' containers, not the door's.
+2. **The `'-'` backface uppers and the `0/0` jambs are never built by
+   `buildWalls`** — it skips no-texture and zero-height walls. The jambs are
+   synthesised by `buildDoor` at `closedHeight..openHeight` (0..68) so the
+   track frames the full opening.
+
+So after `buildDoor` runs today, `#s4` is left holding only its floor flat;
+its ceiling and both faces have been relocated into a parallel `.panel`,
+each face carrying a **static `--light` copy** restated to compensate for
+the inheritance the move severed.
 
 ---
 
@@ -28,204 +64,225 @@ sectors at once fall out for free.
 `scene/mechanics/doors.js::buildDoor`:
 
 1. Creates `.door > .panel`.
-2. **Reparents** the door sector's ceiling surfaces into `.panel`, copying
-   `--light` onto each (inheritance from the sector is now broken, so the
-   value must be restated).
-3. **Reparents** the face walls (upper walls bordering the door sector) into
-   `.panel`, again restating `--light`, and adds `.unpegged`.
-4. Builds the static **track walls** (jambs) via `createWallElement` and
-   appends them to the `.door` group (not the moving panel).
+2. Moves the door sector's ceiling flat out of `#s{door}` into `.panel`
+   (restates `--light`).
+3. Moves the face walls (any upper wall with the door sector as front *or*
+   back) out of their room containers into `.panel` (restates each one's own
+   `--light`, adds `.unpegged`).
+4. Synthesises the `DOORTRAK` jambs via `createWallElement` at
+   `closedHeight..openHeight`, appends to the `.door` group (static).
 5. Records `doorContainers: Map<sectorIndex, .door>`.
 
 `setDoorState(sectorIndex, 'open'|'closed')` flips `data-state` on the
 `.door`; `mechanics/doors.css` transitions `.panel`'s
-`translateY(var(--offset))` where `--offset = -(openHeight - closedHeight)`.
+`translateY(var(--offset))`, `--offset = -(openHeight - closedHeight)`.
 
-Game side (`game/mechanics/doors.js`) owns all the *logic*: `tryOpenDoor`
-(forward use-cast against walls bordering a door sector), key checks,
-auto-close timer, the "player in the doorway → reverse" guard, and the
-`passable` timing. None of that is in CSS.
+Game-side `game/mechanics/doors.js` owns all *logic* — the forward use-cast
+(`tryOpenDoor`), key checks, auto-close timer, the "player in the doorway →
+reverse" guard, `passable` timing. None of that is in CSS, and none of it
+changes here.
 
-### Why the panel model fights the architecture
+### Why the panel fights the architecture
 
-- **Inheritance severed.** Moving a surface out of its `.sector` loses
-  `--light` today (hence the manual copy) and would lose `--floor` /
-  `--ceiling` / `--sector-path` after the height refactor — every one would
-  need restating on the panel, multiplying the very inline writes that
-  refactor removes.
-- **One door = one sector assumption.** `buildDoor` runs per
-  `mapData.doors[i]`, each with a single `sectorIndex`, and `doorContainers`
-  is keyed by that index. DOOM **tagged/remote doors** open *every* sector
-  with a matching tag from one trigger (none in the current E1M1–E1M9 set,
-  but the engine should support them). The panel model would need either N
-  panels driven together or one panel spanning sectors with mismatched
-  geometry and light — both awkward.
+- **It duplicates a container that already exists.** `buildSectorContainers`
+  already made `#s{door}`. The panel is a second home for the same sector's
+  surfaces.
+- **It severs inheritance, then patches it by hand.** Moving surfaces out of
+  their sector loses `--light` (hence the manual restating) and, after the
+  height-inheritance refactor, would also lose `--floor`/`--ceiling`/
+  `--sector-path`.
+- **It encodes "one door = one panel."** Tagged/remote DOOM doors open every
+  sector with a matching tag from a single trigger; the panel model needs N
+  coordinated panels.
 
 ---
 
 ## Proposed design
 
-### Keep surfaces in the sector; animate `--ceiling`
+### The door's own `.sector` is the door
 
-Don't reparent. The door's ceiling flat and face walls stay children of
-their `.sector`. Opening the door = transitioning the sector's effective
-ceiling from `closedHeight` to `openHeight`:
+Stop creating `.door`/`.panel`. Stop moving the door sector's ceiling out of
+`#s{door}`. Opening the door = transitioning that sector's effective ceiling:
 
 ```css
-/* the door sector animates its own ceiling; contents inherit it */
+/* the door sector animates its own ceiling; its contents inherit it */
 .sector[data-door="open"] { --ceiling-offset: var(--door-travel); }
 .sector { transition: --ceiling 1s ease-in-out; }
 ```
 
-where `--door-travel = openHeight - closedHeight`, set on the sector at
-build time, and `--ceiling = calc(var(--end-z) + var(--ceiling-offset, 0))`
-from the height-inheritance refactor.
+with `--door-travel = openHeight - closedHeight` set on the sector at build
+time and `--ceiling = calc(var(--end-z) + var(--ceiling-offset, 0))` from the
+height doc. `setDoorState(sectorIndex, state)` flips `data-door` on **`#s{sectorIndex}`**
+— the door's own `.sector` — replacing the `doorContainers` lookup.
 
-What inherits and moves:
+What follows for free, because they're genuine children of `#s{door}`:
 
 - **Ceiling flat** — already reads `--ceiling` for its z (height doc), so it
-  rises with the door. No special-casing.
-- **Door face / upper walls** — their **bottom** is the door sector's
-  effective ceiling and their **top** is the fixed room ceiling. So a face
-  wall reads the inherited `--ceiling` for its bottom edge:
+  rises. Just don't move it into a panel anymore.
+- **Floor flat** — reads `--floor` (a *separate* channel), so it stays put
+  while the ceiling animates. The two channels never cross.
 
-  ```css
-  /* a door face wall: top fixed (room ceiling), bottom rides the door */
-  .wall.door-face {
-      --floor-z: var(--ceiling);   /* inherited from the door sector */
-      /* --ceiling-z stays the static room-ceiling top */
-  }
-  ```
+### The faces are the one cross-sector piece
 
-  The wall is positioned at its (fixed) top vertex and its height is
-  `top - var(--floor-z)`, which shrinks as `--ceiling` rises; with
-  `.unpegged` (texture pinned to the bottom) the door texture slides upward —
-  exactly the DOOM behavior, and exactly what the panel `translateY`
-  approximates today, but now driven by the same inherited channel as
-  everything else.
+The visible `BIGDOOR2` faces belong to the *room* sectors for lighting, so
+they are **not** children of `#s{door}` and cannot inherit its `--ceiling`.
+A door face is an upper wall whose **top** is its room's (static) ceiling and
+whose **bottom** must track the door sector's rising ceiling:
 
-### Trigger: one attribute on the sector
+```css
+/* a door face: top fixed (its room ceiling), bottom rides the door sector */
+.wall.door-face {
+    --floor-z: var(--ceiling);   /* inherited door-sector ceiling = the wall's bottom */
+    /* --ceiling-z stays the static room-ceiling top */
+}
+```
 
-`setDoorState(sectorIndex, state)` flips `data-door` on the **`.sector`**
-container (replacing the `doorContainers` lookup). The trigger is just as
-simple as today's `.door[data-state]` — one attribute — it just lives on the
-sector now.
+The wall sits at its fixed top vertex; its height is `top - var(--floor-z)`,
+which shrinks as `--ceiling` rises; with `.unpegged` (texture pinned to the
+bottom) the `BIGDOOR2` texture slides upward — exactly the motion the panel
+`translateY` fakes today, now from the same inherited channel as everything
+else.
 
-**Tagged / multi-sector doors fall out for free:** the game dispatches
-`setDoorState` to each sector in the tag group; each sector animates its own
-`--ceiling` independently from its own `--end-z`. No grouping construct in
-the renderer at all.
+For `--floor-z: var(--ceiling)` to resolve to the *door's* ceiling, the face
+must be a child of `#s{door}`. **Reparent just the two faces into the door's
+`.sector`, copying each face's own-room `--light` once at build.** This is
+behaviourally identical to today — the current code already restates a static
+`--light` on each face when it moves them into the panel — but now there is
+no second container, and nothing moves per frame.
 
-### Track walls stay as ordinary sector walls
+> **Alternative (no reparent):** leave the faces in their room containers and
+> have `setDoorState` set the door's ceiling target on the face elements too.
+> That preserves the room's *animated* light on the face (a one-time `--light`
+> copy can't), at the cost of the trigger touching the faces as well as the
+> sector. Pick the reparent model unless a door visibly needs its face to
+> share an animated room light. Either way it's one write per open/close, not
+> per frame.
 
-The static jambs (`trackWalls`) are solid walls bordering the door; they
-belong to their own sectors and are built by `buildWalls` like any other
-wall. The special `createWallElement`-into-`.door` path is removed (this also
-retires one arm of checklist item **C1**, the `buildWalls` /
-`createWallElement` divergence).
+### Jambs stay; they're just static sector walls
+
+The `DOORTRAK` jambs (`sectorIndex = door`, currently synthesised in
+`buildDoor`) are static and frame the opening across the full
+`closedHeight..openHeight` span. They live in `#s{door}` naturally and need
+no ceiling channel. Building them through the normal wall path (with proper
+heights) retires the bespoke `createWallElement`-into-`.door` arm of **C1**.
+
+---
+
+## Unification: doors, lifts, crushers
+
+All three collapse to "a sector with one animating height channel," driven by
+a single attribute flip on the sector:
+
+| Mechanic | Sector channel | Attribute | What inherits & moves |
+|---|---|---|---|
+| Lift | `--floor` (offset `--start-z`) | `data-lift` | floor flat + things in the sector |
+| Door | `--ceiling` (offset `--end-z`) | `data-door` | ceiling flat + door faces |
+| Crusher | `--ceiling` (offset down) | `data-crush`/`--ceiling-offset` | ceiling flat + upper walls |
+
+Crushers fold in identically — `setCrusherOffset` writes the sector's
+`--ceiling-offset` instead of translating a `.crusher` container; their upper
+walls are the same cross-sector face case as doors.
 
 ---
 
 ## The "CSS-only trigger" question
 
-The open question from the brief: *can the door be triggered with a simple
-CSS-only mechanism?*
+**Animation: CSS-only, and now trivially so.** One attribute on the door's
+own `.sector` drives the whole open/close through inheritance + transition.
+No panel, no per-element JS, no per-frame work.
 
-**Animation: yes, already CSS-only.** Flipping one attribute/property on the
-sector drives the whole open/close through inheritance + transition — no
-per-element JS, no panel. That's strictly simpler than today.
+**Activation: stays in JS — it must.** Whether a door *may* open depends on
+proximity + facing (the forward use-cast), key possession, the auto-close
+timer, the "player in the doorway → reverse" guard, and multiplayer authority
+(only the host simulates; clients receive `setDoorState` over the wire). CSS
+selector hacks (`:has()`, `:target`, checkbox) can't read world distance,
+inventory, or remote state and would desync from the authoritative sim. So:
 
-**Activation: no, and it shouldn't be.** Whether a door *may* open is game
-logic that CSS can't express:
+> **JS decides *when*** — one `setDoorState(sectorIndex, state)` dispatch, as
+> now — **CSS does *everything after*** via the sector's `--ceiling` channel.
 
-- proximity + facing (the forward use-cast in `tryOpenDoor`),
-- key possession (`keyRequired` vs `player.collectedKeys`),
-- auto-close timer and the "player in the doorway → reverse instead of
-  crush" guard,
-- multiplayer authority (only the host simulates; clients receive
-  `setDoorState` over the wire).
+The win isn't removing JS from the decision; it's that the decision flips one
+attribute on the door's existing `.sector` and the rendering follows with no
+further dispatch, across any number of grouped sectors.
 
-Pure-CSS trigger hacks (`:has()`, `:target`, checkbox, `:hover`) can't read
-world distance, inventory, or remote state, and would diverge from the
-authoritative simulation in Network DM. So the boundary stays:
+### Tagged / multi-sector doors fall out for free
 
-> **JS decides *when*** (one `setDoorState(sectorIndex, state)` dispatch,
-> exactly as now) **— CSS does *everything after*** via the sector's
-> `--ceiling` channel.
-
-The win isn't removing JS from the decision; it's that the decision sets a
-single inherited property and the rendering — ceiling flat, face walls, any
-things in the doorway sector, lighting — all follow with no further dispatch,
-across any number of grouped sectors.
-
-(If a *non-gameplay* CSS-only demo door is ever wanted — e.g. an attract-mode
-flourish — the same `--ceiling` channel can be driven by a keyframe animation
-or a `:has(:checked)` toggle without touching the gameplay path. Noting it as
-possible, not as the plan.)
+A remote trigger that opens every sector with a matching tag just dispatches
+`setDoorState` per sector in the group. Each door sector is its own `.sector`
+animating its own `--ceiling` from its own `--end-z`. **No grouping construct
+in the renderer at all** — the per-sector model *is* the group model. (No
+tagged doors exist in the shipped E1M1–E1M9 maps; add a synthetic test map to
+exercise this.)
 
 ---
 
 ## What this deletes / simplifies
 
-- **The `.door > .panel` container and the reparenting** in `buildDoor`
-  (ceiling + face-wall moves, and the `--light` restating that compensates
-  for broken inheritance).
-- **`doorContainers: Map<sectorIndex, .door>`** — `setDoorState` targets the
-  `.sector` directly.
-- **The grouped-door problem** — never constructed; per-sector dispatch
-  handles tag groups.
-- **One arm of C1** — door track walls become ordinary `buildWalls` output;
-  the `createWallElement`-into-panel path retires.
+- **The `.door > .panel` container and all reparenting of the ceiling** — the
+  ceiling flat stays in its sector and inherits the animating `--ceiling`.
+- **`doorContainers: Map<sectorIndex, .door>`** — `setDoorState` targets
+  `#s{sectorIndex}` directly.
+- **The per-face `--light` restating** shrinks to a one-time copy on just the
+  two reparented faces (or disappears entirely under the no-reparent
+  alternative).
+- **The grouped-door problem** — never constructed.
+- **One arm of C1** — the `createWallElement`-into-`.door` jamb path retires;
+  jambs become ordinary sector walls.
+- **The `.crusher` container** — same collapse onto the sector's `--ceiling`.
 
 ---
 
 ## Migration phases
 
 1. **Land the height-inheritance refactor first** (sibling doc) so
-   `--ceiling` / `--ceiling-offset` exist and the ceiling flat already reads
-   `--ceiling`.
-2. **Mark door face walls.** In `buildWalls` (or door enrichment), tag the
-   upper walls bordering a door sector with `.door-face` and have them read
-   the inherited `--ceiling` for their bottom. Verify a closed door looks
-   identical.
+   `--ceiling`/`--ceiling-offset` exist and the ceiling flat already reads
+   `--ceiling` from its sector.
+2. **Tag the faces.** In `buildWalls` (or door enrichment) mark the upper
+   walls bordering a door sector with `.door-face`, reparent each into the
+   door's `#s{door}` with a one-time own-room `--light` copy, and have them
+   read `--floor-z: var(--ceiling)`. Verify a *closed* door is pixel-identical
+   to today (faces full-height, lit by their rooms).
 3. **Drive the door from the sector.** Set `--door-travel` + `data-door` on
-   the `.sector`; delete the `.panel` reparenting and `doorContainers`.
-   Point `setDoorState` at the sector container. Verify open/close animation
-   matches the old panel motion (side-by-side on E1M1's first door).
-4. **Crushers** share the `--ceiling-offset` channel (ceiling moving down) —
-   fold `setCrusherOffset` onto the sector at the same time.
-5. **Add a synthetic tagged-door test map** (or temporarily tag two adjacent
-   door sectors) to confirm grouped open/close, since the shipped maps have
-   no tagged doors.
+   `#s{door}`; delete `.door`/`.panel` and `doorContainers`; point
+   `setDoorState` at the sector. Verify the open/close motion matches the old
+   panel translate side-by-side on E1M1's first door (room-0 face top 72,
+   room-3 face top 88).
+4. **Jambs through the normal wall path** (retire the `buildDoor` synth);
+   confirm the `DOORTRAK` track still frames the full 0..68 opening.
+5. **Crushers** onto the same `--ceiling` channel; delete `.crusher`.
+6. **Synthetic tagged-door map** to confirm grouped open/close.
+
+Each phase is independently verifiable (screenshot diff) and revertible.
 
 ---
 
 ## Risks / open questions
 
-- **Door sector also has a floor + things.** Animating `--ceiling` must not
-  disturb `--floor` or things standing in the doorway — they read `--floor`,
-  a separate channel, so they stay put. Confirm the two channels are fully
-  independent (they are by construction: `--floor`/`--floor-offset` vs
-  `--ceiling`/`--ceiling-offset`).
-- **Face-wall bottom inheriting `--ceiling`.** Walls otherwise set their own
-  `--floor-z`; door faces must *not* set it and must inherit. Needs a clear
-  rule so a normal wall and a door-face wall don't get crossed wires
-  (registered `--floor-z` inherits, so an unset face wall would inherit the
-  sector's `--floor-z` if one existed — make sure the sector exposes
-  `--ceiling` under a distinct name and the face wall reads *that*, e.g.
-  `--floor-z: var(--ceiling)`).
-- **`passable` vs visual timing.** Game-side `DOOR_PASSABLE_DELAY` (0.8s)
-  must still roughly track the CSS transition duration (1s) as it does today;
-  keep them defined against a shared constant if possible.
-- **Texture peg / unpegged.** Confirm the door texture still pins and slides
-  correctly when the motion comes from a shrinking wall height rather than a
-  panel translate (lower-unpegged background-position math in `walls.css`).
-- **Multiplayer.** `setDoorState` already fans over the wire per sector; the
-  per-sector model matches that exactly. Catchup (`catchup.js::appendDoorCmds`)
-  iterates `state.doorState` by sector and would target sectors the same way —
-  confirm the joiner-side apply hits the `.sector` attribute.
-- **Light on the moving ceiling.** Today `buildDoor` copies the door sector's
-  light onto the moved ceiling; once the ceiling stays in its sector it
-  inherits `--light` natively, including light-effect animations — a small
-  correctness improvement, but verify no door relied on the copied (possibly
-  different) value.
+- **Reparented-face light is static** (reparent model). A face moved into the
+  door sector carries a one-time `--light` copy and won't follow its room's
+  *animated* light effect. This is **identical to today** (the panel copy is
+  also static), so no regression — but if a future door needs an animated room
+  light on its face, use the no-reparent alternative.
+- **Face bottom must inherit `--ceiling`, not `--floor`.** The door sector
+  exposes both; the `.door-face` rule reads `--ceiling` for `--floor-z`
+  (the wall's bottom). Keep the names distinct so a normal wall and a door
+  face never get crossed wires.
+- **Floor/ceiling channel independence.** Animating `--ceiling` must leave the
+  door sector's floor flat and any thing in the doorway untouched — they read
+  `--floor`. True by construction (`--floor`/`--floor-offset` vs
+  `--ceiling`/`--ceiling-offset`), but verify a thing standing under a closing
+  door doesn't twitch.
+- **`passable` vs visual timing.** Game-side `DOOR_PASSABLE_DELAY` (0.8s) must
+  still track the CSS transition (1s) as today; define both against a shared
+  constant if possible.
+- **Texture peg.** Confirm `BIGDOOR2` pins and slides correctly when the
+  motion comes from a shrinking unpegged wall rather than a panel translate
+  (lower-unpegged `background-position` math in `walls.css`).
+- **Multiplayer catchup.** `catchup.js::appendDoorCmds` iterates
+  `state.doorState` by sector and fires `setDoorState` per sector — already
+  the per-sector shape; confirm the joiner-side apply now flips the `.sector`
+  attribute (not a `.door`).
+- **Closed-state geometry.** With `closed = 0` the door slab is zero-height;
+  confirm the ceiling flat at `--ceiling = 0` doesn't z-fight the floor flat
+  at `--floor = 0` (it does today inside the panel — same coplanar pair, so
+  likely fine, but check backface culling on the coincident flats).
