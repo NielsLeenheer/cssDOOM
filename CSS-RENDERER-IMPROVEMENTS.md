@@ -302,22 +302,21 @@ truth.
 - [ ] Investigate — **promoted to full design doc:
   [`REFACTOR-sector-height-inheritance.md`](REFACTOR-sector-height-inheritance.md)**
 
-The two flagship refactors have their own design docs:
+The two flagship refactors are interdependent and live in one combined
+design doc:
 
-- **[`REFACTOR-sector-height-inheritance.md`](REFACTOR-sector-height-inheritance.md)**
-  — sectors carry `--start-z`/`--end-z` + a derived animatable `--floor`/
-  `--ceiling` (and an inherited `--sector-path` clip-path); floors, ceilings,
-  and things inherit them, so a lift/floor move is one property write on the
-  sector and the game loop's per-thing height fan-out goes away. Expands this
-  item (C5) plus the lift/floor parts of B5.
-- **[`REFACTOR-door-sector-surfaces.md`](REFACTOR-door-sector-surfaces.md)**
-  — a door *is* a sector, so delete the duplicate `.door > .panel` and
-  animate the door's own `.sector` `--ceiling` in place. Unifies doors /
-  lifts / crushers as "a sector with one animating height channel," makes
-  grouped/tagged multi-sector doors trivial (per-sector dispatch = the group
-  model), and retires one arm of C1. The visible faces are the lone
-  cross-sector case (lit by the room, moved by the door). Depends on the
-  height doc.
+- **[`REFACTOR-sector-as-geometry.md`](REFACTOR-sector-as-geometry.md)** —
+  makes the **sector the unit of geometry**: it owns its shape (`bbox` +
+  compound `--sector-path`), `--start-z`/`--end-z`, and `--light`; floors,
+  ceilings, things, and in-sector walls inherit them. Movers become "a sector
+  with one animating `--offset`" routed onto `--floor` or `--ceiling` by
+  `data-mover` — no reparenting, no per-frame fan-out. Walls rename
+  `--floor-z`/`--ceiling-z` → `--start-z`/`--end-z`; door faces stay in their
+  room sector (correct light) and direct-drive their bottom via the shared
+  `--offset`. Every sector collapses to one floor + one ceiling element (even
+  multi-region, via the compound clip-path). Covers C5, A2, the mover parts
+  of B5, and one arm of C1. Gated on a Firefox custom-property-propagation
+  spike (documented in the doc).
 
 Original notes (now folded into the height doc):
 
