@@ -299,7 +299,24 @@ truth.
 
 ### C5. Things inherit z from their sector (drop per-thing `--floor-z`)
 
-- [ ] Investigate
+- [ ] Investigate — **promoted to full design doc:
+  [`REFACTOR-sector-height-inheritance.md`](REFACTOR-sector-height-inheritance.md)**
+
+The two flagship refactors have their own design docs:
+
+- **[`REFACTOR-sector-height-inheritance.md`](REFACTOR-sector-height-inheritance.md)**
+  — sectors carry `--start-z`/`--end-z` + a derived animatable `--floor`/
+  `--ceiling` (and an inherited `--sector-path` clip-path); floors, ceilings,
+  and things inherit them, so a lift/floor move is one property write on the
+  sector and the game loop's per-thing height fan-out goes away. Expands this
+  item (C5) plus the lift/floor parts of B5.
+- **[`REFACTOR-door-sector-surfaces.md`](REFACTOR-door-sector-surfaces.md)**
+  — stop reparenting door ceilings/face-walls into a `.door > .panel`; keep
+  them in their sector and animate the door via the sector's `--ceiling`
+  channel. Makes grouped/tagged multi-sector doors trivial and retires one
+  arm of C1. Depends on the height doc.
+
+Original notes (now folded into the height doc):
 
 Today every thing carries its own inline `--floor-z`, pushed by game-side
 dispatches (`updateThingPosition`, `resetEnemy`, `createPlayerSprite`,
