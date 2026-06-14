@@ -9,7 +9,9 @@ Status:
 - **Sectors** — locked.
 - **Floors & ceilings** — locked.
 - **Walls** — locked.
-- Things, movers (doors/lifts/crushers) — TBD.
+- **Movers (doors / lifts / crushers)** — locked.
+- Things — partially covered under Movers (how they ride a moving floor); a full
+  Things section is TBD.
 - Coordinate system — covered in discussion; not separately documented here.
 
 ---
@@ -187,3 +189,149 @@ lower→lower-floor, upper→higher-ceiling.
   (`isSolid` is often set alongside the others); the flag semantics are messier
   than the clean DOOM upper/middle/lower model and should be pinned before any
   wall-classification work.
+
+---
+
+## Movers (doors, lifts, crushers)
+
+A **mover** is a sector whose floor *or* ceiling animates along the vertical
+(z) axis at runtime. Doors, lifts, and crushers are all movers.
+
+> **A mover is a sector. Exactly one of its surfaces moves — never both — and it
+> moves by a pure translate (the surface keeps its rest geometry). Things sitting
+> on a moving floor ride it by sharing the same translated container.**
+
+### Movers are sectors
+
+A mover is **not** a special object grafted onto the scene — it is an ordinary
+sector that happens to change height. It has the same anatomy as any sector:
+one bounding box, one outline (± holes), one floor-z, one ceiling-z, one light,
+one floor surface, one ceiling surface. The only addition is a runtime
+translate on one surface.
+
+This matters because the mover's motion is visible from its **neighbours**: the
+surface that reads as "the door" from an adjoining room is that neighbour's
+**upper wall** (the overhang down to the closed door), and the surface that
+reads as "the lift" is the step (lower/upper wall) on its boundary. So animating
+a mover means animating its own surface *and* the relevant walls of any
+adjoining sector — see "Adjoining faces" below.
+
+### Which surface moves (verified against E1M-series data)
+
+| Mover | Surface that moves | Direction | Rest state | Verified |
+|---|---|---|---|---|
+| **Door** | ceiling | up to open, down to close | closed: ceiling-z == floor-z | doors closed ceiling==floor, open up — 115/115 |
+| **Lift** | floor | down to lower, up to raise | raised: floor-z == upper neighbour's floor | lift floor down, rest == raised == upper height — 37/38 |
+| **Crusher** | ceiling | down to crush, up to retract | retracted: ceiling at top of crush range | ceiling down, rest == top, floor static — 2/2 |
+
+Two invariants fall out of this:
+
+- **Only one surface moves.** A door/crusher never moves its floor; a lift never
+  moves its ceiling. The static surface stays put.
+- **The floor never moves on a door or crusher**, so things in a door/crusher
+  sector never ride anything; only **lift** things ride.
+
+cssDOOM caveats:
+
+- A **crusher's stored ceiling-z is not its crush range.** The data's ceiling
+  height is the *retracted* position; the crush bottom is computed separately.
+  Don't assume `ceiling-z` bounds the animation.
+- **Lifts currently use synthesized `shaftWalls`** (see `isLiftWall` handling in
+  `walls.js`): the generator's lower walls on a lift boundary are skipped and
+  replaced with shaft walls spanning the full travel. The target model removes
+  that special case — see "Moving walls are fixed geometry" — but it's the
+  current reality.
+
+### Moving walls are fixed geometry, translated
+
+A moving surface (and any moving wall) **never changes its height/geometry at
+runtime.** It is generated once at its **fullest extent** (the rest/largest
+state) and then *translated* between states. A pure translate has no gaps only
+if the geometry already covers both endpoints, so:
+
+- A **door's** moving ceiling-face wall is built to span the full open opening,
+  then translated down to "close" it.
+- A **lift's** moving floor and its shaft walls are built to span the full
+  raised footprint / full travel, then translated down.
+
+This is deliberate: animating `height` (or `--start-z`/`--end-z`) would force a
+per-frame layout/clip recompute, and would fight the light filter for the same
+animatable slots. Translating a fixed quad is cheap and composes cleanly with
+nested transforms.
+
+### DOM structure
+
+A mover sector splits its children into a **static** group and one-or-more
+**moving** groups:
+
+```
+<div class="sector">              ← carries --light, light-effect class,
+  │                                 --base-floor-z / --base-ceiling-z (inherited)
+  ├─ <div class="static">         ← non-moving surface + static walls
+  │     ├─ <div class="ceiling|floor">   (whichever does NOT move)
+  │     ├─ <div class="wall"> …           (walls that don't move)
+  │     └─ things/enemies                  (only for NON-floor-movers)
+  │
+  └─ <div class="moving">         ← the moving group; transform: translate(…)
+        ├─ <div class="floor|ceiling">   (the surface that moves)
+        ├─ <div class="wall"> …           (walls that move with it)
+        └─ things/enemies                  (only for LIFTS — they ride the floor)
+```
+
+- The **move is a `transform: translate3d(…)` on the `.moving` container.** Every
+  child inherits the motion through one transform — guaranteeing the surface, its
+  walls, and (for lifts) the things on it stay glued together with zero sync risk.
+- A sector can hold **several `.moving` groups**: its own (if it's a mover) plus
+  one per adjoining mover whose face it must animate (see below). Each group is
+  **direct-driven** by its mechanic — there is no single shared driver, because a
+  neighbour's group animates on a different schedule than the sector's own.
+
+### Light vs motion — different elements, no conflict
+
+- **Motion** runs as a `transform` on the `.moving` *container*.
+- **Light** runs as `filter: brightness(var(--light))` on the **leaf** (the
+  textured wall / flat / sprite) — exactly as the renderer already does, including
+  animated-light effects via the `lighting.css` descendant pattern.
+
+Because motion and light live on **different elements**, they never compete for
+the same animation slot. This is why grouping is necessary: a single element
+**cannot** simultaneously run a continuous light keyframe and a move keyframe (a
+crusher is both lit and constantly moving). Splitting move-onto-parent /
+light-onto-leaf resolves it structurally. Nested transforms compose correctly,
+so a leaf inside a moving group still gets its filter and its inherited motion.
+
+### Things ride the floor
+
+Things and enemies standing on a **lift** must move with it. They do so by
+living **inside the lift's `.moving` container** (option (a)): one transform
+moves the floor and everything on it together — guaranteed sync, no second
+animation to keep aligned.
+
+- `sector.floorContainer` is set at build time: it points at `.moving` for a
+  **lift**, and at `.static` (or the plain sector) otherwise. `reparentThingToSector`
+  targets `sector.floorContainer`, so a thing always lands in the group that
+  owns its floor.
+- There is **no animated `--floor-z`.** Earlier designs animated an inherited
+  `--floor-z` so things could read their height from the sector; that's dropped.
+  Geometry and things move purely by the parent translate. (The sector may still
+  expose a *static* `--base-floor-z` for initial placement, but it is not
+  animated.)
+
+### Adjoining faces
+
+When a non-mover sector adjoins a mover, the mover's visible face in that sector
+is one of that sector's own walls (e.g. the upper wall that hangs down to a
+closed door). To animate it, the adjoining sector gets its **own `.moving`
+group** holding just those boundary walls, direct-driven in lockstep with the
+mover's surface. A sector adjoining **two** doors therefore carries **two**
+`.moving` groups — one per door — plus its `.static` group.
+
+### Firefox note (empirically de-risked, FF142)
+
+The grouping above is a **structural** choice (clean light/motion separation +
+the keyframe-slot conflict), **not** a Firefox workaround. Measured with
+Playwright Firefox 142 at the pixel level: an inherited, animated, registered
+custom property *does* repaint a descendant's `transform` **and** its `filter`
+(both keyframe and transition). So animating on a parent and lighting on a leaf
+is safe in Firefox; the structure is chosen for correctness and clarity, not to
+dodge a browser bug.
