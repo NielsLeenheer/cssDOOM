@@ -8,8 +8,9 @@ proposal — it describes the agreed model the design must satisfy.
 Status:
 - **Sectors** — locked.
 - **Floors & ceilings** — locked.
-- **Coordinate system** — in progress.
-- Walls, things, movers (doors/lifts/crushers) — TBD.
+- **Walls** — locked.
+- Things, movers (doors/lifts/crushers) — TBD.
+- Coordinate system — covered in discussion; not separately documented here.
 
 ---
 
@@ -123,3 +124,66 @@ one floor and (usually) one ceiling.
   `@property --floor-z`. The parked refactor unifies these.
 - A **sky floor** renders a dark fallback colour instead of showing sky below
   (rare; minor).
+
+---
+
+## Walls
+
+A **wall** is a vertical quad along a linedef.
+
+> **A wall spans from `--start-z` (bottom) to `--end-z` (top) between its two
+> vertices (`--start-x/y` → `--end-x/y`). The renderer derives its width, angle,
+> and position from the vertices; its height is `end-z − start-z`.**
+
+### Linedefs & sidedefs
+
+- A linedef has **one or two sidedefs** (front, optional back). One-sided = a
+  solid wall against the void; two-sided = a portal between two sectors.
+
+### Wall types (per sidedef)
+
+| Type | Covers | Notes |
+|---|---|---|
+| **lower** | the step between the two sectors' **floors** | two-sided only |
+| **upper** | the overhang between the two sectors' **ceilings** | two-sided only |
+| **middle** | one-sided: the full floor→ceiling solid wall · two-sided: an *optional* see-through texture spanning only the opening (grates/bars), usually absent | — |
+
+So a one-sided line uses **only** the middle (full-height) texture; a two-sided
+line uses upper and/or lower (plus an optional middle).
+
+### Which side renders which (verified ~95–99% in E1M1)
+
+- **lower wall → the lower-floor sector** (you see the step *up* from the lower side).
+- **upper wall → the higher-ceiling sector** (you see the overhang from the higher side).
+
+Symmetry: each step is rendered from the side you can actually see it —
+lower→lower-floor, upper→higher-ceiling.
+
+### Sizing model
+
+- **Horizontal:** `--start-x/--start-y` (start vertex) + `--end-x/--end-y` (end
+  vertex). CSS derives `width = hypot(Δx, Δy)`, `angle = atan2(Δy, Δx)`, and
+  positions the wall at the start vertex.
+- **Vertical:** `--start-z` (bottom) + `--end-z` (top) — the wall's vertical
+  span. `height = end-z − start-z`; the wall is anchored at its **top**
+  (`--end-z`) and grows downward.
+  - These were named `--floor-z`/`--ceiling-z`, which are only accurate for a
+    one-sided full-height wall. For a **lower** wall the top is a *floor* (the
+    higher sector's), for an **upper** wall the bottom is a *ceiling* (the lower
+    sector's) — so the floor/ceiling names lie. `--start-z`/`--end-z` is a
+    generic vertical span that's accurate for every wall type.
+  - Deliberate asymmetry with the horizontal pair: `--start-x/y` and `--end-x/y`
+    are the two *vertices*; `--start-z`/`--end-z` are span bounds shared by both
+    vertices (a wall has one bottom and one top, not one per vertex).
+
+### cssDOOM data representation (caveats)
+
+- The generator emits a wall record **per portion, per side**: a two-sided line
+  yields a *visible* (textured) wall and a `'-'` back-face counterpart. So
+  `isUpperWall` ≈ openings × 2; same for lower.
+- Only **`isUpperWall`** records carry `frontSectorIndex`/`backSectorIndex`;
+  lower/middle/solid leave them null (infer the neighbour from heights).
+- The `isSolid` / `isLowerWall` / `isUpperWall` / `isMiddleWall` flags **overlap**
+  (`isSolid` is often set alongside the others); the flag semantics are messier
+  than the clean DOOM upper/middle/lower model and should be pinned before any
+  wall-classification work.

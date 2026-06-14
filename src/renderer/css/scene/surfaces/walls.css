@@ -7,19 +7,21 @@
     --delta-x: calc(var(--end-x) - var(--start-x));
     --delta-y: calc(var(--end-y) - var(--start-y));
 
-    /* Wall dimensions derived from vertices and sector heights */
+    /* Wall dimensions: width from the vertices, height from the vertical span.
+       --start-z/--end-z are the wall's bottom/top (a generic span — accurate for
+       lower/upper/middle walls, unlike floor-z/ceiling-z). */
     width: calc(hypot(var(--delta-x), var(--delta-y)) * 1px);
-    height: calc((var(--ceiling-z) - var(--floor-z)) * 1px);
+    height: calc((var(--end-z) - var(--start-z)) * 1px);
 
     background-repeat: repeat;
     background-position: calc(var(--texture-offset-x, 0) * -1px) calc(var(--texture-offset-y, 0) * -1px);
     transform-origin: 0 0;
 
-    /* Position at start vertex, convert DOOM→CSS coords (X=X, Y=−Z, height=−Y) */
+    /* Position at start vertex + top edge, convert DOOM→CSS coords (X=X, Y=−Z, height=−Y) */
     transform:
         translate3d(
             calc(var(--start-x) * 1px),
-            calc(var(--ceiling-z) * -1px),
+            calc(var(--end-z) * -1px),
             calc(var(--start-y) * -1px)
         )
         rotateY(atan2(var(--delta-y), var(--delta-x)));

@@ -16,8 +16,8 @@ import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 import { mapData } from '../../../../shared/maps/index.js';
 import { appendToSector, getSectorLight } from '../sectors.js';
 
-/** Creates a wall DOM element from wall data with the given floor/ceiling heights. */
-export function createWallElement(wall, floorZ, ceilZ) {
+/** Creates a wall DOM element from wall data spanning the given bottom/top z. */
+export function createWallElement(wall, bottomZ, topZ) {
     const deltaX = wall.end.x - wall.start.x;
     const deltaY = wall.end.y - wall.start.y;
     const wallLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
@@ -29,8 +29,8 @@ export function createWallElement(wall, floorZ, ceilZ) {
     el.style.setProperty('--start-y', wall.start.y);
     el.style.setProperty('--end-x', wall.end.x);
     el.style.setProperty('--end-y', wall.end.y);
-    el.style.setProperty('--floor-z', floorZ);
-    el.style.setProperty('--ceiling-z', ceilZ);
+    el.style.setProperty('--start-z', bottomZ);
+    el.style.setProperty('--end-z', topZ);
     el.dataset.texture = wall.texture; // background-image from textures.css
     el.style.setProperty('--texture-offset-x', wall.xOffset);
     el.style.setProperty('--texture-offset-y', wall.yOffset);
@@ -78,8 +78,8 @@ export function buildWalls(ctx) {
         wallElement.style.setProperty('--start-y', wall.start.y);
         wallElement.style.setProperty('--end-x', wall.end.x);
         wallElement.style.setProperty('--end-y', wall.end.y);
-        wallElement.style.setProperty('--floor-z', wall.bottomHeight);
-        wallElement.style.setProperty('--ceiling-z', wall.topHeight);
+        wallElement.style.setProperty('--start-z', wall.bottomHeight);
+        wallElement.style.setProperty('--end-z', wall.topHeight);
 
         // ML_DONTPEGBOTTOM on a two-sided middle texture pins it to the
         // bottom of the allowable window instead of the default top.
@@ -209,8 +209,8 @@ function buildSkyWalls(ctx) {
         el.style.setProperty('--start-y', wall.start.y);
         el.style.setProperty('--end-x', wall.end.x);
         el.style.setProperty('--end-y', wall.end.y);
-        el.style.setProperty('--floor-z', skyFloor);
-        el.style.setProperty('--ceiling-z', SKY_TOP);
+        el.style.setProperty('--start-z', skyFloor);
+        el.style.setProperty('--end-z', SKY_TOP);
 
         appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, el, wall.sectorIndex);
 
