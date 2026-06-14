@@ -106,7 +106,7 @@
     --explode-transform:
         translate3d(
             calc(var(--start-x) * 1px),
-            calc(var(--ceiling-z) * -1px),
+            calc(var(--end-z) * -1px),
             calc(var(--start-y) * -1px)
         )
         rotateY(atan2(var(--delta-y), var(--delta-x)))
