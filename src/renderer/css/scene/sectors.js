@@ -16,6 +16,7 @@
 
 import { LIGHT_MINIMUM_BRIGHTNESS, DOOM_LIGHT_MAX, LIGHT_DISTANCE_OFFSET, KIOSK_LIGHT_BOOST } from './constants.js';
 import { mapData } from '../../../shared/maps/index.js';
+import { sectorBounds, sectorClipValue } from './surfaces/clip.js';
 
 /**
  * Maps DOOM sector special types to CSS animation classes for dynamic lighting effects.
@@ -55,6 +56,12 @@ function doomLightToCSS(lightLevel, boost = 1) {
  * Build sector containers into the given build context. Reads
  * `mapData.sectors`, creates one `.sector` div per sector, appends it to
  * `ctx.fragment`, and pushes it into `ctx.sceneState.sectorContainers`.
+ *
+ * The container also carries the sector's horizontal footprint —
+ * `--min-x/--max-x/--min-y/--max-y` (bounding box) and `--outline` (clip
+ * path) — so its floor and ceiling inherit them instead of each computing
+ * and storing its own copy. Assumes one `sectorPolygons` entry per sector
+ * (guaranteed by the regenerated maps; see GLOSSARY.md).
  */
 export function buildSectorContainers(ctx) {
     const sectors = mapData.sectors;
@@ -62,6 +69,12 @@ export function buildSectorContainers(ctx) {
 
     // Layout is fixed at boot, so read the kiosk flag once for the whole build.
     const lightBoost = document.body.dataset.layout === 'kiosk' ? KIOSK_LIGHT_BOOST : 1;
+
+    // One polygon per sector index — pick the first if (legacy) duplicates exist.
+    const polyByIndex = new Map();
+    for (const poly of mapData.sectorPolygons || []) {
+        if (!polyByIndex.has(poly.sectorIndex)) polyByIndex.set(poly.sectorIndex, poly);
+    }
 
     for (let i = 0; i < sectors.length; i++) {
         const sector = sectors[i];
@@ -74,6 +87,21 @@ export function buildSectorContainers(ctx) {
 
         if (sector.specialType) {
             applyLightEffect(container, sector.specialType);
+        }
+
+        // Footprint inherited by this sector's floor + ceiling.
+        const poly = polyByIndex.get(i);
+        const outer = poly?.boundaries?.[0];
+        if (outer && outer.length >= 3) {
+            const b = sectorBounds(outer);
+            if (b.maxX - b.minX >= 1 && b.maxY - b.minY >= 1) {
+                container.style.setProperty('--min-x', b.minX);
+                container.style.setProperty('--max-x', b.maxX);
+                container.style.setProperty('--min-y', b.minY);
+                container.style.setProperty('--max-y', b.maxY);
+                const clip = sectorClipValue(poly, b);
+                if (clip) container.style.setProperty('--outline', clip);
+            }
         }
 
         ctx.fragment.appendChild(container);

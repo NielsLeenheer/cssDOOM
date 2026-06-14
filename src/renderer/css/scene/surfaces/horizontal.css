@@ -1,8 +1,9 @@
-/* Floors & ceilings — horizontal surfaces positioned from raw DOOM
-   bounding box coordinates. Built by surfaces/horizontal.js. The two
-   are geometrically identical; the only difference is which custom
-   property carries the surface height (--floor-z vs --ceiling-z),
-   bridged onto --surface-z so one rule serves both. */
+/* Floors & ceilings — horizontal surfaces. Their footprint (bounding box
+   --min-x/--max-x/--min-y/--max-y and clip path --outline) is INHERITED from
+   the parent .sector container (set once per sector in sectors.js), so floor
+   and ceiling share one bbox + one clip instead of each carrying a copy. The
+   two differ only in which custom property carries the surface height
+   (--floor-z vs --ceiling-z), bridged onto --surface-z so one rule serves both. */
 
 .floor   { --surface-z: var(--floor-z); }
 .ceiling { --surface-z: var(--ceiling-z); }
@@ -11,7 +12,7 @@
     --x: calc((var(--min-x) + var(--max-x)) / 2);
     --y: calc((var(--min-y) + var(--max-y)) / 2);
 
-    /* Dimensions from DOOM bounding box */
+    /* Dimensions from the sector's inherited DOOM bounding box */
     width: calc((var(--max-x) - var(--min-x)) * 1px);
     height: calc((var(--max-y) - var(--min-y)) * 1px);
 
@@ -19,6 +20,10 @@
     background-size: 64px 64px;
     background-position: calc(var(--min-x) * -1px) calc(var(--max-y) * 1px);
     transform-origin: 50% 50%;
+
+    /* Carve the bbox quad to the sector shape (inherited; `none` when the
+       sector is a plain rectangle). */
+    clip-path: var(--outline, none);
 
     /* Position from raw DOOM coords (X=X, Y=−Z, height=−Y), then rotate flat */
     transform:

@@ -91,11 +91,13 @@ one floor and (usually) one ceiling.
 
 1. A `<div>` sized to the sector's **bounding box** (`width = max-x − min-x`,
    `height = max-y − min-y`), laid flat by `rotateX(90deg)` and positioned at the
-   surface height.
-2. **Clipped** to the sector shape: rectangular → no clip; concave → `polygon()`;
-   holed → `shape(evenodd …)` with outline + holes as subpaths. Clip coordinates
-   are bbox-relative percentages with DOOM Y flipped (`(maxY − y)/H`), since
-   element-local Y points down.
+   surface height. The bbox (`--min-x/--max-x/--min-y/--max-y`) is **inherited
+   from the parent `.sector`** — set once per sector, not per surface.
+2. **Clipped** to the sector shape via `clip-path: var(--outline)`, also
+   **inherited from the sector**: rectangular → no clip (`--outline` unset →
+   `none`); concave → `polygon()`; holed → `shape(evenodd …)` with outline +
+   holes as subpaths. Clip coordinates are bbox-relative percentages with DOOM Y
+   flipped (`(maxY − y)/H`), since element-local Y points down.
 3. **Textured** world-aligned: `background-size: 64px`, `background-repeat`,
    `background-position` in world coords (`−min-x`, `max-y`) so flats tile
    seamlessly across adjacent sectors and the clip reveals this sector's slice.
@@ -111,12 +113,13 @@ one floor and (usually) one ceiling.
 | Sky | sky floor → dark fallback colour | **sky ceiling: not built** — backdrop shows |
 | Extras | `data-sector` debug label; NUKAGE flat animation | — |
 
-### Known wrinkles (current code; addressed by the parked refactor)
+### Known wrinkles
 
-- The **bbox + clip-path are duplicated** — floor and ceiling each carry their
-  own identical copy inline, rather than inheriting from the sector.
+- ~~bbox + clip-path duplicated per surface~~ — **resolved:** the bounding box
+  (`--min-x/--max-x/--min-y/--max-y`) and clip (`--outline`) now live on the
+  `.sector` and are inherited by its floor and ceiling, computed once per sector.
 - **Two animation paths** exist: a permanent floor lower animates via an inline
   `transition: transform` on the surface, separate from the registered
-  `@property --floor-z`. The refactor unifies these.
+  `@property --floor-z`. The parked refactor unifies these.
 - A **sky floor** renders a dark fallback colour instead of showing sky below
   (rare; minor).
