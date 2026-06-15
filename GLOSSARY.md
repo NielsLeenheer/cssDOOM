@@ -121,9 +121,12 @@ one floor and (usually) one ceiling.
 - ~~bbox + clip-path duplicated per surface~~ — **resolved:** the bounding box
   (`--min-x/--max-x/--min-y/--max-y`) and clip (`--outline`) now live on the
   `.sector` and are inherited by its floor and ceiling, computed once per sector.
-- **Two animation paths** exist: a permanent floor lower animates via an inline
-  `transition: transform` on the surface, separate from the registered
-  `@property --floor-z`. The parked refactor unifies these.
+- **Movement is via the `.mover` translate** (implemented — see
+  IMPLEMENTATION-PLAN-movers.md): door/crusher/lift surfaces ride a `.mover`
+  group's transform, not an animated surface height. **`setFloorHeight`**
+  (permanent floor specials — donut / floor-lower) is a **separate** path that
+  still animates the surface's own `--floor-z` via an inline `transition`; it is
+  out of scope for the mover refactor.
 - A **sky floor** renders a dark fallback colour instead of showing sky below
   (rare; minor).
 

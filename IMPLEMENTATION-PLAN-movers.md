@@ -1,5 +1,9 @@
 # Implementation plan — static / mover containers
 
+**Status: Phases 1–5 implemented, verified on E1M1, and pushed.** (Chromium
+throughout; Firefox cross-check in Phase 5.) The one deferred item is the lift
+`shaftWalls` / `isLiftWall` synthesis — see Phase 5 note.
+
 Turns the mover model pinned in `GLOSSARY.md` ("Movers") into code. The goal:
 **every mover is a sector** whose `.sector` holds a `.static` group and
 one-or-more `.mover` groups; nothing is reparented into a *different* sector;

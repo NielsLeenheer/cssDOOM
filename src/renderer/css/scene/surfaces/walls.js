@@ -5,7 +5,6 @@
  * - createWallElement(): shared helper for mechanics (doors, lifts, crushers)
  *   to create individual wall DOM elements from wall data.
  * - buildWalls(): builds all scene walls from map data during scene construction.
- * - setContainerLight(): sets --light on a container from sector light level.
  *
  * Walls are positioned at their start vertex and rotated with atan2(deltaY, deltaX)
  * using CSS rotateY so they face the correct direction in 3D space.
@@ -14,7 +13,7 @@
 import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
 import { mapData } from '../../../../shared/maps/index.js';
-import { appendToSector, getSectorLight } from '../sectors.js';
+import { appendToSector } from '../sectors.js';
 
 /** Creates a wall DOM element from wall data spanning the given bottom/top z. */
 export function createWallElement(wall, bottomZ, topZ) {
@@ -43,11 +42,6 @@ export function createWallElement(wall, bottomZ, topZ) {
     el._midY = (wall.start.y + wall.end.y) / 2;
 
     return el;
-}
-
-/** Sets --light on a container from its sector's light level. */
-export function setContainerLight(container, sectorIndex) {
-    container.style.setProperty('--light', getSectorLight(sectorIndex));
 }
 
 export function buildWalls(ctx) {
