@@ -4,26 +4,28 @@
 
 import { appendToSector, getSectorLight } from '../sectors.js';
 import { createWallElement } from '../surfaces/walls.js';
+import { createMoverGroup } from './movers.js';
 
 /**
  * Builds the visual representation of a door into the build context.
  *
  * A door IS a sector: its moving group is a `.mover` child of the door's own
- * `.sector` (created by buildSectorContainers), so the ceiling + face walls
- * inherit the sector's --light / bbox / --outline with no manual re-set. The
- * `.mover` translates up to open. Static track side walls go in the sector's
- * `.static` group. See IMPLEMENTATION-PLAN-movers.md.
+ * `.sector`, holding the ceiling. Each door face wall stays in its OWN sector,
+ * inside a `.mover` group there driven in lockstep — so walls are never
+ * reparented across sector boundaries and inherit their own sector's --light /
+ * bbox. The `.mover` groups translate up to open. Static track side walls go in
+ * the door sector's `.static` group. See IMPLEMENTATION-PLAN-movers.md.
  */
 export function buildDoor(ctx, door, trackWallData) {
     const sector = ctx.sceneState.sectorContainers[door.sectorIndex];
     if (!sector) return;
 
     const travelDistance = door.openHeight - door.closedHeight;
+    const offset = `${-travelDistance}px`;
 
-    const mover = document.createElement('div');
-    mover.className = 'mover';
-    mover.dataset.mover = 'door';
-    mover.style.setProperty('--offset', `${-travelDistance}px`);
+    const mover = createMoverGroup('door');
+    mover.style.setProperty('--offset', offset);
+    sector.appendChild(mover);
 
     // Move the door sector's ceiling into the mover (inherits the sector light).
     for (const surfaceElement of ctx.sceneState.surfaceElements) {
@@ -32,19 +34,32 @@ export function buildDoor(ctx, door, trackWallData) {
         }
     }
 
-    // Move door face walls into the mover. A face wall owned by an adjoining
-    // sector still carries that sector's light explicitly here; Phase 3 will
-    // relocate such walls into their own sector's mover group.
+    // Distribute the door face walls (upper walls touching the door sector)
+    // into per-sector `.mover` groups: a wall owned by the door sector rides
+    // the door's own mover; a wall owned by an adjoining sector rides a `.mover`
+    // created inside THAT sector. All groups carry this door's --offset and are
+    // driven together by setDoorState.
+    const groups = [mover];
+    const groupBySector = new Map([[door.sectorIndex, mover]]);
     for (const wallElement of ctx.sceneState.wallElements) {
         const wallData = wallElement._wall;
         if (!wallData || !wallData.isUpperWall) continue;
         if (wallData.frontSectorIndex !== door.sectorIndex && wallData.backSectorIndex !== door.sectorIndex) continue;
-        wallElement.classList.add('unpegged');
-        wallElement.style.setProperty('--light', getSectorLight(wallData.sectorIndex));
-        mover.appendChild(wallElement);
-    }
 
-    sector.appendChild(mover);
+        const ownerIndex = wallElement._sectorIndex;
+        let group = groupBySector.get(ownerIndex);
+        if (group === undefined) {
+            const ownerSector = ctx.sceneState.sectorContainers[ownerIndex];
+            if (!ownerSector) continue;
+            group = createMoverGroup('door');
+            group.style.setProperty('--offset', offset);
+            ownerSector.appendChild(group);
+            groupBySector.set(ownerIndex, group);
+            groups.push(group);
+        }
+        wallElement.classList.add('unpegged');
+        group.appendChild(wallElement);
+    }
 
     // Create static track side walls from game-provided wall data — they don't
     // move, so they live in the door sector's static group.
@@ -60,10 +75,11 @@ export function buildDoor(ctx, door, trackWallData) {
         ctx.sceneState.wallElements.push(trackEl);
     }
 
-    ctx.sceneState.doorContainers.set(door.sectorIndex, mover);
+    ctx.sceneState.doorContainers.set(door.sectorIndex, groups);
 }
 
 export function setDoorState(renderer, sectorIndex, doorState) {
-    const container = renderer.sceneState.doorContainers.get(sectorIndex);
-    if (container) container.dataset.state = doorState;
+    const groups = renderer.sceneState.doorContainers.get(sectorIndex);
+    if (!groups) return;
+    for (const group of groups) group.dataset.state = doorState;
 }
