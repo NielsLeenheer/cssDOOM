@@ -272,23 +272,23 @@ A mover sector splits its children into a **static** group and one-or-more
   │     ├─ <div class="wall"> …           (walls that don't move)
   │     └─ things/enemies                  (only for NON-floor-movers)
   │
-  └─ <div class="moving">         ← the moving group; transform: translate(…)
+  └─ <div class="mover">          ← the moving group; transform: translate(…)
         ├─ <div class="floor|ceiling">   (the surface that moves)
         ├─ <div class="wall"> …           (walls that move with it)
         └─ things/enemies                  (only for LIFTS — they ride the floor)
 ```
 
-- The **move is a `transform: translate3d(…)` on the `.moving` container.** Every
+- The **move is a `transform: translate3d(…)` on the `.mover` container.** Every
   child inherits the motion through one transform — guaranteeing the surface, its
   walls, and (for lifts) the things on it stay glued together with zero sync risk.
-- A sector can hold **several `.moving` groups**: its own (if it's a mover) plus
+- A sector can hold **several `.mover` groups**: its own (if it's a mover) plus
   one per adjoining mover whose face it must animate (see below). Each group is
   **direct-driven** by its mechanic — there is no single shared driver, because a
   neighbour's group animates on a different schedule than the sector's own.
 
 ### Light vs motion — different elements, no conflict
 
-- **Motion** runs as a `transform` on the `.moving` *container*.
+- **Motion** runs as a `transform` on the `.mover` *container*.
 - **Light** runs as `filter: brightness(var(--light))` on the **leaf** (the
   textured wall / flat / sprite) — exactly as the renderer already does, including
   animated-light effects via the `lighting.css` descendant pattern.
@@ -303,11 +303,11 @@ so a leaf inside a moving group still gets its filter and its inherited motion.
 ### Things ride the floor
 
 Things and enemies standing on a **lift** must move with it. They do so by
-living **inside the lift's `.moving` container** (option (a)): one transform
+living **inside the lift's `.mover` container** (option (a)): one transform
 moves the floor and everything on it together — guaranteed sync, no second
 animation to keep aligned.
 
-- `sector.floorContainer` is set at build time: it points at `.moving` for a
+- `sector.floorContainer` is set at build time: it points at `.mover` for a
   **lift**, and at `.static` (or the plain sector) otherwise. `reparentThingToSector`
   targets `sector.floorContainer`, so a thing always lands in the group that
   owns its floor.
@@ -321,10 +321,10 @@ animation to keep aligned.
 
 When a non-mover sector adjoins a mover, the mover's visible face in that sector
 is one of that sector's own walls (e.g. the upper wall that hangs down to a
-closed door). To animate it, the adjoining sector gets its **own `.moving`
+closed door). To animate it, the adjoining sector gets its **own `.mover`
 group** holding just those boundary walls, direct-driven in lockstep with the
 mover's surface. A sector adjoining **two** doors therefore carries **two**
-`.moving` groups — one per door — plus its `.static` group.
+`.mover` groups — one per door — plus its `.static` group.
 
 ### Firefox note (empirically de-risked, FF142)
 
