@@ -82,6 +82,15 @@ export function buildSectorContainers(ctx) {
         container.className = 'sector';
         container.id = `s${i}`;
 
+        // Non-moving geometry + things live in a `.static` child; movers add
+        // `.mover` siblings beside it (see IMPLEMENTATION-PLAN-movers.md). The
+        // sector keeps carrying --light / bbox / --outline, inherited by both
+        // groups. `_staticGroup` is the default append target for the sector.
+        const staticGroup = document.createElement('div');
+        staticGroup.className = 'static';
+        container.appendChild(staticGroup);
+        container._staticGroup = staticGroup;
+
         container.style.setProperty('--light',
             doomLightToCSS(sector.lightLevel, lightBoost));
 
@@ -128,9 +137,25 @@ export function getSectorLight(sectorIndex) {
  * for clarity.
  */
 export function appendToSector(scope, element, sectorIndex) {
-    if (sectorIndex !== undefined && scope.sceneState.sectorContainers[sectorIndex]) {
-        scope.sceneState.sectorContainers[sectorIndex].appendChild(element);
+    const target = sectorContentTarget(scope.sceneState, sectorIndex);
+    if (target) {
+        target.appendChild(element);
     } else {
         scope.root.appendChild(element);
     }
+}
+
+/**
+ * Resolve where a sector's children should be appended: its `.static` group
+ * (falls back to the `.sector` container itself if, for any reason, the group
+ * is missing). Returns null when `sectorIndex` is undefined / out of range so
+ * callers can route to a scene-root fallback. Shared by build-time
+ * (`appendToSector`) and runtime (sprite placement / reparenting) so both
+ * agree on the target.
+ */
+export function sectorContentTarget(sceneState, sectorIndex) {
+    if (sectorIndex === undefined || sectorIndex === null) return null;
+    const sector = sceneState.sectorContainers[sectorIndex];
+    if (!sector) return null;
+    return sector._staticGroup || sector;
 }

@@ -17,6 +17,7 @@
  */
 
 import { ensureThing } from '../../renderer.js';
+import { sectorContentTarget } from '../sectors.js';
 
 // ============================================================================
 // Sprite Sheet Layout
@@ -302,7 +303,7 @@ export function updateThingPosition(renderer, thingIndex, x, y, floorHeight) {
 export function reparentThingToSector(renderer, thingIndex, sectorIndex) {
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
-    const target = renderer.sceneState.sectorContainers[sectorIndex];
+    const target = sectorContentTarget(renderer.sceneState, sectorIndex);
     if (!target || domData.element.parentNode === target) return;
     if (target.moveBefore) {
         target.moveBefore(domData.element, null);
@@ -433,9 +434,7 @@ export function createPlayerSprite(renderer, thingIndex, playerIndex, x, y, floo
     sprite.dataset.type = 'player';
     container.appendChild(sprite);
 
-    const sectorContainer = sectorIndex !== undefined && sectorIndex !== null
-        ? renderer.sceneState.sectorContainers[sectorIndex]
-        : null;
+    const sectorContainer = sectorContentTarget(renderer.sceneState, sectorIndex);
     if (sectorContainer) {
         sectorContainer.appendChild(container);
     } else {
@@ -477,9 +476,7 @@ export function createCorpse(renderer, x, y, floorHeight, sectorIndex, playerInd
     img.draggable = false;
     container.appendChild(img);
 
-    const sectorContainer = sectorIndex !== undefined && sectorIndex !== null
-        ? renderer.sceneState.sectorContainers[sectorIndex]
-        : null;
+    const sectorContainer = sectorContentTarget(renderer.sceneState, sectorIndex);
     if (sectorContainer) {
         sectorContainer.appendChild(container);
     } else {
