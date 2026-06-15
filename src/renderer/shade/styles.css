@@ -30,7 +30,7 @@
        transform here keeps the panel where the build placed it even if
        the transition were already mid-flight when the renderer was
        constructed. */
-    .door > .panel {
+    .mover[data-mover="door"] {
         transition: none !important;
         transform: none !important;
     }

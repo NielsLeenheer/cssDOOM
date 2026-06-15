@@ -1,15 +1,11 @@
-/* Doors */
+/* Doors — the mover group is a `.mover` child of the door's own `.sector`.
+   It translates up to open; the ceiling + face walls inside it ride along. */
 
-.door {
-    top: 0; left: 0; width: 0; height: 0;
-}
-
-.door > .panel {
-    top: 0; left: 0; width: 0; height: 0;
+.mover[data-mover="door"] {
     transform: translateY(0px);
     transition: transform 1s ease-in-out;
 }
 
-.door[data-state="open"] > .panel {
+.mover[data-mover="door"][data-state="open"] {
     transform: translateY(var(--offset));
 }

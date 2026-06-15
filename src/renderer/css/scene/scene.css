@@ -32,15 +32,16 @@
         backface-visibility: visible;
     }
 
-    & .platform .floor {
+    & .mover[data-mover="lift"] .floor {
         backface-visibility: visible;
     }
 }
 
 
-/* Sector containers — grouping nodes for CSS custom property inheritance.
-   No transform, so they sit at the scene origin and don't affect 3D layout. */
-.sector {
+/* Sector containers + mover groups — grouping nodes for CSS custom property
+   inheritance. No transform of their own (movers add one as the animation
+   driver), so they sit at the scene origin and don't affect 3D layout. */
+.sector, .mover {
     top: 0; left: 0; width: 0; height: 0;
 }
 

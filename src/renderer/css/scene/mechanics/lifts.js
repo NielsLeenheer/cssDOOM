@@ -2,29 +2,32 @@
  * Lift rendering — scene construction and visual state updates.
  */
 
-import { createWallElement, setContainerLight } from '../surfaces/walls.js';
+import { appendToSector } from '../sectors.js';
+import { createWallElement } from '../surfaces/walls.js';
 
 /**
  * Builds the visual representation of a lift into the build context.
- * Reparents floor surfaces into the animated platform, creates shaft wall
- * elements, and adds them to the scene state's wallElements.
+ *
+ * A lift IS a sector: its moving group is a `.mover` child of the lift's own
+ * `.sector`, holding the floor + platform-face shaft walls, so they inherit the
+ * sector's --light / bbox / --outline. The `.mover` translates down to lower.
+ * Non-face shaft walls are static and go in the sector's `.static` group.
  */
 export function buildLift(ctx, lift) {
+    const sector = ctx.sceneState.sectorContainers[lift.sectorIndex];
+    if (!sector) return;
+
     const heightDelta = lift.upperHeight - lift.lowerHeight;
 
-    const liftGroup = document.createElement('div');
-    liftGroup.className = 'lift';
-    setContainerLight(liftGroup, lift.sectorIndex);
+    const mover = document.createElement('div');
+    mover.className = 'mover';
+    mover.dataset.mover = 'lift';
+    mover.style.setProperty('--offset', `${heightDelta}px`);
 
-    const liftPlatform = document.createElement('div');
-    liftPlatform.className = 'platform';
-    liftPlatform.style.setProperty('--offset', `${heightDelta}px`);
-    liftGroup.appendChild(liftPlatform);
-
-    // Move floor surfaces into the platform
+    // Move the lift sector's floor into the mover (inherits the sector light).
     for (const surfaceElement of ctx.sceneState.surfaceElements) {
         if (surfaceElement._sectorIndex === lift.sectorIndex && surfaceElement._type === 'floor') {
-            liftPlatform.appendChild(surfaceElement);
+            mover.appendChild(surfaceElement);
         }
     }
 
@@ -47,16 +50,17 @@ export function buildLift(ctx, lift) {
             el.style.setProperty('--light', Math.max(0.1, shaftWall.lightLevel / 255));
         }
 
+        // Platform faces ride the platform; the rest of the shaft is static.
         if (shaftWall.isPlatformFace) {
-            liftPlatform.appendChild(el);
+            mover.appendChild(el);
         } else {
-            liftGroup.appendChild(el);
+            appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, el, lift.sectorIndex);
         }
         ctx.sceneState.wallElements.push(el);
     }
 
-    ctx.fragment.appendChild(liftGroup);
-    ctx.sceneState.liftContainers.set(lift.sectorIndex, liftPlatform);
+    sector.appendChild(mover);
+    ctx.sceneState.liftContainers.set(lift.sectorIndex, mover);
 }
 
 export function setLiftState(renderer, sectorIndex, liftState) {

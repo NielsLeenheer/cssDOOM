@@ -1,6 +1,6 @@
-/* Crushers — offset driven by --crusher-offset custom property */
+/* Crushers — the mover group is a `.mover` child of the crusher's own
+   `.sector`, translated by --crusher-offset; the ceiling + upper walls ride. */
 
-.crusher {
-    top: 0; left: 0; width: 0; height: 0;
+.mover[data-mover="crusher"] {
     transform: translateY(calc(var(--crusher-offset, 0) * 1px));
 }

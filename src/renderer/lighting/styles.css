@@ -20,7 +20,7 @@
        brightness filter. That's the whole point of this renderer. */
 
     /* Doors pinned closed (setDoorState is suppressed at dispatch). */
-    .door > .panel {
+    .mover[data-mover="door"] {
         transition: none !important;
         transform: none !important;
     }
