@@ -159,3 +159,18 @@ export function sectorContentTarget(sceneState, sectorIndex) {
     if (!sector) return null;
     return sector._staticGroup || sector;
 }
+
+/**
+ * Resolve where a sector's THINGS (sprites / enemies / items) should live: the
+ * sector's floor container — a lift's `.mover` group so things ride the
+ * platform, else the `.static` group. `buildLift` sets `sector.floorContainer`
+ * to its `.mover`; everything else falls back to the static target. Used by
+ * thing placement (`buildThing`) and runtime reparenting / sprite spawns so a
+ * thing always lands on the surface that carries its floor.
+ */
+export function sectorFloorTarget(sceneState, sectorIndex) {
+    if (sectorIndex === undefined || sectorIndex === null) return null;
+    const sector = sceneState.sectorContainers[sectorIndex];
+    if (!sector) return null;
+    return sector.floorContainer || sector._staticGroup || sector;
+}

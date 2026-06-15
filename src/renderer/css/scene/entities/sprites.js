@@ -17,7 +17,7 @@
  */
 
 import { ensureThing } from '../../renderer.js';
-import { sectorContentTarget } from '../sectors.js';
+import { sectorFloorTarget } from '../sectors.js';
 
 // ============================================================================
 // Sprite Sheet Layout
@@ -290,7 +290,15 @@ export function updateThingPosition(renderer, thingIndex, x, y, floorHeight) {
     if (!domData) return;
     domData.element.style.setProperty('--x', x);
     domData.element.style.setProperty('--y', y);
-    domData.element.style.setProperty('--floor-z', floorHeight);
+
+    // A thing parented to a lift's `.mover` inherits the platform's vertical
+    // motion from the mover transform; writing the live --floor-z too would
+    // double-move it (the game dispatches the lift's currentHeight here every
+    // frame). Keep --floor-z at the rest height while riding; the parent
+    // supplies the offset. x/y still track so it can walk around on the deck.
+    const parent = domData.element.parentElement;
+    const onLift = parent && parent.classList.contains('mover') && parent.dataset.mover === 'lift';
+    if (!onLift) domData.element.style.setProperty('--floor-z', floorHeight);
 }
 
 /**
@@ -303,7 +311,7 @@ export function updateThingPosition(renderer, thingIndex, x, y, floorHeight) {
 export function reparentThingToSector(renderer, thingIndex, sectorIndex) {
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
-    const target = sectorContentTarget(renderer.sceneState, sectorIndex);
+    const target = sectorFloorTarget(renderer.sceneState, sectorIndex);
     if (!target || domData.element.parentNode === target) return;
     if (target.moveBefore) {
         target.moveBefore(domData.element, null);
@@ -434,7 +442,7 @@ export function createPlayerSprite(renderer, thingIndex, playerIndex, x, y, floo
     sprite.dataset.type = 'player';
     container.appendChild(sprite);
 
-    const sectorContainer = sectorContentTarget(renderer.sceneState, sectorIndex);
+    const sectorContainer = sectorFloorTarget(renderer.sceneState, sectorIndex);
     if (sectorContainer) {
         sectorContainer.appendChild(container);
     } else {
@@ -476,7 +484,7 @@ export function createCorpse(renderer, x, y, floorHeight, sectorIndex, playerInd
     img.draggable = false;
     container.appendChild(img);
 
-    const sectorContainer = sectorContentTarget(renderer.sceneState, sectorIndex);
+    const sectorContainer = sectorFloorTarget(renderer.sceneState, sectorIndex);
     if (sectorContainer) {
         sectorContainer.appendChild(container);
     } else {

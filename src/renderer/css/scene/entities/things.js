@@ -20,7 +20,7 @@
  */
 
 import { THING_SPRITES, THING_NAMES } from '../constants.js';
-import { appendToSector } from '../sectors.js';
+import { sectorFloorTarget } from '../sectors.js';
 
 export function buildThing(ctx, spec) {
     const thingName = THING_NAMES[spec.type];
@@ -49,11 +49,12 @@ export function buildThing(ctx, spec) {
     }
 
     thingContainer.hidden = true;
-    appendToSector(
-        { sceneState: ctx.sceneState, root: ctx.fragment },
-        thingContainer,
-        spec.sectorIndex,
-    );
+    // Things ride their floor: route to the sector's floor container (a lift's
+    // `.mover` if built, else `.static`). Lifts build after things, so a thing
+    // placed here lands in `.static` and buildLift reparents it onto the
+    // platform; runtime spawns after that land on the platform directly.
+    const target = sectorFloorTarget(ctx.sceneState, spec.sectorIndex);
+    (target || ctx.fragment).appendChild(thingContainer);
 
     if (spec.gameId !== undefined) {
         ctx.sceneState.thingDom.set(spec.gameId, { element: thingContainer, sprite: spriteElement });

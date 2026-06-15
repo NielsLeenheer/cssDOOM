@@ -60,6 +60,17 @@ export function buildLift(ctx, lift) {
     }
 
     sector.appendChild(mover);
+
+    // Things ride this lift: route the sector's floor content to the platform,
+    // and move any things already placed here (built before lifts) onto it so
+    // they translate with the floor via the single platform transform.
+    sector.floorContainer = mover;
+    for (const t of ctx.sceneState.thingContainers) {
+        if (t.sectorIndex === lift.sectorIndex && t.element) {
+            mover.appendChild(t.element);
+        }
+    }
+
     ctx.sceneState.liftContainers.set(lift.sectorIndex, mover);
 }
 
