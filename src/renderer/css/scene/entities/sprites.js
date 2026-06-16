@@ -216,7 +216,13 @@ export function playPlayerAttack(renderer, thingIndex, shooter) {
  * renderer reads its own player.
  */
 export function updateEnemyRotation(renderer, thingIndex, enemy, viewers) {
-    const player = viewers[renderer.playerIndex] ?? viewers[0];
+    // A renderer may pin the viewer used for sprite rotation. Spectator mode
+    // sets this so billboards — including the local player's own body, which
+    // movement.js dispatches every frame with viewers[0] = the body's own
+    // position (a degenerate atan2) — orient to the spectator camera instead.
+    // Same substituted-viewer trick the axis renderer applies via its own
+    // updateEnemyRotation override.
+    const player = renderer._viewerOverride ?? viewers[renderer.playerIndex] ?? viewers[0];
     if (!player) return;
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData?.sprite) return;

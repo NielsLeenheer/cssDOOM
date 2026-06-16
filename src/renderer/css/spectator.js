@@ -35,11 +35,18 @@ function setSpectatorFollowHeight(renderer, height) {
     renderer.viewportEl.style.setProperty('--follow-height', height);
 }
 
-/** Billboard angle for the player sprite. Driven each spectator-loop
- *  tick: in top-down mode it tracks the spectator camera angle, in
- *  follow mode it tracks the negated player angle. */
-function setSpectatorAngle(renderer, angle) {
-    renderer.viewportEl.style.setProperty('--spectator-angle', angle);
+/**
+ * Pin — or clear (`null`) — the viewer that `updateEnemyRotation` uses to
+ * pick sprite headings. The local player's body is the standard
+ * `createPlayerSprite` billboard, normally hidden in its own pane and
+ * dispatched every frame with viewers[0] = its own position (degenerate).
+ * Spectator pins a viewer offset from the player toward the spectator camera
+ * so the billboard — and every other sprite in this pane — orients to the
+ * camera. The UI (`src/ui/spectator.js`) computes the world point (it owns
+ * player position) and pushes it here each tick; this only stashes it.
+ */
+function setSpectatorViewer(renderer, viewer) {
+    renderer._viewerOverride = viewer;
 }
 
 /**
@@ -78,6 +85,9 @@ function switchSpectatorMode(renderer, mode) {
  *   2. Fade ceilings back in (delayed so the transform settles first).
  */
 function endSpectatorMode(renderer) {
+    // Release the pinned rotation viewer so sprites fall back to the normal
+    // per-pane viewer (the body is re-hidden in its own pane anyway).
+    renderer._viewerOverride = null;
     transitionScene(renderer, 1, () => {
         document.body.classList.remove('spectator', 'follow-mode');
         fadeCeilings(renderer, true, 1, 0.5);
@@ -145,7 +155,7 @@ function fadeCeilings(renderer, fadeIn, duration, delay = 0) {
 export {
     setSpectatorCamera,
     setSpectatorFollowHeight,
-    setSpectatorAngle,
+    setSpectatorViewer,
     startSpectatorMode,
     switchSpectatorMode,
     endSpectatorMode,

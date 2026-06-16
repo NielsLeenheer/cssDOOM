@@ -149,6 +149,15 @@ body[data-layout="kiosk"][data-game-mode="singleplayer"] .pane[data-player="1"] 
     display: none;
 }
 
+/* Spectator mode reveals the local player's own billboard — the third-person
+   / top-down camera is looking AT the player, so the body the self-hide rule
+   above suppresses in first person must be visible. Same shape the axis
+   renderer uses (axis/styles.css). Higher specificity than the self-hide
+   rules, so it wins. */
+body.spectator .pane[data-player="0"] .enemy.player[data-player-index="0"] {
+    display: block;
+}
+
 /* When a player dies, their LIVE sprite is hidden — a separate `.corpse`
    decoration is spawned at the death point by damage.js's createCorpse so
    the body persists at the original location even after the live player

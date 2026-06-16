@@ -78,11 +78,17 @@ body.spectator.follow-mode .scene {
     transition: none;
 }
 
-/* In follow mode, billboard player sprite toward player angle instead of spectator angle */
-body.spectator.follow-mode #player > .sprite {
+/* The player's body is the standard DM billboard (.enemy.player > .sprite),
+   revealed in spectator panes by enemies.css. The base sprite transform
+   (entities/things.css) billboards toward --player-angle, which already faces
+   the follow-mode camera (its scene yaw is --player-angle, above). Top-down
+   mode yaws the scene by --spectator-angle instead, so the body must
+   counter-rotate by that angle to face the overhead camera — same as the old
+   #player sprite did. */
+body.spectator:not(.follow-mode) .enemy.player > .sprite {
     transform:
         translateX(-50%)
-        rotateY(calc(var(--player-angle) * 1rad))
+        rotateY(calc(var(--spectator-angle, 0) * -1rad))
         scaleX(var(--mirror, 1));
 }
 
@@ -95,7 +101,9 @@ body.spectator .viewport::after {
    the other "hidden HUD" states (overlay-active, lobby claim states).
    Single source for the slide values + selector behavior. */
 
-/* Player container — shared positioning for marker, sprite, and shadow */
+/* Player container — positions the FOV-arc marker at the player location.
+   The body sprite is the DM billboard, parented to its own sector; #player
+   itself carries no sprite. */
 #player {
     display: none;
     top: 0; left: 0; width: 0; height: 0;
@@ -112,16 +120,6 @@ body.spectator .viewport::after {
 
 body.spectator #player {
     display: block;
-}
-
-body.spectator #player > .sprite {
-    animation: sprite-cycle calc(var(--frames) * 150ms) steps(var(--frames)) infinite paused;
-    opacity: 1;
-    transition: opacity 1s ease 0.5s;
-
-    @starting-style {
-        opacity: 0;
-    }
 }
 
 body.spectator #player > .marker {
@@ -166,46 +164,6 @@ body.spectator #player > .marker {
 
 #player > .marker.firing {
     --marker-color: #ff8800;
-}
-
-/* Player sprite — billboard toward spectator camera */
-#player > .sprite {
-    opacity: 0;
-    transition: opacity 0.3s ease 0s;
-    bottom: 0;
-    backface-visibility: visible !important;
-    transform-origin: 50% 100%;
-    transform:
-        translateX(-50%)
-        rotateY(calc(var(--spectator-angle, 0) * -1rad))
-        scaleX(var(--mirror, 1));
-
-    background-image: url('/assets/sprites/sheets/PLAY.png');
-    /* PLAY.png cell layout (matches enemies.css's .sprite[data-type="player"]):
-       57 × 59 cells, 9 columns × 12 rows. Rows 0-4 are walk poses; rows
-       5-9 attack rotations, row 10 death, row 11 xdeath/gib (all unused
-       in spectator). Cell width is 57 because gib frames widen the cell. */
-    --w: 57; --h: 59; --cols: 9; --frames: 4; --rows: 12;
-    animation-play-state: paused;
-    animation-duration: calc(var(--frames) * 150ms);
-}
-
-.renderer.moving #player > .sprite {
-    animation-play-state: running, running;
-}
-
-/* Player shadow */
-#player::before {
-    content: '';
-    position: absolute;
-    width: 32px;
-    height: 32px;
-    margin: -16px 0 0 -16px;
-    background: rgba(0, 0, 0, 0.5);
-    border-radius: 50%;
-    transform: rotateX(90deg);
-    backface-visibility: visible !important;
-    filter: blur(4px);
 }
 
 

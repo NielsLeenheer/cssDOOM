@@ -7,8 +7,11 @@
  * every renderer whose `playerIndex` matches the called playerIndex
  * receives the call.
  *
- * The spectator sprite (#player) is built into every renderer's scene
- * fragment by buildPlayer; each pane has its own copy.
+ * `#player` is observer chrome only — the top-down FOV-arc marker. It is
+ * built into every renderer's scene fragment by buildPlayer; each pane has
+ * its own copy. The player's BODY is the standard DM billboard
+ * (createPlayerSprite), revealed in spectator/axis panes — `#player` carries
+ * no sprite of its own.
  */
 
 export function buildPlayer(ctx) {
@@ -17,9 +20,6 @@ export function buildPlayer(ctx) {
     const marker = document.createElement('div');
     marker.className = 'marker';
     player.appendChild(marker);
-    const playerSprite = document.createElement('div');
-    playerSprite.className = 'sprite';
-    player.appendChild(playerSprite);
     ctx.fragment.appendChild(player);
 }
 

@@ -193,7 +193,7 @@ export class CSSRenderer extends RendererBase {
     // the UI calls through.
     setSpectatorCamera(camera)         { spectator.setSpectatorCamera(this, camera); }
     setSpectatorFollowHeight(height)   { spectator.setSpectatorFollowHeight(this, height); }
-    setSpectatorAngle(angle)           { spectator.setSpectatorAngle(this, angle); }
+    setSpectatorViewer(viewer)         { spectator.setSpectatorViewer(this, viewer); }
     startSpectatorMode(mode)           { spectator.startSpectatorMode(this, mode); }
     switchSpectatorMode(mode)          { spectator.switchSpectatorMode(this, mode); }
     endSpectatorMode()                 { spectator.endSpectatorMode(this); }

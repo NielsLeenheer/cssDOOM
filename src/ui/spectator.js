@@ -43,7 +43,7 @@ function spectatorLoop() {
         if (spectator.keys.f) spectator.height += speed;
 
         orchestrator.setSpectatorCamera(spectator);
-        updatePlayerSprite(spectator.angle);
+        updateSpectatorViewer();
     } else {
         // Follow mode: CSS handles the camera transform automatically.
         // Only zoom keys need JS.
@@ -51,7 +51,7 @@ function spectatorLoop() {
         if (spectator.keys.f) spectator.height += spectator.height * 0.02;
 
         orchestrator.setSpectatorFollowHeight(spectator.height);
-        updatePlayerSprite(-state.players[0].angle, true);
+        updateSpectatorViewer();
     }
     requestAnimationFrame(spectatorLoop);
 }
@@ -62,43 +62,36 @@ if (spectatorButton) {
     spectatorButton.addEventListener('click', () => spectate());
 }
 
-// Player sprite rotation — same system as enemies (--heading/--mirror on sprite sheet)
-// Walk animation is handled by CSS @keyframes sprite-cycle
-function updatePlayerSprite(cameraAngle, forceBack = false) {
-    // Every pane has its own #player (built into each renderer's scene). Update
-    // them all — querySelector would only catch the first, leaving the other
-    // panes' sprites on the CSS default --heading: 0 (the FRONT row), so a
-    // kiosk/mirror layout would show the front in those panes. No change-guard:
-    // a cheap per-frame write to a couple of sprites, and it self-heals a pane
-    // that was rebuilt after the last heading change.
-    const sprites = document.querySelectorAll('#player > .sprite');
-    if (!sprites.length) return;
-
-    // Determine which of the 8 DOOM rotation angles to show
-    let sheetRow, mirrorScale;
-    if (forceBack) {
-        sheetRow = 4;
-        mirrorScale = 1;
-    } else {
-        let relAngle = cameraAngle - state.players[0].angle + Math.PI;
-        relAngle = ((relAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-        const rotationIndex = (Math.floor((relAngle + Math.PI / 8) / (Math.PI / 4)) % 8) + 1;
-
-        if (rotationIndex <= 5) {
-            sheetRow = rotationIndex - 1;
-            mirrorScale = 1;
-        } else {
-            sheetRow = 9 - rotationIndex;
-            mirrorScale = -1;
-        }
-    }
-
-    for (const sprite of sprites) {
-        sprite.style.setProperty('--heading', sheetRow);
-        sprite.style.setProperty('--mirror', mirrorScale);
-    }
-
-    orchestrator.setSpectatorAngle(cameraAngle);
+// Player-sprite rotation is no longer computed here. The body is the standard
+// DM billboard (createPlayerSprite), rotated by the renderer's
+// updateEnemyRotation. We only pin the VIEWER it rotates against: a world
+// point in the direction of the spectator camera, so the billboard faces the
+// camera (and shows its back in follow mode). This reproduces the old heading
+// math via geometry. The renderer reads the pinned viewer for every sprite, so
+// movement.js's per-frame rotation dispatch — which would otherwise use the
+// body's own position — stays correct too.
+//
+//   follow → θ = player.angle      (viewer directly behind player → back view)
+//   top    → θ = spectator.angle   (viewer offset by the top-down camera yaw)
+//
+// The viewer sits VIEWER_DIST units away, not 1: the viewer is computed here on
+// the spectator rAF while updateEnemyRotation runs on the game rAF with the
+// body's own position, so the two reads of the player position can be a frame
+// apart. At run speed (~10 units/frame) a 1-unit offset would be swamped by
+// that delta and the heading would track movement direction instead of facing
+// (sideways/reversed sprite when strafing or backing up). A large offset makes
+// the per-frame delta negligible against it — the same reason a real camera
+// sits far from its subject. Heading depends only on direction, so the
+// magnitude is free to be large.
+const VIEWER_DIST = 1024;
+function updateSpectatorViewer() {
+    const p = state.players[0];
+    if (!p) return;
+    const theta = spectator.mode === 'follow' ? p.angle : spectator.angle;
+    orchestrator.setSpectatorViewer({
+        x: p.x + Math.sin(theta) * VIEWER_DIST,
+        y: p.y - Math.cos(theta) * VIEWER_DIST,
+    });
 }
 
 export function spectate() {
@@ -127,10 +120,14 @@ export function spectate() {
         // Update tab active state
         spectatorTabs.forEach(tab => tab.classList.toggle('active', tab.dataset.mode === 'follow'));
 
+        // Pin the rotation viewer immediately so the revealed billboard faces
+        // the camera from the first frame, before the interactive loop starts.
+        updateSpectatorViewer();
+
         // Start interactive loop after transition completes
         setTimeout(() => {
             if (spectatorActive) {
-                updatePlayerSprite(-state.players[0].angle, true);
+                updateSpectatorViewer();
                 spectatorLoopRunning = true;
                 spectatorLoop();
             }

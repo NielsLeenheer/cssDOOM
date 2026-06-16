@@ -240,7 +240,7 @@ class Orchestrator {
     // never holds a renderer reference directly.
     setSpectatorCamera(camera)        { this.findTarget(0, 'dom')?.setSpectatorCamera?.(camera); }
     setSpectatorFollowHeight(height)  { this.findTarget(0, 'dom')?.setSpectatorFollowHeight?.(height); }
-    setSpectatorAngle(angle)          { this.findTarget(0, 'dom')?.setSpectatorAngle?.(angle); }
+    setSpectatorViewer(viewer)        { this.findTarget(0, 'dom')?.setSpectatorViewer?.(viewer); }
     startSpectatorMode(mode)          { this.findTarget(0, 'dom')?.startSpectatorMode?.(mode); }
     switchSpectatorMode(mode)         { this.findTarget(0, 'dom')?.switchSpectatorMode?.(mode); }
     endSpectatorMode()                { this.findTarget(0, 'dom')?.endSpectatorMode?.(); }

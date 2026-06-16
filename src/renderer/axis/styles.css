@@ -8,9 +8,10 @@
       rotation can't pitch the view — only CSS can.
 
    2. The off-axis cameras are never the player's eyes, so we
-      want to actually SEE the player. The #player FOV-arc
-      marker + sprite are hidden by default (only body.spectator
-      reveals them); enable them on pane-axis. */
+      want to actually SEE the player. The player's body is the
+      .enemy.player billboard (hidden in its own pane by default);
+      reveal it on pane-axis. The #player FOV-arc marker is
+      spectator-only chrome, so hide it here. */
 
 .pane.pane-axis {
     #player {
@@ -27,12 +28,10 @@
                 calc(var(--actor-y) * -1px)
             );
     }
-    /* Hide the spectator-only FOV-arc marker and the ground-shadow
-       pseudo — neither shows in DM and we don't want them on the CAD
-       panes either. The .enemy.player billboard alone represents the
-       player; same shape Network DM uses. */
-    #player > .marker,
-    #player::before {
+    /* Hide the spectator-only FOV-arc marker — it doesn't show in DM and we
+       don't want it on the CAD panes either. The .enemy.player billboard
+       alone represents the player; same shape Network DM uses. */
+    #player > .marker {
         display: none;
     }
     /* Reveal the own-player billboard. enemies.css hides it by default
