@@ -114,8 +114,9 @@ export function setEnemyState(renderer, thingIndex, thingType, newState) {
 }
 
 /**
- * Triggers the death animation on an enemy's sprite and marks its container
- * as dead in this renderer's pane. Pass `instant: true` to skip the animation
+ * Triggers the death animation on an enemy's sprite in this renderer's pane
+ * and flags the thing `collected` so the culler skips it. Pass `instant: true`
+ * to skip the animation
  * and pin the sprite at the final frame — used by the world-snapshot apply
  * path so enemies that died before a joiner connected don't re-play their
  * death animation when culled in. Works because `forwards` fill + an
@@ -133,9 +134,7 @@ export function killEnemy(renderer, thingIndex, thingType, instant = false, gib 
 
     const layout = SPRITE_LAYOUT[thingType];
     const domData = renderer.sceneState.thingDom.get(thingIndex);
-    if (!domData) return;
-    domData.element.classList.add('dead');
-    if (!domData.sprite) return;
+    if (!domData?.sprite) return;
     domData.sprite.style.animationDelay = instant ? '-10s' : '';
     // Pick the xdeath row if this type has one AND the caller asked
     // for it; otherwise fall back to the normal death row. Baron and
@@ -262,7 +261,6 @@ export function resetEnemy(renderer, thingIndex, thingType, x, y, floorHeight) {
     const layout = SPRITE_LAYOUT[thingType];
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
-    domData.element.classList.remove('dead');
     if (domData.sprite) {
         delete domData.sprite.dataset.state;
         if (layout?.walkFrames !== undefined) {
