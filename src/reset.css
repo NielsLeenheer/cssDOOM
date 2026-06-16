@@ -1,3 +1,4 @@
+@layer base {
 /* STCFN — color TrueType font built from the DOOM shareware WAD's STCFN
  * small font glyphs. Each glyph is composed of layered COLR/CPAL fills,
  * one per distinct red shade in the source bitmap (16 colors total).
@@ -159,4 +160,5 @@ body {
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+}
 }

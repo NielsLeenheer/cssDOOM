@@ -1,3 +1,4 @@
+@layer visualizer {
 /* Cat pane — the cat element also carries `.pane-flat` (CatRenderer
    extends FlatRenderer), so it inherits the flat pane's HUD/weapon
    hide, animation suppression, and flat floor/ceiling colours from
@@ -19,4 +20,5 @@
         outline: 1px solid #000;
         border: none;
     }
+}
 }

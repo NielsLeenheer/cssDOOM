@@ -1,3 +1,4 @@
+@layer renderer {
 /* Camera Transform — inverse of player position/angle applied to the scene */
 
 .scene {
@@ -45,4 +46,5 @@
 
 body.no-head-bob .scene {
     animation: none;
+}
 }

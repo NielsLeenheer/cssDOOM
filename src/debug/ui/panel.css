@@ -1,3 +1,4 @@
+@layer debug {
 /* ========================================================================
    Debug Menu — developer affordance, not part of the in-game UI.
    Companion to src/debug/panel.js (which builds the menu's
@@ -113,3 +114,4 @@ body:not([data-layout="kiosk"])         #debug-menu .debug-button-kiosk { displa
    exposes as debug.layers.* — so the panel and console share one codepath.
    Scene layers cross-fade (body.fade-*, features/layers.css); hud and chrome
    hide via body.hide-hud / body.hide-chrome (hud.css / viewport.css). */
+}

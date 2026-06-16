@@ -1,3 +1,4 @@
+@layer renderer {
 
 .switch::after {
     content: '';
@@ -32,3 +33,4 @@
 .switch[data-texture="SW1STON2"]::after { background-image: url('/assets/textures/SW2STON2.png'); }
 .switch[data-texture="SW1STONE"]::after { background-image: url('/assets/textures/SW2STONE.png'); }
 .switch[data-texture="SW1STRTN"]::after { background-image: url('/assets/textures/SW2STRTN.png'); }
+}

@@ -1,3 +1,4 @@
+@layer debug {
 /* ========================================================================
    debug.camera.offset — a view-relative ORBIT for talk shots.
 
@@ -20,10 +21,10 @@
    same --cam-offset-* props, so the transition animates them together over t
    (t = 0 ⇒ 0s ⇒ instant); "from the previous offset" is automatic.
 
-   Must be @imported AFTER renderer/css/scene/camera.css (see index.css): it
-   deliberately overrides that file's `.scene` transform, winning on source
-   order — which also supersedes head-bob's transform (talk shots don't bob).
-   Mirrors the base transform; keep it in sync if that ever changes.
+   In the `debug` cascade layer (last; see index.css), so it deliberately
+   overrides renderer/css/scene/camera.css's `.scene` transform — which also
+   supersedes head-bob's transform (talk shots don't bob). Mirrors the base
+   transform; keep it in sync if that ever changes.
 
    If a re-aim axis feels reversed, flip the `* -1` on that rotate below.
    ======================================================================== */
@@ -60,4 +61,5 @@ body.debug-camera .scene {
         --cam-offset-x var(--cam-offset-t, 0s) ease-in-out,
         --cam-offset-y var(--cam-offset-t, 0s) ease-in-out,
         --cam-offset-z var(--cam-offset-t, 0s) ease-in-out;
+}
 }

@@ -1,3 +1,4 @@
+@layer visualizer {
 /* AxisRenderer — perpendicular CAD-style camera views.
    The camera transform lives in JS (axis/renderer.js
    updateCamera), but two things need CSS:
@@ -105,4 +106,5 @@
     .viewport {
         background: #000;
     }
+}
 }

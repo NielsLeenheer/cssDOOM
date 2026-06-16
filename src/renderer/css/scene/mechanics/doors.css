@@ -1,3 +1,4 @@
+@layer renderer {
 /* Doors — a mover group is a `.mover` child of a `.sector`, tagged
    `data-mover-type="door"` + `data-mover-id="<idx>"` (one group per sector the
    door spans). It translates up to open; the ceiling + face walls ride along. */
@@ -9,4 +10,5 @@
 
 .mover[data-mover-type="door"][data-state="open"] {
     transform: translateY(var(--offset));
+}
 }

@@ -1,3 +1,4 @@
+@layer debug {
 /* debug.layers — animated layer fades (features/layers.js). Opacity instead of
    the menu's instant body.hide-* display toggles, so a layer cross-fades in/out.
    The surfaces' own opacity transition comes from features/sectors.css. */
@@ -49,3 +50,4 @@ body.fade-corpses .decoration > img:is(
     [src$="PLAYN0.png"], [src$="PLAYW0.png"], [src$="POL5A0.png"],
     [src$="POL1A0.png"], [src$="POL6A0.png"]
 ) { opacity: 0; }
+}

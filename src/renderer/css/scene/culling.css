@@ -1,3 +1,4 @@
+@layer renderer {
 /* CSS Culling (experimental)
  *
  * Distance and frustum culling using only CSS. Elements beyond the max
@@ -190,4 +191,5 @@ body.css-frustum-culling {
             display: if(style(--cull-any: 0): block; else: none);
         }
     }
+}
 }

@@ -1,3 +1,4 @@
+@layer renderer {
 /* ========================================================================
    Spectator Mode — renderer-side rules.
 
@@ -173,4 +174,5 @@ body.spectator .scene :not(.sector, .ceiling) {
 
 body.spectator .scene .ceiling {
     display: none;
+}
 }

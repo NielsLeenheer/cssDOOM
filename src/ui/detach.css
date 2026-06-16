@@ -1,3 +1,4 @@
+@layer ui {
 /* Detach button — opens a secondary window that mirrors player 1's view.
    This affordance specifically opens a same-machine secondary; Network DM
    remotes connect via their own URL. Hidden unless we're in Local DM
@@ -12,4 +13,5 @@ body[data-game-mode="deathmatch"][data-network-mode="standalone"]:not([data-layo
 }
 @media (pointer: coarse) {
     #detach-button { display: none !important; }
+}
 }

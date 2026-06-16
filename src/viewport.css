@@ -1,3 +1,4 @@
+@layer base {
 /* ==========================================================================
    Game container — split-screen wrapper around the panes
    ==========================================================================
@@ -328,4 +329,5 @@ body.recording #menu-button,
 body.recording #ui-buttons,
 body.recording #debug-menu {
     display: none;
+}
 }

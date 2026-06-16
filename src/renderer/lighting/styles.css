@@ -1,10 +1,11 @@
+@layer visualizer {
 /* Lighting pane — like the shade pane, but every surface renders pure OPAQUE
    WHITE so the inherited `filter: brightness(var(--light))` cascade (walls.css /
    horizontal.css) shows ONLY the per-sector lighting, in greyscale.
    No surface colours, no transparency: a black-and-white lighting map of the
    level. Structure is the shade scene builder; this CSS hook is the difference.
-   Must be @imported after the dom surface CSS (see index.css) so these rules win
-   the cascade. */
+   In the `visualizer` cascade layer (see index.css) so these rules win over the
+   base surface CSS in the `renderer` layer. */
 .pane.pane-lighting {
     .hud,
     .weapon {
@@ -35,4 +36,5 @@
         background-image: none !important;
         background-color: #fff;
     }
+}
 }

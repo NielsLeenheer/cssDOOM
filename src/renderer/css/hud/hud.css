@@ -1,3 +1,4 @@
+@layer hud {
 /*
  * DOOM HUD — status bar, weapon, overlays, face, keys, digits
  *
@@ -432,8 +433,9 @@ body[data-game-mode="deathmatch"] .renderer.dead .respawn-prompt {
     display: flex;
     animation: respawn-prompt-fade-in 0.4s ease-out 2s forwards;
 }
+} /* end @layer hud */
 
-
+@layer screens {
 /* ========================================================================
    Lobby overlays (Local DM)
    ======================================================================== */
@@ -735,8 +737,9 @@ body[data-game-mode="deathmatch"]:not(:has(.pane-attract.active)) .pane[data-cla
     min-width: calc(72px * var(--screen-scale, 1));
     text-align: right;
 }
+} /* end @layer screens */
 
-
+@layer hud {
 /* ========================================================================
    Deathmatch countdown timer (last 60 s)
    Top-centre m:ss readout in DOOM red. Visibility is driven by the
@@ -768,6 +771,9 @@ body[data-game-mode="deathmatch"] .pane-timer:not(:empty) {
 }
 
 
+} /* end @layer hud */
+
+@layer screens {
 /* ========================================================================
    Attract Loop
    Shown when each pane's `.pane-attract` carries `.active` (added by
@@ -831,7 +837,9 @@ body:has(.pane-attract.active) #ui-buttons,
 body:has(.pane-attract.active) #menu-button {
     display: none;
 }
+} /* end @layer screens */
 
+@layer hud {
 /* ========================================================================
    Status bar + weapon hide
 
@@ -969,3 +977,4 @@ body[data-network-mode="host"]:not(.client-window):not([data-layout="kiosk"]) .p
 .renderer.powerup-lightamp .ceiling {
     --light: 1 !important;
 }
+} /* end @layer hud */

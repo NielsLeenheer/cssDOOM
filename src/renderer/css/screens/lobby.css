@@ -1,3 +1,4 @@
+@layer screens {
 /* ========================================================================
    Network DM lobby — per-pane.
    ------------------------------------------------------------------------
@@ -272,4 +273,5 @@ body.network-client .network-lobby-aside { display: none; }
     letter-spacing: 2px;
     min-height: 1.2em;
     margin-top: 8px;
+}
 }

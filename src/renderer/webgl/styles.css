@@ -1,3 +1,4 @@
+@layer renderer {
 /* WebGLRenderer fills its pane. The pane is sized by the standard
    viewport.css rules (like any other renderer pane); the <canvas>
    backing store is sized in JS to the pane size × devicePixelRatio so the
@@ -18,4 +19,5 @@
     width: 100%;
     height: 100%;
     background: #000;
+}
 }

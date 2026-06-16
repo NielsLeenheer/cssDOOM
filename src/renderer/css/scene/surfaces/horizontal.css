@@ -1,3 +1,4 @@
+@layer renderer {
 /* Floors & ceilings — horizontal surfaces. Their footprint (bounding box
    --min-x/--max-x/--min-y/--max-y and clip path --outline) is INHERITED from
    the parent .sector container (set once per sector in sectors.js), so floor
@@ -67,4 +68,5 @@ body.show-sector-ids .floor::after {
 
 body.no-animated-flats .floor[data-texture^="NUKAGE"] {
     animation: none;
+}
 }

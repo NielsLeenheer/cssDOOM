@@ -1,3 +1,4 @@
+@layer debug {
 /* ========================================================================
    Sector debug visualisations — driven by the debug.sectors.* console
    commands (see src/debug/console.js). Used to build the "anatomy of a
@@ -213,4 +214,4 @@
         repeating-linear-gradient(0deg,  #0ff6 0 1px, transparent 1px 8px),
         repeating-linear-gradient(90deg, #0ff6 0 1px, transparent 1px 8px);
 }
-
+}

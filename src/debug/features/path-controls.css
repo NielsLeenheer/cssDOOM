@@ -1,3 +1,4 @@
+@layer debug {
 /* ========================================================================
    Path recorder transport — the top-centre control bar shown while a
    debug.path.record() session is active (built in src/debug/path.js).
@@ -47,4 +48,5 @@
             color: #fff;
         }
     }
+}
 }

@@ -1,3 +1,4 @@
+@layer renderer {
 /* Projectiles */
 
 .projectile {
@@ -128,4 +129,5 @@
     80%   { background: url('/assets/sprites/TFOGI0.png') no-repeat center bottom / contain; }
     90%   { background: url('/assets/sprites/TFOGJ0.png') no-repeat center bottom / contain; }
     100%  { background: none; }
+}
 }

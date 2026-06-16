@@ -1,3 +1,4 @@
+@layer hud {
 /* Touch Controls — only visible on touch devices */
 
 #touch-controls {
@@ -145,4 +146,5 @@ body.spectator #touch-fire {
 
 #touch-fire:active {
     filter: brightness(1.4);
+}
 }

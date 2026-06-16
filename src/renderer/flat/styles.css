@@ -1,3 +1,4 @@
+@layer visualizer {
 /* Flat pane (bottom-left of the ?visualize layout): same DOM as the
    textured pane but the HUD chrome belongs only to the textured
    pane. Suppress HUD + weapon overlay here so the flat-shaded
@@ -166,4 +167,5 @@
     }
     .pickup:has(> img)::after     { background-color: var(--silhouette-color, #40c060); }
     .decoration:has(> img)::after { background-color: var(--silhouette-color, #909090); }
+}
 }

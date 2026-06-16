@@ -1,3 +1,4 @@
+@layer visualizer {
 /* Shade pane (top-right of the ?visualize layout): walls white, floors
    green, ceilings blue, no animations on lighting or doors. Sector
    lights still apply — the inherited `filter: brightness(var(--light))`
@@ -83,4 +84,5 @@
         text-shadow: 0 0 4px black, 0 0 4px black;
         pointer-events: none;
     }
+}
 }

@@ -1,3 +1,4 @@
+@layer renderer {
 /* CanvasRenderer fills its pane. The pane itself is sized by the
    standard viewport.css rules (same as any other renderer pane); the
    display canvas backing store is sized in JS to the pane size ×
@@ -24,4 +25,5 @@
     /* Belt-and-braces nearest-neighbour upscale in case a browser
        honours the CSS hint over the 2D context flag. */
     image-rendering: pixelated;
+}
 }

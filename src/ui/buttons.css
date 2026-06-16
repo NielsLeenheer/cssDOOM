@@ -1,3 +1,4 @@
+@layer ui {
 /* ========================================================================
    Top-right UI button cluster (fullscreen, help, spectator, detach)
    Flex row anchored to the top-right corner. Hidden buttons (e.g. the
@@ -48,4 +49,5 @@ body[data-layout="kiosk"] #ui-buttons {
    browser handles fullscreen via the system UI). */
 @media (pointer: coarse) {
     #help-button, #fullscreen-button { display: none; }
+}
 }

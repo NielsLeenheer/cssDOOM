@@ -1,3 +1,4 @@
+@layer debug {
 /* debug.isolateHud() (features/isolate.js) — fade the 3D scene out behind a flat
    grey field so only the HUD (status bar + weapon) is left, for the talk's
    HUD-anatomy shot. A grey #434343 layer eases in on .renderer::after, which
@@ -20,3 +21,4 @@
     z-index: 1;   /* above .viewport, below .hud */
 }
 body.debug-isolate-hud .renderer::after { opacity: 1; }
+}

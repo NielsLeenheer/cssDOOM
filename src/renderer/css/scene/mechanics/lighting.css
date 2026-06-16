@@ -1,3 +1,4 @@
+@layer renderer {
 /* Sector Light Effects */
 
 /* DOOM T_Glow is a linear triangle (constant GLOWSPEED) between the
@@ -79,4 +80,5 @@ body.light-falloff {
     .wall, .floor, .ceiling, .decoration img, .sprite {
         filter: brightness(calc(var(--light, 1) * var(--light-falloff)));
     }
+}
 }

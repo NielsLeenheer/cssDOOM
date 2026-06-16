@@ -1,3 +1,4 @@
+@layer renderer {
 /* Scene */
 
 @property --player-z {
@@ -69,4 +70,5 @@
     syntax: "<number>";
     inherits: true;
     initial-value: 1;
+}
 }

@@ -1,3 +1,4 @@
+@layer renderer {
 /* Walls — geometry computed from raw DOOM vertex + sector data */
 
 .wall {
@@ -91,6 +92,4 @@ body.show-sky-walls .sky-wall {
     display: block;
     background: hotpink;
 }
-
-
-
+}

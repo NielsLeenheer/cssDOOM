@@ -1,3 +1,4 @@
+@layer hud {
 
 .weapon {
     position: absolute;
@@ -142,3 +143,4 @@ body:not(.spectator) .renderer.moving .weapon:not(.firing):not(.switching) {
 .weapon[data-type="CHAINSAW"] {
     background-image: url('/assets/weapons/CHAINSAW.png');
     --w: 154; --h: 89; --frames: 4;}
+}

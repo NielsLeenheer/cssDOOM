@@ -1,3 +1,4 @@
+@layer renderer {
 /* Things (enemies, barrels, pickups, decorations) */
 
 .enemy, .barrel, .pickup, .decoration {
@@ -68,4 +69,5 @@
 .sprite[data-type="invisibility"] {
     background-image: url('/assets/sprites/sheets/PINS.png');
     --w: 25; --h: 25; --frames: 4;
+}
 }

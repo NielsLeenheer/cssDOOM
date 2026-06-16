@@ -1,3 +1,4 @@
+@layer renderer {
 
 @keyframes sprite-cycle {
     from { background-position-x: 0; }
@@ -51,4 +52,5 @@
     .sprite {
         animation-delay: random(-2s, 0s) !important;
     }
+}
 }

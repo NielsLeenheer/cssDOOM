@@ -1,3 +1,4 @@
+@layer debug {
 /* ========================================================================
    debug.view.spritesheet.show — sprite-sheet stepped-animation visualisation.
 
@@ -55,4 +56,5 @@
    regardless (author display beats the [hidden] UA rule). */
 :is(.enemy, .barrel, .pickup, .decoration):has(.sprite-sheet-ghost) {
     display: block;
+}
 }
