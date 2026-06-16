@@ -46,22 +46,17 @@ export function buildFlatScene(mapData) {
             buildThing(ctx, thing);
         }
     }
-    // Doors / lifts / crushers re-parent existing wall+ceiling/floor
-    // elements into mechanic containers AND create new track / shaft
-    // walls via createWallElement. The mechanics' CSS rules
-    // (data-state animations, lift offset translations) ride on the
-    // .pane-flat clone just as on the textured pane — animations on
-    // wall background are suppressed by .pane.pane-flat .wall, but
-    // the transform animations on .door > .panel / .lift > .platform
-    // are untouched, so doors still open and lifts still travel.
-    // Doors / lifts / crushers have no build step — their geometry self-routes
-    // into the correct `.static` / `.mover` group during the wall/surface build
-    // above (Phase C).
+    // Doors / lifts / crushers have no build step — every wall (mover faces
+    // included) is born in its final `.static` / `.mover` group during the
+    // wall/surface build above. The mechanics' CSS rules (data-state
+    // animations, `.mover` offset translations) ride on the .pane-flat clone
+    // just as on the textured pane — wall-background animations are suppressed
+    // by .pane.pane-flat .wall, but the `.mover` transform animations are
+    // untouched, so doors still open and lifts still travel.
 
     // Surfaces are painted in their texture's average colour by
     // texture-override.css, keyed on the [data-texture] attribute every
-    // wall / floor / ceiling carries (including door / lift / crusher
-    // track walls, since createWallElement now sets it too). No per-
-    // element JS repaint needed.
+    // wall / floor / ceiling carries (mover faces included — buildWalls sets
+    // it on every wall). No per-element JS repaint needed.
     return { fragment: ctx.fragment, sceneState: ctx.sceneState };
 }

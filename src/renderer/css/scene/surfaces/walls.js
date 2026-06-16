@@ -1,10 +1,10 @@
 /**
- * Wall element creation and scene wall construction.
+ * Scene wall construction.
  *
- * Provides both:
- * - createWallElement(): shared helper for mechanics (doors, lifts, crushers)
- *   to create individual wall DOM elements from wall data.
- * - buildWalls(): builds all scene walls from map data during scene construction.
+ * buildWalls() builds every scene wall from map data during scene
+ * construction — including mover faces, which are routed straight into their
+ * mover's `.mover` group. A wall is born in its final container; nothing is
+ * reparented or synthesized after the build.
  *
  * Walls are positioned at their start vertex and rotated with atan2(deltaY, deltaX)
  * using CSS rotateY so they face the correct direction in 3D space.
@@ -15,35 +15,6 @@ import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 import { mapData } from '../../../../shared/maps/index.js';
 import { appendToSector } from '../sectors.js';
 import { getMoverGroup } from '../mechanics/movers.js';
-
-/** Creates a wall DOM element from wall data spanning the given bottom/top z. */
-export function createWallElement(wall, bottomZ, topZ) {
-    const deltaX = wall.end.x - wall.start.x;
-    const deltaY = wall.end.y - wall.start.y;
-    const wallLength = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-    if (wallLength < 1) return null;
-
-    const el = document.createElement('div');
-    el.className = 'wall';
-    el.style.setProperty('--start-x', wall.start.x);
-    el.style.setProperty('--start-y', wall.start.y);
-    el.style.setProperty('--end-x', wall.end.x);
-    el.style.setProperty('--end-y', wall.end.y);
-    el.style.setProperty('--start-z', bottomZ);
-    el.style.setProperty('--end-z', topZ);
-    el.dataset.texture = wall.texture; // background-image from textures.css
-    el.style.setProperty('--texture-offset-x', wall.xOffset);
-    el.style.setProperty('--texture-offset-y', wall.yOffset);
-    el.classList.add('unpegged');
-
-    el._wall = wall;
-    el._angle = Math.atan2(deltaY, deltaX);
-    el._length = wallLength;
-    el._midX = (wall.start.x + wall.end.x) / 2;
-    el._midY = (wall.start.y + wall.end.y) / 2;
-
-    return el;
-}
 
 export function buildWalls(ctx) {
     for (const wall of mapData.walls) {

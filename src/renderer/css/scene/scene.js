@@ -238,8 +238,8 @@ export async function loadMap(renderer, name) {
  * can exist in both namespaces.
  */
 /** True for texture names that map to a real image file. Filters the DOOM
- *  "no texture" marker, which `createWallElement` writes to data-texture
- *  unconditionally (door tracks / lift shafts built from raw wall data). */
+ *  "no texture" marker ("-") that can appear on a surface's data-texture
+ *  attribute. */
 function isRealTexture(name) {
     return !!name && name !== NO_TEXTURE;
 }

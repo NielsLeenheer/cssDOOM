@@ -21,15 +21,12 @@ import { animName } from '../../canvas/tables.js';
 export const wallPassMethods = {
     /**
      * Precompute which walls are lower-unpegged (texture pinned to the
-     * wall bottom rather than the top), mirroring the CSSRenderer:
-     *
-     *   - a regular wall with the ML_DONTPEGBOTTOM flag (`wall.isUnpegged`);
-     *   - every door face wall (doors.js force-adds `unpegged`);
-     *   - every door track jamb (createWallElement force-adds `unpegged`).
-     *
-     * Lift shaft walls are also always unpegged, but they're emitted from
-     * their own loop so they pass the flag directly. Called from the
-     * engine's setMap after the scene has ingested the map.
+     * wall bottom rather than the top), mirroring the CSSRenderer. Every
+     * such wall carries `wall.isUnpegged` from the map generator — regular
+     * ML_DONTPEGBOTTOM walls plus mover faces (door/lift faces, door track
+     * jambs), which the generator flags as unpegged. One uniform check, no
+     * per-mechanism special cases. Called from the engine's setMap after the
+     * scene has ingested the map.
      */
     _buildWallPegging() {
         const scene = this.scene;
