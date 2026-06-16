@@ -210,9 +210,7 @@ export function spawnProjectile(enemy, projectileDefinition) {
 
     const projectileId = state.nextProjectileId++;
     renderer.dispatch({ type: 'world', cmd: 'createProjectile', args: [projectileId, {
-        type: 'enemy',
-        width: projectileDefinition.size, height: projectileDefinition.size,
-        sprite: projectileDefinition.sprite,
+        type: projectileDefinition.projType,
         startX: enemy.x, startY: enemy.y, startZ: spawnHeight,
         endX, endY, endZ, duration: lifetime,
     }] });

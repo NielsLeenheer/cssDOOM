@@ -284,9 +284,11 @@ export const ENEMY_AI_STATS = {
 // missileDamage: base damage multiplier for impact, matching DOOM's mobjinfo.damage field.
 // Impact damage is rolled as (P_Random()%8+1) * missileDamage.
 // Based on: linuxdoom-1.10/info.c — MT_TROOPSHOT damage=3, MT_BRUISERSHOT damage=8
+// projType selects the renderer-side visual (sprite + size); see
+// PROJECTILE_SPRITES / projectiles.css. The game only carries the type string.
 export const ENEMY_PROJECTILES = {
-    3001: { sprite: 'BAL1A0', speed: 350, sound: 'DSFIRSHT', hitSound: 'DSFIRXPL', size: 15, missileDamage: 3 },  // Imp fireball: 10*FRACUNIT/tic × 35 = 350 units/s, 3–24 damage
-    3003: { sprite: 'BAL7A1A5', speed: 525, sound: 'DSFIRSHT', hitSound: 'DSFIRXPL', size: 16, missileDamage: 8 }, // Baron fireball: 15*FRACUNIT/tic × 35 = 525 units/s, 8–64 damage
+    3001: { projType: 'imp-fireball', speed: 350, sound: 'DSFIRSHT', hitSound: 'DSFIRXPL', missileDamage: 3 },  // Imp fireball: 10*FRACUNIT/tic × 35 = 350 units/s, 3–24 damage
+    3003: { projType: 'baron-fireball', speed: 525, sound: 'DSFIRSHT', hitSound: 'DSFIRXPL', missileDamage: 8 }, // Baron fireball: 15*FRACUNIT/tic × 35 = 525 units/s, 8–64 damage
 };
 
 export const ENEMY_RADIUS = 20;               // Collision radius for all enemies (map units)

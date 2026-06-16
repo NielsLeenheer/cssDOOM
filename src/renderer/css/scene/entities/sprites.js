@@ -381,18 +381,10 @@ export function createTeleportFog(renderer, x, z, y) {
  * Create a projectile DOM element in this renderer's pane and store it
  * in the renderer's projectileDom keyed by the given ID.
  */
-const PROJECTILE_CLASS = {
-    'enemy':         'projectile',
-    'player-rocket': 'projectile player-rocket',
-};
-
-export function createProjectile(renderer, projectileId, { type, width, height, sprite, startX, startY, startZ, endX, endY, endZ, duration }) {
+export function createProjectile(renderer, projectileId, { type, startX, startY, startZ, endX, endY, endZ, duration }) {
     const el = document.createElement('div');
-    el.className = PROJECTILE_CLASS[type] || 'projectile';
-    el.style.width = `${width}px`;
-    el.style.height = `${height}px`;
-    el.style.backgroundImage = `url('/assets/sprites/${sprite}.png')`;
-    el.style.backgroundSize = `${width}px ${height}px`;
+    el.className = 'projectile';
+    el.dataset.type = type; // sprite + size resolved in projectiles.css
     el.style.setProperty('--start-x', startX);
     el.style.setProperty('--start-y', startY);
     el.style.setProperty('--start-z', startZ);

@@ -10,6 +10,24 @@
         projectile-glow 150ms ease-in-out infinite alternate;
 }
 
+/* Per-type sprite + size. The game sends only `data-type`; the visual is
+   resolved here (CSS) and in PROJECTILE_SPRITES (canvas/webgl). */
+.projectile[data-type="imp-fireball"] {
+    width: 15px; height: 15px;
+    background-image: url('/assets/sprites/BAL1A0.png');
+    background-size: 15px 15px;
+}
+.projectile[data-type="baron-fireball"] {
+    width: 16px; height: 16px;
+    background-image: url('/assets/sprites/BAL7A1A5.png');
+    background-size: 16px 16px;
+}
+.projectile[data-type="rocket"] {
+    width: 11px; height: 11px;
+    background-image: url('/assets/sprites/MISLA1.png');
+    background-size: 11px 11px;
+}
+
 @keyframes projectile-move {
     from {
         translate:

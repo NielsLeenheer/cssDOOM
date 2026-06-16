@@ -38,6 +38,16 @@ export const NO_TEXTURE = '-';             // DOOM's marker meaning "no texture 
 // digit "1" = front-facing, "0" = rotation-independent.
 // ============================================================================
 
+// Maps a projectile's semantic type (sent by the game on createProjectile) to
+// its sprite lump name. The CSS renderer reads the type via [data-type] in
+// projectiles.css; canvas/webgl resolve the sprite name through this map. The
+// game side only knows the type string — sprite + size live renderer-side.
+export const PROJECTILE_SPRITES = {
+    'imp-fireball':   'BAL1A0',
+    'baron-fireball': 'BAL7A1A5',
+    'rocket':         'MISLA1',
+};
+
 export const THING_SPRITES = {
     // Enemies (frame A, rotation 1 = front-facing)
     9:    'SPOSA1',   // Shotgun Guy

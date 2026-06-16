@@ -361,8 +361,7 @@ function spawnPlayerRocket(player, forwardX, forwardY) {
 
     const projectileId = state.nextProjectileId++;
     renderer.dispatch({ type: 'world', cmd: 'createProjectile', args: [projectileId, {
-        type: 'player-rocket',
-        width: 11, height: 11, sprite: 'MISLA1',
+        type: 'rocket',
         startX: spawnX, startY: spawnY, startZ: spawnZ,
         endX, endY, endZ: spawnZ, duration: lifetime,
     }] });

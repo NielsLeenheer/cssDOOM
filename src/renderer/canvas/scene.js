@@ -22,7 +22,7 @@
  * world state. Those commands stay in commands.js.
  */
 
-import { THING_SPRITES } from '../css/scene/constants.js';
+import { THING_SPRITES, PROJECTILE_SPRITES } from '../css/scene/constants.js';
 import {
     LIGHT_EFFECT, ENEMY_ANIM, ANIM_FRAME_MS, lightMul,
     DOOR_SPEED, LIFT_SPEED, TAU,
@@ -393,7 +393,7 @@ export class Scene {
 
     createProjectile(id, spec) {
         this.projectiles.set(id, {
-            sprite: spec.sprite,
+            sprite: PROJECTILE_SPRITES[spec.type],
             sx: spec.startX, sy: spec.startY, sz: spec.startZ,
             ex: spec.endX, ey: spec.endY, ez: spec.endZ,
             duration: spec.duration || 1,
