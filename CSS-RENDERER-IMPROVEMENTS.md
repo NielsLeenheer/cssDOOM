@@ -251,26 +251,24 @@ The investigation (against current code) found:
 
 ### B11. Projectiles: convert inline background-image to `data-type` + CSS
 
-- [ ] Investigate
+- [x] Done.
 
-Projectiles are the last scene elements styled with direct
-`style.backgroundImage` — `createProjectile`
-(`scene/entities/sprites.js`) sets `backgroundImage`, `backgroundSize`,
-`width`, and `height` inline from the wire spec. Every other scene sprite
-goes through a declarative mechanism (`data-texture` → generated
-textures.css, `data-type` → enemies.css/things.css, or class-based
-keyframes).
+`createProjectile` no longer sets `backgroundImage`/`backgroundSize`/`width`/
+`height` inline — it sets `el.dataset.type` and the visual is resolved per
+type: `.projectile[data-type="…"]` rules in `projectiles.css` (CSS family) and
+`PROJECTILE_SPRITES` in `css/scene/constants.js` (canvas/webgl, mirroring
+`THING_SPRITES`). Only `--start-*`/`--end-*`/`--duration` stay per-shot.
 
-Projectile types are a small fixed set (enemy fireball, player rocket), so
-this can become `data-type="fireball|rocket"` with the sprite URL, size,
-and `background-size` defined per type in `projectiles.css` — matching the
-sprite convention everywhere else. Only the genuinely per-shot values
-(`--start-*`, `--end-*`, `--duration`) stay inline.
+The doc undercounted the types: `type:'enemy'` was dispatched for *both* imp
+and baron fireballs, which differ in sprite + size. Expanded to three
+semantic types — `imp-fireball` / `baron-fireball` / `rocket` — set as
+`projType` on `ENEMY_PROJECTILES` (game side carries only the type string; no
+sprite/size).
 
-Side benefit: slims the wire envelope — master currently ships
-`width`/`height`/`sprite` over the network on every shot for what is
-static per-type data (check what RenderSink forwards in the
-createProjectile args and trim the spec at the game side).
+Wire envelope slimmed: `width`/`height`/`sprite` dropped from every shot
+(transport relays args verbatim; projectiles aren't in catchup, so no
+stored-spec path). The vestigial `player-rocket` class + `PROJECTILE_CLASS`
+map are gone.
 
 Related to B10 (classes vs data attributes convention).
 
