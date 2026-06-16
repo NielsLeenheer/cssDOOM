@@ -9,7 +9,11 @@
     );
 }
 
-.enemy { transition: --floor-z 0.4s ease-out; }
+/* No transition on --floor-z: floor height is inherited from the sector and
+   changes by reparenting between sectors, which is instant — the enemy SNAPS to
+   the new floor (DOOM-correct). An easing transition here fights the instant
+   reparent + `.mover` translate (dip/jump when crossing a lift edge). Lift
+   riding stays smooth via the `.mover` transform transition, not this. */
 
 .pickup.collected {
     visibility: hidden;

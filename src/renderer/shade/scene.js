@@ -19,9 +19,6 @@ import { buildSectorContainers } from '../css/scene/sectors.js';
 import { buildWalls } from '../css/scene/surfaces/walls.js';
 import { buildFloors } from '../css/scene/surfaces/floors.js';
 import { buildCeilings } from '../css/scene/surfaces/ceilings.js';
-import { buildDoor } from '../css/scene/mechanics/doors.js';
-import { buildLift } from '../css/scene/mechanics/lifts.js';
-import { buildCrusher } from '../css/scene/mechanics/crushers.js';
 
 export function buildShadeScene(mapData) {
     const ctx = {
@@ -36,19 +33,9 @@ export function buildShadeScene(mapData) {
     // Door / lift / crusher containers exist so the scene structure
     // matches the textured pane — but their CSS animations are
     // suppressed by .pane-shade rules so nothing visually moves.
-    if (mapData?.doors) {
-        for (const door of mapData.doors) buildDoor(ctx, door, door.trackWalls || []);
-    }
-    if (mapData?.lifts) {
-        for (const lift of mapData.lifts) {
-            if (lift.upperHeight - lift.lowerHeight > 0) buildLift(ctx, lift);
-        }
-    }
-    if (mapData?.crushers) {
-        for (const crusher of mapData.crushers) {
-            if (crusher.topHeight - crusher.crushHeight > 0) buildCrusher(ctx, crusher);
-        }
-    }
+    // Doors / lifts / crushers have no build step — their geometry self-routes
+    // into the correct `.static` / `.mover` group during the wall/surface build
+    // above (Phase C).
 
     // Surface colours (white walls, green floors, blue ceilings) and
     // texture suppression are handled by shade/styles.css — no

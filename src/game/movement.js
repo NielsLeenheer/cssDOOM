@@ -163,7 +163,7 @@ function updateLocation(player, deltaTime, input) {
         // (east-convention) for updateEnemyRotation's billboard math.
         player.thingRef.facing = Math.PI / 2 + player.angle;
 
-        renderer.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [player.thingIndex, player.x, player.y, player.floorHeight] });
+        renderer.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [player.thingIndex, player.x, player.y] });
         const sector = getSectorAt(player.x, player.y);
         if (sector) {
             renderer.dispatch({ type: 'world', cmd: 'reparentThingToSector', args: [player.thingIndex, sector.sectorIndex] });

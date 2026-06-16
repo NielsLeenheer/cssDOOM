@@ -1,6 +1,18 @@
 # Refactor: Sector-as-geometry — inherited heights, single-toggle movers, no reparenting
 
-Status: design proposal · Owner: TBD · Supersedes the earlier split docs
+> **⚠️ SUPERSEDED (2026-06-16).** This describes the early *no-translate* design —
+> movers animate one `--offset` routed onto the sector's `--floor`/`--ceiling`,
+> surfaces re-evaluate via inheritance. The project moved to the **translate**
+> model instead: a mover is a `.mover` group that *translates* (GLOSSARY.md
+> "Movers", line 124; implemented per `IMPLEMENTATION-PLAN-movers.md`). Do **not**
+> implement §2/§6's `--offset`-on-`--floor` mechanism. The parts that DID carry
+> over and remain valid: **floor-height inheritance** (sector carries the height,
+> things/floors inherit it — now `IMPLEMENTATION-PLAN-movers.md` invariant 6 /
+> Phase F), **no reparenting of surfaces**, **no per-thing floor fan-out**, and
+> the **generator normalizing jambs/shaft walls into ordinary walls** (§9, done).
+> Kept for that rationale and the data audits (§5, §7); the CSS mechanism is dead.
+
+Status: SUPERSEDED design proposal · Owner: TBD · Superseded the earlier split docs
 `REFACTOR-sector-height-inheritance.md` + `REFACTOR-door-sector-surfaces.md`
 (merged here because they're interdependent). Relates to
 `CSS-RENDERER-IMPROVEMENTS.md` items **C5**, **A2**, **B5**, **C1**.

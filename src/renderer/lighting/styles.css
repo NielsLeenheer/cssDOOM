@@ -19,8 +19,8 @@
        animate --light, so the dynamic sector lighting plays through the
        brightness filter. That's the whole point of this renderer. */
 
-    /* Doors pinned closed (setDoorState is suppressed at dispatch). */
-    .mover[data-mover="door"] {
+    /* Doors pinned closed (setMoverState is suppressed at dispatch). */
+    .mover[data-mover-type="door"] {
         transition: none !important;
         transform: none !important;
     }

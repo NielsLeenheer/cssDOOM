@@ -3,10 +3,10 @@
  *
  * Walls are textured quads. Unlike the static flats, wall geometry is
  * rebuilt every frame into a streamed buffer: door panels slide, lift
- * shafts grow, textures scroll and animate, so it's simplest (and plenty
- * fast for a DOOM level's wall count) to regenerate the vertices each
- * frame straight from the live scene state — exactly the values the
- * canvas renderer's `_renderWalls` / `_renderLiftWalls` compute.
+ * faces ride the platform, textures scroll and animate, so it's simplest
+ * (and plenty fast for a DOOM level's wall count) to regenerate the vertices
+ * each frame straight from the live scene state — exactly the values the
+ * canvas renderer's `_renderWalls` computes.
  *
  * Vertices are grouped by texture so each distinct wall texture is one
  * draw call. Per vertex: world position (x,y,z), texel coordinate in
@@ -47,63 +47,41 @@ export const wallPassMethods = {
         for (const arr of groups.values()) arr.length = 0;
 
         for (const wall of scene.walls) {
-            // Lift boundary walls are emitted by the lift loop below at the
-            // animated platform height; skip the static copy here so they
-            // don't z-fight (matches the canvas renderer).
-            if (wall.isLiftWall) continue;
             const name = animName(wall.texture, scene._animFrame);
             const tex = this._getWall(name);
             if (!tex) continue;
 
-            // Door panels raise their visible bottom edge as the door
-            // opens (bottomOffset). The texture offset stays the wall's
-            // own yOffset: door panels are unpegged, so pinning the
-            // texture to the (rising) bottom makes it slide up with the
-            // panel on its own — no need to fold bottomOffset into yOff.
-            const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
-            const wallBottom = wall.bottomHeight + bottomOffset;
-            const wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
-            const yOff = wall.yOffset || 0;
+            let wallBottom, wallTop, yOff, noCull, unpegged;
+            if (wall.moverType === 'lift') {
+                // Lift faces are ordinary walls drawn at the live platform
+                // height: the riser spans platform↔facing floor (growing as the
+                // lift drops), texture pinned to the platform top so it rides
+                // down with it. Well-lining walls carry no moverType and draw
+                // statically like any other wall.
+                const lift = scene.lifts.get(wall.moverSector);
+                if (!lift) continue;
+                const nf = wall.bottomHeight;          // facing floor (face top == lift.upper)
+                wallBottom = Math.min(lift.current, nf);
+                wallTop = Math.max(lift.current, nf);
+                if (wallTop - wallBottom < 0.5) continue;
+                yOff = (wall.yOffset || 0) - (lift.upper - Math.min(nf, lift.lower));
+                noCull = true;
+                unpegged = false;
+            } else {
+                // Door panels raise their visible bottom edge as the door opens
+                // (bottomOffset). Door panels are unpegged, so pinning the
+                // texture to the rising bottom makes it slide up with the panel.
+                const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
+                wallBottom = wall.bottomHeight + bottomOffset;
+                wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
+                yOff = wall.yOffset || 0;
+                noCull = false;
+                unpegged = this._unpegged.has(wall);
+            }
             const light = this._sectorBrightness(wall.sectorIndex, wall.lightLevel);
             const u1 = (wall.xOffset || 0) + (wall.isScrolling ? scene._scrollOffset : 0);
             this._emitWall(groups, name, cam, wall, wallBottom, wallTop, yOff, light, u1,
-                false, this._unpegged.has(wall));
-        }
-
-        // Lift shaft walls — drawn at the live platform height. The
-        // platform-face walls span platform↔facing floor (growing as the
-        // lift drops); the static shaft sides span the full travel so the
-        // shaft isn't see-through once the platform moves away.
-        for (const lift of scene.lifts.values()) {
-            for (const wall of lift.shaftWalls) {
-                const tex = this._getWall(wall.texture);
-                if (!tex || tex.width <= 1) continue;
-                let bottom, top, unpegged, yOff;
-                if (wall.isPlatformFace) {
-                    const nf = wall.neighborFloor ?? lift.lower;
-                    bottom = Math.min(lift.current, nf);
-                    top = Math.max(lift.current, nf);
-                    // The face texture is pinned to the platform top so it
-                    // rides down with the lift (the DOM renders a full-height
-                    // panel pinned to the platform and translates it; that's
-                    // top-pegging, offset by the full panel height so the
-                    // texel at the platform matches). Without this the bottom
-                    // stayed put and the top was simply clipped.
-                    const fullH = lift.upper - Math.min(nf, lift.lower);
-                    unpegged = false;
-                    yOff = (wall.yOffset || 0) - fullH;
-                } else {
-                    bottom = wall.neighborFloor !== undefined
-                        ? Math.min(wall.neighborFloor, lift.lower) : lift.lower;
-                    top = lift.upper;
-                    unpegged = true;                 // static shaft sides
-                    yOff = wall.yOffset || 0;
-                }
-                if (top - bottom < 0.5) continue;
-                const light = this._doomLight(wall.lightLevel ?? lift.light);
-                this._emitWall(groups, wall.texture, cam, wall, bottom, top,
-                    yOff, light, wall.xOffset || 0, true, unpegged);
-            }
+                noCull, unpegged);
         }
 
         // Draw each texture group.

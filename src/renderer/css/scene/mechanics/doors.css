@@ -1,11 +1,12 @@
-/* Doors — the mover group is a `.mover` child of the door's own `.sector`.
-   It translates up to open; the ceiling + face walls inside it ride along. */
+/* Doors — a mover group is a `.mover` child of a `.sector`, tagged
+   `data-mover-type="door"` + `data-mover-id="<idx>"` (one group per sector the
+   door spans). It translates up to open; the ceiling + face walls ride along. */
 
-.mover[data-mover="door"] {
+.mover[data-mover-type="door"] {
     transform: translateY(0px);
     transition: transform 1s ease-in-out;
 }
 
-.mover[data-mover="door"][data-state="open"] {
+.mover[data-mover-type="door"][data-state="open"] {
     transform: translateY(var(--offset));
 }

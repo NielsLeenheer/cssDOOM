@@ -25,12 +25,12 @@
         animation: none !important;
     }
 
-    /* Door panels pin in the closed position — setDoorState is already
+    /* Door panels pin in the closed position — setMoverState is already
        suppressed at dispatch on this renderer, but pinning the
        transform here keeps the panel where the build placed it even if
        the transition were already mid-flight when the renderer was
        constructed. */
-    .mover[data-mover="door"] {
+    .mover[data-mover-type="door"] {
         transition: none !important;
         transform: none !important;
     }

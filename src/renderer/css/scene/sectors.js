@@ -85,14 +85,22 @@ export function buildSectorContainers(ctx) {
         // Non-moving geometry + things live in a `.static` child; movers add
         // `.mover` siblings beside it (see IMPLEMENTATION-PLAN-movers.md). The
         // sector keeps carrying --light / bbox / --outline, inherited by both
-        // groups. `_staticGroup` is the default append target for the sector.
+        // groups. The `.static` group is stored in `sceneState.sectorStatic[i]`
+        // (parallel to `sectorContainers`) — the default append target.
         const staticGroup = document.createElement('div');
         staticGroup.className = 'static';
         container.appendChild(staticGroup);
-        container._staticGroup = staticGroup;
+        ctx.sceneState.sectorStatic[i] = staticGroup;
 
         container.style.setProperty('--light',
             doomLightToCSS(sector.lightLevel, lightBoost));
+
+        // Floor/ceiling height live on the sector and are inherited by its floor
+        // surface, ceiling surface, and the things/enemies standing in it — so
+        // nothing downstream sets its own height. For a mover the moving surface
+        // reads this REST height and the `.mover` translate adds the motion.
+        container.style.setProperty('--floor-z', sector.floorHeight);
+        container.style.setProperty('--ceiling-z', sector.ceilingHeight);
 
         if (sector.specialType) {
             applyLightEffect(container, sector.specialType);
@@ -157,20 +165,21 @@ export function sectorContentTarget(sceneState, sectorIndex) {
     if (sectorIndex === undefined || sectorIndex === null) return null;
     const sector = sceneState.sectorContainers[sectorIndex];
     if (!sector) return null;
-    return sector._staticGroup || sector;
+    return sceneState.sectorStatic[sectorIndex] || sector;
 }
 
 /**
- * Resolve where a sector's THINGS (sprites / enemies / items) should live: the
- * sector's floor container — a lift's `.mover` group so things ride the
- * platform, else the `.static` group. `buildLift` sets `sector.floorContainer`
- * to its `.mover`; everything else falls back to the static target. Used by
- * thing placement (`buildThing`) and runtime reparenting / sprite spawns so a
- * thing always lands on the surface that carries its floor.
+ * Resolve where a sector's THINGS (sprites / enemies / items) should live so a
+ * thing always rides the surface that carries its floor. For a lift sector that
+ * is the lift's own `.mover` group (`lift:<idx>`, where the floor is built —
+ * created in `buildHorizontalSurface`); everything else falls back to the
+ * `.static` group. No reparenting: the thing is placed straight into the group.
+ * Used by thing placement (`buildThing`) and runtime reparenting / sprite spawns.
  */
 export function sectorFloorTarget(sceneState, sectorIndex) {
     if (sectorIndex === undefined || sectorIndex === null) return null;
     const sector = sceneState.sectorContainers[sectorIndex];
     if (!sector) return null;
-    return sector.floorContainer || sector._staticGroup || sector;
+    const liftGroup = sector._moverGroups && sector._moverGroups.get(`lift:${sectorIndex}`);
+    return liftGroup || sceneState.sectorStatic[sectorIndex] || sector;
 }

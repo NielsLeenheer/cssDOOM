@@ -23,9 +23,6 @@ import { buildWalls } from '../css/scene/surfaces/walls.js';
 import { buildFloors } from '../css/scene/surfaces/floors.js';
 import { buildCeilings } from '../css/scene/surfaces/ceilings.js';
 import { buildThing } from '../css/scene/entities/things.js';
-import { buildDoor } from '../css/scene/mechanics/doors.js';
-import { buildLift } from '../css/scene/mechanics/lifts.js';
-import { buildCrusher } from '../css/scene/mechanics/crushers.js';
 
 export function buildFlatScene(mapData) {
     const ctx = {
@@ -57,19 +54,9 @@ export function buildFlatScene(mapData) {
     // wall background are suppressed by .pane.pane-flat .wall, but
     // the transform animations on .door > .panel / .lift > .platform
     // are untouched, so doors still open and lifts still travel.
-    if (mapData?.doors) {
-        for (const door of mapData.doors) buildDoor(ctx, door, door.trackWalls || []);
-    }
-    if (mapData?.lifts) {
-        for (const lift of mapData.lifts) {
-            if (lift.upperHeight - lift.lowerHeight > 0) buildLift(ctx, lift);
-        }
-    }
-    if (mapData?.crushers) {
-        for (const crusher of mapData.crushers) {
-            if (crusher.topHeight - crusher.crushHeight > 0) buildCrusher(ctx, crusher);
-        }
-    }
+    // Doors / lifts / crushers have no build step — their geometry self-routes
+    // into the correct `.static` / `.mover` group during the wall/surface build
+    // above (Phase C).
 
     // Surfaces are painted in their texture's average colour by
     // texture-override.css, keyed on the [data-texture] attribute every

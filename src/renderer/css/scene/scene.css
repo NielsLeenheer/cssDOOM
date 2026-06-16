@@ -32,7 +32,7 @@
         backface-visibility: visible;
     }
 
-    & .mover[data-mover="lift"] .floor {
+    & .mover[data-mover-type="lift"] .floor {
         backface-visibility: visible;
     }
 }
@@ -54,11 +54,11 @@
     initial-value: 0;
 }
 
-/* Registered so it interpolates — things.css transitions --floor-z on
-   .enemy (0.4s ease-out) to smooth floor-height changes (lift rides).
-   Unregistered custom properties animate discretely (flip at 50%).
-   `inherits: true` preserves the default inheritance behavior of
-   unregistered custom properties. */
+/* `inherits: true` is the point: a sector sets `--floor-z` and its floor surface
+   + things/enemies read it by inheritance (set once on the `.sector`, not per
+   element). Registered as `<number>` so `setFloorHeight` (the out-of-scope
+   donut/lower path) can still interpolate it on a floor surface; things do NOT
+   transition it — they snap to the inherited floor on reparent. */
 @property --floor-z {
     syntax: "<number>";
     inherits: true;

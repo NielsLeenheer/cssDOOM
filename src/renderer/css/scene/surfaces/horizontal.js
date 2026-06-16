@@ -13,6 +13,7 @@
 import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
 import { appendToSector } from '../sectors.js';
+import { getMoverGroup, movingPlaneMover } from '../mechanics/movers.js';
 import { sectorBounds } from './clip.js';
 
 /**
@@ -32,9 +33,11 @@ export function buildHorizontalSurface(ctx, sector, height, textureName, surface
     const surfaceElement = document.createElement('div');
     surfaceElement.className = surfaceType;
 
-    // Only the height channel is per-surface; bbox + clip are inherited from
-    // the `.sector` container (set in sectors.js).
-    surfaceElement.style.setProperty(surfaceType === 'floor' ? '--floor-z' : '--ceiling-z', height);
+    // Height, bbox, and clip are all inherited from the `.sector` container (set
+    // in sectors.js): a `.floor` reads `--floor-z`, a `.ceiling` reads
+    // `--ceiling-z`. Nothing per-surface to set here. (The permanent floor-special
+    // path — setFloorHeight, donut/lower — still overrides `--floor-z` on the
+    // surface at runtime; that's a separate, out-of-scope path.)
 
     /**
      * Texture positioning:
@@ -65,7 +68,13 @@ export function buildHorizontalSurface(ctx, sector, height, textureName, surface
     surfaceElement._bboxH = boundingBoxHeight;
 
     surfaceElement.hidden = true;
-    appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, surfaceElement, sector.sectorIndex);
+    // A mover's moving plane (lift floor / door + crusher ceiling) is born in its
+    // `.mover` group inside its own sector, so it rides the mover with no
+    // reparenting. Every other surface lands in the sector's `.static` group.
+    const mover = movingPlaneMover(sector.sectorIndex, surfaceType);
+    const group = mover && getMoverGroup(ctx, sector.sectorIndex, mover.moverType, mover.moverSector);
+    if (group) group.appendChild(surfaceElement);
+    else appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, surfaceElement, sector.sectorIndex);
     ctx.sceneState.surfaceElements.push(surfaceElement);
 }
 

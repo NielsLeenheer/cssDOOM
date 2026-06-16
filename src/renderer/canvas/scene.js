@@ -42,7 +42,7 @@ export const SCENE_COMMANDS = [
     'createProjectile', 'removeProjectile',
     'createPuff', 'createExplosion', 'createTeleportFog',
     'createCorpse', 'createPlayerSprite',
-    'setDoorState', 'setLiftState',
+    'setMoverState',
 ];
 
 export class Scene {
@@ -146,6 +146,7 @@ export class Scene {
         // upper face walls (the panels) slide up with it. Start closed.
         const polyOf = new Map();
         for (const sp of this.sectorPolygons) polyOf.set(sp.sectorIndex, sp);
+        this._polyBySector = polyOf;   // sectorIndex → sectorPolygon, for floorOf()
         for (const door of (data.doors || [])) {
             const faceWalls = this.walls.filter(w => w.isUpperWall
                 && (w.frontSectorIndex === door.sectorIndex
@@ -170,9 +171,10 @@ export class Scene {
         }
 
         // Build lift records. A lift is a sector whose floor rides between
-        // upperHeight (its stored, raised state) and lowerHeight; its
-        // shaft walls are kept on the record and drawn each frame at the
-        // animated height. Start raised.
+        // upperHeight (its stored, raised state) and lowerHeight. Its boundary
+        // walls are ordinary walls in `scene.walls` — the face walls (tagged
+        // moverType:'lift') are drawn each frame at the animated `current`
+        // height by the wall pass; well-lining walls draw statically. Start raised.
         for (const lift of (data.lifts || [])) {
             const sectorPoly = polyOf.get(lift.sectorIndex) || null;
             const raised = sectorPoly ? sectorPoly.floorHeight : lift.upperHeight;
@@ -183,7 +185,6 @@ export class Scene {
                 target: raised,
                 sectorPoly,
                 light: this._sectorLight[lift.sectorIndex] ?? 200,
-                shaftWalls: lift.shaftWalls || [],
             });
             if (sectorPoly) this._floorOverride.set(sectorPoly, raised);
         }
@@ -206,13 +207,6 @@ export class Scene {
             const name = THING_SPRITES[t.type];
             if (!name) continue;
             const light = sectors[t.sectorIndex]?.lightLevel ?? 180;
-            // Anchor to the static floor of the thing's sector rather than
-            // the enriched `t.floorHeight`: that value is computed inside
-            // maps.load against the global lift state, which on a level
-            // transition still holds the *previous* level's lifts, sinking
-            // things into the new floor. The sector's own floorHeight is
-            // immune; moving things get live heights via updateThingPosition.
-            const floorZ = polyOf.get(t.sectorIndex)?.floorHeight ?? t.floorHeight ?? 0;
 
             // Things the game simulates carry a gameId — the key the
             // dispatch commands address them by. Register those in the
@@ -224,7 +218,7 @@ export class Scene {
                 // same way walls/flats do — without it a decoration on a
                 // blinking platform stays at a fixed brightness while the
                 // surfaces around it pulse.
-                this.statics.push({ x: t.x, y: t.y, floorZ, light, name, sectorIndex: t.sectorIndex });
+                this.statics.push({ x: t.x, y: t.y, light, name, sectorIndex: t.sectorIndex });
                 continue;
             }
 
@@ -234,9 +228,8 @@ export class Scene {
                 category: t.category,
                 x: t.x,
                 y: t.y,
-                floorZ,
                 light,
-                sectorIndex: t.sectorIndex,   // live light-special lookup (see statics above)
+                sectorIndex: t.sectorIndex,   // live light-special lookup + floorOf()
                 isEnemy: anim !== null,
                 anim,
                 fixedName: name,                       // used for pickups / barrels
@@ -321,15 +314,26 @@ export class Scene {
 
     // ── Dispatch commands (game loop → world state) ──────────────────────
 
-    updateThingPosition(i, x, y, floorZ) {
+    // Current floor of a sector for placing things/effects: a lift's live height
+    // (via _floorOverride) else the sector's static floor. Things read this by
+    // their sectorIndex rather than carrying a per-thing dispatched floor.
+    floorOf(sectorIndex) {
+        const poly = this._polyBySector?.get(sectorIndex);
+        if (!poly) return 0;
+        return this._floorOverride.get(poly) ?? poly.floorHeight ?? 0;
+    }
+
+    updateThingPosition(i, x, y) {
         const e = this.things.get(i);
-        if (e) { e.x = x; e.y = y; e.floorZ = floorZ; }
+        if (e) { e.x = x; e.y = y; }   // floor comes from floorOf(e.sectorIndex) at draw
     }
 
     reparentThingToSector(i, sectorIndex) {
         const e = this.things.get(i);
+        if (!e) return;
+        e.sectorIndex = sectorIndex;   // floorOf() reads the thing's current sector
         const l = this._sectorLight[sectorIndex];
-        if (e && l != null) e.light = l;
+        if (l != null) e.light = l;
     }
 
     collectItem(i) { const e = this.things.get(i); if (e) e.collected = true; }
@@ -358,7 +362,7 @@ export class Scene {
         if (!e) return;
         if (e.category === 'barrel') {
             // Barrels don't fall over — they detonate and vanish.
-            this._spawnEffect(e.x, e.y, e.floorZ + 24, BARREL_FRAMES, 60, true);
+            this._spawnEffect(e.x, e.y, this.floorOf(e.sectorIndex) + 24, BARREL_FRAMES, 60, true);
             e.collected = true;
             return;
         }
@@ -372,7 +376,7 @@ export class Scene {
         e.state = 'idle';
         e.deathStart = 0;
         e.collected = false;
-        if (x !== undefined) { e.x = x; e.y = y; e.floorZ = floorZ; }
+        if (x !== undefined) { e.x = x; e.y = y; }   // floor via floorOf(e.sectorIndex)
     }
 
     updateEnemyRotation(i, enemy, viewers) {
@@ -412,18 +416,18 @@ export class Scene {
     createCorpse(x, y, floorZ, sectorIndex, playerIndex, gib) {
         const variant = PLAYER_CORPSE_VARIANT[playerIndex] ?? '';
         this.statics.push({
-            x, y, floorZ,
+            x, y, sectorIndex,
             light: this._sectorLight[sectorIndex] ?? 200,
             name: (gib ? 'PLAYW0' : 'PLAYN0') + variant,
         });
     }
 
-    createPlayerSprite(thingIndex, playerIndex, x, y, floorZ /* , sectorIndex */) {
+    createPlayerSprite(thingIndex, playerIndex, x, y, floorZ, sectorIndex) {
         if (this.things.has(thingIndex)) return;   // idempotent
         this.things.set(thingIndex, {
             type: -1,
             category: 'player',
-            x, y, floorZ,
+            x, y, sectorIndex,
             light: 220,
             isEnemy: true,
             anim: PLAYER_ANIM,
@@ -438,13 +442,14 @@ export class Scene {
         });
     }
 
-    setDoorState(sectorIndex, doorState) {
-        const door = this.doors.get(sectorIndex);
-        if (door) door.target = doorState === 'open' ? door.open : door.closed;
-    }
-
-    setLiftState(sectorIndex, liftState) {
-        const lift = this.lifts.get(sectorIndex);
-        if (lift) lift.target = liftState === 'lowered' ? lift.lower : lift.upper;
+    setMoverState(moverType, sectorIndex, value) {
+        if (moverType === 'door') {
+            const door = this.doors.get(sectorIndex);
+            if (door) door.target = value === 'open' ? door.open : door.closed;
+        } else if (moverType === 'lift') {
+            const lift = this.lifts.get(sectorIndex);
+            if (lift) lift.target = value === 'lowered' ? lift.lower : lift.upper;
+        }
+        // crusher: no canvas crusher records (none in E1) — nothing to drive.
     }
 }

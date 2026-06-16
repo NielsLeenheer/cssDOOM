@@ -1,11 +1,13 @@
-/* Lifts — the mover group is a `.mover` child of the lift's own `.sector`.
-   It translates down to lower; the floor + platform-face walls ride along. */
+/* Lifts — a mover group is a `.mover` child of a `.sector`, tagged
+   `data-mover-type="lift"` + `data-mover-id="<idx>"` (the lift owns one group
+   per sector it spans). It translates down to lower; the floor + platform-face
+   walls ride along. */
 
-.mover[data-mover="lift"] {
+.mover[data-mover-type="lift"] {
     transform: translateY(0px);
     transition: transform 1s ease-in-out;
 }
 
-.mover[data-mover="lift"][data-state="lowered"] {
+.mover[data-mover-type="lift"][data-state="lowered"] {
     transform: translateY(var(--offset));
 }

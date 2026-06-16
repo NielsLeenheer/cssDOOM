@@ -265,8 +265,10 @@ function moveEnemyToward(enemy, targetX, targetY, deltaTime) {
  * world coordinates. Notifies the renderer to update the visual representation.
  */
 function updateEnemyPosition(thingIndex, enemy) {
-    const floorHeight = getFloorHeightAt(enemy.x, enemy.y);
-    renderer.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [thingIndex, enemy.x, enemy.y, floorHeight] });
+    // No floor in the dispatch — the renderer derives the enemy's height from
+    // its sector (CSS inherits --floor-z; canvas/webgl read floorOf), and the
+    // reparent below keeps that sector current as it walks.
+    renderer.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [thingIndex, enemy.x, enemy.y] });
     // Reparent to current sector so the enemy inherits its --light (including animations)
     const sector = getSectorAt(enemy.x, enemy.y);
     if (sector) renderer.dispatch({ type: 'world', cmd: 'reparentThingToSector', args: [thingIndex, sector.sectorIndex] });

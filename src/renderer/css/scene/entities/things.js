@@ -30,8 +30,8 @@ export function buildThing(ctx, spec) {
     const thingContainer = document.createElement('div');
     thingContainer.className = spec.category;
     thingContainer.style.setProperty('--x', spec.x);
-    thingContainer.style.setProperty('--floor-z', spec.floorHeight);
     thingContainer.style.setProperty('--y', spec.y);
+    // Floor height inherited from the sector container it's appended into (below).
 
     let spriteElement = null;
     if (thingName) {
@@ -49,10 +49,9 @@ export function buildThing(ctx, spec) {
     }
 
     thingContainer.hidden = true;
-    // Things ride their floor: route to the sector's floor container (a lift's
-    // `.mover` if built, else `.static`). Lifts build after things, so a thing
-    // placed here lands in `.static` and buildLift reparents it onto the
-    // platform; runtime spawns after that land on the platform directly.
+    // Things ride their floor: route to the sector's floor container — a lift's
+    // `.mover` group (built during the floor build, before things) so the thing
+    // rides the platform, else the sector's `.static` group. No reparenting.
     const target = sectorFloorTarget(ctx.sceneState, spec.sectorIndex);
     (target || ctx.fragment).appendChild(thingContainer);
 

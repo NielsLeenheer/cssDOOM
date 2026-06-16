@@ -187,7 +187,6 @@ export class SoftwareRenderer {
 
         this._renderSky(cam);
         this._renderWalls(cam);
-        this._renderLiftWalls(cam);
         this._renderFlats(cam);
         this._renderEntities(cam);
         this._renderWeapon(cam, now, dt);

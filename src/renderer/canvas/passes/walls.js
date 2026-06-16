@@ -16,40 +16,53 @@ export const wallMethods = {
         const scene = this.scene;
         if (!this._unpegged) this._buildWallPegging();
         for (const wall of scene.walls) {
-            // Lift boundary walls are drawn by _renderLiftWalls at the
-            // animated platform height; skip them here so the static and
-            // moving copies don't z-fight (matches the DOM's buildWalls).
-            if (wall.isLiftWall) continue;
             const tex = getWallTexture(animName(wall.texture, scene._animFrame));
             if (!tex) continue;
 
-            // Door panels raise their visible bottom edge as the door opens
-            // (bottomOffset); track jambs override their (zero) top. Door
-            // panels are unpegged, so pinning the texture to the rising
-            // bottom (see _drawWall) slides it up on its own — the yOffset
-            // stays the wall's own, no bottomOffset folded in. Matches WebGL/DOM.
-            const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
-            const wallBottom = wall.bottomHeight + bottomOffset;
-            const wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
-            const yOff = wall.yOffset || 0;
+            let wallBottom, wallTop, yOff, noCull, unpegged;
+            if (wall.moverType === 'lift') {
+                // Lift faces are ordinary walls drawn at the live platform
+                // height: the riser spans platform↔facing floor (growing as the
+                // lift drops), texture pinned to the platform top so it rides
+                // down with it. Well-lining walls carry no moverType and draw
+                // statically below like any other wall.
+                const lift = scene.lifts.get(wall.moverSector);
+                if (!lift) continue;
+                const nf = wall.bottomHeight;          // facing floor (face top == lift.upper)
+                wallBottom = Math.min(lift.current, nf);
+                wallTop = Math.max(lift.current, nf);
+                if (wallTop - wallBottom < 0.5) continue;
+                yOff = (wall.yOffset || 0) - (lift.upper - Math.min(nf, lift.lower));
+                noCull = true;
+                unpegged = false;
+            } else {
+                // Door panels raise their visible bottom edge as the door opens
+                // (bottomOffset). Door panels are unpegged, so pinning the
+                // texture to the rising bottom (see _drawWall) slides it up on
+                // its own — the yOffset stays the wall's own.
+                const bottomOffset = scene._wallBottomOffset.get(wall) || 0;
+                wallBottom = wall.bottomHeight + bottomOffset;
+                wallTop = scene._wallTopOverride.get(wall) ?? wall.topHeight;
+                yOff = wall.yOffset || 0;
+                noCull = false;
+                unpegged = this._unpegged.has(wall);
+            }
             const light = wall.lightLevel * (scene._sectorLightMul[wall.sectorIndex] ?? 1);
 
-            // If this wall reaches its sector's sky ceiling, the area above
-            // its top edge is that sector's sky — paint it at the wall's
-            // depth so it occludes whatever lies beyond the opening.
+            // If this wall reaches its sector's sky ceiling, paint the sky above
+            // its top edge at the wall's depth so it occludes beyond the opening.
             const skyCeil = scene._skyCeil.get(wall.sectorIndex);
             const skyAbove = skyCeil !== undefined && Math.abs(wallTop - skyCeil) < 1;
 
-            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light, false, skyAbove, this._unpegged.has(wall));
+            this._drawWall(cam, wall, tex, wallBottom, wallTop, yOff, light, noCull, skyAbove, unpegged);
         }
     },
 
     /**
      * Mark walls whose texture pins to the wall bottom (lower-unpegged),
      * mirroring the WebGL/DOM renderers: ML_DONTPEGBOTTOM walls
-     * (`wall.isUnpegged`), every door face, and every door track jamb (the
-     * walls carrying a top override). Lift shaft walls pass the flag directly
-     * from `_renderLiftWalls`. Rebuilt per scene (invalidated on setMap/clear).
+     * (`wall.isUnpegged`) and every door face. Lift faces are pinned inline in
+     * `_renderWalls`. Rebuilt per scene (invalidated on setMap/clear).
      */
     _buildWallPegging() {
         const scene = this.scene;
@@ -57,43 +70,6 @@ export const wallMethods = {
         for (const w of scene.walls) if (w.isUnpegged) set.add(w);
         for (const door of scene.doors.values()) for (const w of door.faceWalls) set.add(w);
         for (const w of scene._wallTopOverride.keys()) set.add(w);
-    },
-
-    /**
-     * Draw lift shaft walls. The platform-face walls span from the
-     * platform's current height to the floor they face (so they grow as
-     * the lift drops); the static shaft sides span the full travel so the
-     * shaft isn't see-through once the platform has moved away.
-     */
-    _renderLiftWalls(cam) {
-        for (const lift of this.scene.lifts.values()) {
-            for (const wall of lift.shaftWalls) {
-                const tex = getWallTexture(wall.texture);
-                if (!tex || tex.width <= 1) continue;
-                let bottom, top, unpegged, yOff;
-                if (wall.isPlatformFace) {
-                    const nf = wall.neighborFloor ?? lift.lower;
-                    bottom = Math.min(lift.current, nf);
-                    top = Math.max(lift.current, nf);
-                    // Pin the face texture to the platform top so it rides down
-                    // with the lift (the DOM translates a full-height panel
-                    // pinned to the platform — top-pegging offset by the full
-                    // panel height so the texel at the platform matches). Matches WebGL.
-                    const fullH = lift.upper - Math.min(nf, lift.lower);
-                    unpegged = false;
-                    yOff = (wall.yOffset || 0) - fullH;
-                } else {
-                    bottom = wall.neighborFloor !== undefined
-                        ? Math.min(wall.neighborFloor, lift.lower) : lift.lower;
-                    top = lift.upper;
-                    unpegged = true;                 // static shaft sides
-                    yOff = wall.yOffset || 0;
-                }
-                if (top - bottom < 0.5) continue;
-                const light = wall.lightLevel ?? lift.light;
-                this._drawWall(cam, wall, tex, bottom, top, yOff, light, true, false, unpegged);
-            }
-        }
     },
 
     /**

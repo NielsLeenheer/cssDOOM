@@ -270,35 +270,28 @@ export function resetEnemy(renderer, thingIndex, thingType, x, y, floorHeight) {
     domData._lastMirror = undefined;
     domData.element.style.setProperty('--x', x);
     domData.element.style.setProperty('--y', y);
-    domData.element.style.setProperty('--floor-z', floorHeight);
+    // Floor height is inherited from the sector container — not set per-thing.
 }
 
 // ============================================================================
 // Thing position and lighting
 // ============================================================================
 
-/** Update a thing's position and floor height in this renderer's pane. */
-export function updateThingPosition(renderer, thingIndex, x, y, floorHeight) {
-    // Per-renderer world-view state (read by the culler). The
-    // singleton mirror still fires in parallel during step 1.
+/** Update a thing's x/y in this renderer's pane. Floor is inherited, not sent. */
+export function updateThingPosition(renderer, thingIndex, x, y) {
+    // Per-renderer world-view state (read by the culler for x/y; floor is no
+    // longer mirrored here — the culler reads the thing's sector floor).
     const thing = ensureThing(renderer.state, thingIndex);
     thing.x = x;
     thing.y = y;
-    if (floorHeight !== undefined) thing.floorHeight = floorHeight;
 
     const domData = renderer.sceneState.thingDom.get(thingIndex);
     if (!domData) return;
     domData.element.style.setProperty('--x', x);
     domData.element.style.setProperty('--y', y);
-
-    // A thing parented to a lift's `.mover` inherits the platform's vertical
-    // motion from the mover transform; writing the live --floor-z too would
-    // double-move it (the game dispatches the lift's currentHeight here every
-    // frame). Keep --floor-z at the rest height while riding; the parent
-    // supplies the offset. x/y still track so it can walk around on the deck.
-    const parent = domData.element.parentElement;
-    const onLift = parent && parent.classList.contains('mover') && parent.dataset.mover === 'lift';
-    if (!onLift) domData.element.style.setProperty('--floor-z', floorHeight);
+    // Floor height is inherited from the thing's sector container (sectors.js):
+    // a thing reads its sector's --floor-z, and a lift rider additionally rides
+    // its `.mover` translate. Nothing per-thing to write — only x/y track here.
 }
 
 /**
@@ -428,14 +421,13 @@ export function createPlayerSprite(renderer, thingIndex, playerIndex, x, y, floo
     const thing = ensureThing(renderer.state, thingIndex);
     thing.x = x;
     thing.y = y;
-    thing.floorHeight = floorHeight ?? 0;
 
     const container = document.createElement('div');
     container.className = 'enemy player';
     container.dataset.playerIndex = String(playerIndex);
     container.style.setProperty('--x', x);
     container.style.setProperty('--y', y);
-    container.style.setProperty('--floor-z', floorHeight);
+    // Floor height inherited from the sector container it's appended into below.
 
     const sprite = document.createElement('div');
     sprite.className = 'sprite';
@@ -477,7 +469,7 @@ export function createCorpse(renderer, x, y, floorHeight, sectorIndex, playerInd
     container.className = 'decoration corpse';
     container.style.setProperty('--x', x);
     container.style.setProperty('--y', y);
-    container.style.setProperty('--floor-z', floorHeight);
+    // Floor height inherited from the sector container it's appended into below.
 
     const img = document.createElement('img');
     img.src = `/assets/sprites/${base}${variant}.png`;

@@ -153,8 +153,8 @@ export class Level {
 
         // Game-side state init: populates state.things, state.doorState,
         // state.liftState, state.crusherState from the enriched mapData.
-        // Map enrichment (mapData.things annotations, door.trackWalls)
-        // already ran inside maps.load above.
+        // Map enrichment (mapData.things annotations) already ran inside
+        // maps.load above.
         initThingsState();
         initDoorsState();
         initLiftsState();

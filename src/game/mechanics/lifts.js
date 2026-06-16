@@ -121,7 +121,7 @@ export function activateLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    orchestrator.dispatch({ type: 'world', cmd: 'setLiftState', args: [sectorIndex, 'lowered'] });
+    orchestrator.dispatch({ type: 'world', cmd: 'setMoverState', args: ['lift', sectorIndex, 'lowered'] });
     const lowerCenter = sectorCenter(sectorIndex);
     if (lowerCenter) orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPSTART', lowerCenter] });
 
@@ -141,7 +141,7 @@ function raiseLift(sectorIndex) {
     liftState.moving = true;
     liftState.moveStart = performance.now() / 1000;
     liftState.moveFrom = liftState.currentHeight;
-    orchestrator.dispatch({ type: 'world', cmd: 'setLiftState', args: [sectorIndex, 'raised'] });
+    orchestrator.dispatch({ type: 'world', cmd: 'setMoverState', args: ['lift', sectorIndex, 'raised'] });
     const raiseCenter = sectorCenter(sectorIndex);
     if (raiseCenter) orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSPSTOP', raiseCenter] });
     liftState.timer = null;
@@ -179,13 +179,17 @@ export function updatePlayerFromLift(timestamp) {
         // after death and would otherwise hang in mid-air as the
         // platform descends or rises. Players are handled separately
         // by movement.updateHeight().
+        // Keep the game-state floor of riders current (read by e.g. projectile
+        // targeting). The renderer no longer needs a per-frame floor dispatch:
+        // a rider lives in the lift sector and the renderer derives its height
+        // from that sector (CSS inherits the sector's --floor-z + rides the
+        // `.mover`; canvas/webgl read floorOf()).
         const sectorIndex = liftEntries[index].sectorIndex;
         const things = state.things;
         for (let i = 0, n = things.length; i < n; i++) {
             const thing = things[i];
             if (thing.sectorIndex !== sectorIndex) continue;
             thing.floorHeight = liftState.currentHeight;
-            orchestrator.dispatch({ type: 'world', cmd: 'updateThingPosition', args: [i, thing.x, thing.y, liftState.currentHeight] });
         }
     }
 }

@@ -67,7 +67,7 @@ const SUPPRESSED = new Set([
     'uncollectItem', 'setThingMoving', 'createPuff', 'createExplosion',
     'createTeleportFog', 'createProjectile', 'removeProjectile',
     'createPlayerSprite', 'createCorpse', 'playPlayerAttack',
-    'setDoorState', 'setLiftState', 'setCrusherOffset',
+    'setMoverState',
     'toggleSwitchState', 'setFloorHeight',
     'showLobby', 'hideLobby', 'showIntermission', 'hideIntermission',
     'showResults', 'hideResults', 'showTimer', 'showAttract',

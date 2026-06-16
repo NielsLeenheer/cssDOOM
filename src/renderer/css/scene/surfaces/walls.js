@@ -14,6 +14,7 @@ import { NO_TEXTURE, SKY_TEXTURE } from '../constants.js';
 
 import { mapData } from '../../../../shared/maps/index.js';
 import { appendToSector } from '../sectors.js';
+import { getMoverGroup } from '../mechanics/movers.js';
 
 /** Creates a wall DOM element from wall data spanning the given bottom/top z. */
 export function createWallElement(wall, bottomZ, topZ) {
@@ -53,10 +54,6 @@ export function buildWalls(ctx) {
 
         if (wallLength < 1 || wallHeight < 1) continue;
 
-        // Skip lower walls on lift sector boundaries — shaft walls created
-        // by initLiftsState() cover this geometry with the correct height span
-        if (wall.isLiftWall) continue;
-
         // Skip untextured walls — in DOOM, texture name "-" or empty means transparent/passable
         const textureName = wall.texture;
         if (!textureName || textureName === NO_TEXTURE || textureName === '') continue;
@@ -94,7 +91,17 @@ export function buildWalls(ctx) {
         wallElement._sectorIndex = wall.sectorIndex;
 
         wallElement.hidden = true;
-        appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, wallElement, wall.sectorIndex);
+        // A wall born in its final container: a mover face (tagged
+        // { moverType, moverSector }) goes into that mover's `.mover` group inside
+        // its OWN sector; everything else into the sector's `.static` group. No
+        // reparenting — the wall is never moved after creation.
+        if (wall.moverType) {
+            const group = getMoverGroup(ctx, wall.sectorIndex, wall.moverType, wall.moverSector);
+            if (group) group.appendChild(wallElement);
+            else appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, wallElement, wall.sectorIndex);
+        } else {
+            appendToSector({ sceneState: ctx.sceneState, root: ctx.fragment }, wallElement, wall.sectorIndex);
+        }
         ctx.sceneState.wallElements.push(wallElement);
     }
 

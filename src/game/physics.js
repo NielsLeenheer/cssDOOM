@@ -213,8 +213,8 @@ export function rayHitPoint(originX, originY, directionX, directionY, maxDistanc
                 // Lower walls on lift boundaries use the lift's animated height.
                 // When a lift lowers, the floor step collapses and the wall
                 // should no longer block rays at the original static height.
-                if (wall.isLiftWall) {
-                    const lift = state.liftState.get(wall.liftSectorIndex);
+                if (wall.moverType === 'lift') {
+                    const lift = state.liftState.get(wall.moverSector);
                     if (lift) {
                         // Determine the non-lift sector's floor (the static side)
                         const neighborFloor = wall.topHeight === lift.upperHeight

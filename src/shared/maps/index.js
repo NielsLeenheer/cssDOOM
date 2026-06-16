@@ -8,8 +8,8 @@
  * layer.
  *
  * `load(name)` fetches + caches the raw JSON, then runs the
- * map-side enrichment functions (initThings + initDoors) to
- * annotate mapData in place. State population (`state.things`,
+ * map-side enrichment (initThings) to annotate mapData in place.
+ * State population (`state.things`,
  * `state.doorState`, etc.) is NOT done here — it's the game
  * layer's concern, handled by `initThingsState` / `initDoorsState`
  * / etc. in `src/game/`. Renderer-side scene construction
@@ -22,7 +22,6 @@
  */
 
 import { initThings } from './things.js';
-import { initDoors } from './doors.js';
 
 export const MAPS = ['E1M1', 'E1M2', 'E1M3', 'E1M4', 'E1M5', 'E1M6', 'E1M7', 'E1M8', 'E1M9'];
 
@@ -57,7 +56,6 @@ export async function load(name) {
     mapData = raw;
     currentMap = name;
     initThings(raw);
-    initDoors(raw);
 }
 
 // ── Map sequencing ────────────────────────────────────────────────

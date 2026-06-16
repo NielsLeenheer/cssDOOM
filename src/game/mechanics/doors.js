@@ -46,17 +46,10 @@ export function isDoorClosed(wall) {
 }
 
 /**
- * Initialize all doors from map data — populates state.doorState and
- * annotates each door with its computed `trackWalls` so buildScene can
- * draw the door container with its static track side walls. No renderer
- * commands; buildScene reads mapData.doors directly.
- */
-/**
- * State-side init for doors. Reads `mapData.doors` (with
- * `door.trackWalls` already annotated by
- * `src/shared/maps/doors.js::initDoors`) and populates
+ * State-side init for doors. Reads `mapData.doors` and populates
  * `state.doorState` with the per-door runtime entry the simulation
- * mutates during play.
+ * mutates during play. (Door geometry is built generically by the
+ * renderer from tagged walls; there is no map-side door enrichment.)
  */
 export function initDoorsState() {
     state.doorState = new Map();
@@ -104,7 +97,7 @@ export function toggleDoor(sectorIndex, player) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.passableTimer = setTimeout(() => { doorEntry.passable = true; }, DOOR_PASSABLE_DELAY * 1000);
-    orchestrator.dispatch({ type: 'world', cmd: 'setDoorState', args: [sectorIndex, 'open'] });
+    orchestrator.dispatch({ type: 'world', cmd: 'setMoverState', args: ['door', sectorIndex, 'open'] });
     const openCenter = sectorCenter(sectorIndex);
     if (openCenter) orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSDOROPN', openCenter] });
     doorEntry.timer = setTimeout(() => closeDoor(sectorIndex), DOOR_CLOSE_DELAY);
@@ -134,7 +127,7 @@ function closeDoor(sectorIndex) {
     doorEntry.passable = false;
     clearTimeout(doorEntry.passableTimer);
     doorEntry.timer = null;
-    orchestrator.dispatch({ type: 'world', cmd: 'setDoorState', args: [sectorIndex, 'closed'] });
+    orchestrator.dispatch({ type: 'world', cmd: 'setMoverState', args: ['door', sectorIndex, 'closed'] });
     const closeCenter = sectorCenter(sectorIndex);
     if (closeCenter) orchestrator.dispatch({ type: 'world', cmd: 'playSound', args: ['DSDORCLS', closeCenter] });
 }

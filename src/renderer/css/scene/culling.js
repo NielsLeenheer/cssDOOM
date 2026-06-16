@@ -19,6 +19,7 @@
  */
 
 import { MAX_RENDER_DISTANCE } from '../../../shared/constants.js';
+import { mapData } from '../../../shared/maps/index.js';
 
 // Culling flags — toggled by the debug menu
 export const culling = {
@@ -424,7 +425,10 @@ export function updateCulling(renderer, worldThings, spectatorActive, collectSta
             // sectorIndex enables the same-sky-group exemption so things
             // standing in outdoor sky-sector areas don't get culled by
             // their own sky perimeter.
-            const tz = (gameEntry?.floorHeight ?? 0) + 56;
+            // Floor comes from the thing's sector (not a per-thing dispatch):
+            // a lift rider uses its sector's rest floor here — fine for this
+            // coarse sky-occlusion gate (the 56 fudge covers the slack).
+            const tz = (mapData.sectors?.[t.sectorIndex]?.floorHeight ?? 0) + 56;
             if (behindSkyWall(tx, ty, tz, t.sectorIndex ?? -1, playerX, playerY, skyPlanes, skyGroupOf)) {
                 hide = true; skyCulled++;
             }

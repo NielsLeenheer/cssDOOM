@@ -22,9 +22,6 @@ import { buildFloors } from './surfaces/floors.js';
 import { buildCeilings } from './surfaces/ceilings.js';
 import { buildPlayer } from './entities/player.js';
 import { buildThing } from './entities/things.js';
-import { buildDoor } from './mechanics/doors.js';
-import { buildLift } from './mechanics/lifts.js';
-import { buildCrusher } from './mechanics/crushers.js';
 import { updateCulling as runCulling } from './culling.js';
 
 // Fixed perspective for kiosk panes. Kiosk hardware is known and the
@@ -113,12 +110,11 @@ export function updatePerspective(renderer) {
  * call buildScene() again to produce its own independent fragment. The
  * scene is fully self-contained: static geometry (sectors, walls, floors,
  * ceilings, player billboard) plus dynamic level objects (things, doors,
- * lifts, crushers). Map-side enrichment (`shared/maps/things.js` and
- * `shared/maps/doors.js`) is expected to have run first — it
- * annotates each `mapData.things[i]` in place with category /
- * sectorIndex / floorHeight / gameId and each `mapData.doors[i]`
- * with `trackWalls`. `mapData.lifts` / `mapData.crushers` are read
- * as-is.
+ * lifts, crushers). Map-side enrichment (`shared/maps/things.js`) is
+ * expected to have run first — it annotates each `mapData.things[i]` in
+ * place with category / sectorIndex / floorHeight / gameId. Mover geometry
+ * (doors / lifts / crushers) is read from `mapData.walls` + `.sectorPolygons`
+ * directly, tagged with `{ moverType, moverSector }`.
  *
  * Async because it preloads textures before returning.
  *
@@ -150,19 +146,9 @@ export async function buildScene(mapData) {
             buildThing(ctx, thing);
         }
     }
-    if (mapData?.doors) {
-        for (const door of mapData.doors) buildDoor(ctx, door, door.trackWalls || []);
-    }
-    if (mapData?.lifts) {
-        for (const lift of mapData.lifts) {
-            if (lift.upperHeight - lift.lowerHeight > 0) buildLift(ctx, lift);
-        }
-    }
-    if (mapData?.crushers) {
-        for (const crusher of mapData.crushers) {
-            if (crusher.topHeight - crusher.crushHeight > 0) buildCrusher(ctx, crusher);
-        }
-    }
+    // Doors / lifts / crushers have no build step — their geometry (faces,
+    // moving surface, riser, well lining) self-routes into the correct
+    // `.static` / `.mover` group during the wall/surface build above (Phase C).
 
     await preloadTextures(ctx.fragment);
 

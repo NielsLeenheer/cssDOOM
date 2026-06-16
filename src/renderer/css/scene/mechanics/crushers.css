@@ -1,6 +1,7 @@
-/* Crushers — the mover group is a `.mover` child of the crusher's own
-   `.sector`, translated by --crusher-offset; the ceiling + upper walls ride. */
+/* Crushers — a mover group is a `.mover` child of a `.sector`, tagged
+   `data-mover-type="crusher"` + `data-mover-id="<idx>"`, translated live by
+   --crusher-offset; the ceiling + upper face walls inside it ride along. */
 
-.mover[data-mover="crusher"] {
+.mover[data-mover-type="crusher"] {
     transform: translateY(calc(var(--crusher-offset, 0) * 1px));
 }

@@ -40,7 +40,7 @@
 
 import { state } from './state.js';
 import { PICKUPS, ENEMIES, WEAPONS } from '../shared/constants.js';
-import { getFloorHeightAt, getSectorAt } from './physics.js';
+import { getSectorAt } from './physics.js';
 import { getCurrentTimerText } from './match.js';
 import { getCurrentLevel } from './level.js';
 import { GAME_STATE, getGameState } from './game-state.js';
@@ -169,14 +169,11 @@ function appendThingCmds(out) {
         // Player billboards go through createPlayerSprite above.
         if (t.kind === 'player') continue;
 
-        // t.floorHeight is only updated at init / by lifts. Resolve
-        // live from coords so a wandered-then-killed enemy lands on
-        // the floor it's actually standing on. Mirrors ai.js's
-        // updateThingPosition tick.
-        const floorHeight = getFloorHeightAt(t.x, t.y);
-
+        // No floor in the position tuple — the joiner's renderer derives a
+        // thing's height from its sector (via the reparent tuple below), the
+        // same as the live updateThingPosition path.
         if (t.collected) {
-            positionTuples.push([gameId, t.x, t.y, floorHeight]);
+            positionTuples.push([gameId, t.x, t.y]);
             if (t.sectorIndex != null) reparentTuples.push([gameId, t.sectorIndex]);
             // Discriminate "dead enemy" (killEnemy path) from
             // "collected pickup" (collectItem path). Barrels go down
@@ -189,7 +186,7 @@ function appendThingCmds(out) {
                 collectTuples.push([gameId]);
             }
         } else if (t.x != null && t.y != null) {
-            positionTuples.push([gameId, t.x, t.y, floorHeight]);
+            positionTuples.push([gameId, t.x, t.y]);
             if (t.sectorIndex != null) reparentTuples.push([gameId, t.sectorIndex]);
         }
     }
@@ -206,9 +203,9 @@ function appendThingCmds(out) {
 function appendDoorCmds(out) {
     const tuples = [];
     for (const [sectorIndex, entry] of state.doorState) {
-        tuples.push([sectorIndex, entry.open ? 'open' : 'closed']);
+        tuples.push(['door', sectorIndex, entry.open ? 'open' : 'closed']);
     }
-    if (tuples.length) out.push({ name: 'setDoorState', args: tuples });
+    if (tuples.length) out.push({ name: 'setMoverState', args: tuples });
 }
 
 function appendLiftCmds(out) {
@@ -217,17 +214,17 @@ function appendLiftCmds(out) {
         // Derive a stable resting state from the target so a lift
         // mid-animation snaps to its endpoint when the joiner applies.
         const liftState = entry.targetHeight === entry.upperHeight ? 'raised' : 'lowered';
-        tuples.push([sectorIndex, liftState]);
+        tuples.push(['lift', sectorIndex, liftState]);
     }
-    if (tuples.length) out.push({ name: 'setLiftState', args: tuples });
+    if (tuples.length) out.push({ name: 'setMoverState', args: tuples });
 }
 
 function appendCrusherCmds(out) {
     const tuples = [];
     for (const [sectorIndex, entry] of state.crusherState) {
-        tuples.push([sectorIndex, entry.currentOffset ?? 0]);
+        tuples.push(['crusher', sectorIndex, entry.currentOffset ?? 0]);
     }
-    if (tuples.length) out.push({ name: 'setCrusherOffset', args: tuples });
+    if (tuples.length) out.push({ name: 'setMoverState', args: tuples });
 }
 
 function appendCorpseCmds(out) {

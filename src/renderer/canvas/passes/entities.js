@@ -21,7 +21,7 @@ export const entityMethods = {
         for (const s of scene.statics) {
             const tex = getSpriteTexture(itemFrameName(s.name, now));
             if (tex && tex.width > 1) {
-                this._drawBillboard(cam, s.x, s.y, s.floorZ, tex, s.light, false, false, s.sectorIndex);
+                this._drawBillboard(cam, s.x, s.y, scene.floorOf(s.sectorIndex), tex, s.light, false, false, s.sectorIndex);
             }
         }
 
@@ -34,7 +34,7 @@ export const entityMethods = {
             if (!spr) continue;
             const tex = getSpriteTexture(spr.name);
             if (!tex || tex.width <= 1) continue;
-            this._drawBillboard(cam, e.x, e.y, e.floorZ, tex, e.light, spr.mirror, false, e.sectorIndex);
+            this._drawBillboard(cam, e.x, e.y, scene.floorOf(e.sectorIndex), tex, e.light, spr.mirror, false, e.sectorIndex);
         }
 
         // Projectiles — linear interpolation start → end over duration.

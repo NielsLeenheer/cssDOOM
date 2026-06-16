@@ -204,10 +204,12 @@ export function makeSceneState() {
         wallElements: [],
         surfaceElements: [],
         sectorContainers: [],
+        sectorStatic: [],              // per-sector `.static` group (Phase 1)
         thingContainers: [],
         doorContainers: new Map(),
         liftContainers: new Map(),
         crusherContainers: new Map(),
+        moverGroups: new Map(),        // "type:idx" → [.mover groups] (Phase C registry)
         skyWallPlanes: [],             // sky wall occluders
         skySectors: new Set(),         // sector indices with sky ceilings
         skyGroupOf: new Map(),         // Map<sectorIndex, groupId>
@@ -265,9 +267,7 @@ export function ensureThing(state, thingIndex) {
 // prototype mutation lives next to the class it mutates.
 
 import * as sprites from './scene/entities/sprites.js';
-import * as doors from './scene/mechanics/doors.js';
-import * as lifts from './scene/mechanics/lifts.js';
-import * as crushers from './scene/mechanics/crushers.js';
+import { setMoverState } from './scene/mechanics/movers.js';
 import * as scene from './scene/scene.js';
 import { toggleSwitchState } from './scene/mechanics/switches.js';
 import { setFloorHeight } from './scene/surfaces/floors.js';
@@ -322,10 +322,8 @@ const IMPLS = {
     createPlayerSprite: sprites.createPlayerSprite,
     createCorpse: sprites.createCorpse,
     playPlayerAttack: sprites.playPlayerAttack,
-    // Mechanics state
-    setDoorState: doors.setDoorState,
-    setLiftState: lifts.setLiftState,
-    setCrusherOffset: crushers.setCrusherOffset,
+    // Mechanics state — one generic driver for door / lift / crusher
+    setMoverState,
     toggleSwitchState,
     // Surfaces
     setFloorHeight,
