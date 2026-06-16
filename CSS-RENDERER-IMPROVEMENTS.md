@@ -4,7 +4,7 @@ Working checklist for the CSS renderer (`src/renderer/css/**`). Each item is
 investigated one by one; tick the box when an item is selected / done, or
 strike it through when rejected.
 
-Legend: `[ ]` open · `[x]` done · `[-]` rejected
+Legend: `[ ]` open · `[x]` done · `[~]` partially done · `[-]` rejected
 
 ---
 
@@ -32,6 +32,11 @@ no 404s.
 - [x] Fixed — `--floor-z` registered as `<number>` in scene.css (commit
   `3ba04d6`); audit found `--player-z` already registered and no other
   transitioned/animated custom properties missing registration.
+- Follow-up: the `.enemy { transition: --floor-z }` this item targeted was
+  later **removed entirely** by the movers refactor (see **C5**) — an easing
+  transition fought the instant reparent across a lift edge (dip/jump
+  artifact). Floor height now changes by reparenting between sectors (instant,
+  DOOM-correct); lift riding is smooth via the `.mover` transform transition.
 
 `things.css` has `.enemy { transition: --floor-z 0.4s ease-out; }`, but
 `--floor-z` is never registered with `@property`. Unregistered custom
@@ -128,16 +133,24 @@ The two files are the same ~26-line block except `--floor-z` vs
 
 ### B5. Distance-proportional door/lift speeds + shared "mover" pattern
 
-- [ ] Investigate
+- [~] Partially done — the shared pattern landed with the movers refactor
+  (commit `6843fc1`); two sub-items remain.
 
-`doors.css` / `lifts.css` use a fixed `transition: transform 1s` regardless of
-`--offset`, so tall doors move faster than short ones — real DOOM movers run
-at constant speed. `buildDoor` already knows `travelDistance`; set
-`transition-duration: calc(var(--travel) * Nms)` per door/lift.
+**Done:** doors/lifts/crushers are unified under one `.mover` group + `--offset`
++ `data-state` model, driven by a single `setMoverState`. The "container
+translates by `--offset` on a data-state flip" mechanism is now one shared
+concept (no per-mechanism build functions, no reparenting).
 
-Also: doors' `.panel`, lifts' `.platform` (and crushers) implement the
-identical "container translates by `--offset` on a data-state flip" pattern —
-could share one `.mover` rule.
+**Remaining:**
+
+- *CSS rule dedup.* `mechanics/doors.css` and `mechanics/lifts.css` are now
+  byte-identical except the type selector and state value (`open` vs
+  `lowered`) — they could collapse into one shared `.mover` rule. (Crushers
+  legitimately differ: live `--crusher-offset`, no transition.)
+- *Distance-proportional speed.* Both still use a fixed
+  `transition: transform 1s`, so tall doors move faster than short ones — real
+  DOOM movers run at constant speed. `--offset` is already baked per group
+  (`movers.js`), so `transition-duration: calc(...)` is now a trivial add.
 
 ### B6. View Transitions / `@starting-style` for screen choreography
 
@@ -206,24 +219,35 @@ Two mixed idioms worth standardizing:
 
 ### B10. Classes vs data attributes — pick one convention for state
 
-- [ ] Investigate
+- [~] Partially done — light-effect enum converted; death-state cleanup
+  pending; booleans confirmed already conformant.
 
-The implicit convention today is: *category/identity → class*
-(`.enemy`, `.pickup`, `.wall`, `.sprite`), *enumerated state → data attribute*
+The convention is: *category/identity → class* (`.enemy`, `.pickup`, `.wall`,
+`.sprite`), *enumerated state → data attribute*
 (`data-state="open|lowered|dead|attacking"`, `data-type`, `data-texture`).
-Several places violate it:
+The investigation (against current code) found:
 
-- **Sector light effects** are five mutually exclusive classes
-  (`light-glow`, `light-blink`, `light-blink-fast`, `light-flicker`,
-  `light-fire-flicker`) — a textbook enum that would read better as
-  `data-light="glow|blink|blink-fast|flicker|fire-flicker"` on the sector
-  container (`sectors.js` LIGHT_EFFECT_CLASS becomes a value map).
-- **Duplicated death state**: `killEnemy` sets a `.dead` class on the thing
-  container *and* `data-state="dead"` on the sprite child.
-- Boolean modifiers are a mixed bag: `.collected`, `.moving`, `.unpegged`,
-  `.scroll-texture`, `.firing`, `.paused` as classes vs `data-active` as an
-  attribute. Decide: booleans as classes, enums as data attributes (probably
-  the least-churn rule), then normalize the outliers.
+- **Sector light effects → DONE.** Were five mutually-exclusive classes
+  (`light-glow` …); now `data-light="glow|blink|blink-fast|flicker|fire-flicker"`
+  on the sector container (`sectors.js` LIGHT_EFFECT map writes `dataset.light`;
+  `lighting.css` + `shade/styles.css` select `[data-light="…"]`). Keyframe
+  names + `animation:` references keep the old `light-*` names — only the
+  selectors changed; specificity is 1:1.
+- **Death state → not a duplication, it's dead code (pending deletion).**
+  `killEnemy` sets a `.dead` class on the thing *container* and
+  `data-state="dead"` on the sprite child — but the container `.dead` has
+  **zero consumers** (no CSS selector matches `.enemy.dead`; the only `.dead`
+  rules are `.renderer.dead`, a different element). The real death visuals are
+  the sprite's `data-state` + the `collected` flag. Fix is to delete the two
+  vestigial `.dead` writes (`sprites.js` killEnemy + resetEnemy), leaving the
+  sprite `data-state` as the single source.
+- **Boolean modifiers → already conformant; leave as-is.** `.collected`,
+  `.moving`, `.unpegged`, `.scroll-texture`, `.firing`, `.paused`, `.active`,
+  `.renderer.dead` are genuine booleans and correctly read as classes. The one
+  cross-convention item, `data-active="true|false"` on the pane, is
+  load-bearing — `hud.css` keys off the explicit `[data-active="false"]` state,
+  which a class (absence = false) can't express. Convention: booleans → class,
+  enums → data attribute.
 
 ### B11. Projectiles: convert inline background-image to `data-type` + CSS
 
@@ -256,14 +280,16 @@ Related to B10 (classes vs data attributes convention).
 
 ### C1. Deduplicate wall element creation
 
-- [ ] Investigate
+- [x] Done — resolved by deletion (commit `375bd15`).
 
-`buildWalls()` in `surfaces/walls.js` re-implements almost everything
-`createWallElement()` does (delta math, custom properties,
-`_midX/_angle/_length` expandos) with small divergences — e.g.
-`createWallElement` unconditionally adds `unpegged`, `buildWalls` adds it
-conditionally. Make `buildWalls` call `createWallElement` and layer on the
-extras (switch button, scrolling class, id).
+The premise inverted once the movers refactor landed. `createWallElement`
+existed only as the shared helper the old `mechanics/{doors,lifts,crushers}.js`
+build functions called to synthesize door panels / lift platforms / track
+jambs. Those callers were deleted (a wall is now born in its final
+`.static`/`.mover` container by `buildWalls`), leaving `createWallElement`
+orphaned — nothing imported or called it. So there was no live duplication to
+consolidate; `createWallElement` was deleted and the four comments that still
+named it as the active mechanics helper were reworded.
 
 ### C2. Replace DOM expandos with culler records
 
@@ -299,26 +325,26 @@ truth.
 
 ### C5. Things inherit z from their sector (drop per-thing `--floor-z`)
 
-- [ ] Investigate — **promoted to full design doc:
-  [`REFACTOR-sector-height-inheritance.md`](REFACTOR-sector-height-inheritance.md)**
+- [x] Done — landed via the movers refactor
+  ([`IMPLEMENTATION-PLAN-movers.md`](IMPLEMENTATION-PLAN-movers.md), commit
+  `6843fc1`).
 
-The two flagship refactors are interdependent and live in one combined
-design doc:
+The sector is now the unit of height. The sector container carries
+`@property`-registered `--floor-z`/`--ceiling-z` (`sectors.js`), and floors,
+ceilings, things, and enemies inherit them — the per-thing `--floor-z`
+fan-out (`updateThingPosition`, `resetEnemy`, `createPlayerSprite`,
+`createCorpse`) is gone; `updateThingPosition` writes only `--x`/`--y`. A lift
+moves its `.mover` group via one `translateY`, and everything parented into
+that group rides it automatically; reparenting between sectors
+(`reparentThingToSector` + `moveBefore()`) is the only per-thing mechanism on
+a sector crossing, inheriting both `--light` and height from the new parent.
 
-- **[`REFACTOR-sector-as-geometry.md`](REFACTOR-sector-as-geometry.md)** —
-  makes the **sector the unit of geometry**: it owns its shape (`bbox` +
-  compound `--sector-path`), `--start-z`/`--end-z`, and `--light`; floors,
-  ceilings, things, and in-sector walls inherit them. Movers become "a sector
-  with one animating `--offset`" routed onto `--floor` or `--ceiling` by
-  `data-mover` — no reparenting, no per-frame fan-out. Walls rename
-  `--floor-z`/`--ceiling-z` → `--start-z`/`--end-z`; door faces stay in their
-  room sector (correct light) and direct-drive their bottom via the shared
-  `--offset`. Every sector collapses to one floor + one ceiling element (even
-  multi-region, via the compound clip-path). Covers C5, A2, the mover parts
-  of B5, and one arm of C1. Gated on a Firefox custom-property-propagation
-  spike (documented in the doc).
+(The earlier design docs `REFACTOR-sector-as-geometry.md` and
+`REFACTOR-sector-height-inheritance.md` are superseded — the work shipped
+through the movers plan instead, which also covered A2, the mover parts of
+B5, and one arm of C1.)
 
-Original notes (now folded into the height doc):
+Original notes (realized by the movers refactor):
 
 Today every thing carries its own inline `--floor-z`, pushed by game-side
 dispatches (`updateThingPosition`, `resetEnemy`, `createPlayerSprite`,
