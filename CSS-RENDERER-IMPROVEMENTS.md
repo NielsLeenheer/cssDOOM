@@ -219,8 +219,8 @@ Two mixed idioms worth standardizing:
 
 ### B10. Classes vs data attributes — pick one convention for state
 
-- [~] Partially done — light-effect enum converted; death-state cleanup
-  pending; booleans confirmed already conformant.
+- [x] Done — light-effect enum converted; vestigial death-state class
+  deleted; booleans confirmed already conformant (no change needed).
 
 The convention is: *category/identity → class* (`.enemy`, `.pickup`, `.wall`,
 `.sprite`), *enumerated state → data attribute*
@@ -233,14 +233,14 @@ The investigation (against current code) found:
   `lighting.css` + `shade/styles.css` select `[data-light="…"]`). Keyframe
   names + `animation:` references keep the old `light-*` names — only the
   selectors changed; specificity is 1:1.
-- **Death state → not a duplication, it's dead code (pending deletion).**
-  `killEnemy` sets a `.dead` class on the thing *container* and
-  `data-state="dead"` on the sprite child — but the container `.dead` has
-  **zero consumers** (no CSS selector matches `.enemy.dead`; the only `.dead`
+- **Death state → was not a duplication, it was dead code (DONE).** `killEnemy`
+  used to set a `.dead` class on the thing *container* alongside
+  `data-state="dead"` on the sprite child — but the container `.dead` had
+  **zero consumers** (no CSS selector matched `.enemy.dead`; the only `.dead`
   rules are `.renderer.dead`, a different element). The real death visuals are
-  the sprite's `data-state` + the `collected` flag. Fix is to delete the two
-  vestigial `.dead` writes (`sprites.js` killEnemy + resetEnemy), leaving the
-  sprite `data-state` as the single source.
+  the sprite's `data-state` + the `collected` flag. Deleted the two vestigial
+  `.dead` writes (`sprites.js` killEnemy + resetEnemy), leaving the sprite
+  `data-state` as the single source.
 - **Boolean modifiers → already conformant; leave as-is.** `.collected`,
   `.moving`, `.unpegged`, `.scroll-texture`, `.firing`, `.paused`, `.active`,
   `.renderer.dead` are genuine booleans and correctly read as classes. The one
