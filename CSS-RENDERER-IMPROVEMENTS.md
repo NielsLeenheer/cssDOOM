@@ -88,12 +88,27 @@ revolution>)` now that angle/`turn` math is available in `calc()`.
 
 ### B1. `@layer` instead of import-order comments
 
-- [ ] Investigate
+- [x] Done.
 
-`index.css` has several "must come after X so the cascade wins" comments
-(renderer overlay styles, generated override files). Cascade layers
-(`@layer base, renderer, overrides;` + layered `@import`s) make that ordering
-explicit and immune to import shuffling. Textbook use case.
+`index.css` declares the order once — `@layer base, renderer, hud, screens,
+visualizer, ui, debug;` — and every CSS file assigns its rules to a layer with
+an inline `@layer <name> { … }` block (kept the file structure; no files split,
+no `@import layer()`). A file may span layers: hud.css contributes to `hud`
+(status bar / weapon / overlays) and `screens` (lobby / results / intermission
+/ attract). The "must come after X" comments are gone — precedence is fixed by
+the layer order regardless of import sequence.
+
+Layer model: base (reset + pane layout) < renderer (css/canvas/line/webgl scene
+rendering) < hud < screens < visualizer (flat/shade/cat/axis/lighting panes) <
+ui (menu/buttons/help/detach/spectator controls) < debug. Debug CSS (lazy JS
+chunk) self-assigns to the `debug` layer, which the main bundle forward-declares
+last, so it wins regardless of load timing.
+
+Verified: Vite/lightningcss emits the layer blocks in the declared order
+(spiked), build green, no unlayered/inline/stray CSS, intra-layer source order
+preserved (cat still beats texture-override — and independently via an inline
+`!important` from buildCatScene). Two-agent reviewed (correctness + design
+conformance): PASS.
 
 ### B2. `abs()` and `sign()` in the CSS culler
 
