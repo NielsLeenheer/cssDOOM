@@ -19,23 +19,23 @@ import { mapData } from '../../../shared/maps/index.js';
 import { sectorBounds, sectorClipValue } from './surfaces/clip.js';
 
 /**
- * Maps DOOM sector special types to CSS animation classes for dynamic lighting effects.
- * These classes trigger flickering, glowing, or blinking animations in the stylesheet.
+ * Maps DOOM sector special types to `data-light` values for dynamic lighting
+ * effects. The value selects a CSS animation (flicker / glow / blink) in
+ * mechanics/lighting.css via `[data-light="…"]`.
  */
-const LIGHT_EFFECT_CLASS = {
-    1: 'light-flicker',       // blink random
-    2: 'light-blink-fast',    // blink 0.5s
-    3: 'light-blink',         // blink 1.0s
-    8: 'light-glow',          // oscillate
-    12: 'light-blink-fast',   // blink 0.5s sync
-    13: 'light-blink',        // blink 1.0s sync
-    17: 'light-fire-flicker', // fire flicker
+const LIGHT_EFFECT = {
+    1: 'flicker',       // blink random
+    2: 'blink-fast',    // blink 0.5s
+    3: 'blink',         // blink 1.0s
+    8: 'glow',          // oscillate
+    12: 'blink-fast',   // blink 0.5s sync
+    13: 'blink',        // blink 1.0s sync
+    17: 'fire-flicker', // fire flicker
 };
 
 function applyLightEffect(element, specialType) {
-    const className = LIGHT_EFFECT_CLASS[specialType];
-    if (!className) return;
-    element.classList.add(className);
+    const light = LIGHT_EFFECT[specialType];
+    if (light) element.dataset.light = light;
 }
 
 /**

@@ -43,19 +43,19 @@
    problem in Firefox where animating the light level on a parent sector container doesn't
   update the brightness of child elements with their own light level animation. */
 
-.light-glow :is(.wall, .floor, .ceiling, .decoration) { animation: light-glow 0.9s linear infinite; }
+[data-light="glow"] :is(.wall, .floor, .ceiling, .decoration) { animation: light-glow 0.9s linear infinite; }
 
-.light-blink { animation: light-blink 1s steps(1) infinite; }
-.light-blink-fast { animation: light-blink 0.5s steps(1) infinite; }
-.light-flicker { animation: light-flicker 2s steps(1) infinite; }
-.light-fire-flicker { animation: light-fire-flicker 1.5s steps(1) infinite; }
+[data-light="blink"] { animation: light-blink 1s steps(1) infinite; }
+[data-light="blink-fast"] { animation: light-blink 0.5s steps(1) infinite; }
+[data-light="flicker"] { animation: light-flicker 2s steps(1) infinite; }
+[data-light="fire-flicker"] { animation: light-fire-flicker 1.5s steps(1) infinite; }
 
 body.no-sector-lights {
-    .light-glow,
-    .light-blink,
-    .light-blink-fast,
-    .light-flicker,
-    .light-fire-flicker { animation: none; }
+    [data-light="glow"],
+    [data-light="blink"],
+    [data-light="blink-fast"],
+    [data-light="flicker"],
+    [data-light="fire-flicker"] { animation: none; }
 }
 
 

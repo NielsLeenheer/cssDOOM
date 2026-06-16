@@ -15,13 +15,13 @@
 
     /* Light-effect animations override --light via @keyframes — kill
        them on .pane-shade so each sector's static --light value reads
-       through. The class names come from buildSectorContainers (see
-       src/renderer/css/scene/mechanics/lighting.css). */
-    .light-glow,
-    .light-blink,
-    .light-blink-fast,
-    .light-flicker,
-    .light-fire-flicker {
+       through. The `data-light` values come from buildSectorContainers
+       (see src/renderer/css/scene/mechanics/lighting.css). */
+    [data-light="glow"],
+    [data-light="blink"],
+    [data-light="blink-fast"],
+    [data-light="flicker"],
+    [data-light="fire-flicker"] {
         animation: none !important;
     }
 
